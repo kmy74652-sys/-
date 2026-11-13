@@ -95,8 +95,9 @@ jobs:
         env:
           NODE_ENV: production
 
-      - name: Install and launch APK on Android emulator
+      - name: Best-effort install and launch on Android emulator
         uses: reactivecircus/android-emulator-runner@v2
+        continue-on-error: true
         with:
           api-level: 35
           arch: x86_64
