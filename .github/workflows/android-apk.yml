@@ -103,9 +103,10 @@ jobs:
           profile: pixel_2
           disable-animations: true
           script: |
-            apk="apps/mobile/android/app/build/outputs/apk/release/app-release.apk"
+            apk="$GITHUB_WORKSPACE/apps/mobile/android/app/build/outputs/apk/release/app-release.apk"
+            find "$GITHUB_WORKSPACE/apps/mobile/android/app/build/outputs" -type f -name '*.apk' -print || true
             test -s "$apk"
-            app_id="$(node -e 'console.log(require("./apps/mobile/app.json").expo.android.package)')"
+            app_id="$(node -e 'console.log(require(process.env.GITHUB_WORKSPACE + "/apps/mobile/app.json").expo.android.package)')"
             test -n "$app_id"
             adb install -r "$apk"
             adb logcat -c
