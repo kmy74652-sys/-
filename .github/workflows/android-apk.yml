@@ -82,6 +82,8 @@ jobs:
 
       - name: Build release APK
         run: |
+          autolinking="$(pnpm exec expo-modules-autolinking resolve --platform android --json)"
+          printf '%s' "$autolinking" | node -e 'let text="";process.stdin.on("data",chunk=>text+=chunk);process.stdin.on("end",()=>{const result=JSON.parse(text);const linking=result.modules?.find(item=>item.packageName==="expo-linking");if(!linking||!linking.modules?.includes("expo.modules.linking.ExpoLinkingModule")){console.error("Expo Linking is not registered for Android autolinking.");process.exit(1)}console.log("Expo Linking module detected.")})'
           cd android
           ./gradlew --no-daemon :app:generateAutolinkingPackageList
           package_list=app/build/generated/autolinking/src/main/java/com/facebook/react/PackageList.java
@@ -89,7 +91,6 @@ jobs:
             sed -i 's/import expo\.core\.ExpoModulesPackage;/import expo.modules.ExpoModulesPackage;/' "$package_list"
           fi
           grep -q 'import expo.modules.ExpoModulesPackage;' "$package_list"
-          grep -q 'ExpoLinkingPackage' "$package_list"
           ./gradlew --no-daemon --stacktrace -x :app:generateAutolinkingPackageList assembleRelease
         env:
           NODE_ENV: production

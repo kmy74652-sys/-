@@ -112,12 +112,16 @@ export default function Home() {
         password,
       });
       if (signInError) {
-        setError('تعذر تسجيل الدخول. تحقق من البريد وكلمة المرور.');
+        setError(signInError.status === 429
+          ? 'محاولات كثيرة. انتظر قليلًا ثم حاول مجددًا.'
+          : [400, 401, 422].includes(signInError.status ?? 0)
+            ? 'لم يقبل Supabase البريد أو كلمة المرور. تحقق منهما أو استخدم رابط استعادة كلمة المرور.'
+            : `تعذر الاتصال بخدمة تسجيل الدخول${signInError.status ? ` (HTTP ${signInError.status})` : ''}. تحقق من الإنترنت وحاول مجددًا.`);
         return;
       }
       await load();
     } catch {
-      setError('تعذر إكمال تسجيل الدخول بسبب مشكلة اتصال. حاول مرة أخرى.');
+      setError('تعذر إكمال تسجيل الدخول بسبب انقطاع الاتصال. تحقق من الإنترنت وحاول مجددًا.');
     } finally {
       setBusy(false);
     }
@@ -135,6 +139,16 @@ export default function Home() {
       setNotice('إذا كان البريد مسجلًا، سيصلك رابط استعادة كلمة المرور.');
     } catch {
       setError('تعذر إرسال رابط الاستعادة. تحقق من البريد والاتصال ثم حاول مجددًا.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function retrySession() {
+    setBusy(true);
+    setError('');
+    try {
+      await load();
     } finally {
       setBusy(false);
     }
@@ -195,6 +209,9 @@ export default function Home() {
               >
                 {busy ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>دخول آمن</Text>}
               </Pressable>
+              {!!error && <Pressable accessibilityRole="button" disabled={busy} style={styles.resetButton} onPress={() => void retrySession()}>
+                <Text style={styles.resetText}>إعادة الاتصال بالخادم</Text>
+              </Pressable>}
               <Pressable accessibilityRole="button" disabled={busy} style={styles.resetButton} onPress={() => void resetPassword()}>
                 <Text style={styles.resetText}>نسيت كلمة المرور؟ أرسل رابط استعادة</Text>
               </Pressable>
