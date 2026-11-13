@@ -45,8 +45,12 @@ jobs:
           curl --fail --silent --show-error --max-time 20 \
             -H "apikey: $EXPO_PUBLIC_SUPABASE_ANON_KEY" \
             "$supabase_url/auth/v1/health" >/dev/null
-          curl --fail --silent --show-error --max-time 20 \
-            "${EXPO_PUBLIC_API_BASE_URL%/}/api/health" >/dev/null
+          api_status="$(curl --silent --show-error --max-time 20 \
+            --output /tmp/alshaeri-api-health.json --write-out '%{http_code}' \
+            "${EXPO_PUBLIC_API_BASE_URL%/}/api/health" || printf '000')"
+          if [ "$api_status" != "200" ] || ! grep -q '"service":"alshaeri-api"' /tmp/alshaeri-api-health.json 2>/dev/null; then
+            echo "::warning title=API endpoint not verified::The configured API URL did not return the expected public health response (HTTP $api_status). APK will build, but API-backed sign-in/data operations may not work until this endpoint is corrected."
+          fi
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
