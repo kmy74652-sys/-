@@ -39,8 +39,7 @@ jobs:
           fi
           curl --fail --silent --show-error --max-time 20 \
             -H "apikey: $EXPO_PUBLIC_SUPABASE_ANON_KEY" \
-            -H "Accept: application/openapi+json" \
-            "$supabase_url/rest/v1/" >/dev/null
+            "$supabase_url/auth/v1/health" >/dev/null
           curl --fail --silent --show-error --max-time 20 \
             "${EXPO_PUBLIC_API_BASE_URL%/}/api/health" >/dev/null
         env:
