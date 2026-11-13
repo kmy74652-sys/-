@@ -81,7 +81,15 @@ jobs:
           NODE_ENV: production
 
       - name: Build release APK
-        run: cd android && ./gradlew --no-daemon --stacktrace assembleRelease
+        run: |
+          cd android
+          ./gradlew --no-daemon :app:generateAutolinkingPackageList
+          package_list=app/build/generated/autolinking/src/main/java/com/facebook/react/PackageList.java
+          if grep -q 'import expo.core.ExpoModulesPackage;' "$package_list"; then
+            sed -i 's/import expo\.core\.ExpoModulesPackage;/import expo.modules.ExpoModulesPackage;/' "$package_list"
+          fi
+          grep -q 'import expo.modules.ExpoModulesPackage;' "$package_list"
+          ./gradlew --no-daemon --stacktrace -x :app:generateAutolinkingPackageList assembleRelease
         env:
           NODE_ENV: production
 
