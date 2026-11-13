@@ -89,9 +89,32 @@ jobs:
             sed -i 's/import expo\.core\.ExpoModulesPackage;/import expo.modules.ExpoModulesPackage;/' "$package_list"
           fi
           grep -q 'import expo.modules.ExpoModulesPackage;' "$package_list"
+          grep -q 'ExpoLinkingPackage' "$package_list"
           ./gradlew --no-daemon --stacktrace -x :app:generateAutolinkingPackageList assembleRelease
         env:
           NODE_ENV: production
+
+      - name: Install and launch APK on Android emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          arch: x86_64
+          profile: pixel_2
+          disable-animations: true
+          script: |
+            apk="apps/mobile/android/app/build/outputs/apk/release/app-release.apk"
+            test -s "$apk"
+            app_id="$(node -e 'console.log(require("./apps/mobile/app.json").expo.android.package)')"
+            test -n "$app_id"
+            adb install -r "$apk"
+            adb logcat -c
+            adb shell monkey -p "$app_id" -c android.intent.category.LAUNCHER 1
+            sleep 15
+            adb shell pidof "$app_id" >/dev/null || { adb logcat -d -t 2000; exit 1; }
+            if adb logcat -d -t 2000 | grep -E "FATAL EXCEPTION|Process: $app_id"; then
+              echo "Android launch smoke test detected a crash for $app_id."
+              exit 1
+            fi
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useRouter } from 'expo-router';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -29,11 +30,13 @@ const modules = [
 ] as const;
 
 export default function Home() {
+  const router = useRouter();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [checkingSession, setCheckingSession] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -120,6 +123,23 @@ export default function Home() {
     }
   }
 
+  async function resetPassword() {
+    if (!supabase) { setError('إعدادات Supabase غير متاحة.'); return; }
+    if (!email.trim()) { setError('اكتب بريدك الإلكتروني أولًا لإرسال رابط الاستعادة.'); return; }
+    setBusy(true);
+    setError('');
+    setNotice('');
+    try {
+      const { error: resetError } = await supabase.auth.resetPasswordForEmail(email.trim());
+      if (resetError) throw resetError;
+      setNotice('إذا كان البريد مسجلًا، سيصلك رابط استعادة كلمة المرور.');
+    } catch {
+      setError('تعذر إرسال رابط الاستعادة. تحقق من البريد والاتصال ثم حاول مجددًا.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
   if (checkingSession) {
     return (
       <SafeAreaView style={[styles.safe, styles.bootScreen]}>
@@ -145,6 +165,7 @@ export default function Home() {
               <Text style={styles.eyebrow}>وصول آمن للموظفين</Text>
               <Text style={styles.title}>برنامج الشاعري</Text>
               <Text style={styles.copy}>استخدم الحساب المرتبط بملف موظف نشط.</Text>
+              {!!notice && <Text accessibilityLiveRegion="polite" style={styles.success}>{notice}</Text>}
               {!!error && <Text accessibilityRole="alert" style={styles.error}>{error}</Text>}
               <TextInput
                 style={styles.input}
@@ -174,6 +195,9 @@ export default function Home() {
               >
                 {busy ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>دخول آمن</Text>}
               </Pressable>
+              <Pressable accessibilityRole="button" disabled={busy} style={styles.resetButton} onPress={() => void resetPassword()}>
+                <Text style={styles.resetText}>نسيت كلمة المرور؟ أرسل رابط استعادة</Text>
+              </Pressable>
             </View>
           </ScrollView>
         </KeyboardAvoidingView>
@@ -198,6 +222,11 @@ export default function Home() {
             </View>
           ))}
         </View>
+        {allowed.has('tasks.read') && (
+          <Pressable accessibilityRole="button" style={styles.taskLink} onPress={() => router.push('/tasks')}>
+            <Text style={styles.taskLinkText}>فتح المهام والتقارير والتنبيهات</Text>
+          </Pressable>
+        )}
         <Pressable
           accessibilityRole="button"
           style={({ pressed }) => [styles.outline, pressed && styles.pressed]}
@@ -214,6 +243,7 @@ export default function Home() {
         >
           <Text style={styles.outlineText}>تسجيل الخروج</Text>
         </Pressable>
+        {!!error && <Text accessibilityRole="alert" style={styles.error}>{error}</Text>}
       </ScrollView>
     </SafeAreaView>
   );
@@ -252,10 +282,15 @@ const styles = StyleSheet.create({
     backgroundColor: '#fbfcfc',
   },
   error: { color: '#a8443d', minHeight: 22, textAlign: 'right', lineHeight: 22, marginBottom: 4 },
+  success: { color: '#23633c', minHeight: 22, textAlign: 'right', lineHeight: 22, marginBottom: 8 },
   button: { minHeight: 50, backgroundColor: '#17324d', borderRadius: 12, padding: 14, alignItems: 'center', justifyContent: 'center' },
   buttonText: { color: '#fff', fontWeight: '800', fontSize: 16 },
+  resetButton: { minHeight: 44, alignItems: 'center', justifyContent: 'center', marginTop: 6 },
+  resetText: { color: '#39556a', fontWeight: '700', textDecorationLine: 'underline' },
   pressed: { opacity: 0.82 },
   grid: { gap: 12 },
+  taskLink: { minHeight: 52, marginTop: 16, borderRadius: 12, padding: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: '#17324d' },
+  taskLinkText: { color: '#fff', fontWeight: '800', fontSize: 16 },
   card: { backgroundColor: '#fff', borderRadius: 16, padding: 18, borderWidth: 1, borderColor: '#e2e9eb' },
   cardTitle: { color: '#17324d', fontSize: 17, fontWeight: '800', textAlign: 'right', lineHeight: 26 },
   cardCopy: { color: '#718394', marginTop: 8, textAlign: 'right', lineHeight: 22 },
