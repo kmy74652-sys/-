@@ -5,9 +5,10 @@
   "main": "expo-router/entry",
   "scripts": {
     "start": "expo start",
-    "android": "expo start --android",
+    "android": "expo run:android",
     "web": "expo start --web",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "ios": "expo run:ios"
   },
   "dependencies": {
     "@babel/runtime": "^7.26.0",
@@ -15,7 +16,9 @@
     "@supabase/supabase-js": "^2.49.1",
     "expo": "~52.0.0",
     "expo-asset": "~11.0.5",
+    "expo-build-properties": "~0.13.3",
     "expo-router": "~4.0.0",
+    "expo-system-ui": "~4.0.9",
     "query-string": "^9.1.1",
     "react": "18.3.1",
     "react-native": "0.76.3",

@@ -31,7 +31,18 @@ jobs:
               missing=1
             fi
           done
-          exit "$missing"
+          if [ "$missing" -ne 0 ]; then exit 1; fi
+          supabase_url="${EXPO_PUBLIC_SUPABASE_URL%/}"
+          if [ "$supabase_url" != "https://fjmryqhdwxsocdzswnkq.supabase.co" ]; then
+            echo "::error title=Wrong Supabase project::EXPO_PUBLIC_SUPABASE_URL does not match the requested project."
+            exit 1
+          fi
+          curl --fail --silent --show-error --max-time 20 \
+            -H "apikey: $EXPO_PUBLIC_SUPABASE_ANON_KEY" \
+            -H "Accept: application/openapi+json" \
+            "$supabase_url/rest/v1/" >/dev/null
+          curl --fail --silent --show-error --max-time 20 \
+            "${EXPO_PUBLIC_API_BASE_URL%/}/api/health" >/dev/null
         env:
           EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
           EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
@@ -62,6 +73,7 @@ jobs:
       - name: Generate native Android project
         run: pnpm exec expo prebuild --platform android --no-install --clean
         env:
+          NODE_ENV: production
           EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
           EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
           EXPO_PUBLIC_API_BASE_URL: ${{ secrets.EXPO_PUBLIC_API_BASE_URL }}
@@ -69,6 +81,7 @@ jobs:
       - name: Build release APK
         run: cd android && ./gradlew --no-daemon --stacktrace assembleRelease
         env:
+          NODE_ENV: production
           EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
           EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
           EXPO_PUBLIC_API_BASE_URL: ${{ secrets.EXPO_PUBLIC_API_BASE_URL }}
