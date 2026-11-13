@@ -1,0 +1,23 @@
+{
+  "name": "alshaeri-enterprise",
+  "private": true,
+  "version": "0.1.0",
+  "packageManager": "pnpm@11.25.0",
+  "scripts": {
+    "dev": "concurrently -k \"pnpm --filter @alshaeri/api dev\" \"pnpm --filter @alshaeri/web dev\"",
+    "build": "pnpm -r build",
+    "typecheck": "pnpm -r typecheck",
+    "schema:verify": "node scripts/verify-schema.mjs",
+    "db:migrate": "node scripts/apply-migrations.mjs",
+    "db:verify": "node scripts/verify-remote.mjs",
+    "supabase:push": "supabase db push",
+    "supabase:reset": "supabase db reset"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "@types/pg": "^8.23.1",
+    "concurrently": "^9.1.2",
+    "pg": "^8.23.1",
+    "typescript": "^5.7.2"
+  }
+}

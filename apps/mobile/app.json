@@ -1,0 +1,29 @@
+{
+  "expo": {
+    "name": "برنامج الشاعري",
+    "slug": "alshaeri-mobile",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "scheme": "alshaeri",
+    "userInterfaceStyle": "light",
+    "experiments": {
+      "typedRoutes": true
+    },
+    "plugins": [
+      "expo-router"
+    ],
+    "android": {
+      "package": "com.alshaeri.mobile",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundColor": "#17324d"
+      }
+    },
+    "icon": "./assets/icon.png",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#f4f7f8"
+    }
+  }
+}

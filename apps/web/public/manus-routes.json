@@ -1,0 +1,1 @@
+{"routes":[{"path":"/","title":"لوحة التحكم"},{"path":"/login","title":"تسجيل الدخول"},{"path":"/employees","title":"الموظفون"},{"path":"/branches","title":"الفروع"},{"path":"/roles","title":"الأدوار والصلاحيات"},{"path":"/tasks","title":"المهام"},{"path":"/customers","title":"العملاء والحسابات"},{"path":"/reports","title":"التقارير والرقابة"}]}
