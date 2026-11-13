@@ -30,6 +30,7 @@ const modules = [
 
 export default function Home() {
   const [profile, setProfile] = useState<Profile | null>(null);
+  const [checkingSession, setCheckingSession] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -40,15 +41,59 @@ export default function Home() {
   }, []);
 
   async function load() {
-    if (!supabase) return;
-    const { data } = await supabase.auth.getSession();
-    if (!data.session) return;
-    const baseUrl = process.env.EXPO_PUBLIC_API_BASE_URL ?? '';
-    if (baseUrl) await flushQueue(data.session.access_token, baseUrl);
-    const response = await fetch(`${baseUrl}/api/me`, {
-      headers: { Authorization: `Bearer ${data.session.access_token}` },
-    });
-    if (response.ok) setProfile((await response.json()).employee as Profile);
+    try {
+      if (!supabase) {
+        setError('إعدادات Supabase غير متاحة.');
+        setProfile(null);
+        return;
+      }
+
+      const { data, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError) throw sessionError;
+      if (!data.session) {
+        setProfile(null);
+        return;
+      }
+
+      const baseUrl = (process.env.EXPO_PUBLIC_API_BASE_URL ?? '').trim().replace(/\/+$/, '');
+      if (!baseUrl) {
+        setProfile(null);
+        setError('خدمة التطبيق غير مضبوطة. يرجى التواصل مع مسؤول النظام.');
+        return;
+      }
+
+      // A temporary queue/storage failure must not block restoring the employee profile.
+      try {
+        await flushQueue(data.session.access_token, baseUrl);
+      } catch {
+        // Pending operations remain queued; the UI can still proceed online.
+      }
+
+      const response = await fetch(`${baseUrl}/api/me`, {
+        headers: { Authorization: `Bearer ${data.session.access_token}` },
+      });
+      if (!response.ok) {
+        setProfile(null);
+        setError(response.status === 401
+          ? 'تعذر التحقق من الجلسة مع خادم التطبيق (401). تحقق من اتصال الخدمة.'
+          : response.status === 403
+            ? 'الحساب غير مرتبط بموظف نشط أو لا يملك صلاحية الدخول.'
+            : `تعذر تحميل ملف الموظف من الخادم (رمز ${response.status}).`);
+        return;
+      }
+
+      const result = await response.json() as { employee?: Profile };
+      if (!result.employee || !Array.isArray(result.employee.permissions)) {
+        throw new Error('invalid_employee_response');
+      }
+      setProfile(result.employee);
+      setError('');
+    } catch {
+      setProfile(null);
+      setError('تعذر الاتصال بخدمة التطبيق. تحقق من الإنترنت وحاول مرة أخرى.');
+    } finally {
+      setCheckingSession(false);
+    }
   }
 
   async function login() {
@@ -58,16 +103,30 @@ export default function Home() {
     }
     setBusy(true);
     setError('');
-    const { error: signInError } = await supabase.auth.signInWithPassword({
-      email: email.trim(),
-      password,
-    });
-    if (signInError) {
-      setError('تعذر تسجيل الدخول.');
-    } else {
+    try {
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password,
+      });
+      if (signInError) {
+        setError('تعذر تسجيل الدخول. تحقق من البريد وكلمة المرور.');
+        return;
+      }
       await load();
+    } catch {
+      setError('تعذر إكمال تسجيل الدخول بسبب مشكلة اتصال. حاول مرة أخرى.');
+    } finally {
+      setBusy(false);
     }
-    setBusy(false);
+  }
+
+  if (checkingSession) {
+    return (
+      <SafeAreaView style={[styles.safe, styles.bootScreen]}>
+        <ActivityIndicator size="large" color="#17324d" />
+        <Text style={styles.copy}>جارٍ التحقق من الجلسة…</Text>
+      </SafeAreaView>
+    );
   }
 
   if (!profile) {
@@ -86,6 +145,7 @@ export default function Home() {
               <Text style={styles.eyebrow}>وصول آمن للموظفين</Text>
               <Text style={styles.title}>برنامج الشاعري</Text>
               <Text style={styles.copy}>استخدم الحساب المرتبط بملف موظف نشط.</Text>
+              {!!error && <Text accessibilityRole="alert" style={styles.error}>{error}</Text>}
               <TextInput
                 style={styles.input}
                 placeholder="البريد الإلكتروني"
@@ -105,7 +165,6 @@ export default function Home() {
                 value={password}
                 onChangeText={setPassword}
               />
-              {!!error && <Text accessibilityRole="alert" style={styles.error}>{error}</Text>}
               <Pressable
                 accessibilityRole="button"
                 accessibilityState={{ disabled: busy }}
@@ -142,10 +201,16 @@ export default function Home() {
         <Pressable
           accessibilityRole="button"
           style={({ pressed }) => [styles.outline, pressed && styles.pressed]}
-          onPress={() => {
-            void supabase?.auth.signOut();
-            setProfile(null);
-          }}
+          onPress={() => void (async () => {
+            try {
+              const { error: signOutError } = await supabase?.auth.signOut() ?? {};
+              if (signOutError) throw signOutError;
+              setProfile(null);
+              setError('');
+            } catch {
+              setError('تعذر تسجيل الخروج بأمان. تحقق من الاتصال ثم أعد المحاولة.');
+            }
+          })()}
         >
           <Text style={styles.outlineText}>تسجيل الخروج</Text>
         </Pressable>
@@ -156,6 +221,7 @@ export default function Home() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: '#f4f7f8' },
+  bootScreen: { alignItems: 'center', justifyContent: 'center', padding: 24 },
   keyboardArea: { flex: 1 },
   authScroll: { flexGrow: 1, justifyContent: 'center', padding: 16, paddingBottom: 28 },
   auth: {
