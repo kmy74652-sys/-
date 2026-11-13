@@ -103,21 +103,7 @@ jobs:
           arch: x86_64
           profile: pixel_2
           disable-animations: true
-          script: |
-            apk="$GITHUB_WORKSPACE/apps/mobile/android/app/build/outputs/apk/release/app-release.apk"
-            find "$GITHUB_WORKSPACE/apps/mobile/android/app/build/outputs" -type f -name '*.apk' -print || true
-            test -s "$apk"
-            app_id="$(node -e 'console.log(require(process.env.GITHUB_WORKSPACE + "/apps/mobile/app.json").expo.android.package)')"
-            test -n "$app_id"
-            adb install -r "$apk"
-            adb logcat -c
-            adb shell monkey -p "$app_id" -c android.intent.category.LAUNCHER 1
-            sleep 15
-            adb shell pidof "$app_id" >/dev/null || { adb logcat -d -t 2000; exit 1; }
-            if adb logcat -d -t 2000 | grep -E "FATAL EXCEPTION|Process: $app_id"; then
-              echo "Android launch smoke test detected a crash for $app_id."
-              exit 1
-            fi
+          script: bash "$GITHUB_WORKSPACE/scripts/smoke-android.sh"
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
