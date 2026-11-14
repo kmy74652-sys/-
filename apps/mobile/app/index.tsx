@@ -13,7 +13,7 @@ import {
   View,
 } from 'react-native';
 import { supabase } from '../lib/supabase';
-import { flushQueue } from '../lib/syncQueue';
+import { friendlyDataError, getMyEmployeeProfile } from '../lib/mobileData';
 
 type Profile = {
   fullName: string;
@@ -50,52 +50,22 @@ export default function Home() {
         setProfile(null);
         return;
       }
-
-      const { data, error: sessionError } = await supabase.auth.getSession();
-      if (sessionError) throw sessionError;
-      if (!data.session) {
-        setProfile(null);
-        return;
-      }
-
-      const baseUrl = (process.env.EXPO_PUBLIC_API_BASE_URL ?? '').trim().replace(/\/+$/, '');
-      if (!baseUrl) {
-        setProfile(null);
-        setError('خدمة التطبيق غير مضبوطة. يرجى التواصل مع مسؤول النظام.');
-        return;
-      }
-
-      // A temporary queue/storage failure must not block restoring the employee profile.
-      try {
-        await flushQueue(data.session.access_token, baseUrl);
-      } catch {
-        // Pending operations remain queued; the UI can still proceed online.
-      }
-
-      const response = await fetch(`${baseUrl}/api/me`, {
-        headers: { Authorization: `Bearer ${data.session.access_token}` },
-      });
-      if (!response.ok) {
-        setProfile(null);
-        setError(response.status === 401
-          ? 'خادم التطبيق رفض رمز الجلسة (401). قد تكون كلمة المرور صحيحة؛ تحقّق من رابط API وإعداد المصادقة بين الخادم وSupabase.'
-          : response.status === 403
-            ? 'الحساب غير مرتبط بموظف نشط أو لا يملك صلاحية الدخول.'
-            : response.status === 503
-              ? 'خادم التطبيق غير مكتمل الإعداد (503). يلزم ضبط اتصال Supabase الخادمي قبل الدخول.'
-            : `تعذر تحميل ملف الموظف من الخادم (رمز ${response.status}).`);
-        return;
-      }
-
-      const result = await response.json() as { employee?: Profile };
-      if (!result.employee || !Array.isArray(result.employee.permissions)) {
-        throw new Error('invalid_employee_response');
-      }
-      setProfile(result.employee);
       setError('');
-    } catch {
+      const identity = await getMyEmployeeProfile();
+      if (!identity) {
+        setProfile(null);
+        return;
+      }
+      if (!identity.employee) {
+        setProfile(null);
+        setError('تم تسجيل الدخول إلى Supabase، لكن الحساب غير مرتبط بملف موظف نشط. تواصل مع مسؤول النظام.');
+        return;
+      }
+      setProfile(identity.employee);
+      setError('');
+    } catch (cause) {
       setProfile(null);
-      setError('تعذر الاتصال بخدمة التطبيق. تحقق من الإنترنت وحاول مرة أخرى.');
+      setError(friendlyDataError(cause, 'تعذر الاتصال بـSupabase. تحقق من الإنترنت وحاول مرة أخرى.'));
     } finally {
       setCheckingSession(false);
     }
@@ -212,7 +182,7 @@ export default function Home() {
                 {busy ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>دخول آمن</Text>}
               </Pressable>
               {!!error && <Pressable accessibilityRole="button" disabled={busy} style={styles.resetButton} onPress={() => void retrySession()}>
-                <Text style={styles.resetText}>إعادة الاتصال بالخادم</Text>
+                <Text style={styles.resetText}>إعادة الاتصال بـSupabase</Text>
               </Pressable>}
               <Pressable accessibilityRole="button" disabled={busy} style={styles.resetButton} onPress={() => void resetPassword()}>
                 <Text style={styles.resetText}>نسيت كلمة المرور؟ أرسل رابط استعادة</Text>

@@ -12,8 +12,15 @@ import {
   View,
 } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
-import { supabase } from '../lib/supabase';
-import { flushQueue, pendingCount } from '../lib/syncQueue';
+import {
+  friendlyDataError,
+  getMyEmployeeProfile,
+  listMyNotifications,
+  listMyTasks,
+  reviewTask,
+  submitTaskReport,
+  updateTaskStatus,
+} from '../lib/mobileData';
 
 type ReportField = { key: string; label: string; type: 'text' | 'number' | 'progress' | 'status' | 'notes' | 'textarea' | 'date' | 'select' | 'multiselect' | 'checkbox' | 'attachment'; options?: string[]; required?: boolean };
 type Task = {
@@ -36,14 +43,12 @@ const statusLabels: Record<Task['status'], string> = {
   approved: 'معتمدة', rejected: 'تحتاج استكمالًا', cancelled: 'ملغاة',
 };
 const priorityLabels: Record<Task['priority'], string> = { low: 'منخفضة', normal: 'عادية', high: 'عالية', urgent: 'عاجلة' };
-const API_BASE = (process.env.EXPO_PUBLIC_API_BASE_URL ?? '').trim().replace(/\/+$/, '');
 
 export default function TasksScreen() {
   const router = useRouter();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [canReview, setCanReview] = useState(false);
-  const [pendingOperations, setPendingOperations] = useState(0);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [busyTask, setBusyTask] = useState('');
@@ -57,45 +62,17 @@ export default function TasksScreen() {
 
   const load = useCallback(async () => {
     setError('');
-    if (!API_BASE) {
-      setError('خدمة التطبيق غير مضبوطة. تعذر تحميل المهام.');
-      setLoading(false);
-      setRefreshing(false);
-      return;
-    }
     try {
-      if (!supabase) throw new Error('تعذر تهيئة تسجيل الدخول.');
-      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-      if (sessionError) throw sessionError;
-      const token = sessionData.session?.access_token;
-      if (!token) throw new Error('انتهت الجلسة. عد إلى صفحة الدخول وسجل الدخول مجددًا.');
-      const headers = { Authorization: `Bearer ${token}` };
-      try {
-        await flushQueue(token, API_BASE);
-      } catch {
-        // Keep queued operations and load the task list even if a sync attempt fails.
-      }
-      try { setPendingOperations(await pendingCount()); } catch { setPendingOperations(-1); }
-      const [profileResponse, tasksResponse, notificationsResponse] = await Promise.all([
-        fetch(`${API_BASE}/api/me`, { headers }),
-        fetch(`${API_BASE}/api/tasks`, { headers }),
-        fetch(`${API_BASE}/api/notifications`, { headers }),
-      ]);
-      if (profileResponse.status === 401 || tasksResponse.status === 401) throw new Error('رفض خادم التطبيق الجلسة (401). تحقق من إعداد API ثم أعد تسجيل الدخول.');
-      if (profileResponse.status === 403 || tasksResponse.status === 403) throw new Error('لا يملك هذا الحساب صلاحية عرض المهام.');
-      if (!profileResponse.ok || !tasksResponse.ok) throw new Error(`تعذر تحميل المهام من الخادم (رمز ${!tasksResponse.ok ? tasksResponse.status : profileResponse.status}).`);
-      const profileBody = await profileResponse.json() as { employee?: { permissions?: string[] } };
-      const taskBody = await tasksResponse.json() as { tasks?: Task[] };
-      setCanReview(Boolean(profileBody.employee?.permissions?.includes('tasks.review')));
-      setTasks(Array.isArray(taskBody.tasks) ? taskBody.tasks : []);
-      if (notificationsResponse.ok) {
-        const notificationBody = await notificationsResponse.json() as { notifications?: Notification[] };
-        setNotifications(Array.isArray(notificationBody.notifications) ? notificationBody.notifications : []);
-      } else {
-        setNotifications([]);
-      }
+      const identity = await getMyEmployeeProfile();
+      if (!identity) throw new Error('not_authenticated');
+      if (!identity.employee) throw new Error('employee_not_active');
+      if (!identity.employee.permissions.includes('tasks.read')) throw new Error('permission_denied');
+      const [taskRows, notificationRows] = await Promise.all([listMyTasks(), listMyNotifications()]);
+      setCanReview(identity.employee.permissions.includes('tasks.review'));
+      setTasks(taskRows);
+      setNotifications(notificationRows);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'تعذر الاتصال بخدمة المهام.');
+      setError(friendlyDataError(cause, 'تعذر تحميل البيانات مباشرة من Supabase. تحقق من الاتصال والصلاحيات.'));
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -110,26 +87,18 @@ export default function TasksScreen() {
     return () => subscription.remove();
   }, [load]);
 
-  async function mutate(task: Task, path: string, payload: unknown, successMessage: string) {
+  async function mutate(task: Task, operation: () => Promise<void>, successMessage: string) {
     setBusyTask(task.id);
     setError('');
     setNotice('');
     try {
-      const token = (await supabase?.auth.getSession())?.data.session?.access_token;
-      if (!token) throw new Error('انتهت الجلسة. سجل الدخول مجددًا.');
-      const response = await fetch(`${API_BASE}${path}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify(payload),
-      });
-      const result = await response.json().catch(() => ({})) as { error?: string };
-      if (!response.ok) throw new Error(response.status === 401 ? 'انتهت الجلسة أو رفضها الخادم (401).' : result.error ?? `تعذر الحفظ (رمز ${response.status}).`);
+      await operation();
       setNotice(successMessage);
       setReportTask('');
       setReviewNote('');
       await load();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'تعذر تنفيذ الإجراء. تحقق من الاتصال وحاول مجددًا.');
+      setError(friendlyDataError(cause, 'تعذر تنفيذ الإجراء عبر Supabase. تحقق من الاتصال والصلاحيات.'));
     } finally {
       setBusyTask('');
     }
@@ -160,7 +129,7 @@ export default function TasksScreen() {
           : field.type === 'checkbox' ? raw === 'true' : raw;
       }
     }
-    void mutate(task, `/api/tasks/${task.id}/report`, { values }, 'تم إرسال التقرير للمراجعة.');
+    void mutate(task, () => submitTaskReport(task.id, values), 'تم إرسال التقرير للمراجعة.');
   }
 
   const formatDate = (value: string) => {
@@ -188,8 +157,6 @@ export default function TasksScreen() {
             <Text style={styles.backText}>رجوع</Text>
           </Pressable>
         </View>
-        {pendingOperations !== 0 && <Text style={styles.pending}>{pendingOperations < 0 ? 'تعذر قراءة حالة المزامنة' : `عمليات بانتظار المزامنة: ${pendingOperations}`}</Text>}
-
         {!!error && <Text accessibilityRole="alert" style={styles.error}>{error}</Text>}
         {!!notice && <Text accessibilityLiveRegion="polite" style={styles.notice}>{notice}</Text>}
         {loading && <View style={styles.loading}><ActivityIndicator size="large" color="#17324d" /><Text style={styles.muted}>جارٍ تحميل المهام…</Text></View>}
@@ -269,12 +236,12 @@ export default function TasksScreen() {
 
             <View style={styles.actions}>
               {['pending', 'rejected'].includes(task.status) && (
-                <Pressable disabled={busyTask === task.id} style={styles.primaryButton} onPress={() => void mutate(task, `/api/tasks/${task.id}/updates`, { status: 'in_progress' }, 'تم تسجيل بدء تنفيذ المهمة.')}>
+                <Pressable disabled={busyTask === task.id} style={styles.primaryButton} onPress={() => void mutate(task, () => updateTaskStatus(task.id, 'in_progress'), 'تم تسجيل بدء تنفيذ المهمة.')}>
                   <Text style={styles.primaryText}>بدء التنفيذ</Text>
                 </Pressable>
               )}
               {task.status === 'in_progress' && !task.report_schema?.length && (
-                <Pressable disabled={busyTask === task.id} style={styles.primaryButton} onPress={() => void mutate(task, `/api/tasks/${task.id}/updates`, { status: 'submitted' }, 'أرسلت المهمة للمراجعة.')}>
+                <Pressable disabled={busyTask === task.id} style={styles.primaryButton} onPress={() => void mutate(task, () => updateTaskStatus(task.id, 'submitted'), 'أرسلت المهمة للمراجعة.')}>
                   <Text style={styles.primaryText}>إرسال للمراجعة</Text>
                 </Pressable>
               )}
@@ -289,8 +256,8 @@ export default function TasksScreen() {
               {canReview && task.status === 'submitted' && (
                 <>
                   <TextInput style={styles.input} value={reviewNote} onChangeText={setReviewNote} placeholder="ملاحظة المراجعة (والسبب عند الإرجاع)" accessibilityLabel="ملاحظة المراجعة" />
-                  <Pressable disabled={busyTask === task.id} style={styles.primaryButton} onPress={() => void mutate(task, `/api/tasks/${task.id}/review`, { decision: 'approved', note: reviewNote || null }, 'تم اعتماد المهمة.')}><Text style={styles.primaryText}>اعتماد</Text></Pressable>
-                  <Pressable disabled={busyTask === task.id || !reviewNote.trim()} style={styles.secondaryButton} onPress={() => void mutate(task, `/api/tasks/${task.id}/review`, { decision: 'rejected', note: reviewNote }, 'أعيدت المهمة مع ملاحظات.')}><Text style={styles.secondaryText}>إرجاع مع سبب</Text></Pressable>
+                  <Pressable disabled={busyTask === task.id} style={styles.primaryButton} onPress={() => void mutate(task, () => reviewTask(task.id, 'approved', reviewNote || null), 'تم اعتماد المهمة.')}><Text style={styles.primaryText}>اعتماد</Text></Pressable>
+                  <Pressable disabled={busyTask === task.id || !reviewNote.trim()} style={styles.secondaryButton} onPress={() => void mutate(task, () => reviewTask(task.id, 'rejected', reviewNote), 'أعيدت المهمة مع ملاحظات.')}><Text style={styles.secondaryText}>إرجاع مع سبب</Text></Pressable>
                 </>
               )}
             </View>
