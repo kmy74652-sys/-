@@ -262,18 +262,29 @@ app.patch('/api/employees/:employeeId/access', requireEmployee, requirePermissio
   return response.json({ employeeId: request.params.employeeId, roleCodes: parsed.data.roleCodes, branchIds: parsed.data.branchIds, defaultBranchId: parsed.data.defaultBranchId });
 });
 
+const TASK_POSITION_CODES = ['owner', 'admin_followup', 'accountant', 'warehouse_keeper', 'warehouse_worker'] as const;
+const TASK_POSITION_LABELS: Record<(typeof TASK_POSITION_CODES)[number], string> = {
+  owner: 'صاحب المؤسسة',
+  admin_followup: 'المدير التنفيذي',
+  accountant: 'المحاسب',
+  warehouse_keeper: 'أمين المخازن',
+  warehouse_worker: 'عمال التحميل',
+};
+const taskPositionCodeSchema = z.enum(TASK_POSITION_CODES);
+
 const taskStatusSchema = z.enum(['pending', 'in_progress', 'submitted', 'approved', 'rejected', 'cancelled']);
 const taskCreateSchema = z.object({
   title: z.string().trim().min(2).max(200),
   description: z.string().trim().max(5000).optional().nullable(),
   assigneeEmployeeId: z.string().uuid(),
+  positionCode: taskPositionCodeSchema,
   branchId: z.string().uuid().optional().nullable(),
   startsAt: z.string().datetime({ offset: true }),
   dueAt: z.string().datetime({ offset: true }),
   priority: z.enum(['low', 'normal', 'high', 'urgent']).default('normal'),
   proofRequired: z.boolean().default(false),
   proofInstructions: z.string().trim().max(1000).optional().nullable(),
-  reportFields: z.array(z.object({ key: z.string().trim().regex(/^[a-zA-Z][a-zA-Z0-9_]{1,39}$/), label: z.string().trim().min(2).max(120), type: z.enum(['text', 'number', 'progress', 'status', 'notes']), required: z.boolean().default(false) })).max(20).default([]),
+  reportFields: z.array(z.object({ key: z.string().trim().regex(/^[a-zA-Z][a-zA-Z0-9_]{1,39}$/), label: z.string().trim().min(2).max(120), type: z.enum(['text', 'number', 'progress', 'status', 'notes']), required: z.boolean().default(false) })).min(1).max(20),
   idempotencyKey: z.string().trim().min(8).max(160).optional(),
 });
 
@@ -283,7 +294,7 @@ function canSeeTask(request: AuthenticatedRequest, task: { assignee_employee_id:
 
 app.get('/api/tasks', requireEmployee, requirePermission('tasks.read'), async (request: AuthenticatedRequest, response) => {
   if (!supabaseAdmin || !request.employee) return response.status(503).json({ error: 'auth_not_configured' });
-  let query = supabaseAdmin.from('tasks').select('id,branch_id,created_by,assignee_employee_id,title,description,starts_at,due_at,priority,status,proof_required,proof_instructions,report_schema,recurring_template_id,created_at,updated_at').eq('institution_id', request.employee.institutionId).order('due_at', { ascending: true });
+  let query = supabaseAdmin.from('tasks').select('id,branch_id,created_by,assignee_employee_id,title,description,starts_at,due_at,priority,status,proof_required,proof_instructions,report_schema,position_code,recurring_template_id,created_at,updated_at').eq('institution_id', request.employee.institutionId).order('due_at', { ascending: true });
   if (!request.employee.permissions.includes('tasks.read_all')) query = query.or(`assignee_employee_id.eq.${request.employee.id},created_by.eq.${request.employee.id}`);
   const { data, error } = await query;
   if (error) return response.status(500).json({ error: 'tasks_lookup_failed' });
@@ -300,11 +311,11 @@ app.post('/api/tasks', requireEmployee, requirePermission('tasks.manage'), async
     const { data: branch } = await supabaseAdmin.from('branches').select('id').eq('institution_id', request.employee.institutionId).eq('id', parsed.data.branchId).maybeSingle();
     if (!branch) return response.status(400).json({ error: 'branch_not_found' });
   }
-  const payload = { institution_id: request.employee.institutionId, branch_id: parsed.data.branchId ?? null, created_by: request.employee.id, assignee_employee_id: parsed.data.assigneeEmployeeId, title: parsed.data.title, description: parsed.data.description ?? null, starts_at: parsed.data.startsAt, due_at: parsed.data.dueAt, priority: parsed.data.priority, proof_required: parsed.data.proofRequired, proof_instructions: parsed.data.proofInstructions ?? null, report_schema: parsed.data.reportFields, idempotency_key: parsed.data.idempotencyKey ?? request.get('idempotency-key') ?? randomUUID() };
-  const { data, error } = await supabaseAdmin.from('tasks').upsert(payload, { onConflict: 'institution_id,idempotency_key', ignoreDuplicates: true }).select('id,branch_id,created_by,assignee_employee_id,title,description,starts_at,due_at,priority,status,proof_required,proof_instructions,report_schema,recurring_template_id,created_at,updated_at').maybeSingle();
+  const payload = { institution_id: request.employee.institutionId, branch_id: parsed.data.branchId ?? null, position_code: parsed.data.positionCode, created_by: request.employee.id, assignee_employee_id: parsed.data.assigneeEmployeeId, title: parsed.data.title, description: parsed.data.description ?? null, starts_at: parsed.data.startsAt, due_at: parsed.data.dueAt, priority: parsed.data.priority, proof_required: parsed.data.proofRequired, proof_instructions: parsed.data.proofInstructions ?? null, report_schema: parsed.data.reportFields, idempotency_key: parsed.data.idempotencyKey ?? request.get('idempotency-key') ?? randomUUID() };
+  const { data, error } = await supabaseAdmin.from('tasks').upsert(payload, { onConflict: 'institution_id,idempotency_key', ignoreDuplicates: true }).select('id,branch_id,position_code,created_by,assignee_employee_id,title,description,starts_at,due_at,priority,status,proof_required,proof_instructions,report_schema,recurring_template_id,created_at,updated_at').maybeSingle();
   if (error) return response.status(400).json({ error: 'task_create_failed', detail: error.code === '23505' ? 'task_idempotency_conflict' : undefined });
   if (data) return response.status(201).json({ task: data });
-  const { data: existing } = await supabaseAdmin.from('tasks').select('id,branch_id,created_by,assignee_employee_id,title,description,starts_at,due_at,priority,status,proof_required,proof_instructions,report_schema,recurring_template_id,created_at,updated_at').eq('institution_id', request.employee.institutionId).eq('idempotency_key', payload.idempotency_key).maybeSingle();
+  const { data: existing } = await supabaseAdmin.from('tasks').select('id,branch_id,position_code,created_by,assignee_employee_id,title,description,starts_at,due_at,priority,status,proof_required,proof_instructions,report_schema,recurring_template_id,created_at,updated_at').eq('institution_id', request.employee.institutionId).eq('idempotency_key', payload.idempotency_key).maybeSingle();
   return response.status(200).json({ task: existing, idempotentReplay: true });
 });
 
@@ -350,6 +361,7 @@ const recurrenceSchema = z.object({
   title: z.string().trim().min(2).max(200),
   description: z.string().trim().max(5000).optional().nullable(),
   assigneeEmployeeId: z.string().uuid(),
+  positionCode: taskPositionCodeSchema,
   branchId: z.string().uuid().optional().nullable(),
   recurrence: z.enum(['daily', 'weekly', 'monthly']),
   weekDay: z.number().int().min(1).max(7).optional().nullable(),
@@ -364,7 +376,7 @@ app.post('/api/recurring-tasks', requireEmployee, requirePermission('tasks.manag
   if (!parsed.success || (parsed.data.recurrence === 'weekly' && !parsed.data.weekDay) || (parsed.data.recurrence === 'monthly' && !parsed.data.monthDay)) return response.status(400).json({ error: 'invalid_recurrence_payload' });
   const { data: assignee } = await supabaseAdmin.from('employees').select('id,status').eq('institution_id', request.employee.institutionId).eq('id', parsed.data.assigneeEmployeeId).maybeSingle();
   if (!assignee || assignee.status !== 'active') return response.status(400).json({ error: 'assignee_not_active' });
-  const { data, error } = await supabaseAdmin.from('recurring_task_templates').insert({ institution_id: request.employee.institutionId, branch_id: parsed.data.branchId ?? null, created_by: request.employee.id, assignee_employee_id: parsed.data.assigneeEmployeeId, title: parsed.data.title, description: parsed.data.description ?? null, recurrence: parsed.data.recurrence, week_day: parsed.data.weekDay ?? null, month_day: parsed.data.monthDay ?? null, starts_on: parsed.data.startsOn, ends_on: parsed.data.endsOn ?? null }).select('id,title,recurrence,week_day,month_day,starts_on,ends_on,is_active,last_generated_for').single();
+  const { data, error } = await supabaseAdmin.from('recurring_task_templates').insert({ institution_id: request.employee.institutionId, branch_id: parsed.data.branchId ?? null, position_code: parsed.data.positionCode, created_by: request.employee.id, assignee_employee_id: parsed.data.assigneeEmployeeId, title: parsed.data.title, description: parsed.data.description ?? null, recurrence: parsed.data.recurrence, week_day: parsed.data.weekDay ?? null, month_day: parsed.data.monthDay ?? null, starts_on: parsed.data.startsOn, ends_on: parsed.data.endsOn ?? null }).select('id,title,position_code,recurrence,week_day,month_day,starts_on,ends_on,is_active,last_generated_for').single();
   if (error) return response.status(400).json({ error: 'recurrence_create_failed' });
   return response.status(201).json({ template: data });
 });
@@ -395,7 +407,7 @@ const reportFormSchema = z.object({
   code: z.string().trim().regex(/^[a-z0-9][a-z0-9_-]{1,63}$/),
   nameAr: z.string().trim().min(2).max(160),
   description: z.string().trim().max(2000).optional().nullable(),
-  fields: z.array(reportFieldSchema).max(50),
+  fields: z.array(reportFieldSchema).min(1).max(50),
 });
 
 const taskLibrarySchema = z.object({
@@ -403,7 +415,7 @@ const taskLibrarySchema = z.object({
   title: z.string().trim().min(2).max(200),
   description: z.string().trim().max(5000).optional().nullable(),
   taskType: z.string().trim().min(2).max(100),
-  jobTitleId: z.string().uuid().optional().nullable(),
+  positionCode: taskPositionCodeSchema,
   branchIds: z.array(z.string().uuid()).max(100).default([]),
   employeeIds: z.array(z.string().uuid()).max(100).default([]),
   recurrence: z.enum(['daily', 'weekly', 'monthly']).optional().nullable(),
@@ -458,10 +470,10 @@ app.post('/api/report-forms', requireEmployee, requirePermission('report_forms.m
 
 app.get('/api/task-library', requireEmployee, requirePermission('task_library.read'), async (request: AuthenticatedRequest, response) => {
   if (!supabaseAdmin || !request.employee) return response.status(503).json({ error: 'auth_not_configured' });
-  let query = supabaseAdmin.from('task_library_templates').select('id,code,title,description,task_type,job_title_id,recurrence,week_day,month_day,default_duration_minutes,report_form_id,version,is_active,created_at,updated_at,job_titles(id,code,name_ar),report_forms(id,code,name_ar,version)').eq('institution_id', request.employee.institutionId).order('title');
+  let query = supabaseAdmin.from('task_library_templates').select('id,code,title,description,task_type,position_code,recurrence,week_day,month_day,default_duration_minutes,report_form_id,version,is_active,created_at,updated_at,report_forms(id,code,name_ar,version)').eq('institution_id', request.employee.institutionId).order('title');
   if (request.query.taskType) query = query.eq('task_type', String(request.query.taskType));
   if (request.query.recurrence) query = query.eq('recurrence', String(request.query.recurrence));
-  if (request.query.jobTitleId) query = query.eq('job_title_id', String(request.query.jobTitleId));
+  if (request.query.positionCode) query = query.eq('position_code', String(request.query.positionCode));
   const { data: templates, error } = await query;
   if (error) return response.status(500).json({ error: 'task_library_lookup_failed' });
   const ids = (templates ?? []).map((template) => template.id);
@@ -476,7 +488,8 @@ app.post('/api/task-library', requireEmployee, requirePermission('task_library.m
   if (!supabaseAdmin || !request.employee) return response.status(503).json({ error: 'auth_not_configured' });
   const parsed = taskLibrarySchema.safeParse(request.body);
   if (!parsed.success || (parsed.data.recurrence === 'weekly' && !parsed.data.weekDay) || (parsed.data.recurrence === 'monthly' && !parsed.data.monthDay)) return response.status(400).json({ error: 'invalid_task_library_payload' });
-  const { data: template, error } = await supabaseAdmin.from('task_library_templates').insert({ institution_id: request.employee.institutionId, code: parsed.data.code, title: parsed.data.title, description: parsed.data.description ?? null, task_type: parsed.data.taskType, job_title_id: parsed.data.jobTitleId ?? null, recurrence: parsed.data.recurrence ?? null, week_day: parsed.data.weekDay ?? null, month_day: parsed.data.monthDay ?? null, default_duration_minutes: parsed.data.defaultDurationMinutes ?? null, report_form_id: parsed.data.reportFormId ?? null, created_by: request.employee.id, updated_by: request.employee.id }).select('id,code,title,version').single();
+  if (!parsed.data.reportFormId) return response.status(400).json({ error: 'task_library_report_form_required' });
+  const { data: template, error } = await supabaseAdmin.from('task_library_templates').insert({ institution_id: request.employee.institutionId, code: parsed.data.code, title: parsed.data.title, description: parsed.data.description ?? null, task_type: parsed.data.taskType, position_code: parsed.data.positionCode, recurrence: parsed.data.recurrence ?? null, week_day: parsed.data.weekDay ?? null, month_day: parsed.data.monthDay ?? null, default_duration_minutes: parsed.data.defaultDurationMinutes ?? null, report_form_id: parsed.data.reportFormId ?? null, created_by: request.employee.id, updated_by: request.employee.id }).select('id,code,title,position_code,version').single();
   if (error || !template) return response.status(400).json({ error: 'task_library_create_failed' });
   const branchRows = parsed.data.branchIds.map((branchId) => ({ institution_id: request.employee!.institutionId, template_id: template.id, branch_id: branchId }));
   const employeeRows = parsed.data.employeeIds.map((employeeId) => ({ institution_id: request.employee!.institutionId, template_id: template.id, employee_id: employeeId }));
@@ -497,7 +510,7 @@ app.patch('/api/task-library/:templateId', requireEmployee, requirePermission('t
   if (parsed.data.title !== undefined) updatePayload.title = parsed.data.title;
   if (parsed.data.description !== undefined) updatePayload.description = parsed.data.description;
   if (parsed.data.taskType !== undefined) updatePayload.task_type = parsed.data.taskType;
-  if (parsed.data.jobTitleId !== undefined) updatePayload.job_title_id = parsed.data.jobTitleId;
+  if (parsed.data.positionCode !== undefined) updatePayload.position_code = parsed.data.positionCode;
   if (parsed.data.recurrence !== undefined) updatePayload.recurrence = parsed.data.recurrence;
   if (parsed.data.weekDay !== undefined) updatePayload.week_day = parsed.data.weekDay;
   if (parsed.data.monthDay !== undefined) updatePayload.month_day = parsed.data.monthDay;
@@ -516,19 +529,21 @@ app.post('/api/task-library/:templateId/convert', requireEmployee, requirePermis
   if (!supabaseAdmin || !request.employee) return response.status(503).json({ error: 'auth_not_configured' });
   const parsed = libraryConversionSchema.safeParse(request.body);
   if (!parsed.success || new Date(parsed.data.dueAt) < new Date(parsed.data.startsAt)) return response.status(400).json({ error: 'invalid_library_conversion_payload' });
-  const { data: template } = await supabaseAdmin.from('task_library_templates').select('id,title,description,version,default_duration_minutes,report_form_id,report_forms(id,report_form_fields(field_key,label_ar,field_type,is_required,sort_order,options,config))').eq('institution_id', request.employee.institutionId).eq('id', request.params.templateId).eq('is_active', true).maybeSingle();
+  const { data: template } = await supabaseAdmin.from('task_library_templates').select('id,title,description,version,position_code,default_duration_minutes,report_form_id,report_forms(id,report_form_fields(field_key,label_ar,field_type,is_required,sort_order,options,config))').eq('institution_id', request.employee.institutionId).eq('id', request.params.templateId).eq('is_active', true).maybeSingle();
   if (!template) return response.status(404).json({ error: 'task_library_not_found' });
+  if (!template.position_code) return response.status(409).json({ error: 'task_library_position_required' });
   const { data: assignee } = await supabaseAdmin.from('employees').select('id,status').eq('institution_id', request.employee.institutionId).eq('id', parsed.data.assigneeEmployeeId).maybeSingle();
   if (!assignee || assignee.status !== 'active') return response.status(400).json({ error: 'assignee_not_active' });
   if (parsed.data.branchId) { const { data: branch } = await supabaseAdmin.from('branches').select('id').eq('institution_id', request.employee.institutionId).eq('id', parsed.data.branchId).maybeSingle(); if (!branch) return response.status(400).json({ error: 'branch_not_found' }); }
   const form = Array.isArray(template.report_forms) ? template.report_forms[0] : template.report_forms;
   const fields = form && Array.isArray(form.report_form_fields) ? form.report_form_fields : [];
+  if (!template.report_form_id || !fields.length) return response.status(409).json({ error: 'task_library_report_form_required' });
   const reportSchema = fields.sort((a, b) => a.sort_order - b.sort_order).map((field) => ({ key: field.field_key, label: field.label_ar, type: field.field_type, required: field.is_required, options: field.options, config: field.config }));
-  const payload = { institution_id: request.employee.institutionId, branch_id: parsed.data.branchId ?? null, created_by: request.employee.id, assignee_employee_id: parsed.data.assigneeEmployeeId, title: template.title, description: template.description, starts_at: parsed.data.startsAt, due_at: parsed.data.dueAt, priority: parsed.data.priority, proof_required: reportSchema.some((field) => field.type === 'attachment' && field.required), proof_instructions: null, report_schema: reportSchema, library_template_id: template.id, library_template_version: template.version, idempotency_key: parsed.data.idempotencyKey ?? request.get('idempotency-key') ?? randomUUID() };
-  const { data: task, error } = await supabaseAdmin.from('tasks').upsert(payload, { onConflict: 'institution_id,idempotency_key', ignoreDuplicates: true }).select('id,title,branch_id,assignee_employee_id,starts_at,due_at,priority,status,report_schema,library_template_id,library_template_version').maybeSingle();
+  const payload = { institution_id: request.employee.institutionId, branch_id: parsed.data.branchId ?? null, position_code: template.position_code, created_by: request.employee.id, assignee_employee_id: parsed.data.assigneeEmployeeId, title: template.title, description: template.description, starts_at: parsed.data.startsAt, due_at: parsed.data.dueAt, priority: parsed.data.priority, proof_required: reportSchema.some((field) => field.type === 'attachment' && field.required), proof_instructions: null, report_schema: reportSchema, library_template_id: template.id, library_template_version: template.version, idempotency_key: parsed.data.idempotencyKey ?? request.get('idempotency-key') ?? randomUUID() };
+  const { data: task, error } = await supabaseAdmin.from('tasks').upsert(payload, { onConflict: 'institution_id,idempotency_key', ignoreDuplicates: true }).select('id,title,branch_id,assignee_employee_id,position_code,starts_at,due_at,priority,status,report_schema,library_template_id,library_template_version').maybeSingle();
   if (error) return response.status(400).json({ error: 'library_conversion_failed' });
   if (task) return response.status(201).json({ task });
-  const { data: existing } = await supabaseAdmin.from('tasks').select('id,title,branch_id,assignee_employee_id,starts_at,due_at,priority,status,report_schema,library_template_id,library_template_version').eq('institution_id', request.employee.institutionId).eq('idempotency_key', payload.idempotency_key).maybeSingle();
+  const { data: existing } = await supabaseAdmin.from('tasks').select('id,title,branch_id,assignee_employee_id,position_code,starts_at,due_at,priority,status,report_schema,library_template_id,library_template_version').eq('institution_id', request.employee.institutionId).eq('idempotency_key', payload.idempotency_key).maybeSingle();
   return response.status(200).json({ task: existing, idempotentReplay: true });
 });
 
@@ -625,7 +640,7 @@ app.post('/api/receipts/:receiptId/approve', requireEmployee, requirePermission(
 app.get('/api/reports/oversight', requireEmployee, requireAnyPermission('reports.read_all', 'tasks.read_all'), async (request: AuthenticatedRequest, response) => {
   if (!supabaseAdmin || !request.employee) return response.status(503).json({ error: 'auth_not_configured' });
   const [tasksResult, reportsResult, reviewsResult] = await Promise.all([
-    supabaseAdmin.from('tasks').select('id,title,status,due_at,assignee_employee_id,branch_id,created_at').eq('institution_id', request.employee.institutionId).order('due_at', { ascending: true }),
+    supabaseAdmin.from('tasks').select('id,title,status,due_at,assignee_employee_id,branch_id,position_code,created_at').eq('institution_id', request.employee.institutionId).order('due_at', { ascending: true }),
     supabaseAdmin.from('task_reports').select('id,task_id,submitted_by,values,branch_id,execution_date,created_at').eq('institution_id', request.employee.institutionId).order('created_at', { ascending: false }).limit(100),
     supabaseAdmin.from('task_reviews').select('id,task_id,reviewer_employee_id,decision,note,created_at').eq('institution_id', request.employee.institutionId).order('created_at', { ascending: false }).limit(100),
   ]);
@@ -641,11 +656,15 @@ app.get('/api/reports/oversight', requireEmployee, requireAnyPermission('reports
   const branchName = new Map((branches ?? []).map((branch) => [branch.id, branch.name]));
   const now = Date.now();
   const taskStatuses = tasks.reduce<Record<string, number>>((result, task) => { result[task.status] = (result[task.status] ?? 0) + 1; return result; }, {});
-  const overdueTasks = tasks.filter((task) => !['approved', 'cancelled'].includes(task.status) && new Date(task.due_at).getTime() < now).map((task) => ({ ...task, assignee_name: employeeName.get(task.assignee_employee_id) ?? 'موظف', branch_name: task.branch_id ? branchName.get(task.branch_id) ?? 'فرع' : 'كل الفروع' }));
-  const pendingReports = tasks.filter((task) => task.status === 'submitted').map((task) => ({ ...task, assignee_name: employeeName.get(task.assignee_employee_id) ?? 'موظف', branch_name: task.branch_id ? branchName.get(task.branch_id) ?? 'فرع' : 'كل الفروع' }));
-  const reports = (reportsResult.data ?? []).map((report) => ({ ...report, submitted_by_name: employeeName.get(report.submitted_by) ?? 'موظف' }));
+  const positionLabel = (code: string | null) => code && code in TASK_POSITION_LABELS ? TASK_POSITION_LABELS[code as keyof typeof TASK_POSITION_LABELS] : null;
+  const withPositionLabel = <T extends { position_code: string | null }>(row: T) => ({ ...row, position_label_ar: positionLabel(row.position_code) });
+  const overdueTasks = tasks.filter((task) => !['approved', 'cancelled'].includes(task.status) && new Date(task.due_at).getTime() < now).map((task) => ({ ...withPositionLabel(task), assignee_name: employeeName.get(task.assignee_employee_id) ?? 'موظف', branch_name: task.branch_id ? branchName.get(task.branch_id) ?? 'فرع' : 'كل الفروع' }));
+  const pendingReports = tasks.filter((task) => task.status === 'submitted').map((task) => ({ ...withPositionLabel(task), assignee_name: employeeName.get(task.assignee_employee_id) ?? 'موظف', branch_name: task.branch_id ? branchName.get(task.branch_id) ?? 'فرع' : 'كل الفروع' }));
+  const taskById = new Map(tasks.map((task) => [task.id, task]));
+  const reports = (reportsResult.data ?? []).map((report) => { const task = taskById.get(report.task_id); return { ...report, task_title: task?.title ?? 'مهمة', position_code: task?.position_code ?? null, position_label_ar: positionLabel(task?.position_code ?? null), submitted_by_name: employeeName.get(report.submitted_by) ?? 'موظف' }; });
+  const positionCounts = Object.fromEntries(TASK_POSITION_CODES.map((code) => [code, tasks.filter((task) => task.position_code === code).length]));
   const reviews = (reviewsResult.data ?? []).map((review) => ({ ...review, reviewer_name: employeeName.get(review.reviewer_employee_id) ?? 'مراجع' }));
-  return response.json({ taskStatuses, overdueTasks, pendingReports, reports, reviews, totals: { tasks: tasks.length, reports: reports.length, approved: tasks.filter((task) => task.status === 'approved').length, overdue: overdueTasks.length, pending: pendingReports.length } });
+  return response.json({ taskStatuses, positionCounts, unclassifiedTaskCount: tasks.filter((task) => !task.position_code).length, overdueTasks, pendingReports, reports, reviews, totals: { tasks: tasks.length, reports: reports.length, approved: tasks.filter((task) => task.status === 'approved').length, overdue: overdueTasks.length, pending: pendingReports.length } });
 });
 
 app.get('/api/reports/summary', requireEmployee, requirePermission('finance.read'), async (request: AuthenticatedRequest, response) => {

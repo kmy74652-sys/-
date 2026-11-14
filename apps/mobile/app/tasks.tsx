@@ -28,6 +28,10 @@ type Task = {
   title: string;
   description: string | null;
   assignee_employee_id: string;
+  branch_id: string | null;
+  branch_name?: string | null;
+  branch_level?: number | null;
+  position_code: 'owner' | 'admin_followup' | 'accountant' | 'warehouse_keeper' | 'warehouse_worker' | null;
   starts_at: string;
   due_at: string;
   priority: 'low' | 'normal' | 'high' | 'urgent';
@@ -43,6 +47,10 @@ const statusLabels: Record<Task['status'], string> = {
   approved: 'معتمدة', rejected: 'تحتاج استكمالًا', cancelled: 'ملغاة',
 };
 const priorityLabels: Record<Task['priority'], string> = { low: 'منخفضة', normal: 'عادية', high: 'عالية', urgent: 'عاجلة' };
+const positionLabels: Record<NonNullable<Task['position_code']>, string> = {
+  owner: 'صاحب المؤسسة', admin_followup: 'المدير التنفيذي', accountant: 'المحاسب',
+  warehouse_keeper: 'أمين المخازن', warehouse_worker: 'عمال التحميل',
+};
 
 export default function TasksScreen() {
   const router = useRouter();
@@ -57,6 +65,7 @@ export default function TasksScreen() {
   const [reviewNote, setReviewNote] = useState('');
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<Task['status'] | 'all'>('all');
+  const [positionFilter, setPositionFilter] = useState<Task['position_code'] | 'all'>('all');
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
 
@@ -138,6 +147,7 @@ export default function TasksScreen() {
   };
   const filteredTasks = tasks.filter((task) =>
     (statusFilter === 'all' || task.status === statusFilter) &&
+    (positionFilter === 'all' || task.position_code === positionFilter) &&
     (!search.trim() || `${task.title} ${task.description ?? ''}`.toLocaleLowerCase('ar').includes(search.trim().toLocaleLowerCase('ar'))),
   );
 
@@ -164,6 +174,14 @@ export default function TasksScreen() {
         {!loading && tasks.length > 0 && <>
           <TextInput style={styles.input} value={search} onChangeText={setSearch} placeholder="ابحث عن مهمة…" accessibilityLabel="البحث في المهام" />
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filters}>
+            {([['all', 'كل المناصب'], ['owner', 'صاحب المؤسسة'], ['admin_followup', 'المدير التنفيذي'], ['accountant', 'المحاسب'], ['warehouse_keeper', 'أمين المخازن'], ['warehouse_worker', 'عمال التحميل']] as const).map(([code, label]) => {
+              const selected = positionFilter === code;
+              return <Pressable key={code} accessibilityRole="button" accessibilityState={{ selected }} style={[styles.filterChip, selected && styles.filterChipSelected]} onPress={() => setPositionFilter(code)}>
+                <Text style={selected ? styles.filterChipTextSelected : styles.filterChipText}>{label}</Text>
+              </Pressable>;
+            })}
+          </ScrollView>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filters}>
             {(['all', 'pending', 'in_progress', 'submitted', 'rejected', 'approved'] as const).map((status) => {
               const selected = statusFilter === status;
               return <Pressable key={status} accessibilityRole="button" accessibilityState={{ selected }} style={[styles.filterChip, selected && styles.filterChipSelected]} onPress={() => setStatusFilter(status)}>
@@ -180,6 +198,7 @@ export default function TasksScreen() {
               <Text style={[styles.badge, task.status === 'approved' ? styles.goodBadge : task.status === 'rejected' ? styles.warnBadge : styles.neutralBadge]}>{statusLabels[task.status]}</Text>
             </View>
             {!!task.description && <Text style={styles.body}>{task.description}</Text>}
+            <Text style={styles.meta}>المنصب: {task.position_code ? positionLabels[task.position_code] : 'بحاجة إلى تصنيف'}{task.branch_name ? ` · الفرع: ${task.branch_name}${task.branch_level ? ` (المستوى ${task.branch_level})` : ''}` : task.branch_id ? ' · فرع محدد' : ''}</Text>
             <Text style={styles.meta}>الأولوية: {priorityLabels[task.priority]} · الموعد: {formatDate(task.due_at)}</Text>
             {task.proof_required && <Text style={styles.proof}>{task.proof_instructions || 'يتطلب إرفاق دليل إنجاز.'}</Text>}
 

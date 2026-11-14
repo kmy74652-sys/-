@@ -21,6 +21,10 @@ export type MobileTask = {
   title: string;
   description: string | null;
   assignee_employee_id: string;
+  branch_id: string | null;
+  branch_name?: string | null;
+  branch_level?: number | null;
+  position_code: 'owner' | 'admin_followup' | 'accountant' | 'warehouse_keeper' | 'warehouse_worker' | null;
   starts_at: string;
   due_at: string;
   priority: 'low' | 'normal' | 'high' | 'urgent';
@@ -66,10 +70,16 @@ export async function listMyTasks(): Promise<MobileTask[]> {
   const client = getClient();
   const { data, error } = await client
     .from('tasks')
-    .select('id,title,description,assignee_employee_id,starts_at,due_at,priority,status,proof_required,proof_instructions,report_schema')
+    .select('id,title,description,assignee_employee_id,branch_id,position_code,starts_at,due_at,priority,status,proof_required,proof_instructions,report_schema')
     .order('due_at', { ascending: true });
   if (error) throw error;
-  return (data ?? []) as MobileTask[];
+  const rows = data ?? [];
+  const branchIds = [...new Set(rows.map((task) => task.branch_id).filter((id): id is string => Boolean(id)))];
+  if (!branchIds.length) return rows as MobileTask[];
+  const { data: branches, error: branchError } = await client.from('branches').select('id,name,branch_level').in('id', branchIds);
+  if (branchError) return rows as MobileTask[];
+  const branchById = new Map((branches ?? []).map((branch) => [branch.id, branch]));
+  return rows.map((task) => ({ ...task, branch_name: branchById.get(task.branch_id)?.name ?? null, branch_level: branchById.get(task.branch_id)?.branch_level ?? null })) as MobileTask[];
 }
 
 export async function listMyNotifications(): Promise<MobileNotification[]> {
@@ -115,6 +125,9 @@ export function friendlyDataError(error: unknown, fallback: string): string {
   const detail = error as { code?: string; message?: string; status?: number } | null;
   const message = detail?.message ?? '';
   const code = detail?.code ?? '';
+  if ((code === '42703' || code === 'PGRST204') && message.includes('position_code')) {
+    return 'يجب تطبيق migration 018 لتفعيل تصنيفات المناصب قبل تحديث بيانات المهام.';
+  }
   if (code === 'PGRST202' || code === '42883' || message.includes('mobile_my_profile')) {
     return 'تحديث قاعدة بيانات Supabase المطلوب لم يطبّق بعد. أعد نشر migrations ثم حاول مجددًا.';
   }
