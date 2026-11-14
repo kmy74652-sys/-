@@ -15,3 +15,7 @@
 5. شغّل اللوحة وAPI عبر `pnpm dev`.
 
 لا تضع `SUPABASE_SERVICE_ROLE_KEY` في كود المتصفح أو Git. لا تنفذ أي migration على قاعدة بيانات التدريب أو المشروع القديم.
+
+## تطبيق Android وSupabase
+
+تطبيق Android يتصل مباشرة بـSupabase Auth وPostgREST/RPC، ولا يعتمد على مسار `/api/me` أو خادم API مستقل لاستعادة ملف الموظف. قبل استخدام تسجيل الدخول والمهام في إصدار يحتوي migration جديدة، طبّق migrations على مشروع Supabase المقصود. راجع [دليل migrations للموبايل](supabase/README.md) لمعرفة متطلبات migration `017_mobile_client_access.sql` وأوامر التطبيق والتحقق.
