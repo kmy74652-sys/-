@@ -200,7 +200,7 @@ export default function Home() {
   }
 
   const allowed = new Set(profile.permissions);
-  const isOwner = profile.roles.some((role) => role.code === 'owner') && allowed.has('employees.manage');
+  const isOwner = profile.roles.some((role) => role.code === 'owner' || role.code === 'admin_followup') && allowed.has('employees.manage');
   return (
     <SafeAreaView style={styles.safe}>
       <ScrollView contentContainerStyle={styles.content}>
@@ -224,7 +224,7 @@ export default function Home() {
         )}
         {isOwner && (
           <Pressable accessibilityRole="button" style={styles.settingsLink} onPress={() => router.push('/settings')}>
-            <Text style={styles.settingsLinkText}>إعدادات الموظفين ورموز الدخول</Text>
+            <Text style={styles.settingsLinkText}>إدارة الموظفين وحسابات الدخول</Text>
           </Pressable>
         )}
         <Pressable

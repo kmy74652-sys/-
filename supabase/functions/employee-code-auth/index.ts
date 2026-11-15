@@ -216,6 +216,31 @@ async function verifyOwner(request: Request, clients: FunctionClients): Promise<
   return { authorized: true, profile };
 }
 
+function isOwnerProfile(profile: EmployeeProfile) {
+  return profile.roles.some((role) => role.code === 'owner');
+}
+
+async function targetIsOwner(admin: AdminClient, organizationId: string, membershipId: string) {
+  const { data } = await admin.from('role_assignments')
+    .select('id')
+    .eq('organization_id', organizationId)
+    .eq('membership_id', membershipId)
+    .eq('role_code', 'owner')
+    .limit(1);
+  return Boolean(data?.length);
+}
+
+async function writeAudit(admin: AdminClient, organizationId: string, membershipId: string | null, actorId: string, action: string, metadata: Record<string, unknown> = {}) {
+  const { error } = await admin.from('employee_access_audit_log').insert({
+    organization_id: organizationId,
+    membership_id: membershipId,
+    actor_membership_id: actorId,
+    action,
+    metadata,
+  });
+  return error;
+}
+
 async function login(body: Record<string, unknown>, request: Request, clients: FunctionClients) {
   const employeeNo = typeof body.employeeNo === 'string' ? body.employeeNo.trim() : '';
   const code = body.code;
@@ -397,7 +422,48 @@ async function ownerOperation(body: Record<string, unknown>, request: Request, c
     return response({ error: 'database_update_required' }, 503);
   }
   if (!target || !target.user_id) return response({ error: 'employee_auth_not_linked' }, 404);
-  if (!target.is_active) return response({ error: 'employee_not_active' }, 400);
+  const targetOwner = await targetIsOwner(clients.adminClient, owner.institutionId, employeeId);
+  if (targetOwner && !isOwnerProfile(owner)) return response({ error: 'owner_account_protected' }, 403);
+  if (!target.is_active && !['update_employee', 'audit'].includes(String(body.action))) return response({ error: 'employee_not_active' }, 400);
+
+  if (body.action === 'audit') {
+    const { data, error } = await clients.adminClient
+      .from('employee_access_audit_log')
+      .select('id,membership_id,actor_membership_id,action,created_at,metadata')
+      .eq('organization_id', owner.institutionId)
+      .or(`membership_id.eq.${employeeId},actor_membership_id.eq.${employeeId}`)
+      .order('created_at', { ascending: false })
+      .limit(200);
+    if (error) return response({ error: 'audit_lookup_failed' }, 500);
+    return response({ audit: data ?? [] });
+  }
+
+  if (body.action === 'update_employee') {
+    const fullName = typeof body.fullName === 'string' ? body.fullName.trim() : '';
+    const employeeNo = typeof body.employeeNo === 'string' ? body.employeeNo.trim() : '';
+    const status = body.status === 'suspended' ? false : body.status === 'active' ? true : undefined;
+    const roleCode = typeof body.roleCode === 'string' ? body.roleCode : undefined;
+    const branchId = typeof body.branchId === 'string' ? body.branchId : undefined;
+    if (fullName.length < 2 || fullName.length > 160 || !/^\d{1,32}$/.test(employeeNo) || !['admin_followup', 'accountant', 'warehouse_keeper', 'warehouse_worker'].includes(roleCode ?? '') || !/^[0-9a-f-]{36}$/i.test(branchId ?? '')) {
+      return response({ error: 'invalid_employee_payload' }, 400);
+    }
+    const { data: duplicate } = await clients.adminClient.from('organization_memberships').select('id').eq('organization_id', owner.institutionId).eq('employee_no', employeeNo).neq('id', employeeId).maybeSingle();
+    if (duplicate) return response({ error: 'employee_no_exists' }, 409);
+    const { data: branch } = await clients.adminClient.from('branches').select('id').eq('organization_id', owner.institutionId).eq('id', branchId).eq('is_active', true).maybeSingle();
+    if (!branch) return response({ error: 'branch_not_found' }, 400);
+    const { error: memberError } = await clients.adminClient.from('organization_memberships').update({ display_name: fullName, employee_no: employeeNo, is_active: status }).eq('organization_id', owner.institutionId).eq('id', employeeId);
+    if (memberError) return response({ error: 'employee_update_failed' }, 400);
+    const { data: currentRole } = await clients.adminClient.from('role_assignments').select('role_code,branch_id').eq('organization_id', owner.institutionId).eq('membership_id', employeeId).limit(1).maybeSingle();
+    const { error: roleError } = await clients.adminClient.from('role_assignments').update({ role_code: roleCode, branch_id: branchId }).eq('organization_id', owner.institutionId).eq('membership_id', employeeId);
+    if (roleError) return response({ error: 'employee_access_update_failed' }, 400);
+    const actions = ['updated'];
+    if (currentRole?.role_code !== roleCode) actions.push('role_changed');
+    if (currentRole?.branch_id !== branchId) actions.push('branch_changed');
+    if (status === false) actions.push('suspended');
+    if (status === true) actions.push('reactivated');
+    for (const action of actions) await writeAudit(clients.adminClient, owner.institutionId, employeeId, owner.id, action, { employeeNo, roleCode, branchId });
+    return response({ ok: true });
+  }
 
   const revoke = body.action === 'revoke_code';
   if (!revoke && (body.action !== 'set_code' || !isAccessCode(body.code))) {
@@ -424,12 +490,7 @@ async function ownerOperation(body: Record<string, unknown>, request: Request, c
     return response({ error: 'access_code_status_update_failed' }, 500);
   }
 
-  const { error: auditError } = await clients.adminClient.from('employee_access_audit_log').insert({
-    organization_id: owner.institutionId,
-    membership_id: target.id,
-    actor_membership_id: owner.id,
-    action: revoke ? 'code_revoked' : 'code_set',
-  });
+  const { error: auditError } = await writeAudit(clients.adminClient, owner.institutionId, target.id, owner.id, revoke ? 'code_revoked' : 'password_reset');
   if (auditError) {
     console.error('employee_code_audit_write_failed');
     return response({ error: 'access_code_audit_failed' }, 500);
@@ -446,6 +507,7 @@ async function createEmployee(body: Record<string, unknown>, request: Request, c
   const fullName = typeof body.fullName === 'string' ? body.fullName.trim() : '';
   const roleCode = typeof body.roleCode === 'string' ? body.roleCode : '';
   const branchId = typeof body.branchId === 'string' ? body.branchId : '';
+  const requestedCode = isAccessCode(body.code) ? body.code : null;
   const allowedRoles = new Set(['admin_followup', 'accountant', 'warehouse_keeper', 'warehouse_worker']);
   if (!/^\d{1,32}$/.test(employeeNo) || fullName.length < 2 || fullName.length > 160 || !allowedRoles.has(roleCode) || !/^[0-9a-f-]{36}$/i.test(branchId)) {
     return response({ error: 'invalid_employee_payload' }, 400);
@@ -484,7 +546,7 @@ async function createEmployee(body: Record<string, unknown>, request: Request, c
     return response({ error: 'employee_access_setup_failed' }, 400);
   }
 
-  const code = randomAccessCode();
+  const code = requestedCode ?? randomAccessCode();
   const credentialUpdate = await setEmployeeAccessCode(clients.adminClient, membership.id, authData.user.id, code);
   if (credentialUpdate.error) {
     await clients.adminClient.from('organization_memberships').delete().eq('id', membership.id);
@@ -508,7 +570,7 @@ Deno.serve(async (request): Promise<Response> => {
     if (body.action === 'login') return await login(body, request, clients);
     if (body.action === 'bootstrap_owner') return await bootstrapOwner(body, clients);
     if (body.action === 'create_employee') return await createEmployee(body, request, clients);
-    if (body.action === 'list' || body.action === 'set_code' || body.action === 'revoke_code') {
+    if (body.action === 'list' || body.action === 'set_code' || body.action === 'revoke_code' || body.action === 'update_employee' || body.action === 'audit') {
       return await ownerOperation(body, request, clients);
     }
     return response({ error: 'unsupported_action' }, 400);
