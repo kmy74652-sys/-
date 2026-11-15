@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useRouter } from 'expo-router';
+import { useRouter, type ErrorBoundaryProps } from 'expo-router';
 import {
   ActivityIndicator,
   Alert,
@@ -16,8 +16,8 @@ import { supabase } from '../lib/supabase';
 
 type EmployeeAccess = {
   id: string;
-  employeeNo: string;
-  fullName: string;
+  employeeNo: string | null;
+  fullName: string | null;
   status: string;
   hasAuthAccount: boolean;
   codeSetAt: string | null;
@@ -33,9 +33,22 @@ function functionErrorText(error: unknown) {
   const status = functionStatus(error);
   if (status === 401) return 'انتهت الجلسة. سجّل الدخول مجددًا.';
   if (status === 403) return 'هذه الإعدادات متاحة لصاحب المؤسسة فقط.';
-  if (status === 404 || status === 503) return 'خدمة الرموز أو migration 019 غير منشورين على Supabase بعد.';
+  if (status === 404 || status === 503) return 'خدمة الرموز أو تحديث قاعدة البيانات غير جاهز في Supabase بعد.';
   if (status === 429) return 'محاولات كثيرة. انتظر قليلًا ثم حاول مجددًا.';
   return 'تعذر إكمال الطلب. تحقق من الاتصال وحاول مجددًا.';
+}
+
+function normalizeEmployeeList(data: unknown): EmployeeAccess[] {
+  const employees = (data as EmployeeListResult | null)?.employees;
+  if (!Array.isArray(employees)) return [];
+  return employees.filter((employee) => employee && typeof employee.id === 'string').map((employee) => ({
+    id: employee.id,
+    employeeNo: typeof employee.employeeNo === 'string' ? employee.employeeNo : null,
+    fullName: typeof employee.fullName === 'string' ? employee.fullName : null,
+    status: typeof employee.status === 'string' ? employee.status : 'inactive',
+    hasAuthAccount: employee.hasAuthAccount === true,
+    codeSetAt: typeof employee.codeSetAt === 'string' ? employee.codeSetAt : null,
+  }));
 }
 
 export default function EmployeeAccessSettings() {
@@ -63,8 +76,10 @@ export default function EmployeeAccessSettings() {
         setError('يجب تسجيل الدخول بحساب صاحب المؤسسة لفتح هذه الإعدادات.');
         return;
       }
-      const owner = identity.employee.roles.some((role) => role.code === 'owner')
-        && identity.employee.permissions.includes('employees.manage');
+      const employeeRoles = Array.isArray(identity.employee.roles) ? identity.employee.roles : [];
+      const employeePermissions = Array.isArray(identity.employee.permissions) ? identity.employee.permissions : [];
+      const owner = employeeRoles.some((role) => role?.code === 'owner')
+        && employeePermissions.includes('employees.manage');
       setIsOwner(owner);
       if (!owner) {
         setError('هذه الإعدادات متاحة لصاحب المؤسسة فقط.');
@@ -77,7 +92,7 @@ export default function EmployeeAccessSettings() {
         setError(functionErrorText(listError));
         return;
       }
-      setEmployees((data as EmployeeListResult | null)?.employees ?? []);
+      setEmployees(normalizeEmployeeList(data));
     } catch (cause) {
       setError(friendlyDataError(cause, 'تعذر تحميل قائمة الموظفين. تحقق من الاتصال ثم أعد المحاولة.'));
     } finally {
@@ -109,7 +124,7 @@ export default function EmployeeAccessSettings() {
       const { data, error: refreshError } = await supabase.functions.invoke('employee-code-auth', {
         body: { action: 'list' },
       });
-      if (!refreshError) setEmployees((data as EmployeeListResult | null)?.employees ?? []);
+      if (!refreshError) setEmployees(normalizeEmployeeList(data));
     } catch {
       setError('تعذر حفظ الرمز. تحقق من الاتصال ثم حاول مجددًا.');
     } finally {
@@ -145,7 +160,7 @@ export default function EmployeeAccessSettings() {
       const { data, error: refreshError } = await supabase.functions.invoke('employee-code-auth', {
         body: { action: 'list' },
       });
-      if (!refreshError) setEmployees((data as EmployeeListResult | null)?.employees ?? []);
+      if (!refreshError) setEmployees(normalizeEmployeeList(data));
     } catch {
       setError('تعذر إلغاء الرمز. تحقق من الاتصال ثم حاول مجددًا.');
     } finally {
@@ -179,8 +194,8 @@ export default function EmployeeAccessSettings() {
           const busy = busyEmployeeId === employee.id;
           return (
             <View style={styles.employeeCard} key={employee.id}>
-              <Text style={styles.employeeName}>{employee.fullName}</Text>
-              <Text style={styles.employeeMeta}>رقم الموظف: {employee.employeeNo}</Text>
+              <Text style={styles.employeeName}>{employee.fullName || 'موظف'}</Text>
+              <Text style={styles.employeeMeta}>رقم الموظف: {employee.employeeNo || 'غير محدد'}</Text>
               <Text style={styles.employeeMeta}>
                 {employee.codeSetAt ? 'تم تعيين رمز دخول' : 'لم يُعيّن رمز دخول بعد'}
                 {!active ? ' · الحساب غير نشط' : ''}
@@ -235,6 +250,22 @@ export default function EmployeeAccessSettings() {
           </Pressable>
         )}
       </ScrollView>
+    </SafeAreaView>
+  );
+}
+
+export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
+  return (
+    <SafeAreaView style={styles.safe}>
+      <View style={styles.content}>
+        <Text style={styles.title}>تعذر فتح إعدادات الموظفين</Text>
+        <Text accessibilityRole="alert" style={styles.error}>
+          أوقفنا هذا الجزء بأمان بدل إغلاق التطبيق. رمز الخطأ: {error?.name || 'غير معروف'}.
+        </Text>
+        <Pressable accessibilityRole="button" style={styles.refresh} onPress={() => { void retry(); }}>
+          <Text style={styles.refreshText}>إعادة فتح الصفحة</Text>
+        </Pressable>
+      </View>
     </SafeAreaView>
   );
 }
