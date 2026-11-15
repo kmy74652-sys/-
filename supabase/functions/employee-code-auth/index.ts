@@ -444,7 +444,7 @@ async function ownerOperation(body: Record<string, unknown>, request: Request, c
     const status = body.status === 'suspended' ? false : body.status === 'active' ? true : undefined;
     const roleCode = typeof body.roleCode === 'string' ? body.roleCode : undefined;
     const branchId = typeof body.branchId === 'string' ? body.branchId : undefined;
-    if (fullName.length < 2 || fullName.length > 160 || !/^\d{1,32}$/.test(employeeNo) || !['admin_followup', 'accountant', 'warehouse_keeper', 'warehouse_worker'].includes(roleCode ?? '') || !/^[0-9a-f-]{36}$/i.test(branchId ?? '')) {
+    if (fullName.length < 2 || fullName.length > 160 || !/^\d{1,32}$/.test(employeeNo) || !['owner', 'admin_followup', 'accountant', 'warehouse_keeper', 'warehouse_worker'].includes(roleCode ?? '') || (!isOwnerProfile(owner) && roleCode === 'owner') || !/^[0-9a-f-]{36}$/i.test(branchId ?? '')) {
       return response({ error: 'invalid_employee_payload' }, 400);
     }
     const { data: duplicate } = await clients.adminClient.from('organization_memberships').select('id').eq('organization_id', owner.institutionId).eq('employee_no', employeeNo).neq('id', employeeId).maybeSingle();
@@ -508,8 +508,8 @@ async function createEmployee(body: Record<string, unknown>, request: Request, c
   const roleCode = typeof body.roleCode === 'string' ? body.roleCode : '';
   const branchId = typeof body.branchId === 'string' ? body.branchId : '';
   const requestedCode = isAccessCode(body.code) ? body.code : null;
-  const allowedRoles = new Set(['admin_followup', 'accountant', 'warehouse_keeper', 'warehouse_worker']);
-  if (!/^\d{1,32}$/.test(employeeNo) || fullName.length < 2 || fullName.length > 160 || !allowedRoles.has(roleCode) || !/^[0-9a-f-]{36}$/i.test(branchId)) {
+  const allowedRoles = new Set(['owner', 'admin_followup', 'accountant', 'warehouse_keeper', 'warehouse_worker']);
+  if (!/^\d{1,32}$/.test(employeeNo) || fullName.length < 2 || fullName.length > 160 || !allowedRoles.has(roleCode) || (roleCode === 'owner' && !isOwnerProfile(owner)) || !/^[0-9a-f-]{36}$/i.test(branchId)) {
     return response({ error: 'invalid_employee_payload' }, 400);
   }
 

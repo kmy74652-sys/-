@@ -33,7 +33,7 @@ export default function Home() {
   const router = useRouter();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [checkingSession, setCheckingSession] = useState(true);
-  const [employeeNo, setEmployeeNo] = useState('');
+  const [employeeNo, setEmployeeNo] = useState('1');
   const [code, setCode] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -77,11 +77,11 @@ export default function Home() {
       return;
     }
     if (!employeeNo.trim() || !code) {
-      setError('أدخل رقم الموظف ورمز الدخول.');
+      setError('أدخل رقم الموظف وكلمة المرور.');
       return;
     }
     if (!/^\S{8,64}$/.test(code)) {
-      setError('يجب أن يتكون رمز الدخول من 8 إلى 64 محرفًا دون مسافات.');
+      setError('يجب أن تتكون كلمة المرور من 8 إلى 64 محرفًا دون مسافات.');
       return;
     }
 
@@ -149,9 +149,9 @@ export default function Home() {
           >
             <View style={styles.auth}>
               <Text style={styles.mark}>ش</Text>
-              <Text style={styles.eyebrow}>وصول آمن للموظفين</Text>
+              <Text style={styles.eyebrow}>دخول المالك والموظفين</Text>
               <Text style={styles.title}>برنامج الشاعري</Text>
-              <Text style={styles.copy}>أدخل رقم الموظف والرمز الشخصي الذي عيّنه صاحب المؤسسة. لا يلزم إدخال بريد إلكتروني.</Text>
+              <Text style={styles.copy}>لصاحب المؤسسة: رقم الموظف الافتراضي هو 1. أدخل كلمة المرور التي عيّنها لك النظام. وبقية الموظفين يستخدمون رقمهم وكلمة المرور التي يحددها المسؤول.</Text>
               {!!error && <Text accessibilityRole="alert" style={styles.error}>{error}</Text>}
               <TextInput
                 style={styles.input}
@@ -167,7 +167,7 @@ export default function Home() {
               />
               <TextInput
                 style={styles.input}
-                placeholder="رمز الدخول الشخصي"
+                placeholder="كلمة المرور"
                 secureTextEntry
                 autoCapitalize="none"
                 autoCorrect={false}
@@ -177,7 +177,7 @@ export default function Home() {
                 onChangeText={setCode}
                 onSubmitEditing={() => void login()}
                 editable={!busy}
-                accessibilityLabel="رمز الدخول الشخصي"
+                accessibilityLabel="كلمة المرور"
               />
               <Pressable
                 accessibilityRole="button"

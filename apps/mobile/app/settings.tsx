@@ -24,6 +24,13 @@ type EmployeeAccess = {
 };
 type Branch = { id: string; name: string };
 type AuditEntry = { id: string; action: string; created_at: string; metadata?: Record<string, unknown> };
+const roleOptions = [
+  ['owner', 'صاحب المؤسسة'],
+  ['admin_followup', 'المدير التنفيذي'],
+  ['accountant', 'المحاسب'],
+  ['warehouse_keeper', 'أمين المخازن'],
+  ['warehouse_worker', 'عامل تحميل'],
+] as const;
 
 type EmployeeListResult = { employees?: EmployeeAccess[] };
 
@@ -239,7 +246,8 @@ export default function EmployeeAccessSettings() {
             <TextInput style={styles.input} placeholder="اسم الموظف" value={createForm.fullName} onChangeText={(value) => setCreateForm((current) => ({ ...current, fullName: value }))} />
             <TextInput style={styles.input} placeholder="رقم الموظف الفريد" keyboardType="number-pad" value={createForm.employeeNo} onChangeText={(value) => setCreateForm((current) => ({ ...current, employeeNo: value }))} />
             <TextInput style={styles.input} placeholder="كلمة المرور الأولية" secureTextEntry value={createForm.code} onChangeText={(value) => setCreateForm((current) => ({ ...current, code: value }))} />
-            <TextInput style={styles.input} placeholder="الدور: warehouse_worker" value={createForm.roleCode} onChangeText={(value) => setCreateForm((current) => ({ ...current, roleCode: value }))} />
+            <Text style={styles.employeeMeta}>التصنيف الوظيفي</Text>
+            <View style={styles.roleChoices}>{roleOptions.map(([code, label]) => <Pressable key={code} accessibilityRole="button" style={[styles.roleChoice, createForm.roleCode === code && styles.roleChoiceActive]} onPress={() => setCreateForm((current) => ({ ...current, roleCode: code }))}><Text style={styles.roleChoiceText}>{label}</Text></Pressable>)}</View>
             <TextInput style={styles.input} placeholder="معرّف الفرع" value={createForm.branchId} onChangeText={(value) => setCreateForm((current) => ({ ...current, branchId: value }))} />
             <Pressable accessibilityRole="button" disabled={busyEmployeeId !== null} style={styles.primaryButton} onPress={() => void createEmployee()}><Text style={styles.buttonText}>{busyEmployeeId === 'create' ? 'جارٍ الإنشاء…' : 'إنشاء الحساب'}</Text></Pressable>
           </View>
@@ -267,8 +275,10 @@ export default function EmployeeAccessSettings() {
                 <>
                   <TextInput style={styles.input} placeholder="الاسم" value={editForms[employee.id].fullName} onChangeText={(value) => setEditForms((current) => ({ ...current, [employee.id]: { ...current[employee.id], fullName: value } }))} />
                   <TextInput style={styles.input} placeholder="الرقم الوظيفي" value={editForms[employee.id].employeeNo} onChangeText={(value) => setEditForms((current) => ({ ...current, [employee.id]: { ...current[employee.id], employeeNo: value } }))} />
-                  <TextInput style={styles.input} placeholder="الدور" value={editForms[employee.id].roleCode} onChangeText={(value) => setEditForms((current) => ({ ...current, [employee.id]: { ...current[employee.id], roleCode: value } }))} />
+                  <Text style={styles.employeeMeta}>التصنيف الوظيفي</Text>
+                  <View style={styles.roleChoices}>{roleOptions.map(([code, label]) => <Pressable key={code} accessibilityRole="button" style={[styles.roleChoice, editForms[employee.id].roleCode === code && styles.roleChoiceActive]} onPress={() => setEditForms((current) => ({ ...current, [employee.id]: { ...current[employee.id], roleCode: code } }))}><Text style={styles.roleChoiceText}>{label}</Text></Pressable>)}</View>
                   <TextInput style={styles.input} placeholder="معرّف الفرع" value={editForms[employee.id].branchId} onChangeText={(value) => setEditForms((current) => ({ ...current, [employee.id]: { ...current[employee.id], branchId: value } }))} />
+                  <Pressable accessibilityRole="button" style={styles.refresh} onPress={() => setEditForms((current) => ({ ...current, [employee.id]: { ...current[employee.id], status: current[employee.id].status === 'active' ? 'suspended' : 'active' } }))}><Text style={styles.refreshText}>{editForms[employee.id].status === 'active' ? 'تجهيز لإيقاف الحساب' : 'تجهيز لإعادة تفعيل الحساب'}</Text></Pressable>
                   <Pressable accessibilityRole="button" disabled={busyEmployeeId !== null} style={styles.primaryButton} onPress={() => void updateEmployee(employee)}><Text style={styles.buttonText}>{busyEmployeeId === employee.id ? 'جارٍ الحفظ…' : 'حفظ بيانات الحساب'}</Text></Pressable>
                   <Pressable accessibilityRole="button" style={styles.refresh} onPress={() => void loadAudit(employee)}><Text style={styles.refreshText}>عرض سجل التعديلات</Text></Pressable>
                   {(audit[employee.id] ?? []).map((entry) => <Text style={styles.employeeMeta} key={entry.id}>{entry.action} · {new Date(entry.created_at).toLocaleString('ar-SA')}</Text>)}
@@ -364,5 +374,9 @@ const styles = StyleSheet.create({
   dangerText: { color: '#a8443d', fontWeight: '800' },
   refresh: { minHeight: 46, alignItems: 'center', justifyContent: 'center', marginTop: 18, borderWidth: 1, borderColor: '#17324d', borderRadius: 11 },
   refreshText: { color: '#17324d', fontWeight: '800' },
+  roleChoices: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 10 },
+  roleChoice: { borderWidth: 1, borderColor: '#d6e0e4', borderRadius: 10, paddingVertical: 9, paddingHorizontal: 10, backgroundColor: '#fbfcfc' },
+  roleChoiceActive: { backgroundColor: '#dceee7', borderColor: '#2f6654' },
+  roleChoiceText: { color: '#39556a', fontSize: 13, fontWeight: '700' },
   pressed: { opacity: 0.82 },
 });
