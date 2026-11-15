@@ -9,6 +9,7 @@ const corsHeaders = {
 const RATE_WINDOW_MS = 15 * 60 * 1000;
 const MAX_EMPLOYEE_FAILURES = 8;
 const MAX_IP_FAILURES = 40;
+const OWNER_EMAIL = 'als43870@gmail.com';
 type AdminClient = SupabaseClient<any, 'public', 'public', any, any>;
 type FunctionClients = {
   url: string;
@@ -20,7 +21,7 @@ type FunctionClients = {
 type EmployeeProfile = {
   id: string;
   institutionId: string;
-  employeeNo: string;
+  employeeNo: string | null;
   fullName: string;
   status: string;
   roles: Array<{ code: string }>;
@@ -44,7 +45,6 @@ function defaultNamedKey(envName: string, legacyNames: string[]) {
       const parsed = JSON.parse(source) as Record<string, unknown>;
       if (typeof parsed.default === 'string') return parsed.default;
     } catch {
-      // Some self-hosted/legacy deployments expose a single value instead of a key map.
       if (!source.trim().startsWith('{')) return source;
     }
   }
@@ -73,6 +73,11 @@ function getClients(): FunctionClients {
   return { url, publishableKey, adminClient, secretKey };
 }
 
+async function sha256Hex(value: string) {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));
+  return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
 async function hmacHex(secret: string, value: string) {
   const key = await crypto.subtle.importKey(
     'raw',
@@ -90,6 +95,63 @@ function clientIp(request: Request) {
   if (direct) return direct;
   const forwarded = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim();
   return forwarded || 'unknown';
+}
+
+function isAccessCode(value: unknown): value is string {
+  return typeof value === 'string' && /^\S{8,64}$/.test(value);
+}
+
+function randomReplacementPassword() {
+  const bytes = crypto.getRandomValues(new Uint8Array(32));
+  return [...bytes].map((byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
+function toBase64(bytes: Uint8Array) {
+  let binary = '';
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary);
+}
+
+function fromBase64(value: string) {
+  return Uint8Array.from(atob(value), (character) => character.charCodeAt(0));
+}
+
+async function deriveAccessCodeHash(code: string, salt: Uint8Array) {
+  const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(code), 'PBKDF2', false, ['deriveBits']);
+  const bits = await crypto.subtle.deriveBits({ name: 'PBKDF2', hash: 'SHA-256', salt: salt.buffer as ArrayBuffer, iterations: 310_000 }, key, 256);
+  return new Uint8Array(bits);
+}
+
+function constantTimeEqual(left: Uint8Array, right: Uint8Array) {
+  if (left.length !== right.length) return false;
+  let difference = 0;
+  for (let index = 0; index < left.length; index += 1) difference |= left[index] ^ right[index];
+  return difference === 0;
+}
+
+async function setEmployeeAccessCode(admin: AdminClient, membershipId: string, userId: string, code: string) {
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const codeHash = await deriveAccessCodeHash(code, salt);
+  const bridgePassword = randomReplacementPassword();
+  const { error: authError } = await admin.auth.admin.updateUserById(userId, { password: bridgePassword });
+  if (authError) return { error: 'auth_update_failed' } as const;
+  const { error: credentialError } = await admin.from('employee_access_credentials').upsert({
+    membership_id: membershipId,
+    code_salt: toBase64(salt),
+    code_hash: toBase64(codeHash),
+    auth_bridge_password: bridgePassword,
+    updated_at: new Date().toISOString(),
+  });
+  if (credentialError) return { error: 'credential_store_failed' } as const;
+  return { error: null } as const;
+}
+
+async function removeEmployeeAccessCode(admin: AdminClient, membershipId: string, userId: string) {
+  const { error: authError } = await admin.auth.admin.updateUserById(userId, { password: randomReplacementPassword() });
+  if (authError) return { error: 'auth_update_failed' } as const;
+  const { error: credentialError } = await admin.from('employee_access_credentials').delete().eq('membership_id', membershipId);
+  if (credentialError) return { error: 'credential_store_failed' } as const;
+  return { error: null } as const;
 }
 
 async function countRecentFailures(admin: AdminClient, employeeHash: string, ipHash: string) {
@@ -117,8 +179,6 @@ async function recordFailure(admin: AdminClient, employeeHash: string, ipHash: s
     ip_key_hash: ipHash,
   });
   if (error) throw new Error('login_rate_limit_write_failed');
-
-  // Keep the private throttle table bounded without storing old access attempts indefinitely.
   await admin.from('employee_access_code_login_attempts')
     .delete()
     .lt('attempted_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
@@ -150,15 +210,6 @@ async function verifyOwner(request: Request, clients: FunctionClients): Promise<
   return { authorized: true, profile };
 }
 
-function isAccessCode(value: unknown): value is string {
-  return typeof value === 'string' && /^\S{8,64}$/.test(value);
-}
-
-function randomReplacementPassword() {
-  const bytes = crypto.getRandomValues(new Uint8Array(48));
-  return [...bytes].map((byte) => byte.toString(16).padStart(2, '0')).join('');
-}
-
 async function login(body: Record<string, unknown>, request: Request, clients: FunctionClients) {
   const employeeNo = typeof body.employeeNo === 'string' ? body.employeeNo.trim() : '';
   const code = body.code;
@@ -175,23 +226,48 @@ async function login(body: Record<string, unknown>, request: Request, clients: F
     return response({ error: 'too_many_attempts' }, 429);
   }
 
-  const { data: matches, error: employeeError } = await clients.adminClient
-    .from('employees')
-    .select('id,institution_id,auth_user_id,status,access_code_set_at')
+  const { data: matches, error: membershipError } = await clients.adminClient
+    .from('organization_memberships')
+    .select('id,organization_id,user_id,is_active,employee_no,access_code_set_at')
     .eq('employee_no', employeeNo)
     .limit(2);
-  if (employeeError) {
-    console.error('employee_code_login_employee_lookup_failed');
+  if (membershipError) {
+    console.error('employee_code_login_membership_lookup_failed');
     return response({ error: 'database_update_required' }, 503);
   }
-
-  const employee = matches?.length === 1 ? matches[0] : null;
-  if (!employee || employee.status !== 'active' || !employee.auth_user_id || !employee.access_code_set_at) {
+  const membership = matches?.length === 1 ? matches[0] : null;
+  if (!membership || !membership.is_active || !membership.access_code_set_at) {
     await recordFailure(clients.adminClient, employeeHash, ipHash);
     return response({ error: 'invalid_credentials' }, 401);
   }
 
-  const { data: authData, error: authLookupError } = await clients.adminClient.auth.admin.getUserById(employee.auth_user_id);
+  const { data: credential, error: credentialError } = await clients.adminClient
+    .from('employee_access_credentials')
+    .select('code_salt,code_hash,auth_bridge_password')
+    .eq('membership_id', membership.id)
+    .maybeSingle();
+  if (credentialError) {
+    console.error('employee_code_login_credential_lookup_failed');
+    return response({ error: 'database_update_required' }, 503);
+  }
+  let codeMatches = false;
+  if (credential) {
+    try {
+      const [derived, stored] = await Promise.all([
+        deriveAccessCodeHash(code, fromBase64(credential.code_salt)),
+        Promise.resolve(fromBase64(credential.code_hash)),
+      ]);
+      codeMatches = constantTimeEqual(derived, stored);
+    } catch {
+      codeMatches = false;
+    }
+  }
+  if (!credential || !codeMatches) {
+    await recordFailure(clients.adminClient, employeeHash, ipHash);
+    return response({ error: 'invalid_credentials' }, 401);
+  }
+
+  const { data: authData, error: authLookupError } = await clients.adminClient.auth.admin.getUserById(membership.user_id);
   const authUser = authData?.user;
   if (authLookupError || !authUser || (!authUser.email && !authUser.phone)) {
     console.error('employee_code_login_auth_user_lookup_failed');
@@ -203,8 +279,8 @@ async function login(body: Record<string, unknown>, request: Request, clients: F
     auth: { autoRefreshToken: false, persistSession: false, detectSessionInUrl: false },
   });
   const credentials = authUser.email
-    ? { email: authUser.email, password: code }
-    : { phone: authUser.phone!, password: code };
+    ? { email: authUser.email, password: credential.auth_bridge_password }
+    : { phone: authUser.phone!, password: credential.auth_bridge_password };
   const { data: sessionData, error: signInError } = await authClient.auth.signInWithPassword(credentials);
   if (signInError || !sessionData.session) {
     await recordFailure(clients.adminClient, employeeHash, ipHash);
@@ -220,6 +296,60 @@ async function login(body: Record<string, unknown>, request: Request, clients: F
   });
 }
 
+async function bootstrapOwner(body: Record<string, unknown>, clients: FunctionClients) {
+  const token = typeof body.bootstrapToken === 'string' ? body.bootstrapToken : '';
+  const code = body.code;
+  if (token.length < 32 || !isAccessCode(code)) return response({ error: 'invalid_bootstrap_request' }, 400);
+
+  const tokenHash = await sha256Hex(token);
+  const { data: claimed, error: claimError } = await clients.adminClient
+    .rpc('claim_employee_access_code_bootstrap', { p_token_hash: tokenHash });
+  if (claimError || claimed !== true) return response({ error: 'bootstrap_token_invalid_or_expired' }, 401);
+
+  const { data: members, error: memberError } = await clients.adminClient
+    .from('organization_memberships')
+    .select('id,organization_id,user_id,is_active,employee_no')
+    .eq('employee_no', '1')
+    .eq('is_active', true)
+    .limit(2);
+  if (memberError || members?.length !== 1) {
+    console.error('employee_code_bootstrap_owner_membership_lookup_failed');
+    return response({ error: 'owner_membership_not_unique' }, 409);
+  }
+  const membership = members[0];
+
+  const { data: ownerRole, error: roleError } = await clients.adminClient
+    .from('role_assignments')
+    .select('id')
+    .eq('organization_id', membership.organization_id)
+    .eq('membership_id', membership.id)
+    .eq('role_code', 'owner')
+    .limit(1);
+  if (roleError || !ownerRole?.length) return response({ error: 'owner_permission_required' }, 403);
+
+  const { data: authData, error: authError } = await clients.adminClient.auth.admin.getUserById(membership.user_id);
+  if (authError || authData.user?.email?.toLowerCase() !== OWNER_EMAIL) {
+    console.error('employee_code_bootstrap_designated_owner_check_failed');
+    return response({ error: 'designated_owner_check_failed' }, 403);
+  }
+
+  const credentialUpdate = await setEmployeeAccessCode(clients.adminClient, membership.id, membership.user_id, code as string);
+  if (credentialUpdate.error) {
+    console.error('employee_code_bootstrap_credential_update_failed', credentialUpdate.error);
+    return response({ error: 'owner_code_update_failed' }, 500);
+  }
+  const { error: metadataError } = await clients.adminClient
+    .from('organization_memberships')
+    .update({ access_code_set_at: new Date().toISOString(), access_code_updated_by: membership.id })
+    .eq('id', membership.id)
+    .eq('organization_id', membership.organization_id);
+  if (metadataError) {
+    console.error('employee_code_bootstrap_metadata_update_failed_after_auth_update');
+    return response({ error: 'owner_code_status_update_failed' }, 500);
+  }
+  return response({ ok: true, employeeNo: '1' });
+}
+
 async function ownerOperation(body: Record<string, unknown>, request: Request, clients: FunctionClients): Promise<Response> {
   const authorized = await verifyOwner(request, clients);
   if (!authorized.authorized) return authorized.error;
@@ -227,22 +357,22 @@ async function ownerOperation(body: Record<string, unknown>, request: Request, c
 
   if (body.action === 'list') {
     const { data, error } = await clients.adminClient
-      .from('employees')
-      .select('id,employee_no,full_name,status,auth_user_id,access_code_set_at')
-      .eq('institution_id', owner.institutionId)
+      .from('organization_memberships')
+      .select('id,employee_no,display_name,is_active,user_id,access_code_set_at')
+      .eq('organization_id', owner.institutionId)
       .order('employee_no', { ascending: true })
       .limit(500);
     if (error) {
       console.error('employee_code_owner_list_failed');
       return response({ error: 'database_update_required' }, 503);
     }
-    return response({ employees: (data ?? []).map((employee) => ({
-      id: employee.id,
-      employeeNo: employee.employee_no,
-      fullName: employee.full_name,
-      status: employee.status,
-      hasAuthAccount: Boolean(employee.auth_user_id),
-      codeSetAt: employee.access_code_set_at,
+    return response({ employees: (data ?? []).map((member) => ({
+      id: member.id,
+      employeeNo: member.employee_no,
+      fullName: member.display_name,
+      status: member.is_active ? 'active' : 'inactive',
+      hasAuthAccount: Boolean(member.user_id),
+      codeSetAt: member.access_code_set_at,
     })) });
   }
 
@@ -251,39 +381,37 @@ async function ownerOperation(body: Record<string, unknown>, request: Request, c
     return response({ error: 'invalid_employee' }, 400);
   }
   const { data: target, error: targetError } = await clients.adminClient
-    .from('employees')
-    .select('id,auth_user_id,status')
-    .eq('institution_id', owner.institutionId)
+    .from('organization_memberships')
+    .select('id,user_id,is_active')
+    .eq('organization_id', owner.institutionId)
     .eq('id', employeeId)
     .maybeSingle();
   if (targetError) {
     console.error('employee_code_target_lookup_failed');
     return response({ error: 'database_update_required' }, 503);
   }
-  if (!target || !target.auth_user_id) return response({ error: 'employee_auth_not_linked' }, 404);
-  if (target.status !== 'active') return response({ error: 'employee_not_active' }, 400);
+  if (!target || !target.user_id) return response({ error: 'employee_auth_not_linked' }, 404);
+  if (!target.is_active) return response({ error: 'employee_not_active' }, 400);
 
   const revoke = body.action === 'revoke_code';
   if (!revoke && (body.action !== 'set_code' || !isAccessCode(body.code))) {
     return response({ error: 'invalid_access_code' }, 400);
   }
-  const nextPassword = revoke ? randomReplacementPassword() : body.code as string;
-  const { error: passwordError } = await clients.adminClient.auth.admin.updateUserById(
-    target.auth_user_id,
-    { password: nextPassword },
-  );
-  if (passwordError) {
-    console.error('employee_code_auth_update_failed');
+  const credentialUpdate = revoke
+    ? await removeEmployeeAccessCode(clients.adminClient, target.id, target.user_id)
+    : await setEmployeeAccessCode(clients.adminClient, target.id, target.user_id, body.code as string);
+  if (credentialUpdate.error) {
+    console.error('employee_code_credential_update_failed', credentialUpdate.error);
     return response({ error: 'access_code_update_failed' }, 500);
   }
 
   const { error: metadataError } = await clients.adminClient
-    .from('employees')
+    .from('organization_memberships')
     .update({
       access_code_set_at: revoke ? null : new Date().toISOString(),
       access_code_updated_by: owner.id,
     })
-    .eq('institution_id', owner.institutionId)
+    .eq('organization_id', owner.institutionId)
     .eq('id', employeeId);
   if (metadataError) {
     console.error('employee_code_metadata_update_failed_after_auth_update');
@@ -301,6 +429,7 @@ Deno.serve(async (request): Promise<Response> => {
     const body = await request.json() as Record<string, unknown>;
     const clients = getClients();
     if (body.action === 'login') return await login(body, request, clients);
+    if (body.action === 'bootstrap_owner') return await bootstrapOwner(body, clients);
     if (body.action === 'list' || body.action === 'set_code' || body.action === 'revoke_code') {
       return await ownerOperation(body, request, clients);
     }
