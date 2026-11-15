@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { supabase } from './lib/supabase';
 import { BranchesPage, CustomersPage, EmployeesPage, RolesPage, TaskLibraryPage, TasksPage } from './management';
 import { ReportsPage } from './business';
+import { ReportDesignerPage } from './reportDesigner';
 import './styles.css';
 
 type EmployeeProfile = {
@@ -24,6 +25,7 @@ const modules = [
   ['الأدوار والصلاحيات', 'roles.read', '/roles', 'مراجعة الوصول المؤسسي'],
   ['المهام والمتابعة', 'tasks.read', '/tasks', 'متابعة الحالة والإنجاز'],
   ['مكتبة المهام', 'task_library.read', '/task-library', 'قوالب المهام ونماذج التقارير'],
+  ['مصمم التقارير', 'report_forms.manage', '/report-designer', 'مكتبة القوالب وإصدارات التقارير'],
   ['العملاء والحسابات', 'customers.read', '/customers', 'كشوف الحساب والتحصيل والحدود'],
   ['التقارير والرقابة', 'finance.read', '/reports', 'ملخص مالي وتنبيهات وسجل التدقيق'],
 ] as const;
@@ -156,6 +158,7 @@ function App() {
   if (window.location.pathname === '/roles' && profile.permissions.includes('roles.read')) return <RolesPage onBack={backHome} />;
   if (window.location.pathname === '/tasks' && profile.permissions.includes('tasks.read')) return <TasksPage onBack={backHome} />;
   if (window.location.pathname === '/task-library' && profile.permissions.includes('task_library.read')) return <TaskLibraryPage onBack={backHome} />;
+  if (window.location.pathname === '/report-designer' && profile.permissions.includes('report_forms.manage')) return <ReportDesignerPage onBack={backHome} />;
   if (window.location.pathname === '/customers' && profile.permissions.includes('customers.read')) return <CustomersPage onBack={backHome} />;
   if (window.location.pathname === '/reports' && profile.permissions.includes('finance.read')) return <ReportsPage onBack={backHome} />;
   return <Dashboard profile={profile} onLogout={async () => { await supabase?.auth.signOut(); setProfile(null); }} />;

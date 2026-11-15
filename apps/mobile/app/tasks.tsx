@@ -130,6 +130,16 @@ export default function TasksScreen() {
         if (attachments[task.id]?.length) values[field.key] = attachments[task.id].map((file) => file);
         continue;
       }
+      if (field.type === 'calculated') {
+        values[field.key] = calculatedValue(task.id, field);
+        continue;
+      }
+      if (field.type === 'signature') {
+        const [name, acknowledgedAt] = raw.split('|');
+        if (field.required && (!name || !acknowledgedAt)) { setError(`أكمل الإقرار بالتوقيع الاسمي: ${field.label}`); return; }
+        if (name && acknowledgedAt) values[field.key] = { name, acknowledged_at: acknowledgedAt };
+        continue;
+      }
       if (field.required && !raw) {
         setError(`أكمل الحقل المطلوب: ${field.label}`);
         return;
@@ -138,6 +148,11 @@ export default function TasksScreen() {
         const selected = JSON.parse(raw) as string[];
         if (field.required && !selected.length) { setError(`اختر خيارًا واحدًا على الأقل: ${field.label}`); return; }
         values[field.key] = selected;
+      } else if (field.type === 'table') {
+        let rows: Array<Record<string, string>> = [];
+        try { rows = raw ? JSON.parse(raw) as Array<Record<string, string>> : []; } catch { setError(`صيغة جدول غير صالحة: ${field.label}`); return; }
+        if (field.required && !rows.length) { setError(`أضف صفًا واحدًا على الأقل: ${field.label}`); return; }
+        values[field.key] = rows;
       } else if (raw) {
         values[field.key] = ['number', 'progress'].includes(field.type)
           ? Number(raw)
@@ -145,6 +160,20 @@ export default function TasksScreen() {
       }
     }
     void mutate(task, () => submitTaskReport(task.id, values), 'تم إرسال التقرير للمراجعة.');
+  }
+
+  function tableColumns(field: ReportField) { return Array.isArray(field.config?.columns) && field.config.columns.length ? field.config.columns.map(String) : ['القيمة']; }
+  function tableRows(taskId: string, field: ReportField) { const raw = drafts[taskId]?.[field.key] ?? '[]'; try { const parsed = JSON.parse(raw); return Array.isArray(parsed) ? parsed as Array<Record<string, string>> : []; } catch { return []; } }
+  function updateTable(taskId: string, field: ReportField, rows: Array<Record<string, string>>) { setDrafts((current) => ({ ...current, [taskId]: { ...current[taskId], [field.key]: JSON.stringify(rows) } })); }
+  function calculatedValue(taskId: string, field: ReportField) {
+    const formula = String(field.config?.formula ?? '').trim();
+    const sumRows = formula.match(/^sum_rows\(([^.]+)\.([^)]+)\)$/);
+    if (sumRows) { const source = tasks.find((task) => task.id === taskId)?.report_schema.find((item) => item.key === sumRows[1]); return source ? tableRows(taskId, source).reduce((total, row) => total + (Number(row[sumRows[2]]) || 0), 0) : 0; }
+    const sum = formula.match(/^sum\(([^)]+)\)$/);
+    if (sum) return Number(drafts[taskId]?.[sum[1]] ?? 0) || 0;
+    const difference = formula.match(/^difference\(([^,]+),([^)]+)\)$/);
+    if (difference) return (Number(drafts[taskId]?.[difference[1].trim()] ?? 0) || 0) - (Number(drafts[taskId]?.[difference[2].trim()] ?? 0) || 0);
+    return '';
   }
 
   async function chooseAttachment(task: Task) {
@@ -227,9 +256,15 @@ export default function TasksScreen() {
             {reportTask === task.id && (task.report_schema ?? []).map((field) => (
               <View key={field.key} style={styles.field}>
                 <Text style={styles.fieldLabel}>{field.label}{field.required ? ' *' : ''}</Text>
-                {['attachment', 'image', 'file'].includes(field.type) ? (
+                {field.type === 'calculated' ? (
+                  <View style={styles.calculated}><Text style={styles.calculatedValue}>{String(calculatedValue(task.id, field))}</Text><Text style={styles.meta}>محسوب تلقائيًا من الصيغة: {String(field.config?.formula ?? 'غير محددة')}</Text></View>
+                ) : field.type === 'table' ? (
+                  <View style={styles.tableEditor}>{tableRows(task.id, field).map((row, rowIndex) => <View style={styles.tableRow} key={`${field.key}-${rowIndex}`}>{tableColumns(field).map((column) => <TextInput key={column} style={styles.tableCell} placeholder={column} value={row[column] ?? ''} onChangeText={(value) => { const rows = tableRows(task.id, field); rows[rowIndex] = { ...rows[rowIndex], [column]: value }; updateTable(task.id, field, rows); }} />)}<Pressable style={styles.secondaryButton} onPress={() => updateTable(task.id, field, tableRows(task.id, field).filter((_, index) => index !== rowIndex))}><Text style={styles.secondaryText}>حذف الصف</Text></Pressable></View>)}<Pressable style={styles.secondaryButton} onPress={() => { const rows = tableRows(task.id, field); const blank = Object.fromEntries(tableColumns(field).map((column) => [column, ''])); updateTable(task.id, field, [...rows, blank]); }}><Text style={styles.secondaryText}>إضافة صف</Text></Pressable></View>
+                ) : ['attachment', 'image', 'file'].includes(field.type) ? (
                   <View style={styles.field}><Pressable style={styles.secondaryButton} onPress={() => void chooseAttachment(task)}><Text style={styles.secondaryText}>اختيار مرفق من الهاتف</Text></Pressable>{!!attachments[task.id]?.length && <Text style={styles.meta}>{attachments[task.id].map((file) => file.name).join('، ')}</Text>}</View>
-                ) : ['checkbox', 'boolean', 'signature'].includes(field.type) ? (
+                ) : field.type === 'signature' ? (
+                  <View style={styles.field}><TextInput style={styles.input} placeholder="اكتب الاسم للإقرار" value={(drafts[task.id]?.[field.key] ?? '').split('|')[0]} onChangeText={(value) => setDrafts((current) => ({ ...current, [task.id]: { ...current[task.id], [field.key]: value } }))} /><Pressable style={styles.secondaryButton} onPress={() => { const name = (drafts[task.id]?.[field.key] ?? '').split('|')[0].trim(); if (name) setDrafts((current) => ({ ...current, [task.id]: { ...current[task.id], [field.key]: `${name}|${new Date().toISOString()}` } })); }}><Text style={styles.secondaryText}>{(drafts[task.id]?.[field.key] ?? '').includes('|') ? 'تم الإقرار ✓' : 'تأكيد الإقرار'}</Text></Pressable></View>
+                ) : ['checkbox', 'boolean'].includes(field.type) ? (
                   <Pressable
                     accessibilityRole="checkbox"
                     accessibilityState={{ checked: drafts[task.id]?.[field.key] === 'true' }}
@@ -262,9 +297,8 @@ export default function TasksScreen() {
                     value={drafts[task.id]?.[field.key] ?? ''}
                     onChangeText={(value) => setDrafts((current) => ({ ...current, [task.id]: { ...current[task.id], [field.key]: value } }))}
                     keyboardType={['number', 'progress', 'integer', 'quantity', 'money'].includes(field.type) ? 'numeric' : 'default'}
-                    multiline={['notes', 'textarea', 'long_text', 'table', 'decision_notes'].includes(field.type)}
-                    editable={field.type !== 'calculated'}
-                    placeholder={field.type === 'progress' ? 'أدخل نسبة الإنجاز' : ['date', 'datetime'].includes(field.type) ? 'التاريخ والوقت' : field.type === 'calculated' ? 'يحسبه النظام' : field.required ? 'مطلوب' : 'اختياري'}
+                    multiline={['notes', 'textarea', 'long_text', 'decision_notes'].includes(field.type)}
+                    placeholder={field.type === 'progress' ? 'أدخل نسبة الإنجاز' : ['date', 'datetime'].includes(field.type) ? 'التاريخ والوقت' : field.required ? 'مطلوب' : 'اختياري'}
                   />
                 )}
               </View>
@@ -372,4 +406,9 @@ const styles = StyleSheet.create({
   sectionTitle: { color: '#17324d', fontSize: 18, fontWeight: '800', textAlign: 'right' },
   notification: { borderTopWidth: 1, borderTopColor: '#edf1f3', paddingTop: 10, gap: 4 },
   notificationTitle: { color: '#17324d', fontWeight: '700', textAlign: 'right' },
+  tableEditor: { gap: 8, borderWidth: 1, borderColor: '#dce6e9', borderRadius: 10, padding: 8 },
+  tableRow: { gap: 6, borderBottomWidth: 1, borderBottomColor: '#edf1f3', paddingBottom: 8 },
+  tableCell: { minHeight: 42, borderWidth: 1, borderColor: '#d6e0e4', borderRadius: 8, paddingHorizontal: 10, textAlign: 'right', backgroundColor: '#fbfcfc' },
+  calculated: { backgroundColor: '#eef5f7', borderRadius: 10, padding: 12, gap: 4 },
+  calculatedValue: { color: '#17324d', fontSize: 20, fontWeight: '900', textAlign: 'right' },
 });
