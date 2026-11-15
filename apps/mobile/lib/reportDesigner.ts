@@ -13,7 +13,7 @@ export type DesignerField = {
   validation: Record<string, unknown>;
   config: Record<string, unknown>;
 };
-export type ReportTemplate = { id: string; code: string; title: string; description: string | null; role_code: string; is_active: boolean };
+export type ReportTemplate = { id: string; code: string; title: string; description: string | null; role_code: string; is_active: boolean; created_by?: string; updated_by?: string | null; created_at?: string; updated_at?: string };
 export type ReportVersion = { id: string; template_id: string; version_no: number; status: string; report_required: boolean };
 
 function client() { if (!supabase) throw new Error('supabase_not_configured'); return supabase; }
@@ -27,7 +27,7 @@ async function userAndOrganization() {
 }
 export async function listDesignerTemplates() {
   const { db } = await userAndOrganization();
-  const { data, error } = await db.from('report_form_templates').select('id,code,title,description,role_code,is_active').eq('is_active', true).order('title').limit(100);
+  const { data, error } = await db.from('report_form_templates').select('id,code,title,description,role_code,is_active,created_by,updated_by,created_at,updated_at').eq('is_active', true).order('title').limit(100);
   if (error) throw error;
   return (data ?? []) as ReportTemplate[];
 }
@@ -63,6 +63,11 @@ export async function saveDesignerTemplate(input: { templateId?: string; title: 
 }
 export async function publishDesignerVersion(taskId: string, templateId: string, versionId: string, reportRequired: boolean) {
   const { data, error } = await client().rpc('publish_task_report_form', { p_task_id: taskId, p_template_id: templateId, p_version_id: versionId, p_report_required: reportRequired });
+  if (error) throw error;
+  return data as string;
+}
+export async function approveDesignerVersion(versionId: string) {
+  const { data, error } = await client().rpc('approve_report_form_version', { p_version_id: versionId });
   if (error) throw error;
   return data as string;
 }
