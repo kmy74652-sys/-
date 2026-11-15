@@ -4,3 +4,6 @@ packages:
 
 allowBuilds:
   esbuild: true
+
+patchedDependencies:
+  expo-router@4.0.22: patches/expo-router@4.0.22.patch

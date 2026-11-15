@@ -4,6 +4,9 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+patchedDependencies:
+  expo-router@4.0.22: 00f1e13dafaae8d1c2853e170b0021f92abb3eb48b790373db0dc3df5b0dbb48
+
 importers:
 
   .:
@@ -77,7 +80,7 @@ importers:
         version: 7.0.5(b15a29a6cd08a257ea8d8fcb8a8017d0)
       expo-router:
         specifier: ~4.0.0
-        version: 4.0.22(f5233acb0795bd3f9e502801a2617a87)
+        version: 4.0.22(patch_hash=00f1e13dafaae8d1c2853e170b0021f92abb3eb48b790373db0dc3df5b0dbb48)(f5233acb0795bd3f9e502801a2617a87)
       expo-system-ui:
         specifier: ~4.0.9
         version: 4.0.9(3a7f1dabee50c2406f81a1357d69aee0)
@@ -7767,7 +7770,7 @@ snapshots:
     dependencies:
       invariant: 2.2.4
 
-  expo-router@4.0.22(f5233acb0795bd3f9e502801a2617a87):
+  expo-router@4.0.22(patch_hash=00f1e13dafaae8d1c2853e170b0021f92abb3eb48b790373db0dc3df5b0dbb48)(f5233acb0795bd3f9e502801a2617a87):
     dependencies:
       '@expo/metro-runtime': 4.0.1(react-native@0.76.9(@babel/core@7.29.13(supports-color@8.1.1))(@babel/preset-env@7.29.7(@babel/core@7.29.13(supports-color@8.1.1))(supports-color@8.1.1))(@react-native-community/cli@15.0.1(supports-color@8.1.1)(typescript@5.3.3))(@types/react@18.3.31)(react@18.3.1)(supports-color@8.1.1))
       '@expo/server': 0.5.3(supports-color@8.1.1)
