@@ -106,6 +106,11 @@ function randomReplacementPassword() {
   return [...bytes].map((byte) => byte.toString(16).padStart(2, '0')).join('');
 }
 
+function randomAccessCode() {
+  const bytes = crypto.getRandomValues(new Uint8Array(8));
+  return [...bytes].map((byte) => String(byte % 10)).join('');
+}
+
 function toBase64(bytes: Uint8Array) {
   let binary = '';
   for (const byte of bytes) binary += String.fromCharCode(byte);
@@ -419,7 +424,78 @@ async function ownerOperation(body: Record<string, unknown>, request: Request, c
     return response({ error: 'access_code_status_update_failed' }, 500);
   }
 
+  const { error: auditError } = await clients.adminClient.from('employee_access_audit_log').insert({
+    organization_id: owner.institutionId,
+    membership_id: target.id,
+    actor_membership_id: owner.id,
+    action: revoke ? 'code_revoked' : 'code_set',
+  });
+  if (auditError) {
+    console.error('employee_code_audit_write_failed');
+    return response({ error: 'access_code_audit_failed' }, 500);
+  }
+
   return response({ ok: true, revoked: revoke });
+}
+
+async function createEmployee(body: Record<string, unknown>, request: Request, clients: FunctionClients): Promise<Response> {
+  const authorized = await verifyOwner(request, clients);
+  if (!authorized.authorized) return authorized.error;
+  const owner = authorized.profile;
+  const employeeNo = typeof body.employeeNo === 'string' ? body.employeeNo.trim() : '';
+  const fullName = typeof body.fullName === 'string' ? body.fullName.trim() : '';
+  const roleCode = typeof body.roleCode === 'string' ? body.roleCode : '';
+  const branchId = typeof body.branchId === 'string' ? body.branchId : '';
+  const allowedRoles = new Set(['admin_followup', 'accountant', 'warehouse_keeper', 'warehouse_worker']);
+  if (!/^\d{1,32}$/.test(employeeNo) || fullName.length < 2 || fullName.length > 160 || !allowedRoles.has(roleCode) || !/^[0-9a-f-]{36}$/i.test(branchId)) {
+    return response({ error: 'invalid_employee_payload' }, 400);
+  }
+
+  const [{ data: existing }, { data: branch }] = await Promise.all([
+    clients.adminClient.from('organization_memberships').select('id').eq('organization_id', owner.institutionId).eq('employee_no', employeeNo).maybeSingle(),
+    clients.adminClient.from('branches').select('id').eq('organization_id', owner.institutionId).eq('id', branchId).eq('is_active', true).maybeSingle(),
+  ]);
+  if (existing) return response({ error: 'employee_no_exists' }, 409);
+  if (!branch) return response({ error: 'branch_not_found' }, 400);
+
+  const syntheticEmail = `employee-${owner.institutionId}-${employeeNo}@employee.invalid`;
+  const { data: authData, error: authError } = await clients.adminClient.auth.admin.createUser({
+    email: syntheticEmail,
+    password: randomReplacementPassword(),
+    email_confirm: true,
+    user_metadata: { employee_no: employeeNo, organization_id: owner.institutionId },
+  });
+  if (authError || !authData.user) return response({ error: 'employee_auth_create_failed' }, 400);
+
+  const { data: membership, error: membershipError } = await clients.adminClient
+    .from('organization_memberships')
+    .insert({ organization_id: owner.institutionId, user_id: authData.user.id, display_name: fullName, is_active: true, employee_no: employeeNo })
+    .select('id,employee_no,display_name,is_active')
+    .single();
+  if (membershipError || !membership) {
+    await clients.adminClient.auth.admin.deleteUser(authData.user.id);
+    return response({ error: 'employee_create_failed' }, 400);
+  }
+
+  const { error: roleError } = await clients.adminClient.from('role_assignments').insert({ organization_id: owner.institutionId, membership_id: membership.id, role_code: roleCode, branch_id: branchId });
+  if (roleError) {
+    await clients.adminClient.from('organization_memberships').delete().eq('id', membership.id);
+    await clients.adminClient.auth.admin.deleteUser(authData.user.id);
+    return response({ error: 'employee_access_setup_failed' }, 400);
+  }
+
+  const code = randomAccessCode();
+  const credentialUpdate = await setEmployeeAccessCode(clients.adminClient, membership.id, authData.user.id, code);
+  if (credentialUpdate.error) {
+    await clients.adminClient.from('organization_memberships').delete().eq('id', membership.id);
+    await clients.adminClient.auth.admin.deleteUser(authData.user.id);
+    return response({ error: 'access_code_create_failed' }, 500);
+  }
+  const now = new Date().toISOString();
+  const { error: metadataError } = await clients.adminClient.from('organization_memberships').update({ access_code_set_at: now, access_code_updated_by: owner.id }).eq('id', membership.id);
+  const { error: auditError } = await clients.adminClient.from('employee_access_audit_log').insert({ organization_id: owner.institutionId, membership_id: membership.id, actor_membership_id: owner.id, action: 'created', metadata: { roleCode, branchId } });
+  if (metadataError || auditError) return response({ error: 'access_code_status_update_failed' }, 500);
+  return response({ ok: true, employee: { id: membership.id, employeeNo, fullName, status: 'active', roleCode, branchId }, accessCode: code }, 201);
 }
 
 Deno.serve(async (request): Promise<Response> => {
@@ -431,6 +507,7 @@ Deno.serve(async (request): Promise<Response> => {
     const clients = getClients();
     if (body.action === 'login') return await login(body, request, clients);
     if (body.action === 'bootstrap_owner') return await bootstrapOwner(body, clients);
+    if (body.action === 'create_employee') return await createEmployee(body, request, clients);
     if (body.action === 'list' || body.action === 'set_code' || body.action === 'revoke_code') {
       return await ownerOperation(body, request, clients);
     }
