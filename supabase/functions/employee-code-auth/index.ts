@@ -203,9 +203,10 @@ async function verifyOwner(request: Request, clients: FunctionClients): Promise<
   }
   const profile = (data as { employee?: EmployeeProfile } | null)?.employee;
   const ownerRole = profile?.roles?.some((role) => role.code === 'owner') ?? false;
+  const executiveRole = profile?.roles?.some((role) => role.code === 'admin_followup') ?? false;
   const canManageEmployees = profile?.permissions?.includes('employees.manage') ?? false;
-  if (!profile || !ownerRole || !canManageEmployees) {
-    return { authorized: false, error: response({ error: 'owner_permission_required' }, 403) };
+  if (!profile || (!ownerRole && !executiveRole) || !canManageEmployees) {
+    return { authorized: false, error: response({ error: 'employee_access_management_permission_required' }, 403) };
   }
   return { authorized: true, profile };
 }

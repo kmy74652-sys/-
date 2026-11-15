@@ -6,6 +6,7 @@ const mobile = fs.readFileSync(new URL('../apps/mobile/lib/mobileData.ts', impor
 const tasks = fs.readFileSync(new URL('../apps/mobile/app/tasks.tsx', import.meta.url), 'utf8').toLowerCase();
 const web = fs.readFileSync(new URL('../apps/web/src/reportDesigner.tsx', import.meta.url), 'utf8').toLowerCase();
 const webMain = fs.readFileSync(new URL('../apps/web/src/main.tsx', import.meta.url), 'utf8').toLowerCase();
+assert(webMain.includes('employee-code-auth') && webMain.includes('employeeno') && webMain.includes('دخول بالرمز') && !webMain.includes('signInWithPassword'), 'desktop employee code login missing');
 const designer = fs.readFileSync(new URL('../apps/mobile/lib/reportDesigner.ts', import.meta.url), 'utf8').toLowerCase();
 for (const token of ['report_form_templates', 'report_form_versions', 'report_form_version_fields', 'task_report_form_snapshots', 'publish_task_report_form', 'report_forms.manage', 'enable row level security']) assert(migration.includes(token), `missing designer token ${token}`);
 for (const fieldType of ['short_text', 'long_text', 'quantity', 'money', 'datetime', 'table', 'image', 'file', 'signature', 'calculated', 'decision_notes']) assert(migration.includes(fieldType) && designer.includes(fieldType), `missing field type ${fieldType}`);

@@ -31,56 +31,25 @@ const modules = [
 ] as const;
 
 function Login({ onLoggedIn }: { onLoggedIn: () => void }) {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [employeeNo, setEmployeeNo] = useState('');
+  const [code, setCode] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const [notice, setNotice] = useState('');
-
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!supabase) return setError('إعدادات Supabase العامة غير متاحة في هذه النسخة.');
-    setBusy(true);
-    setError('');
-    setNotice('');
-    const { error: signInError } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
-    if (signInError) {
-      setError('تعذر تسجيل الدخول. تحقق من البريد وكلمة المرور أو تواصل مع مسؤول المؤسسة.');
-      setBusy(false);
-      return;
-    }
-    onLoggedIn();
-    setBusy(false);
+    if (!employeeNo.trim() || !/^\S{8,64}$/.test(code)) return setError('أدخل رقم الموظف ورمزًا من 8 إلى 64 محرفًا دون مسافات.');
+    setBusy(true); setError('');
+    try {
+      const { data, error: functionError } = await supabase.functions.invoke('employee-code-auth', { body: { action: 'login', employeeNo: employeeNo.trim(), code } });
+      if (functionError) { const status = (functionError as { context?: { status?: number } }).context?.status; setError(status === 429 ? 'محاولات كثيرة. انتظر 15 دقيقة ثم حاول مجددًا.' : status === 401 ? 'رقم الموظف أو رمز الدخول غير صحيح.' : 'تعذر الاتصال بخدمة الدخول بالرمز.'); return; }
+      if (typeof data?.access_token !== 'string' || typeof data?.refresh_token !== 'string') { setError('لم تُرجع خدمة الدخول جلسة صالحة.'); return; }
+      const { error: sessionError } = await supabase.auth.setSession({ access_token: data.access_token, refresh_token: data.refresh_token });
+      if (sessionError) throw sessionError;
+      setCode(''); onLoggedIn();
+    } catch { setError('تعذر إكمال تسجيل الدخول بالرمز. تحقق من الاتصال وحاول مجددًا.'); } finally { setBusy(false); }
   }
-
-  async function sendPasswordReset() {
-    if (!supabase || !email.trim()) return setError('اكتب البريد الإلكتروني أولًا.');
-    setBusy(true); setError(''); setNotice('');
-    const { error: resetError } = await supabase.auth.resetPasswordForEmail(email.trim());
-    if (resetError) setError('تعذر إرسال رابط استعادة كلمة المرور.');
-    else setNotice('تم إرسال رابط استعادة كلمة المرور إلى بريدك الإلكتروني.');
-    setBusy(false);
-  }
-
-  return (
-    <main className="auth-shell">
-      <section className="auth-card">
-        <div className="brand-mark">ش</div>
-        <p className="eyebrow">وصول آمن للموظفين</p>
-        <h1>تسجيل الدخول إلى برنامج الشاعري</h1>
-        <p className="auth-copy">استخدم الحساب المرتبط بملف موظف نشط. لا يُمنح الوصول بمجرد نجاح كلمة المرور.</p>
-        <form onSubmit={submit} className="auth-form">
-          <label>البريد الإلكتروني<input type="email" autoComplete="username" value={email} onChange={(event) => setEmail(event.target.value)} required /></label>
-          <label>كلمة المرور<input type="password" autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} required /></label>
-          {error && <p className="form-error" role="alert">{error}</p>}
-          {notice && <p className="form-success" role="status">{notice}</p>}
-          <button type="submit" disabled={busy}>{busy ? 'جارٍ التحقق…' : 'دخول آمن'}</button>
-          <button type="button" className="text-button auth-reset" onClick={() => void sendPasswordReset()} disabled={busy}>نسيت كلمة المرور؟ أرسل رابطًا جديدًا</button>
-        </form>
-        <p className="auth-footnote">يتم التحقق من المؤسسة والموظف والأدوار على الخادم وقاعدة البيانات.</p>
-      </section>
-    </main>
-  );
+  return <main className="auth-shell"><section className="auth-card"><div className="brand-mark">ش</div><p className="eyebrow">دخول الموظفين بالرمز</p><h1>تسجيل الدخول إلى برنامج الشاعري</h1><p className="auth-copy">استخدم رقم الموظف والرمز الذي أنشأه صاحب المؤسسة أو المدير المخول. لا يحتاج الموظف إلى بريد إلكتروني للدخول.</p><form onSubmit={submit} className="auth-form"><label>رقم الموظف<input inputMode="numeric" autoComplete="username" value={employeeNo} onChange={(event) => setEmployeeNo(event.target.value)} required /></label><label>رمز الدخول<input type="password" autoComplete="current-password" value={code} onChange={(event) => setCode(event.target.value)} minLength={8} maxLength={64} required /></label>{error && <p className="form-error" role="alert">{error}</p>}<button type="submit" disabled={busy}>{busy ? 'جارٍ التحقق…' : 'دخول بالرمز'}</button></form><p className="auth-footnote">يتم التحقق من الرمز على خدمة Supabase مع تحديد محاولات الدخول.</p></section></main>;
 }
 
 function Dashboard({ profile, onLogout }: { profile: EmployeeProfile; onLogout: () => void }) {
