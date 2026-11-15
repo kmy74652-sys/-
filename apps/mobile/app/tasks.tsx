@@ -17,10 +17,13 @@ import {
   getMyEmployeeProfile,
   listMyNotifications,
   listMyTasks,
+  listTaskTimeline,
+  syncOfflineQueue,
   reviewTask,
   submitTaskReport,
   updateTaskStatus,
 } from '../lib/mobileData';
+import { pickTaskAttachment, uploadTaskAttachment, type PickedAttachment } from '../lib/taskAttachments';
 
 type ReportField = { key: string; label: string; type: 'text' | 'number' | 'progress' | 'status' | 'notes' | 'textarea' | 'date' | 'select' | 'multiselect' | 'checkbox' | 'attachment'; options?: string[]; required?: boolean };
 type Task = {
@@ -35,7 +38,7 @@ type Task = {
   starts_at: string;
   due_at: string;
   priority: 'low' | 'normal' | 'high' | 'urgent';
-  status: 'pending' | 'in_progress' | 'submitted' | 'approved' | 'rejected' | 'cancelled';
+  status: 'pending' | 'in_progress' | 'submitted' | 'approved' | 'rejected' | 'cancelled' | 'late';
   proof_required: boolean;
   proof_instructions: string | null;
   report_schema: ReportField[];
@@ -44,7 +47,7 @@ type Notification = { id: string; title: string; body: string; severity: string;
 
 const statusLabels: Record<Task['status'], string> = {
   pending: 'معلقة', in_progress: 'قيد التنفيذ', submitted: 'بانتظار المراجعة',
-  approved: 'معتمدة', rejected: 'تحتاج استكمالًا', cancelled: 'ملغاة',
+  approved: 'معتمدة', rejected: 'تحتاج استكمالًا', cancelled: 'ملغاة', late: 'متأخرة',
 };
 const priorityLabels: Record<Task['priority'], string> = { low: 'منخفضة', normal: 'عادية', high: 'عالية', urgent: 'عاجلة' };
 const positionLabels: Record<NonNullable<Task['position_code']>, string> = {
@@ -68,10 +71,13 @@ export default function TasksScreen() {
   const [positionFilter, setPositionFilter] = useState<Task['position_code'] | 'all'>('all');
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  const [attachments, setAttachments] = useState<Record<string, Array<PickedAttachment & { path?: string }>>>({});
+  const [timeline, setTimeline] = useState<Record<string, Awaited<ReturnType<typeof listTaskTimeline>>>>({});
 
   const load = useCallback(async () => {
     setError('');
     try {
+      await syncOfflineQueue();
       const identity = await getMyEmployeeProfile();
       if (!identity) throw new Error('not_authenticated');
       if (!identity.employee) throw new Error('employee_not_active');
@@ -119,9 +125,11 @@ export default function TasksScreen() {
       const raw = drafts[task.id]?.[field.key]?.trim() ?? '';
       if (field.type === 'attachment') {
         if (field.required) {
-          setError(`الحقل «${field.label}» يتطلب مرفقًا. رفع الملفات غير متاح في هذه النسخة؛ لا يمكن إرسال التقرير قبل دعم المرفقات.`);
+          if (!attachments[task.id]?.length) { setError(`الحقل «${field.label}» يتطلب مرفقًا.`); return; }
+        values[field.key] = attachments[task.id].map((file) => file);
           return;
         }
+        if (attachments[task.id]?.length) values[field.key] = attachments[task.id].map((file) => file);
         continue;
       }
       if (field.required && !raw) {
@@ -139,6 +147,20 @@ export default function TasksScreen() {
       }
     }
     void mutate(task, () => submitTaskReport(task.id, values), 'تم إرسال التقرير للمراجعة.');
+  }
+
+  async function chooseAttachment(task: Task) {
+    try {
+      const file = await pickTaskAttachment();
+      if (!file) return;
+      const uploaded = await uploadTaskAttachment(task.id, file);
+      setAttachments((current) => ({ ...current, [task.id]: [...(current[task.id] ?? []), { ...file, ...uploaded }] }));
+      setNotice('تم رفع المرفق وتجهيزه للتقرير.');
+    } catch (cause) { setError(friendlyDataError(cause, 'تعذر رفع المرفق. تأكد من الاتصال وحجم الملف.')); }
+  }
+  async function showTimeline(task: Task) {
+    try { const rows = await listTaskTimeline(task.id); setTimeline((current) => ({ ...current, [task.id]: rows })); }
+    catch (cause) { setError(friendlyDataError(cause, 'تعذر تحميل سجل المهمة.')); }
   }
 
   const formatDate = (value: string) => {
@@ -182,7 +204,7 @@ export default function TasksScreen() {
             })}
           </ScrollView>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filters}>
-            {(['all', 'pending', 'in_progress', 'submitted', 'rejected', 'approved'] as const).map((status) => {
+            {(['all', 'pending', 'in_progress', 'submitted', 'rejected', 'approved', 'late'] as const).map((status) => {
               const selected = statusFilter === status;
               return <Pressable key={status} accessibilityRole="button" accessibilityState={{ selected }} style={[styles.filterChip, selected && styles.filterChipSelected]} onPress={() => setStatusFilter(status)}>
                 <Text style={selected ? styles.filterChipTextSelected : styles.filterChipText}>{status === 'all' ? 'الكل' : statusLabels[status]}</Text>
@@ -201,12 +223,14 @@ export default function TasksScreen() {
             <Text style={styles.meta}>المنصب: {task.position_code ? positionLabels[task.position_code] : 'بحاجة إلى تصنيف'}{task.branch_name ? ` · الفرع: ${task.branch_name}${task.branch_level ? ` (المستوى ${task.branch_level})` : ''}` : task.branch_id ? ' · فرع محدد' : ''}</Text>
             <Text style={styles.meta}>الأولوية: {priorityLabels[task.priority]} · الموعد: {formatDate(task.due_at)}</Text>
             {task.proof_required && <Text style={styles.proof}>{task.proof_instructions || 'يتطلب إرفاق دليل إنجاز.'}</Text>}
+            <Pressable style={styles.secondaryButton} onPress={() => void showTimeline(task)}><Text style={styles.secondaryText}>عرض السجل الزمني</Text></Pressable>
+            {!!timeline[task.id]?.length && <View style={styles.timeline}>{timeline[task.id].map((entry) => <Text key={entry.id} style={styles.meta}>{formatDate(entry.created_at)} · {entry.status} · {entry.actor_name}{entry.note ? ` — ${entry.note}` : ''}</Text>)}</View>}
 
             {reportTask === task.id && (task.report_schema ?? []).map((field) => (
               <View key={field.key} style={styles.field}>
                 <Text style={styles.fieldLabel}>{field.label}{field.required ? ' *' : ''}</Text>
                 {field.type === 'attachment' ? (
-                  <Text style={styles.attachmentNotice}>هذا الحقل يحتاج رفع ملفًا. رفع المرفقات من الهاتف غير متاح حاليًا.</Text>
+                  <View style={styles.field}><Pressable style={styles.secondaryButton} onPress={() => void chooseAttachment(task)}><Text style={styles.secondaryText}>اختيار مرفق من الهاتف</Text></Pressable>{!!attachments[task.id]?.length && <Text style={styles.meta}>{attachments[task.id].map((file) => file.name).join('، ')}</Text>}</View>
                 ) : field.type === 'checkbox' ? (
                   <Pressable
                     accessibilityRole="checkbox"
@@ -260,7 +284,7 @@ export default function TasksScreen() {
                 </Pressable>
               )}
               {task.status === 'in_progress' && !task.report_schema?.length && (
-                <Pressable disabled={busyTask === task.id} style={styles.primaryButton} onPress={() => void mutate(task, () => updateTaskStatus(task.id, 'submitted'), 'أرسلت المهمة للمراجعة.')}>
+                <Pressable disabled={busyTask === task.id} style={styles.primaryButton} onPress={() => void mutate(task, () => submitTaskReport(task.id, {}), 'أرسلت المهمة للمراجعة.')}>
                   <Text style={styles.primaryText}>إرسال للمراجعة</Text>
                 </Pressable>
               )}
@@ -344,6 +368,7 @@ const styles = StyleSheet.create({
   notice: { color: '#23633c', backgroundColor: '#e8f5eb', borderRadius: 10, padding: 12, textAlign: 'right', lineHeight: 22 },
   empty: { color: '#718394', textAlign: 'center', paddingVertical: 22 },
   muted: { color: '#718394', textAlign: 'center' },
+  timeline: { borderTopWidth: 1, borderTopColor: '#edf1f3', paddingTop: 8, gap: 4 },
   notifications: { marginTop: 10, padding: 16, backgroundColor: '#fff', borderWidth: 1, borderColor: '#e2e9eb', borderRadius: 16, gap: 10 },
   sectionTitle: { color: '#17324d', fontSize: 18, fontWeight: '800', textAlign: 'right' },
   notification: { borderTopWidth: 1, borderTopColor: '#edf1f3', paddingTop: 10, gap: 4 },

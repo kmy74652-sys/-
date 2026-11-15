@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { flushQueue, queueOperation, type QueueItem } from './offlineQueue';
 
 export type MobileProfile = {
   id: string;
@@ -28,7 +29,7 @@ export type MobileTask = {
   starts_at: string;
   due_at: string;
   priority: 'low' | 'normal' | 'high' | 'urgent';
-  status: 'pending' | 'in_progress' | 'submitted' | 'approved' | 'rejected' | 'cancelled';
+  status: 'pending' | 'in_progress' | 'submitted' | 'approved' | 'rejected' | 'cancelled' | 'late';
   proof_required: boolean;
   proof_instructions: string | null;
   report_schema: Array<{
@@ -48,6 +49,7 @@ export type MobileNotification = {
   read_at: string | null;
   created_at: string;
 };
+export type TaskTimelineEntry = { id: string; status: string; note: string | null; actor_name: string; created_at: string };
 
 function getClient() {
   if (!supabase) throw new Error('supabase_not_configured');
@@ -98,19 +100,30 @@ async function callRpc(name: string, args: Record<string, unknown>) {
   if (error) throw error;
 }
 
-export function updateTaskStatus(taskId: string, status: 'in_progress' | 'submitted', note: string | null = null) {
-  return callRpc('mobile_record_task_update', {
-    p_task_id: taskId,
-    p_status: status,
-    p_note: note,
-  });
+function isOffline(error: unknown) { const message = String((error as { message?: string })?.message ?? error).toLowerCase(); return message.includes('network') || message.includes('fetch') || message.includes('offline') || message.includes('timeout'); }
+function idempotencyKey(taskId: string, operation: string) { return `${operation}:${taskId}:${Date.now()}`; }
+async function executeQueueItem(item: QueueItem) {
+  if (item.kind === 'status') await callRpc('mobile_record_task_update', { p_task_id: item.payload.taskId, p_status: item.payload.status, p_note: item.payload.note ?? null, p_idempotency_key: item.payload.idempotencyKey });
+  if (item.kind === 'report') await callRpc('mobile_submit_task_report', { p_task_id: item.payload.taskId, p_values: item.payload.values, p_idempotency_key: item.payload.idempotencyKey });
+}
+export function syncOfflineQueue() { return flushQueue(executeQueueItem); }
+
+export async function updateTaskStatus(taskId: string, status: 'in_progress' | 'submitted', note: string | null = null) {
+  const payload = { taskId, status, note, idempotencyKey: idempotencyKey(taskId, `status:${status}`) };
+  try { await callRpc('mobile_record_task_update', { p_task_id: taskId, p_status: status, p_note: note, p_idempotency_key: payload.idempotencyKey }); }
+  catch (error) { if (!isOffline(error)) throw error; await queueOperation('status', payload); }
 }
 
-export function submitTaskReport(taskId: string, values: Record<string, unknown>) {
-  return callRpc('mobile_submit_task_report', {
-    p_task_id: taskId,
-    p_values: values,
-  });
+export async function submitTaskReport(taskId: string, values: Record<string, unknown>) {
+  const payload = { taskId, values, idempotencyKey: idempotencyKey(taskId, 'report') };
+  try { await callRpc('mobile_submit_task_report', { p_task_id: taskId, p_values: values, p_idempotency_key: payload.idempotencyKey }); }
+  catch (error) { if (!isOffline(error)) throw error; await queueOperation('report', payload); }
+}
+
+export async function listTaskTimeline(taskId: string): Promise<TaskTimelineEntry[]> {
+  const { data, error } = await getClient().rpc('mobile_task_timeline', { p_task_id: taskId });
+  if (error) throw error;
+  return (data ?? []) as TaskTimelineEntry[];
 }
 
 export function reviewTask(taskId: string, decision: 'approved' | 'rejected', note: string | null) {
