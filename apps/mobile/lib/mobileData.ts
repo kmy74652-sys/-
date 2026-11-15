@@ -123,7 +123,13 @@ export async function submitTaskReport(taskId: string, values: Record<string, un
 export async function listTaskTimeline(taskId: string): Promise<TaskTimelineEntry[]> {
   const { data, error } = await getClient().rpc('mobile_task_timeline', { p_task_id: taskId });
   if (error) throw error;
-  return (data ?? []) as TaskTimelineEntry[];
+  return ((data ?? []) as Array<{ event_id: string; action_type: string; new_status: string | null; notes: string | null; actor_name: string; created_at: string }>).map((entry) => ({
+    id: entry.event_id,
+    status: entry.new_status || entry.action_type,
+    note: entry.notes,
+    actor_name: entry.actor_name,
+    created_at: entry.created_at,
+  }));
 }
 
 export function reviewTask(taskId: string, decision: 'approved' | 'rejected', note: string | null) {
