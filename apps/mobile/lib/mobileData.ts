@@ -16,7 +16,7 @@ export type MobileProfile = {
 };
 
 export type MobileIdentity = { userId: string; employee: MobileProfile | null };
-type ReportField = { key: string; label: string; type: 'text' | 'number' | 'progress' | 'status' | 'notes' | 'textarea' | 'date' | 'select' | 'multiselect' | 'checkbox' | 'attachment'; options?: string[]; required?: boolean };
+type ReportField = { key: string; label: string; description?: string | null; type: 'text' | 'number' | 'progress' | 'status' | 'notes' | 'textarea' | 'date' | 'select' | 'multiselect' | 'checkbox' | 'attachment' | 'short_text' | 'long_text' | 'integer' | 'quantity' | 'money' | 'datetime' | 'boolean' | 'table' | 'image' | 'file' | 'signature' | 'calculated' | 'decision_notes'; options?: string[]; required?: boolean; repeatable?: boolean; validation?: Record<string, unknown>; config?: Record<string, unknown> };
 
 export type MobileTask = {
   id: string;
@@ -36,7 +36,7 @@ export type MobileTask = {
   report_schema: Array<{
     key: string;
     label: string;
-    type: 'text' | 'number' | 'progress' | 'status' | 'notes' | 'textarea' | 'date' | 'select' | 'multiselect' | 'checkbox' | 'attachment';
+    type: ReportField['type'];
     options?: string[];
     required?: boolean;
   }>;
@@ -88,6 +88,10 @@ export async function listMyTasks(): Promise<MobileTask[]> {
   if (branchesResult.error) throw branchesResult.error;
   if (membershipsResult.error) throw membershipsResult.error;
   if (fieldsResult.error) throw fieldsResult.error;
+  const snapshotsResult = taskIds.length
+    ? await client.from('task_report_form_snapshots').select('task_id,schema').in('task_id', taskIds).limit(200)
+    : { data: [], error: null };
+  if (snapshotsResult.error) throw snapshotsResult.error;
   const branches = branchesResult.data ?? [];
   const branchById = new Map((branches ?? []).map((branch) => [branch.id, branch]));
   const membershipByUser = new Map((membershipsResult.data ?? []).map((membership) => [membership.user_id, membership.id]));
@@ -99,6 +103,14 @@ export async function listMyTasks(): Promise<MobileTask[]> {
     const type = field.field_type === 'long_text' ? 'textarea' : field.field_type === 'multi_select' ? 'multiselect' : field.field_type;
     const normalized = { key: field.field_key ?? `field_${field.label}`, label: field.label, type, options: Array.isArray(field.options) ? field.options : [], required: field.is_required } as ReportField;
     fieldsByTask.set(field.task_id, [...(fieldsByTask.get(field.task_id) ?? []), normalized]);
+  }
+  for (const snapshot of snapshotsResult.data ?? []) {
+    const snapshotFields = Array.isArray(snapshot.schema) ? snapshot.schema as Array<Record<string, unknown>> : [];
+    fieldsByTask.set(snapshot.task_id, snapshotFields.map((field) => ({
+      key: String(field.key ?? ''), label: String(field.label ?? ''), description: (field.description as string | null) ?? null,
+      type: String(field.type ?? 'short_text') as ReportField['type'], options: Array.isArray(field.options) ? field.options.map(String) : [],
+      required: Boolean(field.required), repeatable: Boolean(field.repeatable), validation: (field.validation as Record<string, unknown>) ?? {}, config: (field.config as Record<string, unknown>) ?? {},
+    })));
   }
   return rows.map((task) => {
     const role = task.assigned_to ? roleByMembership.get(membershipByUser.get(task.assigned_to) ?? '') : null;

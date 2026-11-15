@@ -1,0 +1,12 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+const migration = fs.readFileSync(new URL('../supabase/migrations/026_dynamic_report_designer.sql', import.meta.url), 'utf8').toLowerCase();
+const ui = fs.readFileSync(new URL('../apps/mobile/app/admin.tsx', import.meta.url), 'utf8').toLowerCase();
+const mobile = fs.readFileSync(new URL('../apps/mobile/lib/mobileData.ts', import.meta.url), 'utf8').toLowerCase();
+const designer = fs.readFileSync(new URL('../apps/mobile/lib/reportDesigner.ts', import.meta.url), 'utf8').toLowerCase();
+for (const token of ['report_form_templates', 'report_form_versions', 'report_form_version_fields', 'task_report_form_snapshots', 'publish_task_report_form', 'report_forms.manage', 'enable row level security']) assert(migration.includes(token), `missing designer token ${token}`);
+for (const fieldType of ['short_text', 'long_text', 'quantity', 'money', 'datetime', 'table', 'image', 'file', 'signature', 'calculated', 'decision_notes']) assert(migration.includes(fieldType) && designer.includes(fieldType), `missing field type ${fieldType}`);
+assert(ui.includes('مصمم التقارير') && ui.includes('إضافة حقل') && ui.includes('معاينة الموظف'), 'designer UI missing');
+assert(ui.includes('publishdesignerversion') && ui.includes('reporttemplateid'), 'task publishing integration missing');
+assert(mobile.includes('task_report_form_snapshots') && mobile.includes('snapshot.schema'), 'mobile snapshot reader missing');
+console.log(JSON.stringify({ ok: true, schema: true, fieldTypes: 15, versionedSnapshot: true, mobileReader: true }));

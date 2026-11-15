@@ -25,7 +25,7 @@ import {
 } from '../lib/mobileData';
 import { pickTaskAttachment, uploadTaskAttachment, type PickedAttachment } from '../lib/taskAttachments';
 
-type ReportField = { key: string; label: string; type: 'text' | 'number' | 'progress' | 'status' | 'notes' | 'textarea' | 'date' | 'select' | 'multiselect' | 'checkbox' | 'attachment'; options?: string[]; required?: boolean };
+type ReportField = { key: string; label: string; description?: string | null; type: 'text' | 'number' | 'progress' | 'status' | 'notes' | 'textarea' | 'date' | 'select' | 'multiselect' | 'checkbox' | 'attachment' | 'short_text' | 'long_text' | 'integer' | 'quantity' | 'money' | 'datetime' | 'boolean' | 'table' | 'image' | 'file' | 'signature' | 'calculated' | 'decision_notes'; options?: string[]; required?: boolean; repeatable?: boolean; validation?: Record<string, unknown>; config?: Record<string, unknown> };
 type Task = {
   id: string;
   title: string;
@@ -227,9 +227,9 @@ export default function TasksScreen() {
             {reportTask === task.id && (task.report_schema ?? []).map((field) => (
               <View key={field.key} style={styles.field}>
                 <Text style={styles.fieldLabel}>{field.label}{field.required ? ' *' : ''}</Text>
-                {field.type === 'attachment' ? (
+                {['attachment', 'image', 'file'].includes(field.type) ? (
                   <View style={styles.field}><Pressable style={styles.secondaryButton} onPress={() => void chooseAttachment(task)}><Text style={styles.secondaryText}>اختيار مرفق من الهاتف</Text></Pressable>{!!attachments[task.id]?.length && <Text style={styles.meta}>{attachments[task.id].map((file) => file.name).join('، ')}</Text>}</View>
-                ) : field.type === 'checkbox' ? (
+                ) : ['checkbox', 'boolean', 'signature'].includes(field.type) ? (
                   <Pressable
                     accessibilityRole="checkbox"
                     accessibilityState={{ checked: drafts[task.id]?.[field.key] === 'true' }}
@@ -261,9 +261,10 @@ export default function TasksScreen() {
                     style={styles.input}
                     value={drafts[task.id]?.[field.key] ?? ''}
                     onChangeText={(value) => setDrafts((current) => ({ ...current, [task.id]: { ...current[task.id], [field.key]: value } }))}
-                    keyboardType={['number', 'progress'].includes(field.type) ? 'numeric' : 'default'}
-                    multiline={['notes', 'textarea'].includes(field.type)}
-                    placeholder={field.type === 'progress' ? 'أدخل نسبة الإنجاز' : field.type === 'date' ? 'YYYY-MM-DD' : field.required ? 'مطلوب' : 'اختياري'}
+                    keyboardType={['number', 'progress', 'integer', 'quantity', 'money'].includes(field.type) ? 'numeric' : 'default'}
+                    multiline={['notes', 'textarea', 'long_text', 'table', 'decision_notes'].includes(field.type)}
+                    editable={field.type !== 'calculated'}
+                    placeholder={field.type === 'progress' ? 'أدخل نسبة الإنجاز' : ['date', 'datetime'].includes(field.type) ? 'التاريخ والوقت' : field.type === 'calculated' ? 'يحسبه النظام' : field.required ? 'مطلوب' : 'اختياري'}
                   />
                 )}
               </View>
