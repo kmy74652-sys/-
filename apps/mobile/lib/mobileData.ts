@@ -16,6 +16,7 @@ export type MobileProfile = {
 };
 
 export type MobileIdentity = { userId: string; employee: MobileProfile | null };
+type ReportField = { key: string; label: string; type: 'text' | 'number' | 'progress' | 'status' | 'notes' | 'textarea' | 'date' | 'select' | 'multiselect' | 'checkbox' | 'attachment'; options?: string[]; required?: boolean };
 
 export type MobileTask = {
   id: string;
@@ -72,16 +73,38 @@ export async function listMyTasks(): Promise<MobileTask[]> {
   const client = getClient();
   const { data, error } = await client
     .from('tasks')
-    .select('id,title,description,assignee_employee_id,branch_id,position_code,starts_at,due_at,priority,status,proof_required,proof_instructions,report_schema')
+    .select('id,title,description,assigned_to,branch_id,due_at,priority,status,assigned_at,created_at')
     .order('due_at', { ascending: true });
   if (error) throw error;
   const rows = data ?? [];
   const branchIds = [...new Set(rows.map((task) => task.branch_id).filter((id): id is string => Boolean(id)))];
-  if (!branchIds.length) return rows as MobileTask[];
-  const { data: branches, error: branchError } = await client.from('branches').select('id,name,branch_level').in('id', branchIds);
-  if (branchError) return rows as MobileTask[];
+  const assignedIds = [...new Set(rows.map((task) => task.assigned_to).filter((id): id is string => Boolean(id)))];
+  const taskIds = rows.map((task) => task.id);
+  const [branchesResult, membershipsResult, fieldsResult] = await Promise.all([
+    branchIds.length ? client.from('branches').select('id,name,branch_level').in('id', branchIds) : Promise.resolve({ data: [], error: null }),
+    assignedIds.length ? client.from('organization_memberships').select('id,user_id').in('user_id', assignedIds) : Promise.resolve({ data: [], error: null }),
+    taskIds.length ? client.from('task_report_fields').select('task_id,label,field_key,field_type,is_required,options,sort_order').in('task_id', taskIds).order('sort_order', { ascending: true }) : Promise.resolve({ data: [], error: null }),
+  ]);
+  if (branchesResult.error) throw branchesResult.error;
+  if (membershipsResult.error) throw membershipsResult.error;
+  if (fieldsResult.error) throw fieldsResult.error;
+  const branches = branchesResult.data ?? [];
   const branchById = new Map((branches ?? []).map((branch) => [branch.id, branch]));
-  return rows.map((task) => ({ ...task, branch_name: branchById.get(task.branch_id)?.name ?? null, branch_level: branchById.get(task.branch_id)?.branch_level ?? null })) as MobileTask[];
+  const membershipByUser = new Map((membershipsResult.data ?? []).map((membership) => [membership.user_id, membership.id]));
+  const roleAssignments = membershipByUser.size ? await client.from('role_assignments').select('membership_id,role_code').in('membership_id', [...membershipByUser.values()]).limit(100) : { data: [], error: null };
+  if (roleAssignments.error) throw roleAssignments.error;
+  const roleByMembership = new Map((roleAssignments.data ?? []).map((assignment) => [assignment.membership_id, assignment.role_code]));
+  const fieldsByTask = new Map<string, ReportField[]>();
+  for (const field of fieldsResult.data ?? []) {
+    const type = field.field_type === 'long_text' ? 'textarea' : field.field_type === 'multi_select' ? 'multiselect' : field.field_type;
+    const normalized = { key: field.field_key ?? `field_${field.label}`, label: field.label, type, options: Array.isArray(field.options) ? field.options : [], required: field.is_required } as ReportField;
+    fieldsByTask.set(field.task_id, [...(fieldsByTask.get(field.task_id) ?? []), normalized]);
+  }
+  return rows.map((task) => {
+    const role = task.assigned_to ? roleByMembership.get(membershipByUser.get(task.assigned_to) ?? '') : null;
+    const status = task.status === 'new' || task.status === 'received' ? 'pending' : task.status === 'report_submitted' ? 'submitted' : task.status === 'completed_approved' ? 'approved' : task.status === 'needs_revision' ? 'rejected' : task.status === 'on_hold' ? 'in_progress' : task.status;
+    return { ...task, assignee_employee_id: task.assigned_to, position_code: role ?? null, starts_at: task.assigned_at ?? task.created_at ?? task.due_at, status, proof_required: false, proof_instructions: null, report_schema: fieldsByTask.get(task.id) ?? [], branch_name: branchById.get(task.branch_id)?.name ?? null, branch_level: branchById.get(task.branch_id)?.branch_level ?? null };
+  }) as MobileTask[];
 }
 
 export async function listMyNotifications(): Promise<MobileNotification[]> {

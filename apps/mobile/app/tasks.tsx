@@ -126,8 +126,6 @@ export default function TasksScreen() {
       if (field.type === 'attachment') {
         if (field.required) {
           if (!attachments[task.id]?.length) { setError(`الحقل «${field.label}» يتطلب مرفقًا.`); return; }
-        values[field.key] = attachments[task.id].map((file) => file);
-          return;
         }
         if (attachments[task.id]?.length) values[field.key] = attachments[task.id].map((file) => file);
         continue;

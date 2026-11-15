@@ -62,6 +62,7 @@ export default function Home() {
       }
       setProfile(identity.employee);
       setError('');
+      router.replace('/admin');
     } catch (cause) {
       setProfile(null);
       setError(friendlyDataError(cause, 'تعذر الاتصال بـSupabase. تحقق من الإنترنت وحاول مرة أخرى.'));
