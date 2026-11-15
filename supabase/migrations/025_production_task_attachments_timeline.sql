@@ -5,7 +5,7 @@ begin;
 -- production-compatible timeline RPC; it does not recreate either table.
 
 insert into storage.buckets (id, name, public, file_size_limit)
-values ('task-reports', 'task-reports', false, 20971520)
+values ('task-attachments', 'task-attachments', false, 20971520)
 on conflict (id) do update set public = false, file_size_limit = 20971520;
 
 alter table public.task_attachments enable row level security;
@@ -49,7 +49,7 @@ drop policy if exists task_reports_storage_read_visible_task on storage.objects;
 create policy task_reports_storage_read_visible_task
 on storage.objects for select to authenticated
 using (
-  bucket_id = 'task-reports'
+  bucket_id = 'task-attachments'
   and exists (
     select 1 from public.task_attachments a
     join public.tasks t on t.id = a.task_id
@@ -67,7 +67,7 @@ drop policy if exists task_reports_storage_insert_uploader on storage.objects;
 create policy task_reports_storage_insert_uploader
 on storage.objects for insert to authenticated
 with check (
-  bucket_id = 'task-reports'
+  bucket_id = 'task-attachments'
   and exists (
     select 1 from public.tasks t
     where split_part(name, '/', 1) ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'

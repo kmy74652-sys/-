@@ -14,7 +14,7 @@ export async function uploadTaskAttachment(taskId: string, file: PickedAttachmen
   const response = await fetch(file.uri);
   const body = await response.arrayBuffer();
   const path = `${taskId}/${Date.now()}-${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
-  const { error } = await supabase.storage.from('task-reports').upload(path, body, { contentType: file.mimeType, upsert: false });
+  const { error } = await supabase.storage.from('task-attachments').upload(path, body, { contentType: file.mimeType, upsert: false });
   if (error) throw error;
   const { data: authData } = await supabase.auth.getUser();
   if (!authData.user) throw new Error('not_authenticated');
@@ -27,7 +27,7 @@ export async function uploadTaskAttachment(taskId: string, file: PickedAttachmen
     size_bytes: file.size,
   });
   if (metadataError) {
-    await supabase.storage.from('task-reports').remove([path]);
+    await supabase.storage.from('task-attachments').remove([path]);
     throw metadataError;
   }
   return { path, name: file.name, mimeType: file.mimeType, size: file.size };
