@@ -18,7 +18,7 @@ import { friendlyDataError, getMyEmployeeProfile } from '../lib/mobileData';
 type Profile = {
   fullName: string;
   employeeNo: string;
-  roles: { nameAr: string }[];
+  roles: { code: string; nameAr: string }[];
   permissions: string[];
   branches: { name: string }[];
 };
@@ -33,10 +33,9 @@ export default function Home() {
   const router = useRouter();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [checkingSession, setCheckingSession] = useState(true);
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [employeeNo, setEmployeeNo] = useState('');
+  const [code, setCode] = useState('');
   const [error, setError] = useState('');
-  const [notice, setNotice] = useState('');
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -76,41 +75,42 @@ export default function Home() {
       setError('إعدادات Supabase غير متاحة.');
       return;
     }
+    if (!employeeNo.trim() || !code) {
+      setError('أدخل رقم الموظف ورمز الدخول.');
+      return;
+    }
+    if (!/^\S{8,64}$/.test(code)) {
+      setError('يجب أن يتكون رمز الدخول من 8 إلى 64 محرفًا دون مسافات.');
+      return;
+    }
+
     setBusy(true);
     setError('');
     try {
-      const { error: signInError } = await supabase.auth.signInWithPassword({
-        email: email.trim(),
-        password,
+      const { data, error: functionError } = await supabase.functions.invoke('employee-code-auth', {
+        body: { action: 'login', employeeNo: employeeNo.trim(), code },
       });
-      if (signInError) {
-        setError(signInError.status === 429
-          ? 'محاولات كثيرة. انتظر قليلًا ثم حاول مجددًا.'
-          : [400, 401, 422].includes(signInError.status ?? 0)
-            ? 'لم يقبل Supabase البريد أو كلمة المرور. تحقق منهما أو استخدم رابط استعادة كلمة المرور.'
-            : `تعذر الاتصال بخدمة تسجيل الدخول${signInError.status ? ` (HTTP ${signInError.status})` : ''}. تحقق من الإنترنت وحاول مجددًا.`);
+      if (functionError) {
+        const status = (functionError as { context?: { status?: number } }).context?.status;
+        if (status === 429) setError('محاولات كثيرة. انتظر 15 دقيقة ثم حاول مجددًا.');
+        else if (status === 401) setError('رقم الموظف أو رمز الدخول غير صحيح، أو لم يعيّن المالك رمزًا لهذا الموظف.');
+        else if (status === 404 || status === 503) setError('خدمة الدخول بالرمز أو تحديث قاعدة البيانات غير جاهز في Supabase بعد.');
+        else setError('تعذر الاتصال بخدمة تسجيل الدخول. تحقق من الإنترنت وحاول مجددًا.');
         return;
       }
+      if (typeof data?.access_token !== 'string' || typeof data?.refresh_token !== 'string') {
+        setError('لم تُرجع خدمة الدخول جلسة صالحة. تحقق من إعداد Supabase.');
+        return;
+      }
+      const { error: sessionError } = await supabase.auth.setSession({
+        access_token: data.access_token,
+        refresh_token: data.refresh_token,
+      });
+      if (sessionError) throw sessionError;
+      setCode('');
       await load();
     } catch {
       setError('تعذر إكمال تسجيل الدخول بسبب انقطاع الاتصال. تحقق من الإنترنت وحاول مجددًا.');
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function resetPassword() {
-    if (!supabase) { setError('إعدادات Supabase غير متاحة.'); return; }
-    if (!email.trim()) { setError('اكتب بريدك الإلكتروني أولًا لإرسال رابط الاستعادة.'); return; }
-    setBusy(true);
-    setError('');
-    setNotice('');
-    try {
-      const { error: resetError } = await supabase.auth.resetPasswordForEmail(email.trim());
-      if (resetError) throw resetError;
-      setNotice('إذا كان البريد مسجلًا، سيصلك رابط استعادة كلمة المرور.');
-    } catch {
-      setError('تعذر إرسال رابط الاستعادة. تحقق من البريد والاتصال ثم حاول مجددًا.');
     } finally {
       setBusy(false);
     }
@@ -150,27 +150,33 @@ export default function Home() {
               <Text style={styles.mark}>ش</Text>
               <Text style={styles.eyebrow}>وصول آمن للموظفين</Text>
               <Text style={styles.title}>برنامج الشاعري</Text>
-              <Text style={styles.copy}>استخدم الحساب المرتبط بملف موظف نشط.</Text>
-              {!!notice && <Text accessibilityLiveRegion="polite" style={styles.success}>{notice}</Text>}
+              <Text style={styles.copy}>أدخل رقم الموظف والرمز الشخصي الذي عيّنه صاحب المؤسسة. لا يلزم إدخال بريد إلكتروني.</Text>
               {!!error && <Text accessibilityRole="alert" style={styles.error}>{error}</Text>}
               <TextInput
                 style={styles.input}
-                placeholder="البريد الإلكتروني"
+                placeholder="رقم الموظف"
                 autoCapitalize="none"
-                autoComplete="email"
-                keyboardType="email-address"
+                autoCorrect={false}
+                autoComplete="off"
                 returnKeyType="next"
-                value={email}
-                onChangeText={setEmail}
+                value={employeeNo}
+                onChangeText={setEmployeeNo}
+                editable={!busy}
+                accessibilityLabel="رقم الموظف"
               />
               <TextInput
                 style={styles.input}
-                placeholder="كلمة المرور"
+                placeholder="رمز الدخول الشخصي"
                 secureTextEntry
-                autoComplete="current-password"
+                autoCapitalize="none"
+                autoCorrect={false}
+                autoComplete="off"
                 returnKeyType="done"
-                value={password}
-                onChangeText={setPassword}
+                value={code}
+                onChangeText={setCode}
+                onSubmitEditing={() => void login()}
+                editable={!busy}
+                accessibilityLabel="رمز الدخول الشخصي"
               />
               <Pressable
                 accessibilityRole="button"
@@ -184,9 +190,7 @@ export default function Home() {
               {!!error && <Pressable accessibilityRole="button" disabled={busy} style={styles.resetButton} onPress={() => void retrySession()}>
                 <Text style={styles.resetText}>إعادة الاتصال بـSupabase</Text>
               </Pressable>}
-              <Pressable accessibilityRole="button" disabled={busy} style={styles.resetButton} onPress={() => void resetPassword()}>
-                <Text style={styles.resetText}>نسيت كلمة المرور؟ أرسل رابط استعادة</Text>
-              </Pressable>
+              <Text style={styles.helpText}>نسيت الرمز أو لم يُعيّن لك بعد؟ تواصل مع صاحب المؤسسة.</Text>
             </View>
           </ScrollView>
         </KeyboardAvoidingView>
@@ -195,6 +199,7 @@ export default function Home() {
   }
 
   const allowed = new Set(profile.permissions);
+  const isOwner = profile.roles.some((role) => role.code === 'owner') && allowed.has('employees.manage');
   return (
     <SafeAreaView style={styles.safe}>
       <ScrollView contentContainerStyle={styles.content}>
@@ -214,6 +219,11 @@ export default function Home() {
         {allowed.has('tasks.read') && (
           <Pressable accessibilityRole="button" style={styles.taskLink} onPress={() => router.push('/tasks')}>
             <Text style={styles.taskLinkText}>فتح المهام والتقارير والتنبيهات</Text>
+          </Pressable>
+        )}
+        {isOwner && (
+          <Pressable accessibilityRole="button" style={styles.settingsLink} onPress={() => router.push('/settings')}>
+            <Text style={styles.settingsLinkText}>إعدادات الموظفين ورموز الدخول</Text>
           </Pressable>
         )}
         <Pressable
@@ -271,7 +281,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#fbfcfc',
   },
   error: { color: '#a8443d', minHeight: 22, textAlign: 'right', lineHeight: 22, marginBottom: 4 },
-  success: { color: '#23633c', minHeight: 22, textAlign: 'right', lineHeight: 22, marginBottom: 8 },
+  helpText: { color: '#718394', fontSize: 13, textAlign: 'right', lineHeight: 20, marginTop: 14 },
   button: { minHeight: 50, backgroundColor: '#17324d', borderRadius: 12, padding: 14, alignItems: 'center', justifyContent: 'center' },
   buttonText: { color: '#fff', fontWeight: '800', fontSize: 16 },
   resetButton: { minHeight: 44, alignItems: 'center', justifyContent: 'center', marginTop: 6 },
@@ -280,6 +290,8 @@ const styles = StyleSheet.create({
   grid: { gap: 12 },
   taskLink: { minHeight: 52, marginTop: 16, borderRadius: 12, padding: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: '#17324d' },
   taskLinkText: { color: '#fff', fontWeight: '800', fontSize: 16 },
+  settingsLink: { minHeight: 52, marginTop: 12, borderRadius: 12, padding: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: '#2f6654' },
+  settingsLinkText: { color: '#fff', fontWeight: '800', fontSize: 16 },
   card: { backgroundColor: '#fff', borderRadius: 16, padding: 18, borderWidth: 1, borderColor: '#e2e9eb' },
   cardTitle: { color: '#17324d', fontSize: 17, fontWeight: '800', textAlign: 'right', lineHeight: 26 },
   cardCopy: { color: '#718394', marginTop: 8, textAlign: 'right', lineHeight: 22 },

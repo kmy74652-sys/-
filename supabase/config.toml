@@ -1,0 +1,4 @@
+project_id = "fjmryqhdwxsocdzswnkq"
+
+[functions.employee-code-auth]
+verify_jwt = false
