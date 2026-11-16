@@ -24,8 +24,9 @@ import {
   updateTaskStatus,
 } from '../lib/mobileData';
 import { pickTaskAttachment, uploadTaskAttachment, type PickedAttachment } from '../lib/taskAttachments';
+import { evaluateReportField, normalizeTableColumns, reportDefaultDraft, validateReportFieldValue, type ReportField, type ReportTableColumn } from '../lib/reportSchema';
+import ReportFieldInput from '../components/ReportFieldInput';
 
-type ReportField = { key: string; label: string; description?: string | null; type: 'text' | 'number' | 'progress' | 'status' | 'notes' | 'textarea' | 'date' | 'select' | 'multiselect' | 'checkbox' | 'attachment' | 'short_text' | 'long_text' | 'integer' | 'quantity' | 'money' | 'datetime' | 'boolean' | 'table' | 'image' | 'file' | 'signature' | 'calculated' | 'decision_notes'; options?: string[]; required?: boolean; repeatable?: boolean; validation?: Record<string, unknown>; config?: Record<string, unknown> };
 type Task = {
   id: string;
   title: string;
@@ -71,7 +72,7 @@ export default function TasksScreen() {
   const [positionFilter, setPositionFilter] = useState<Task['position_code'] | 'all'>('all');
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
-  const [attachments, setAttachments] = useState<Record<string, Array<PickedAttachment & { path?: string }>>>({});
+  const [attachments, setAttachments] = useState<Record<string, Record<string, Array<PickedAttachment & { path?: string }>>>>({});
   const [timeline, setTimeline] = useState<Record<string, Awaited<ReturnType<typeof listTaskTimeline>>>>({});
 
   const load = useCallback(async () => {
@@ -85,6 +86,17 @@ export default function TasksScreen() {
       const [taskRows, notificationRows] = await Promise.all([listMyTasks(), listMyNotifications()]);
       setCanReview(identity.employee.permissions.includes('tasks.review'));
       setTasks(taskRows);
+      setDrafts((current) => {
+        const next = { ...current };
+        for (const task of taskRows) {
+          const taskDraft = { ...(next[task.id] ?? {}) };
+          for (const field of task.report_schema ?? []) {
+            if (taskDraft[field.key] === undefined) taskDraft[field.key] = reportDefaultDraft(field);
+          }
+          next[task.id] = taskDraft;
+        }
+        return next;
+      });
       setNotifications(notificationRows);
     } catch (cause) {
       setError(friendlyDataError(cause, 'تعذر تحميل البيانات مباشرة من Supabase. تحقق من الاتصال والصلاحيات.'));
@@ -119,69 +131,79 @@ export default function TasksScreen() {
     }
   }
 
-  function submitReport(task: Task) {
+  function draftValuesForTask(task: Task, strict = false): Record<string, unknown> {
     const values: Record<string, unknown> = {};
+    try {
+      for (const field of task.report_schema ?? []) {
+        if (field.type === 'calculated') continue;
+        const raw = drafts[task.id]?.[field.key]?.trim() ?? '';
+        if (['attachment', 'image', 'file'].includes(field.type)) {
+          if (attachments[task.id]?.[field.key]?.length) values[field.key] = attachments[task.id][field.key];
+        } else if (field.type === 'table' || field.type === 'multiselect' || field.type === 'signature') {
+          if (!raw) continue;
+          values[field.key] = JSON.parse(raw) as unknown;
+        } else if (field.type === 'boolean' || field.type === 'checkbox') {
+          if (raw === 'true' || raw === 'false') values[field.key] = raw === 'true';
+          else if (raw) values[field.key] = raw;
+        } else if (['number', 'progress', 'integer', 'quantity', 'money'].includes(field.type)) {
+          if (raw) values[field.key] = /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/.test(raw) ? Number(raw) : raw;
+        } else if (raw) values[field.key] = raw;
+      }
+    } catch (cause) {
+      if (strict) throw new Error(`تحقق من تنسيق الحقل المركب: ${(cause as Error).message}`);
+    }
     for (const field of task.report_schema ?? []) {
-      const raw = drafts[task.id]?.[field.key]?.trim() ?? '';
-      if (field.type === 'attachment') {
-        if (field.required) {
-          if (!attachments[task.id]?.length) { setError(`الحقل «${field.label}» يتطلب مرفقًا.`); return; }
-        }
-        if (attachments[task.id]?.length) values[field.key] = attachments[task.id].map((file) => file);
-        continue;
-      }
-      if (field.type === 'calculated') {
-        values[field.key] = calculatedValue(task.id, field);
-        continue;
-      }
-      if (field.type === 'signature') {
-        const [name, acknowledgedAt] = raw.split('|');
-        if (field.required && (!name || !acknowledgedAt)) { setError(`أكمل الإقرار بالتوقيع الاسمي: ${field.label}`); return; }
-        if (name && acknowledgedAt) values[field.key] = { name, acknowledged_at: acknowledgedAt };
-        continue;
-      }
-      if (field.required && !raw) {
-        setError(`أكمل الحقل المطلوب: ${field.label}`);
-        return;
-      }
-      if (field.type === 'multiselect' && raw) {
-        const selected = JSON.parse(raw) as string[];
-        if (field.required && !selected.length) { setError(`اختر خيارًا واحدًا على الأقل: ${field.label}`); return; }
-        values[field.key] = selected;
-      } else if (field.type === 'table') {
-        let rows: Array<Record<string, string>> = [];
-        try { rows = raw ? JSON.parse(raw) as Array<Record<string, string>> : []; } catch { setError(`صيغة جدول غير صالحة: ${field.label}`); return; }
-        if (field.required && !rows.length) { setError(`أضف صفًا واحدًا على الأقل: ${field.label}`); return; }
-        values[field.key] = rows;
-      } else if (raw) {
-        values[field.key] = ['number', 'progress'].includes(field.type)
-          ? Number(raw)
-          : field.type === 'checkbox' ? raw === 'true' : raw;
-      }
+      if (field.type !== 'calculated') continue;
+      const calculated = evaluateReportField(field, task.report_schema, values);
+      if (calculated.value !== null) values[field.key] = calculated.value;
+      else if (strict) throw new Error(`تعذر حساب «${field.label}»: ${calculated.error ?? 'تحقق من الحقول المرتبطة.'}`);
+    }
+    return values;
+  }
+  function submitReport(task: Task) {
+    let values: Record<string, unknown>;
+    try { values = draftValuesForTask(task, true); }
+    catch (cause) { setError((cause as Error).message); return; }
+    for (const field of task.report_schema ?? []) {
+      const issue = validateReportFieldValue(field, values[field.key]);
+      if (issue) { setError(issue); return; }
     }
     void mutate(task, () => submitTaskReport(task.id, values), 'تم إرسال التقرير للمراجعة.');
   }
 
-  function tableColumns(field: ReportField) { return Array.isArray(field.config?.columns) && field.config.columns.length ? field.config.columns.map(String) : ['القيمة']; }
-  function tableRows(taskId: string, field: ReportField) { const raw = drafts[taskId]?.[field.key] ?? '[]'; try { const parsed = JSON.parse(raw); return Array.isArray(parsed) ? parsed as Array<Record<string, string>> : []; } catch { return []; } }
-  function updateTable(taskId: string, field: ReportField, rows: Array<Record<string, string>>) { setDrafts((current) => ({ ...current, [taskId]: { ...current[taskId], [field.key]: JSON.stringify(rows) } })); }
+  function tableColumns(field: ReportField): ReportTableColumn[] {
+    const columns = normalizeTableColumns(field);
+    return columns.length ? columns : [{ key: 'value', label: 'القيمة', type: 'short_text', required: false }];
+  }
+  function tableRows(taskId: string, field: ReportField): Array<Record<string, unknown>> {
+    const raw = drafts[taskId]?.[field.key] ?? '[]';
+    try { const parsed = JSON.parse(raw); return Array.isArray(parsed) ? parsed as Array<Record<string, unknown>> : []; }
+    catch { return []; }
+  }
+  function updateTable(taskId: string, field: ReportField, rows: Array<Record<string, unknown>>) {
+    setDrafts((current) => ({ ...current, [taskId]: { ...current[taskId], [field.key]: JSON.stringify(rows) } }));
+  }
   function calculatedValue(taskId: string, field: ReportField) {
-    const formula = String(field.config?.formula ?? '').trim();
-    const sumRows = formula.match(/^sum_rows\(([^.]+)\.([^)]+)\)$/);
-    if (sumRows) { const source = tasks.find((task) => task.id === taskId)?.report_schema.find((item) => item.key === sumRows[1]); return source ? tableRows(taskId, source).reduce((total, row) => total + (Number(row[sumRows[2]]) || 0), 0) : 0; }
-    const sum = formula.match(/^sum\(([^)]+)\)$/);
-    if (sum) return Number(drafts[taskId]?.[sum[1]] ?? 0) || 0;
-    const difference = formula.match(/^difference\(([^,]+),([^)]+)\)$/);
-    if (difference) return (Number(drafts[taskId]?.[difference[1].trim()] ?? 0) || 0) - (Number(drafts[taskId]?.[difference[2].trim()] ?? 0) || 0);
-    return '';
+    const task = tasks.find((candidate) => candidate.id === taskId);
+    return task ? evaluateReportField(field, task.report_schema, draftValuesForTask(task)).value : null;
+  }
+  function calculationError(taskId: string, field: ReportField) {
+    const task = tasks.find((candidate) => candidate.id === taskId);
+    return task ? evaluateReportField(field, task.report_schema, draftValuesForTask(task)).error : null;
   }
 
-  async function chooseAttachment(task: Task) {
+  async function chooseAttachment(task: Task, fieldKey: string) {
     try {
       const file = await pickTaskAttachment();
       if (!file) return;
       const uploaded = await uploadTaskAttachment(task.id, file);
-      setAttachments((current) => ({ ...current, [task.id]: [...(current[task.id] ?? []), { ...file, ...uploaded }] }));
+      setAttachments((current) => ({
+        ...current,
+        [task.id]: {
+          ...current[task.id],
+          [fieldKey]: [...(current[task.id]?.[fieldKey] ?? []), { ...file, ...uploaded }],
+        },
+      }));
       setNotice('تم رفع المرفق وتجهيزه للتقرير.');
     } catch (cause) { setError(friendlyDataError(cause, 'تعذر رفع المرفق. تأكد من الاتصال وحجم الملف.')); }
   }
@@ -253,56 +275,14 @@ export default function TasksScreen() {
             <Pressable style={styles.secondaryButton} onPress={() => void showTimeline(task)}><Text style={styles.secondaryText}>عرض السجل الزمني</Text></Pressable>
             {!!timeline[task.id]?.length && <View style={styles.timeline}>{timeline[task.id].map((entry) => <Text key={entry.id} style={styles.meta}>{formatDate(entry.created_at)} · {entry.status} · {entry.actor_name}{entry.note ? ` — ${entry.note}` : ''}</Text>)}</View>}
 
-            {reportTask === task.id && (task.report_schema ?? []).map((field) => (
-              <View key={field.key} style={styles.field}>
-                <Text style={styles.fieldLabel}>{field.label}{field.required ? ' *' : ''}</Text>
-                {field.type === 'calculated' ? (
-                  <View style={styles.calculated}><Text style={styles.calculatedValue}>{String(calculatedValue(task.id, field))}</Text><Text style={styles.meta}>محسوب تلقائيًا من الصيغة: {String(field.config?.formula ?? 'غير محددة')}</Text></View>
-                ) : field.type === 'table' ? (
-                  <View style={styles.tableEditor}>{tableRows(task.id, field).map((row, rowIndex) => <View style={styles.tableRow} key={`${field.key}-${rowIndex}`}>{tableColumns(field).map((column) => <TextInput key={column} style={styles.tableCell} placeholder={column} value={row[column] ?? ''} onChangeText={(value) => { const rows = tableRows(task.id, field); rows[rowIndex] = { ...rows[rowIndex], [column]: value }; updateTable(task.id, field, rows); }} />)}<Pressable style={styles.secondaryButton} onPress={() => updateTable(task.id, field, tableRows(task.id, field).filter((_, index) => index !== rowIndex))}><Text style={styles.secondaryText}>حذف الصف</Text></Pressable></View>)}<Pressable style={styles.secondaryButton} onPress={() => { const rows = tableRows(task.id, field); const blank = Object.fromEntries(tableColumns(field).map((column) => [column, ''])); updateTable(task.id, field, [...rows, blank]); }}><Text style={styles.secondaryText}>إضافة صف</Text></Pressable></View>
-                ) : ['attachment', 'image', 'file'].includes(field.type) ? (
-                  <View style={styles.field}><Pressable style={styles.secondaryButton} onPress={() => void chooseAttachment(task)}><Text style={styles.secondaryText}>اختيار مرفق من الهاتف</Text></Pressable>{!!attachments[task.id]?.length && <Text style={styles.meta}>{attachments[task.id].map((file) => file.name).join('، ')}</Text>}</View>
-                ) : field.type === 'signature' ? (
-                  <View style={styles.field}><TextInput style={styles.input} placeholder="اكتب الاسم للإقرار" value={(drafts[task.id]?.[field.key] ?? '').split('|')[0]} onChangeText={(value) => setDrafts((current) => ({ ...current, [task.id]: { ...current[task.id], [field.key]: value } }))} /><Pressable style={styles.secondaryButton} onPress={() => { const name = (drafts[task.id]?.[field.key] ?? '').split('|')[0].trim(); if (name) setDrafts((current) => ({ ...current, [task.id]: { ...current[task.id], [field.key]: `${name}|${new Date().toISOString()}` } })); }}><Text style={styles.secondaryText}>{(drafts[task.id]?.[field.key] ?? '').includes('|') ? 'تم الإقرار ✓' : 'تأكيد الإقرار'}</Text></Pressable></View>
-                ) : ['checkbox', 'boolean'].includes(field.type) ? (
-                  <Pressable
-                    accessibilityRole="checkbox"
-                    accessibilityState={{ checked: drafts[task.id]?.[field.key] === 'true' }}
-                    style={styles.secondaryButton}
-                    onPress={() => setDrafts((current) => ({ ...current, [task.id]: { ...current[task.id], [field.key]: current[task.id]?.[field.key] === 'true' ? 'false' : 'true' } }))}
-                  >
-                    <Text style={styles.secondaryText}>{drafts[task.id]?.[field.key] === 'true' ? 'نعم ✓' : 'لا — اضغط للتغيير'}</Text>
-                  </Pressable>
-                ) : ['select', 'multiselect'].includes(field.type) && field.options?.length ? (
-                  <View style={styles.choices}>
-                    {field.options.map((option) => {
-                      const raw = drafts[task.id]?.[field.key] ?? (field.type === 'multiselect' ? '[]' : '');
-                      const selected = field.type === 'multiselect' ? (JSON.parse(raw || '[]') as string[]).includes(option) : raw === option;
-                      return (
-                        <Pressable key={option} style={[styles.choice, selected && styles.choiceSelected]} onPress={() => {
-                          const next = field.type === 'multiselect'
-                            ? JSON.stringify(selected ? (JSON.parse(raw || '[]') as string[]).filter((value) => value !== option) : [...(JSON.parse(raw || '[]') as string[]), option])
-                            : option;
-                          setDrafts((current) => ({ ...current, [task.id]: { ...current[task.id], [field.key]: next } }));
-                        }}>
-                          <Text style={selected ? styles.choiceSelectedText : styles.choiceText}>{option}</Text>
-                        </Pressable>
-                      );
-                    })}
-                  </View>
-                ) : (
-                  <TextInput
-                    accessibilityLabel={field.label}
-                    style={styles.input}
-                    value={drafts[task.id]?.[field.key] ?? ''}
-                    onChangeText={(value) => setDrafts((current) => ({ ...current, [task.id]: { ...current[task.id], [field.key]: value } }))}
-                    keyboardType={['number', 'progress', 'integer', 'quantity', 'money'].includes(field.type) ? 'numeric' : 'default'}
-                    multiline={['notes', 'textarea', 'long_text', 'decision_notes'].includes(field.type)}
-                    placeholder={field.type === 'progress' ? 'أدخل نسبة الإنجاز' : ['date', 'datetime'].includes(field.type) ? 'التاريخ والوقت' : field.required ? 'مطلوب' : 'اختياري'}
-                  />
-                )}
-              </View>
-            ))}
+            {reportTask === task.id && (task.report_schema ?? []).map((field) => <ReportFieldInput
+              key={field.key} field={field} raw={drafts[task.id]?.[field.key] ?? ''}
+              attachments={attachments[task.id]?.[field.key] ?? []} calculated={calculatedValue(task.id, field)} calculationError={calculationError(task.id, field)}
+              rows={field.type === 'table' ? tableRows(task.id, field) : []}
+              onDraftChange={(value) => setDrafts((current) => ({ ...current, [task.id]: { ...current[task.id], [field.key]: value } }))}
+              onTableChange={(rows) => updateTable(task.id, field, rows)}
+              onChooseAttachment={() => void chooseAttachment(task, field.key)}
+            />)}
 
             {!!task.report_schema?.length && ['in_progress', 'rejected'].includes(task.status) && reportTask !== task.id && (
               <Pressable accessibilityRole="button" style={styles.secondaryButton} onPress={() => { setError(''); setReportTask(task.id); }}>

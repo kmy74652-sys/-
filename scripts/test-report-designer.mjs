@@ -1,25 +1,95 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-const migration = ['026_dynamic_report_designer.sql', '027_report_form_approval.sql', '028_snapshot_report_validation.sql', '029_snapshot_field_validation.sql', '030_calculated_report_validation.sql', '031_signature_report_validation.sql'].map((file) => fs.readFileSync(new URL(`../supabase/migrations/${file}`, import.meta.url), 'utf8')).join('\n').toLowerCase();
-const ui = fs.readFileSync(new URL('../apps/mobile/app/admin.tsx', import.meta.url), 'utf8').toLowerCase();
-const mobile = fs.readFileSync(new URL('../apps/mobile/lib/mobileData.ts', import.meta.url), 'utf8').toLowerCase();
-const tasks = fs.readFileSync(new URL('../apps/mobile/app/tasks.tsx', import.meta.url), 'utf8').toLowerCase();
-const web = fs.readFileSync(new URL('../apps/web/src/reportDesigner.tsx', import.meta.url), 'utf8').toLowerCase();
-const webMain = fs.readFileSync(new URL('../apps/web/src/main.tsx', import.meta.url), 'utf8').toLowerCase();
-assert(webMain.includes('employee-code-auth') && webMain.includes('employeeno') && webMain.includes('دخول بالرمز') && !webMain.includes('signInWithPassword'), 'desktop employee code login missing');
-const designer = fs.readFileSync(new URL('../apps/mobile/lib/reportDesigner.ts', import.meta.url), 'utf8').toLowerCase();
-for (const token of ['report_form_templates', 'report_form_versions', 'report_form_version_fields', 'task_report_form_snapshots', 'publish_task_report_form', 'report_forms.manage', 'enable row level security']) assert(migration.includes(token), `missing designer token ${token}`);
-for (const fieldType of ['short_text', 'long_text', 'quantity', 'money', 'datetime', 'table', 'image', 'file', 'signature', 'calculated', 'decision_notes']) assert(migration.includes(fieldType) && designer.includes(fieldType), `missing field type ${fieldType}`);
-assert(ui.includes('مصمم التقارير') && ui.includes('إضافة حقل') && ui.includes('معاينة كما يراها الموظف'), 'designer UI missing');
-assert(ui.includes('search') && ui.includes('نسخ وتعديل') && ui.includes('اعتماد من المالك'), 'library search/copy/approval UI missing');
-assert(ui.includes('خيارات القائمة مفصولة بفواصل') && ui.includes('قواعد التحقق: min=0,max=100') && ui.includes('أعمدة الجدول مفصولة بفواصل') && ui.includes('صيغة مثل sum(quantity)'), 'field options and validation editor missing');
-assert(ui.includes('publishdesignerversion') && ui.includes('reporttemplateid'), 'task publishing integration missing');
-assert(migration.includes('approved_by') && migration.includes('approved_at') && migration.includes('approve_report_form_version'), 'owner approval schema missing');
-assert(migration.includes('invalid_report_field_option') && migration.includes('report_field_below_min') && migration.includes('report_field_above_max'), 'server validation missing');
-assert(mobile.includes('task_report_form_snapshots') && mobile.includes('snapshot.schema'), 'mobile snapshot reader missing');
-assert(tasks.includes('إضافة صف') && tasks.includes('json.stringify(rows)') && tasks.includes("field.type === 'table'"), 'mobile table row editor missing');
-assert(tasks.includes('calculatedvalue') && tasks.includes('sum_rows') && tasks.includes('difference'), 'calculated field engine missing');
-assert(migration.includes('invalid_calculated_report_value'), 'calculated server validation missing');
-assert(tasks.includes('تأكيد الإقرار') && tasks.includes('acknowledged_at') && migration.includes("v_type='signature'"), 'signature acknowledgement missing');
-assert(web.includes('reportdesignerpage') && web.includes('report_form_templates') && webMain.includes('report_forms.manage') && webMain.includes('/report-designer'), 'desktop designer missing');
-console.log(JSON.stringify({ ok: true, schema: true, fieldTypes: 15, versionedSnapshot: true, mobileReader: true }));
+import ts from 'typescript';
+
+const read = (path) => fs.readFileSync(new URL(path, import.meta.url), 'utf8');
+const migration = ['026_dynamic_report_designer.sql', '027_report_form_approval.sql', '028_snapshot_report_validation.sql', '029_snapshot_field_validation.sql', '030_calculated_report_validation.sql', '031_signature_report_validation.sql', '034_report_builder_integrity.sql']
+  .map((file) => read(`../supabase/migrations/${file}`)).join('\n');
+const currentMigration = read('../supabase/migrations/034_report_builder_integrity.sql');
+const mobileDesigner = read('../apps/mobile/components/ReportDesigner.tsx');
+const reportInput = read('../apps/mobile/components/ReportFieldInput.tsx');
+const tasks = read('../apps/mobile/app/tasks.tsx');
+const webDesigner = read('../apps/web/src/reportDesigner.tsx');
+const designerApi = read('../apps/mobile/lib/reportDesigner.ts');
+const schemaSource = read('../apps/mobile/lib/reportSchema.ts');
+
+const compiled = ts.transpileModule(schemaSource, {
+  compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
+}).outputText;
+const schemaModule = { exports: {} };
+new Function('exports', 'module', compiled)(schemaModule.exports, schemaModule);
+const {
+  calculateFormula,
+  evaluateReportField,
+  validateDesignerFields,
+  validateReportFieldValue,
+} = schemaModule.exports;
+
+const designerField = (patch = {}) => ({
+  field_key: 'quantity', label: 'الكمية', description: '', field_type: 'quantity', is_required: true,
+  repeatable: false, sort_order: 0, options: [], validation: {}, config: {}, ...patch,
+});
+const runtimeField = (patch = {}) => ({
+  key: 'quantity', label: 'الكمية', type: 'quantity', required: true, options: [], validation: {}, config: {}, ...patch,
+});
+
+// Safe arithmetic parser: precedence, parentheses, field references, division-by-zero and rejection of code.
+assert.ok(Math.abs(calculateFormula('({quantity} * 2 + 4) / 3', { quantity: 5 }) - 14 / 3) < 1e-10);
+assert.throws(() => calculateFormula('4 / 0', {}), /القسمة على صفر/);
+assert.throws(() => calculateFormula('process.exit()', {}), /صيغة/);
+assert.throws(() => calculateFormula('{missing} + 1', {}), /أكمل الحقل/);
+const table = runtimeField({
+  key: 'items', label: 'الأصناف', type: 'table', required: true,
+  config: { columns: [{ key: 'qty', label: 'الكمية', type: 'quantity', required: true, validation: { min: 1 } }] },
+});
+const totalField = runtimeField({ key: 'total', label: 'الإجمالي', type: 'calculated', config: { formula: 'sum_rows(items.qty)' } });
+assert.deepEqual(evaluateReportField(totalField, [table, totalField], { items: [{ qty: '2.5' }, { qty: 3 }] }), { value: 5.5, error: null });
+
+// Validation rules for fields, list values, table columns and signatures.
+assert.match(validateDesignerFields([designerField({ label: '   ' })]), /لا يمكن ترك الاسم فارغًا/);
+assert.match(validateDesignerFields([designerField({ validation: { min: 10, max: 2 } })]), /الحد الأدنى أكبر/);
+assert.equal(validateReportFieldValue(runtimeField({ validation: { min: 2, max: 10 } }), '1'), '«الكمية»: الحد الأدنى المسموح 2.');
+assert.equal(validateReportFieldValue(runtimeField({ validation: { allow_negative: false } }), '-1'), '«الكمية»: القيم السالبة غير مسموحة.');
+const selectField = runtimeField({ key: 'status', label: 'الحالة', type: 'select', options: ['جديد', 'مكتمل'] });
+assert.match(validateReportFieldValue(selectField, 'غير معروف'), /الخيارات المتاحة/);
+const listDesignerField = designerField({ field_key: 'status', label: 'الحالة', field_type: 'select', options: ['جديد', 'مكتمل'] });
+assert.equal(validateDesignerFields([listDesignerField]), null);
+const tableIssue = validateReportFieldValue(table, [{ qty: '0' }]);
+assert.match(tableIssue, /الكمية/);
+const consentSignature = runtimeField({
+  key: 'signature', label: 'التوقيع', type: 'signature', required: false,
+  config: { consent_text: 'أقر بصحة البيانات' },
+});
+assert.match(validateReportFieldValue(consentSignature, undefined), /التوقيع/);
+assert.match(validateReportFieldValue(consentSignature, { strokes: ['M 1 1 L 2 2'], acknowledged: false }), /وافق/);
+assert.equal(validateReportFieldValue(consentSignature, { strokes: ['M 1 1 L 2 2'], acknowledged: true }), null);
+
+// UI/API coverage: structured editor, server draft RPC, dynamic tables, calculated values and drawn signatures.
+assert(mobileDesigner.includes('مخطط الحقول') && mobileDesigner.includes('خصائص الحقل') && mobileDesigner.includes('معاينة الموظف'));
+assert(mobileDesigner.includes('saveDesignerTemplate') && mobileDesigner.includes('approveDesignerVersion'));
+assert(reportInput.includes('إضافة صف') && reportInput.includes('SignaturePad') && reportInput.includes('react-native-svg'));
+assert(tasks.includes('validateReportFieldValue') && tasks.includes('evaluateReportField') && tasks.includes('reportDefaultDraft'));
+assert(designerApi.includes("rpc('save_report_form_draft'") && designerApi.includes("rpc('approve_report_form_version'"));
+assert(webDesigner.includes("rpc('save_report_form_draft'") && webDesigner.includes("rpc('approve_report_form_version'"));
+
+// DB invariants: org-scoped access, approved versions, immutable snapshots/signatures and server validation.
+for (const token of [
+  'report_designer_allowed_for_org', 'report_can_review_in_org', 'save_report_form_draft',
+  'approve_report_form_version', 'publish_task_report_form', 'create_task_with_report_form',
+  'task_report_signature_immutable', 'task_reports_signature_protection', 'report_signature_immutable',
+  'task_reports_select_scoped', 'report_form_version_requires_approval', 'task_report_snapshot_missing',
+  'report_field_below_min', 'report_field_above_max', 'report_calculated_division_by_zero',
+  'unknown_report_field', 'report_provenance_immutable',
+]) assert(currentMigration.includes(token), `migration missing ${token}`);
+assert.match(currentMigration, /revoke insert, update, delete on public\.task_reports/i);
+assert.match(currentMigration, /grant select on public\.task_reports to authenticated/i);
+assert.match(currentMigration, /length\(v_column->>'label'\)>200/i, 'table column label length check must compare outside length()');
+assert.match(currentMigration, /a\.task_id=p_task_id and a\.uploaded_by=auth\.uid\(\) and a\.storage_path=v_attachment_path/i, 'report attachment must belong to the submitting user and task');
+assert.match(currentMigration, /report_validate_field\(v_field,v_raw,p_values,v_task\.id\)/i, 'server field validation must receive the task id');
+assert.match(migration, /alter table public\.report_form_templates enable row level security/i);
+for (const protectedName of ['task_attachments', 'task_activity_log', 'mobile_task_timeline']) {
+  assert(!new RegExp(`(?:create|alter|drop|truncate)\\s+(?:table|policy|trigger)?\\s*(?:if\\s+(?:not\\s+)?exists\\s+)?public\\.${protectedName}\\b`, 'i').test(currentMigration), `protected table ${protectedName} must not be structurally changed`);
+}
+assert(!/\b(?:insert|update|delete)\s+(?:into\s+)?storage\.buckets\b/i.test(currentMigration), 'protected storage bucket must not be modified');
+
+console.log(JSON.stringify({ ok: true, safeFormulaEngine: true, validation: true, signatures: true, rlsAndSnapshots: true }));

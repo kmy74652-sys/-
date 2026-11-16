@@ -155,6 +155,56 @@ h2 { margin-bottom: 0; font-size: clamp(22px, 3vw, 32px); }
 .task-report-input { border: 1px solid #cfdbe0; border-radius: 9px; padding: 10px 11px; color: #17324d; font: inherit; resize: vertical; }
 .auth-form .auth-reset { border: 1px solid #ccd9de; background: #fff; color: #17324d; cursor: pointer; }
 
+.report-designer-grid { display: grid; grid-template-columns: minmax(275px, .75fr) minmax(0, 1.5fr); gap: 18px; align-items: start; }
+.report-library, .report-editor-card { min-width: 0; }
+.report-search { width: 100%; min-height: 44px; border: 1px solid #cfdbe0; border-radius: 10px; padding: 10px 12px; font: inherit; color: #17324d; background: #fbfcfc; }
+.report-role-filters { display: flex; gap: 7px; flex-wrap: wrap; margin: 12px 0; }
+.report-role-filters .active-filter { color: #fff; border-color: #17324d; background: #17324d; }
+.report-template-list { display: grid; gap: 9px; margin-top: 10px; }
+.report-template { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 13px; border: 1px solid #e0e7e9; border-radius: 12px; background: #fbfcfc; }
+.report-template-main { min-width: 0; display: grid; gap: 5px; }
+.report-template-main strong { overflow-wrap: anywhere; }
+.report-template-main small { line-height: 1.6; overflow-wrap: anywhere; }
+.report-template-actions, .report-field-actions { display: flex; align-items: center; justify-content: flex-end; gap: 5px; flex-wrap: wrap; }
+.report-editor-card { display: grid; gap: 16px; }
+.report-meta-grid, .report-control-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.report-control { min-width: 0; display: grid; gap: 6px; color: #526779; font-size: 12px; font-weight: 700; line-height: 1.55; }
+.report-control input, .report-control select, .report-control textarea, .report-settings-block > select, .option-row > input, .option-add > input {
+  width: 100%; min-width: 0; border: 1px solid #cfdbe0; border-radius: 9px; padding: 10px 11px; background: #fbfcfc; color: #17324d; font: inherit; outline: none;
+}
+.report-control textarea { resize: vertical; }
+.report-control input:focus, .report-control select:focus, .report-control textarea:focus, .option-row > input:focus, .option-add > input:focus { border-color: #3d7791; box-shadow: 0 0 0 3px rgba(61, 119, 145, .12); }
+.report-control small { font-size: 11px; line-height: 1.5; }
+.report-description { grid-column: 1 / -1; }
+.report-workbench { display: grid; grid-template-columns: minmax(230px, .82fr) minmax(0, 1.18fr); gap: 14px; align-items: start; }
+.report-field-list, .report-field-editor { min-width: 0; border: 1px solid #e0e7e9; border-radius: 13px; padding: 13px; background: #fbfcfc; }
+.report-subhead { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
+.report-subhead h4 { margin: 0 0 4px; font-size: 15px; }
+.report-subhead small { font-size: 11px; line-height: 1.5; }
+.report-subhead .ghost-button { white-space: nowrap; }
+.report-field-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: center; padding: 8px; border: 1px solid #e3e9eb; border-radius: 10px; background: #fff; margin-top: 8px; }
+.report-field-row.selected { border-color: #3d7791; box-shadow: 0 0 0 2px rgba(61, 119, 145, .09); }
+.report-field-pick { min-width: 0; display: grid; gap: 4px; border: 0; background: transparent; color: #17324d; text-align: right; font: inherit; cursor: pointer; }
+.report-field-pick strong, .report-field-pick small { overflow-wrap: anywhere; }
+.report-field-pick small { color: #748597; font-size: 11px; }
+.report-field-actions .text-button { padding: 7px 9px; }
+.report-field-actions button:disabled, .report-template-actions button:disabled { opacity: .45; cursor: not-allowed; }
+.report-type-pill { flex: 0 0 auto; border-radius: 999px; padding: 6px 9px; background: #edf3f5; color: #39556a; font-size: 11px; }
+.report-empty-editor { min-height: 160px; display: grid; align-content: center; justify-items: center; gap: 9px; color: #748597; text-align: center; }
+.report-empty-editor p { margin: 0; line-height: 1.7; }
+.report-settings-block { display: grid; gap: 11px; margin-top: 14px; padding-top: 13px; border-top: 1px solid #e4eaec; }
+.report-settings-block h5 { margin: 0; color: #17324d; font-size: 13px; }
+.report-settings-block > small, .report-settings-block > p { color: #748597; font-size: 12px; line-height: 1.7; margin: 0; }
+.option-editor { display: grid; gap: 7px; }
+.option-row, .option-add { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 7px; align-items: center; }
+.option-add { margin-top: 4px; }
+.table-column-editor { display: grid; gap: 9px; padding: 11px; border: 1px solid #e0e7e9; border-radius: 10px; background: #fff; }
+.report-preview { display: grid; gap: 8px; margin-top: 16px; }
+.report-preview > strong { font-size: 12px; }
+.report-preview-card { display: grid; gap: 5px; padding: 12px; border: 1px dashed #b9cbd3; border-radius: 10px; background: #fff; }
+.report-preview-card span { color: #17324d; font-weight: 700; }
+.report-preview-card small { line-height: 1.6; }
+
 /* Shared mobile refinements for the dashboard and every management route. */
 button, a, input, select, textarea { -webkit-tap-highlight-color: transparent; }
 button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
@@ -280,4 +330,22 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; }
+}
+
+@media (max-width: 1100px) {
+  .report-designer-grid { grid-template-columns: 1fr; }
+}
+@media (max-width: 760px) {
+  .report-workbench { grid-template-columns: 1fr; }
+}
+@media (max-width: 640px) {
+  .report-meta-grid, .report-control-grid { grid-template-columns: 1fr; }
+  .report-description { grid-column: auto; }
+  .report-field-row { grid-template-columns: 1fr; }
+  .report-field-actions { justify-content: flex-start; }
+  .report-template { flex-direction: column; }
+  .report-template-actions { justify-content: flex-start; }
+  .report-subhead { align-items: flex-start; flex-direction: column; }
+  .report-subhead .ghost-button { width: 100%; }
+  .option-row, .option-add { grid-template-columns: 1fr; }
 }

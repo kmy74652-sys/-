@@ -1,5 +1,6 @@
 import { supabase } from './supabase';
 import { flushQueue, queueOperation, type QueueItem } from './offlineQueue';
+import type { ReportField } from './reportSchema';
 
 export type MobileProfile = {
   id: string;
@@ -16,7 +17,6 @@ export type MobileProfile = {
 };
 
 export type MobileIdentity = { userId: string; employee: MobileProfile | null };
-type ReportField = { key: string; label: string; description?: string | null; type: 'text' | 'number' | 'progress' | 'status' | 'notes' | 'textarea' | 'date' | 'select' | 'multiselect' | 'checkbox' | 'attachment' | 'short_text' | 'long_text' | 'integer' | 'quantity' | 'money' | 'datetime' | 'boolean' | 'table' | 'image' | 'file' | 'signature' | 'calculated' | 'decision_notes'; options?: string[]; required?: boolean; repeatable?: boolean; validation?: Record<string, unknown>; config?: Record<string, unknown> };
 
 export type MobileTask = {
   id: string;
@@ -33,13 +33,7 @@ export type MobileTask = {
   status: 'pending' | 'in_progress' | 'submitted' | 'approved' | 'rejected' | 'cancelled' | 'late';
   proof_required: boolean;
   proof_instructions: string | null;
-  report_schema: Array<{
-    key: string;
-    label: string;
-    type: ReportField['type'];
-    options?: string[];
-    required?: boolean;
-  }>;
+  report_schema: ReportField[];
 };
 
 export type MobileNotification = {
@@ -73,7 +67,7 @@ export async function listMyTasks(): Promise<MobileTask[]> {
   const client = getClient();
   const { data, error } = await client
     .from('tasks')
-    .select('id,title,description,assigned_to,branch_id,due_at,priority,status,assigned_at,created_at')
+    .select('id,title,description,assigned_to,branch_id,position_code,due_at,priority,status,assigned_at,created_at')
     .order('due_at', { ascending: true });
   if (error) throw error;
   const rows = data ?? [];
@@ -88,10 +82,15 @@ export async function listMyTasks(): Promise<MobileTask[]> {
   if (branchesResult.error) throw branchesResult.error;
   if (membershipsResult.error) throw membershipsResult.error;
   if (fieldsResult.error) throw fieldsResult.error;
-  const snapshotsResult = taskIds.length
-    ? await client.from('task_report_form_snapshots').select('task_id,schema').in('task_id', taskIds).limit(200)
-    : { data: [], error: null };
-  if (snapshotsResult.error) throw snapshotsResult.error;
+  const snapshotRows: Array<{ task_id: string; schema: unknown }> = [];
+  const snapshotPageSize = 200;
+  for (let offset = 0; offset < taskIds.length; offset += snapshotPageSize) {
+    const pageIds = taskIds.slice(offset, offset + snapshotPageSize);
+    const snapshotsResult = await client.from('task_report_form_snapshots')
+      .select('task_id,schema').in('task_id', pageIds).order('task_id').limit(snapshotPageSize);
+    if (snapshotsResult.error) throw snapshotsResult.error;
+    snapshotRows.push(...(snapshotsResult.data ?? []));
+  }
   const branches = branchesResult.data ?? [];
   const branchById = new Map((branches ?? []).map((branch) => [branch.id, branch]));
   const membershipByUser = new Map((membershipsResult.data ?? []).map((membership) => [membership.user_id, membership.id]));
@@ -104,7 +103,7 @@ export async function listMyTasks(): Promise<MobileTask[]> {
     const normalized = { key: field.field_key ?? `field_${field.label}`, label: field.label, type, options: Array.isArray(field.options) ? field.options : [], required: field.is_required } as ReportField;
     fieldsByTask.set(field.task_id, [...(fieldsByTask.get(field.task_id) ?? []), normalized]);
   }
-  for (const snapshot of snapshotsResult.data ?? []) {
+  for (const snapshot of snapshotRows) {
     const snapshotFields = Array.isArray(snapshot.schema) ? snapshot.schema as Array<Record<string, unknown>> : [];
     fieldsByTask.set(snapshot.task_id, snapshotFields.map((field) => ({
       key: String(field.key ?? ''), label: String(field.label ?? ''), description: (field.description as string | null) ?? null,
@@ -115,7 +114,7 @@ export async function listMyTasks(): Promise<MobileTask[]> {
   return rows.map((task) => {
     const role = task.assigned_to ? roleByMembership.get(membershipByUser.get(task.assigned_to) ?? '') : null;
     const status = task.status === 'new' || task.status === 'received' ? 'pending' : task.status === 'report_submitted' ? 'submitted' : task.status === 'completed_approved' ? 'approved' : task.status === 'needs_revision' ? 'rejected' : task.status === 'on_hold' ? 'in_progress' : task.status;
-    return { ...task, assignee_employee_id: task.assigned_to, position_code: role ?? null, starts_at: task.assigned_at ?? task.created_at ?? task.due_at, status, proof_required: false, proof_instructions: null, report_schema: fieldsByTask.get(task.id) ?? [], branch_name: branchById.get(task.branch_id)?.name ?? null, branch_level: branchById.get(task.branch_id)?.branch_level ?? null };
+    return { ...task, assignee_employee_id: task.assigned_to, position_code: (task.position_code as MobileTask['position_code'] | null) ?? role ?? null, starts_at: task.assigned_at ?? task.created_at ?? task.due_at, status, proof_required: false, proof_instructions: null, report_schema: fieldsByTask.get(task.id) ?? [], branch_name: branchById.get(task.branch_id)?.name ?? null, branch_level: branchById.get(task.branch_id)?.branch_level ?? null };
   }) as MobileTask[];
 }
 
@@ -195,6 +194,33 @@ export function friendlyDataError(error: unknown, fallback: string): string {
     task_must_be_submitted: 'لا يمكن مراجعة المهمة قبل إرسالها.',
     task_reviewer_not_independent: 'لا يمكن لمنشئ المهمة أو منفذها اعتمادها.',
     required_report_field_missing: 'أكمل جميع حقول التقرير المطلوبة.',
+    task_report_required_without_fields: 'اختر نموذجًا يحتوي حقول تقرير أو اجعل التقرير اختياريًا.',
+    task_title_or_due_date_invalid: 'تحقق من عنوان المهمة والموعد النهائي.',
+    task_template_role_mismatch: 'قالب المهمة لا يطابق التصنيف الوظيفي المحدد.',
+    no_employee_for_role: 'لا يوجد موظف نشط بهذا التصنيف في الفرع المحدد.',
+    report_template_role_mismatch: 'نموذج التقرير لا يطابق تصنيف المهمة. اختر نموذجًا مطابقًا.',
+    report_form_version_requires_approval: 'لا يمكن ربط المهمة إلا بإصدار معتمد من نموذج التقرير.',
+    report_form_snapshot_immutable: 'للمهمة لقطة نموذج محفوظة؛ لا يمكن استبدالها بعد إنشائها.',
+    report_form_fields_required: 'أضف حقلًا واحدًا على الأقل قبل اعتماد النموذج.',
+    report_field_label_required: 'اسم الحقل مطلوب ولا يمكن أن يكون فارغًا.',
+    report_field_options_required: 'أضف خيارًا واحدًا على الأقل لهذا الحقل.',
+    report_field_below_min: 'القيمة أقل من الحد الأدنى المحدد للحقل.',
+    report_field_above_max: 'القيمة أعلى من الحد الأقصى المحدد للحقل.',
+    report_field_min_length: 'النص أقصر من الحد الأدنى المسموح.',
+    report_field_max_length: 'النص أطول من الحد الأقصى المسموح.',
+    report_field_integer_required: 'أدخل رقمًا صحيحًا دون كسور.',
+    report_field_negative_not_allowed: 'القيم السالبة غير مسموحة في هذا الحقل.',
+    report_field_zero_not_allowed: 'يجب أن تكون القيمة أكبر من صفر.',
+    report_field_decimal_places: 'عدد المنازل العشرية يتجاوز الحد المسموح.',
+    report_table_min_rows: 'أضف الحد الأدنى من الصفوف المطلوبة إلى الجدول.',
+    report_table_max_rows: 'عدد صفوف الجدول يتجاوز الحد الأقصى.',
+    required_report_table_cell: 'أكمل الخلايا المطلوبة في الجدول.',
+    invalid_report_field_option: 'اختر قيمة من الخيارات المحددة لهذا الحقل.',
+    invalid_calculated_report_value: 'قيمة الحقل المحسوب لا تطابق الصيغة. راجع الحقول المرتبطة.',
+    report_calculated_division_by_zero: 'تعذر الحساب لأن المقسوم عليه يساوي صفرًا.',
+    report_signature_consent_required: 'وافق على نص الإقرار قبل إرسال التوقيع.',
+    report_signature_required: 'ارسم التوقيع قبل إرسال التقرير.',
+    report_signature_immutable: 'حُفظ التوقيع مع التقرير ولا يمكن تعديله بعد الإرسال.',
     invalid_task_report_payload: 'بيانات التقرير غير صالحة.',
     not_authenticated: 'انتهت الجلسة. سجّل الدخول مجددًا.',
   };

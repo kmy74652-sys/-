@@ -58,10 +58,14 @@ export async function listTaskTemplates() {
   return data ?? [];
 }
 
-export async function createAdministrativeTask(input: { title: string; description: string; dueAt: string; priority: string; branchId: string | null; roleCode: string; templateId: string | null }) {
+export async function createAdministrativeTask(input: { title: string; description: string; dueAt: string; priority: string; branchId: string | null; roleCode: string; templateId: string | null; reportTemplateId?: string | null; reportVersionId?: string | null; reportRequired?: boolean }) {
   const db = client();
   const { data: authData, error: authError } = await db.auth.getUser();
   if (authError || !authData.user) throw authError ?? new Error('not_authenticated');
+  const reportTemplateId = input.reportTemplateId ?? null;
+  const reportVersionId = input.reportVersionId ?? null;
+  if ((reportTemplateId === null) !== (reportVersionId === null)) throw new Error('report_form_version_required');
+  if (input.reportRequired && !reportTemplateId && !input.templateId) throw new Error('task_report_required_without_fields');
   let assignmentQuery = db.from('role_assignments').select('membership_id,organization_id,branch_id').eq('role_code', input.roleCode).limit(20);
   if (input.branchId) assignmentQuery = assignmentQuery.eq('branch_id', input.branchId);
   const { data: assignments, error: assignmentError } = await assignmentQuery;
@@ -73,27 +77,24 @@ export async function createAdministrativeTask(input: { title: string; descripti
   const assignee = memberships?.[0];
   const assignment = assignments.find((row) => row.membership_id === assignee?.id);
   if (!assignee || !assignment) throw new Error('no_employee_for_role');
-  const { data: task, error } = await db.from('tasks').insert({
-    organization_id: assignment.organization_id,
-    branch_id: input.branchId,
-    title: input.title.trim(),
-    description: input.description.trim() || null,
-    assigned_to: assignee.user_id,
-    created_by: authData.user.id,
-    due_at: input.dueAt,
-    priority: input.priority,
-    template_id: input.templateId,
-  }).select('id').single();
+  const { data: task, error } = await db.rpc('create_task_with_report_form', {
+    p_organization_id: assignment.organization_id,
+    p_title: input.title.trim(),
+    p_description: input.description.trim() || null,
+    p_due_at: input.dueAt,
+    p_priority: input.priority,
+    p_branch_id: input.branchId,
+    p_role_code: input.roleCode,
+    p_template_id: input.templateId,
+    p_assigned_to: assignee.user_id,
+    p_report_template_id: reportTemplateId,
+    p_report_version_id: reportVersionId,
+    p_report_required: Boolean(input.reportRequired),
+  });
   if (error) throw error;
-  if (input.templateId && task?.id) {
-    const { data: templateFields, error: fieldsError } = await db.from('task_template_report_fields').select('label,field_key,field_type,is_required,options,sort_order').eq('template_id', input.templateId).order('sort_order', { ascending: true }).limit(100);
-    if (fieldsError) throw fieldsError;
-    if (templateFields?.length) {
-      const { error: copyError } = await db.from('task_report_fields').insert(templateFields.map((field) => ({ ...field, task_id: task.id })));
-      if (copyError) throw copyError;
-    }
-  }
-  return task;
+  const result = task as { id?: string; assigned_to?: string } | null;
+  if (!result?.id) throw new Error('task_create_response_invalid');
+  return { id: result.id, assigned_to: result.assigned_to ?? assignee.user_id };
 }
 
 export const statusLabel = (status: string) => ({ new: 'جديدة', received: 'مستلمة', in_progress: 'قيد التنفيذ', on_hold: 'معلّقة', report_submitted: 'بانتظار المراجعة', needs_revision: 'تحتاج تصحيحًا', completed_approved: 'منجزة ومعتمدة', late: 'متأخرة' }[status] ?? status);
