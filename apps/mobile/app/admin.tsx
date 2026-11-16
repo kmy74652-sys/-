@@ -29,7 +29,7 @@ export default function AdminScreen() {
     try {
       const identity = await getMyEmployeeProfile();
       if (!identity?.employee) throw new Error('employee_not_active');
-      if (!identity.employee.permissions.includes('tasks.read')) throw new Error('permission_denied');
+      if (!identity.employee.permissions.includes('tasks.manage')) throw new Error('permission_denied');
       const [dashboard, taskTemplates, reportTemplates] = await Promise.all([loadDashboardData(), listTaskTemplates(), listDesignerTemplates()]);
       setData(dashboard);
       setTemplates(taskTemplates);
