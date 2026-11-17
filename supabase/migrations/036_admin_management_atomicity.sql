@@ -128,7 +128,7 @@ as $$
 declare
   v_branch public.branches%rowtype;
 begin
-  if p_action not in ('create','update','archive') then
+  if p_action not in ('create','update','archive','activate') then
     raise exception using errcode='22023', message='invalid_branch_action';
   end if;
 
@@ -167,7 +167,7 @@ begin
       organization_id,membership_id,actor_membership_id,action,metadata
     ) values (p_organization_id,null,p_actor_membership_id,'branch_updated',
       jsonb_build_object('branch_id',v_branch.id,'code',v_branch.code,'name',v_branch.name));
-  else
+  elsif p_action='archive' then
     if p_branch_id is null then raise exception using errcode='22023', message='branch_id_required'; end if;
     if exists (
       select 1 from public.role_assignments ra
@@ -183,6 +183,16 @@ begin
     insert into public.employee_access_audit_log(
       organization_id,membership_id,actor_membership_id,action,metadata
     ) values (p_organization_id,null,p_actor_membership_id,'branch_archived',
+      jsonb_build_object('branch_id',v_branch.id,'code',v_branch.code,'name',v_branch.name));
+  elsif p_action='activate' then
+    if p_branch_id is null then raise exception using errcode='22023', message='branch_id_required'; end if;
+    update public.branches set is_active=true
+    where id=p_branch_id and organization_id=p_organization_id
+    returning * into v_branch;
+    if not found then raise exception using errcode='P0002', message='branch_not_found'; end if;
+    insert into public.employee_access_audit_log(
+      organization_id,membership_id,actor_membership_id,action,metadata
+    ) values (p_organization_id,null,p_actor_membership_id,'branch_reactivated',
       jsonb_build_object('branch_id',v_branch.id,'code',v_branch.code,'name',v_branch.name));
   end if;
 
