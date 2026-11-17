@@ -5,6 +5,7 @@ import AdenDeadlinePicker, { adenDateTimeToIso, currentAdenDateTime } from '../c
 import { friendlyDataError, getMyEmployeeProfile } from '../lib/mobileData';
 import { createAdministrativeTask, loadDashboardData, roleLabel, statusLabel, type DashboardData } from '../lib/adminData';
 import { supabase } from '../lib/supabase';
+import { loadOrganizationBranding } from '../lib/organizationBranding';
 import { listApprovedDesignerTemplates, type ReportTemplate } from '../lib/reportDesigner';
 import ReportDesigner from '../components/ReportDesigner';
 import TaskDesigner, { type TaskTemplateDraft } from '../components/TaskDesigner';
@@ -41,12 +42,11 @@ export default function AdminScreen() {
       const identity = await getMyEmployeeProfile();
       if (!identity?.employee) throw new Error('employee_not_active');
       setCurrentName(identity.employee.fullName || 'المستخدم');
-      const { data: institution, error: brandError } = await supabase!.from('institutions').select('name,settings').eq('id', identity.employee.institutionId).maybeSingle();
-      if (brandError) throw brandError;
-      const branding = ((institution?.settings ?? {}) as Record<string, unknown>).branding as Record<string, unknown> | undefined;
-      setBrandName(typeof institution?.name === 'string' ? institution.name : 'مؤسسة الشاعري للتجارة العامة');
-      setBrandTagline(typeof branding?.tagline === 'string' ? branding.tagline : 'معًا... نحو إدارة أفضل');
-      setBrandLogoUrl(typeof branding?.logo_url === 'string' ? branding.logo_url : null);
+      const branding = await loadOrganizationBranding(identity.employee.institutionId);
+      setBrandName(branding.name);
+      setBrandTagline(branding.tagline);
+      setBrandLogoUrl(branding.logoUrl);
+      setNotice(branding.settingsAvailable ? '' : 'تعديل هوية المؤسسة سيتاح بعد تحديث قاعدة البيانات؛ لوحة الإدارة تعمل بالبيانات الحالية.');
       const currentPermissions = identity.employee.permissions;
       if (!currentPermissions.includes('tasks.manage')) throw new Error('permission_denied');
       const canManageLibrary = currentPermissions.includes('task_library.manage');
