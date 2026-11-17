@@ -38,7 +38,11 @@ jobs:
             echo "::error title=Wrong Supabase project::EXPO_PUBLIC_SUPABASE_URL does not match the requested project."
             exit 1
           fi
-          if rg -n 'EXPO_PUBLIC_API_BASE_URL|/api/' app lib; then
+          if ! command -v grep >/dev/null 2>&1; then
+            echo "::error title=Missing grep::The API-reference safety scan cannot run."
+            exit 1
+          fi
+          if grep -R -n -E -- 'EXPO_PUBLIC_API_BASE_URL|/api/' app lib; then
             echo "::error title=External API reference found::The mobile client must use Supabase directly."
             exit 1
           fi
