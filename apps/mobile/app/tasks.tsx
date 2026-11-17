@@ -20,12 +20,17 @@ import {
   listTaskTimeline,
   syncOfflineQueue,
   reviewTask,
+  reviewTaskFormReport,
+  completeTaskExecutionStep,
   submitTaskReport,
+  saveTaskReportDraft,
   updateTaskStatus,
+  type MobileTaskReportForm,
 } from '../lib/mobileData';
 import { pickTaskAttachment, uploadTaskAttachment, type PickedAttachment } from '../lib/taskAttachments';
 import { evaluateReportField, normalizeTableColumns, reportDefaultDraft, validateReportFieldValue, type ReportField, type ReportTableColumn } from '../lib/reportSchema';
 import ReportFieldInput from '../components/ReportFieldInput';
+import ReportReadOnly from '../components/ReportReadOnly';
 
 type Task = {
   id: string;
@@ -38,11 +43,15 @@ type Task = {
   position_code: 'owner' | 'admin_followup' | 'accountant' | 'warehouse_keeper' | 'warehouse_worker' | null;
   starts_at: string;
   due_at: string;
-  priority: 'low' | 'normal' | 'high' | 'urgent';
+  priority: 'normal' | 'important' | 'urgent' | 'critical';
   status: 'pending' | 'in_progress' | 'submitted' | 'approved' | 'rejected' | 'cancelled' | 'late';
   proof_required: boolean;
   proof_instructions: string | null;
   report_schema: ReportField[];
+  task_instructions: string | null;
+  report_flow: 'legacy' | 'multi_form';
+  execution_steps: Array<{ id: string; title: string; instructions: string | null; sort_order: number; required: boolean; evidence_required: boolean; evidence_instructions: string | null; completed: boolean }>;
+  report_forms: MobileTaskReportForm[];
 };
 type Notification = { id: string; title: string; body: string; severity: string; read_at: string | null; created_at: string };
 
@@ -50,7 +59,7 @@ const statusLabels: Record<Task['status'], string> = {
   pending: 'معلقة', in_progress: 'قيد التنفيذ', submitted: 'بانتظار المراجعة',
   approved: 'معتمدة', rejected: 'تحتاج استكمالًا', cancelled: 'ملغاة', late: 'متأخرة',
 };
-const priorityLabels: Record<Task['priority'], string> = { low: 'منخفضة', normal: 'عادية', high: 'عالية', urgent: 'عاجلة' };
+const priorityLabels: Record<Task['priority'], string> = { normal: 'عادية', important: 'مهمة', urgent: 'عاجلة', critical: 'حرجة' };
 const positionLabels: Record<NonNullable<Task['position_code']>, string> = {
   owner: 'صاحب المؤسسة', admin_followup: 'المدير التنفيذي', accountant: 'المحاسب',
   warehouse_keeper: 'أمين المخازن', warehouse_worker: 'عمال التحميل',
@@ -65,6 +74,7 @@ export default function TasksScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [busyTask, setBusyTask] = useState('');
   const [reportTask, setReportTask] = useState('');
+  const [activeReportForm, setActiveReportForm] = useState<{ taskId: string; snapshotId: string } | null>(null);
   const [drafts, setDrafts] = useState<Record<string, Record<string, string>>>({});
   const [reviewNote, setReviewNote] = useState('');
   const [search, setSearch] = useState('');
@@ -73,6 +83,7 @@ export default function TasksScreen() {
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [attachments, setAttachments] = useState<Record<string, Record<string, Array<PickedAttachment & { path?: string }>>>>({});
+  const [stepAttachments, setStepAttachments] = useState<Record<string, Record<string, { id: string; name: string }>>>({});
   const [timeline, setTimeline] = useState<Record<string, Awaited<ReturnType<typeof listTaskTimeline>>>>({});
 
   const load = useCallback(async () => {
@@ -92,6 +103,16 @@ export default function TasksScreen() {
           const taskDraft = { ...(next[task.id] ?? {}) };
           for (const field of task.report_schema ?? []) {
             if (taskDraft[field.key] === undefined) taskDraft[field.key] = reportDefaultDraft(field);
+          }
+          for (const form of task.report_forms ?? []) {
+            const formKey = formDraftKey(task, form);
+            const formDraft = { ...(next[formKey] ?? {}) };
+            for (const field of form.schema) {
+              const persisted = form.draft_values?.[field.key];
+              if (persisted !== undefined && formDraft[field.key] === undefined) formDraft[field.key] = typeof persisted === 'string' ? persisted : JSON.stringify(persisted);
+              if (formDraft[field.key] === undefined) formDraft[field.key] = reportDefaultDraft(field);
+            }
+            next[formKey] = formDraft;
           }
           next[task.id] = taskDraft;
         }
@@ -122,6 +143,7 @@ export default function TasksScreen() {
       await operation();
       setNotice(successMessage);
       setReportTask('');
+      setActiveReportForm(null);
       setReviewNote('');
       await load();
     } catch (cause) {
@@ -171,6 +193,49 @@ export default function TasksScreen() {
     void mutate(task, () => submitTaskReport(task.id, values), 'تم إرسال التقرير للمراجعة.');
   }
 
+  function formDraftKey(task: Task, form: MobileTaskReportForm) { return `${task.id}:${form.snapshot_id}`; }
+  function valuesForReportForm(task: Task, form: MobileTaskReportForm, strict = false): Record<string, unknown> {
+    const key = formDraftKey(task, form);
+    const values: Record<string, unknown> = {};
+    try {
+      for (const field of form.schema) {
+        if (field.type === 'calculated') continue;
+        const raw = drafts[key]?.[field.key]?.trim() ?? '';
+        if (['attachment', 'image', 'file'].includes(field.type)) {
+          if (attachments[key]?.[field.key]?.length) values[field.key] = attachments[key][field.key];
+        } else if (field.type === 'table' || field.type === 'multiselect' || field.type === 'signature') {
+          if (raw) values[field.key] = JSON.parse(raw) as unknown;
+        } else if (field.type === 'boolean' || field.type === 'checkbox') {
+          if (raw === 'true' || raw === 'false') values[field.key] = raw === 'true';
+          else if (raw) values[field.key] = raw;
+        } else if (['number', 'progress', 'integer', 'quantity', 'money'].includes(field.type)) {
+          if (raw) values[field.key] = /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/.test(raw) ? Number(raw) : raw;
+        } else if (raw) values[field.key] = raw;
+      }
+    } catch (cause) { if (strict) throw new Error(`تحقق من تنسيق الحقل المركب: ${(cause as Error).message}`); }
+    for (const field of form.schema) if (field.type === 'calculated') {
+      const calculated = evaluateReportField(field, form.schema, values);
+      if (calculated.value !== null) values[field.key] = calculated.value;
+      else if (strict) throw new Error(`تعذر حساب «${field.label}»: ${calculated.error ?? 'تحقق من الحقول المرتبطة.'}`);
+    }
+    return values;
+  }
+  async function saveSeparateDraft(task: Task, form: MobileTaskReportForm) {
+    try {
+      const values = valuesForReportForm(task, form);
+      await saveTaskReportDraft(task.id, form.snapshot_id, values);
+      setNotice(`تم حفظ مسودة «${form.title}» على الجهاز والخادم.`);
+    } catch (cause) { setError(friendlyDataError(cause, 'تعذر حفظ مسودة التقرير.')); }
+  }
+
+  function submitSeparateReport(task: Task, form: MobileTaskReportForm) {
+    let values: Record<string, unknown>;
+    try { values = valuesForReportForm(task, form, true); }
+    catch (cause) { setError((cause as Error).message); return; }
+    for (const field of form.schema) { const issue = validateReportFieldValue(field, values[field.key]); if (issue) { setError(issue); return; } }
+    void mutate(task, () => submitTaskReport(task.id, values, form.snapshot_id), `تم إرسال «${form.title}» للمراجعة بصورة مستقلة.`);
+  }
+
   function tableColumns(field: ReportField): ReportTableColumn[] {
     const columns = normalizeTableColumns(field);
     return columns.length ? columns : [{ key: 'value', label: 'القيمة', type: 'short_text', required: false }];
@@ -206,6 +271,25 @@ export default function TasksScreen() {
       }));
       setNotice('تم رفع المرفق وتجهيزه للتقرير.');
     } catch (cause) { setError(friendlyDataError(cause, 'تعذر رفع المرفق. تأكد من الاتصال وحجم الملف.')); }
+  }
+  async function chooseFormAttachment(task: Task, form: MobileTaskReportForm, fieldKey: string) {
+    const draftKey = formDraftKey(task, form);
+    try {
+      const file = await pickTaskAttachment();
+      if (!file) return;
+      const uploaded = await uploadTaskAttachment(task.id, file);
+      setAttachments((current) => ({ ...current, [draftKey]: { ...current[draftKey], [fieldKey]: [...(current[draftKey]?.[fieldKey] ?? []), { ...file, ...uploaded }] } }));
+      setNotice('تم رفع المرفق وتجهيزه لنموذج التقرير المحدد.');
+    } catch (cause) { setError(friendlyDataError(cause, 'تعذر رفع المرفق. تأكد من الاتصال وحجم الملف.')); }
+  }
+  async function chooseStepEvidence(task: Task, stepId: string) {
+    try {
+      const file = await pickTaskAttachment();
+      if (!file) return;
+      const uploaded = await uploadTaskAttachment(task.id, file, stepId);
+      setStepAttachments((current) => ({ ...current, [task.id]: { ...current[task.id], [stepId]: { id: uploaded.id, name: uploaded.name } } }));
+      setNotice('تم رفع الإثبات وربطه بخطوة التنفيذ. أكمل الخطوة لتسجيله.');
+    } catch (cause) { setError(friendlyDataError(cause, 'تعذر رفع إثبات الخطوة.')); }
   }
   async function showTimeline(task: Task) {
     try { const rows = await listTaskTimeline(task.id); setTimeline((current) => ({ ...current, [task.id]: rows })); }
@@ -272,6 +356,14 @@ export default function TasksScreen() {
             <Text style={styles.meta}>المنصب: {task.position_code ? positionLabels[task.position_code] : 'بحاجة إلى تصنيف'}{task.branch_name ? ` · الفرع: ${task.branch_name}${task.branch_level ? ` (المستوى ${task.branch_level})` : ''}` : task.branch_id ? ' · فرع محدد' : ''}</Text>
             <Text style={styles.meta}>الأولوية: {priorityLabels[task.priority]} · الموعد: {formatDate(task.due_at)}</Text>
             {task.proof_required && <Text style={styles.proof}>{task.proof_instructions || 'يتطلب إرفاق دليل إنجاز.'}</Text>}
+            {!!task.task_instructions && <View style={styles.timeline}><Text style={styles.fieldLabel}>تعليمات التنفيذ</Text><Text style={styles.body}>{task.task_instructions}</Text></View>}
+            {!!task.execution_steps.length && <View style={styles.timeline}><Text style={styles.fieldLabel}>خطوات التنفيذ</Text>{task.execution_steps.map((step,index)=><View key={step.id} style={styles.stepCard}>
+              <Text style={styles.fieldLabel}>{index+1}. {step.title}{step.required?' · إلزامية':' · اختيارية'}{step.completed?' · مكتملة':''}</Text>
+              {!!step.instructions && <Text style={styles.body}>{step.instructions}</Text>}
+              {step.evidence_required && <Text style={styles.proof}>{step.evidence_instructions || 'أرفق إثباتًا قبل إكمال هذه الخطوة.'}</Text>}
+              {!step.completed && step.evidence_required && <><Pressable style={styles.secondaryButton} onPress={()=>void chooseStepEvidence(task,step.id)}><Text style={styles.secondaryText}>{stepAttachments[task.id]?.[step.id]?.name ?? 'اختيار إثبات للخطوة'}</Text></Pressable>{!!stepAttachments[task.id]?.[step.id] && <Text style={styles.meta}>المرفق جاهز: {stepAttachments[task.id][step.id].name}</Text>}</>}
+              {!step.completed && <Pressable disabled={busyTask===task.id || (step.evidence_required&&!stepAttachments[task.id]?.[step.id])} style={[styles.primaryButton,{opacity:step.evidence_required&&!stepAttachments[task.id]?.[step.id]?0.5:1}]} onPress={()=>void mutate(task,()=>completeTaskExecutionStep(step.id,stepAttachments[task.id]?.[step.id]?[stepAttachments[task.id][step.id].id]:[]),'تم تسجيل إكمال الخطوة.') }><Text style={styles.primaryText}>إكمال الخطوة</Text></Pressable>}
+            </View>)}</View>}
             <Pressable style={styles.secondaryButton} onPress={() => void showTimeline(task)}><Text style={styles.secondaryText}>عرض السجل الزمني</Text></Pressable>
             {!!timeline[task.id]?.length && <View style={styles.timeline}>{timeline[task.id].map((entry) => <Text key={entry.id} style={styles.meta}>{formatDate(entry.created_at)} · {entry.status} · {entry.actor_name}{entry.note ? ` — ${entry.note}` : ''}</Text>)}</View>}
 
@@ -284,7 +376,22 @@ export default function TasksScreen() {
               onChooseAttachment={() => void chooseAttachment(task, field.key)}
             />)}
 
-            {!!task.report_schema?.length && ['in_progress', 'rejected'].includes(task.status) && reportTask !== task.id && (
+            {!!task.report_forms.length && <View style={styles.timeline}><Text style={styles.fieldLabel}>نماذج التقارير المرتبطة</Text>{task.report_forms.map((form)=>{
+              const key=formDraftKey(task,form); const opened=activeReportForm?.taskId===task.id&&activeReportForm.snapshotId===form.snapshot_id;
+              const statusLabel=form.status==='submitted'?'بانتظار مراجعة هذا النموذج':form.status==='approved'?'تم اعتماد هذا النموذج':form.status==='returned'?'أُعيد هذا النموذج للتعديل':form.required?'مطلوب الإرسال':'اختياري';
+              const canEdit=['in_progress','rejected','submitted'].includes(task.status)&&form.status!=='submitted'&&form.status!=='approved';
+              return <View key={form.snapshot_id} style={styles.reportCard}>
+                <View style={styles.taskHeading}><Text style={styles.taskTitle}>{form.title}</Text><Text style={[styles.badge,form.status==='approved'?styles.goodBadge:form.status==='returned'?styles.warnBadge:styles.neutralBadge]}>{statusLabel}</Text></View>
+                <Text style={styles.meta}>{form.required?'إلزامي لإكمال المهمة':'اختياري'} · {form.schema.length} حقول</Text>
+                {!!form.review_note&&form.status==='returned'&&<Text style={styles.proof}>ملاحظة المراجع: {form.review_note}</Text>}
+                {form.status==='submitted'&&<ReportReadOnly fields={form.schema} values={form.values}/>}
+                {canReview&&form.status==='submitted'&&form.report_id&&<><TextInput style={styles.input} value={reviewNote} onChangeText={setReviewNote} placeholder="ملاحظة المراجعة" accessibilityLabel={`ملاحظة مراجعة ${form.title}`}/><Pressable disabled={busyTask===task.id} style={styles.primaryButton} onPress={()=>void mutate(task,()=>reviewTaskFormReport(form.report_id!,'approved',reviewNote||null),`تم اعتماد «${form.title}» فقط.`)}><Text style={styles.primaryText}>اعتماد هذا التقرير</Text></Pressable><Pressable disabled={busyTask===task.id||!reviewNote.trim()} style={styles.secondaryButton} onPress={()=>void mutate(task,()=>reviewTaskFormReport(form.report_id!,'returned',reviewNote),`أعيد «${form.title}» للتعديل.`)}><Text style={styles.secondaryText}>إرجاع هذا التقرير مع سبب</Text></Pressable></>}
+                {canEdit&&!opened&&<Pressable style={styles.secondaryButton} onPress={()=>{setError('');setActiveReportForm({taskId:task.id,snapshotId:form.snapshot_id});}}><Text style={styles.secondaryText}>{form.status==='returned'?'تعديل وإعادة إرسال':'فتح هذا التقرير'}</Text></Pressable>}
+                {canEdit&&opened&&<>{form.schema.map((field)=><ReportFieldInput key={field.key} field={field} raw={drafts[key]?.[field.key]??''} attachments={attachments[key]?.[field.key]??[]} calculated={evaluateReportField(field,form.schema,valuesForReportForm(task,form)).value} calculationError={evaluateReportField(field,form.schema,valuesForReportForm(task,form)).error} rows={field.type==='table'?tableRows(key,field):[]} onDraftChange={(value)=>setDrafts((current)=>({...current,[key]:{...current[key],[field.key]:value}}))} onTableChange={(rows)=>updateTable(key,field,rows)} onChooseAttachment={()=>void chooseFormAttachment(task,form,field.key)}/>)}<Pressable style={styles.secondaryButton} onPress={()=>void saveSeparateDraft(task,form)}><Text style={styles.secondaryText}>حفظ المسودة</Text></Pressable><Pressable disabled={busyTask===task.id} style={styles.primaryButton} onPress={()=>submitSeparateReport(task,form)}><Text style={styles.primaryText}>{busyTask===task.id?'جارٍ الإرسال…':'إرسال هذا التقرير فقط'}</Text></Pressable><Pressable style={styles.secondaryButton} onPress={()=>setActiveReportForm(null)}><Text style={styles.secondaryText}>إغلاق النموذج</Text></Pressable></>}
+              </View>;
+            })}</View>}
+
+            {task.report_flow !== 'multi_form' && !!task.report_schema?.length && ['in_progress', 'rejected'].includes(task.status) && reportTask !== task.id && (
               <Pressable accessibilityRole="button" style={styles.secondaryButton} onPress={() => { setError(''); setReportTask(task.id); }}>
                 <Text style={styles.secondaryText}>كتابة التقرير</Text>
               </Pressable>
@@ -296,7 +403,7 @@ export default function TasksScreen() {
                   <Text style={styles.primaryText}>بدء التنفيذ</Text>
                 </Pressable>
               )}
-              {task.status === 'in_progress' && !task.report_schema?.length && (
+              {task.status === 'in_progress' && !task.report_schema?.length && !task.report_forms.length && (
                 <Pressable disabled={busyTask === task.id} style={styles.primaryButton} onPress={() => void mutate(task, () => submitTaskReport(task.id, {}), 'أرسلت المهمة للمراجعة.')}>
                   <Text style={styles.primaryText}>إرسال للمراجعة</Text>
                 </Pressable>
@@ -309,7 +416,7 @@ export default function TasksScreen() {
                   <Pressable style={styles.secondaryButton} onPress={() => setReportTask('')}><Text style={styles.secondaryText}>إلغاء</Text></Pressable>
                 </>
               )}
-              {canReview && task.status === 'submitted' && (
+              {canReview && task.report_flow !== 'multi_form' && task.status === 'submitted' && (
                 <>
                   <TextInput style={styles.input} value={reviewNote} onChangeText={setReviewNote} placeholder="ملاحظة المراجعة (والسبب عند الإرجاع)" accessibilityLabel="ملاحظة المراجعة" />
                   <Pressable disabled={busyTask === task.id} style={styles.primaryButton} onPress={() => void mutate(task, () => reviewTask(task.id, 'approved', reviewNote || null), 'تم اعتماد المهمة.')}><Text style={styles.primaryText}>اعتماد</Text></Pressable>
@@ -382,6 +489,8 @@ const styles = StyleSheet.create({
   empty: { color: '#718394', textAlign: 'center', paddingVertical: 22 },
   muted: { color: '#718394', textAlign: 'center' },
   timeline: { borderTopWidth: 1, borderTopColor: '#edf1f3', paddingTop: 8, gap: 4 },
+  stepCard: { backgroundColor: '#f8fafb', borderWidth: 1, borderColor: '#e2eaed', borderRadius: 11, padding: 11, gap: 8 },
+  reportCard: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#e2eaed', borderRadius: 12, padding: 12, gap: 8 },
   notifications: { marginTop: 10, padding: 16, backgroundColor: '#fff', borderWidth: 1, borderColor: '#e2e9eb', borderRadius: 16, gap: 10 },
   sectionTitle: { color: '#17324d', fontSize: 18, fontWeight: '800', textAlign: 'right' },
   notification: { borderTopWidth: 1, borderTopColor: '#edf1f3', paddingTop: 10, gap: 4 },

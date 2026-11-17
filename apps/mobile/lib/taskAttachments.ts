@@ -9,7 +9,7 @@ export async function pickTaskAttachment(): Promise<PickedAttachment | null> {
   if (!file.size || file.size > 20 * 1024 * 1024) throw new Error('attachment_too_large');
   return { uri: file.uri, name: file.name, mimeType: file.mimeType || 'application/octet-stream', size: file.size };
 }
-export async function uploadTaskAttachment(taskId: string, file: PickedAttachment) {
+export async function uploadTaskAttachment(taskId: string, file: PickedAttachment, executionStepId?: string) {
   if (!supabase) throw new Error('supabase_not_configured');
   const response = await fetch(file.uri);
   const body = await response.arrayBuffer();
@@ -18,17 +18,18 @@ export async function uploadTaskAttachment(taskId: string, file: PickedAttachmen
   if (error) throw error;
   const { data: authData } = await supabase.auth.getUser();
   if (!authData.user) throw new Error('not_authenticated');
-  const { error: metadataError } = await supabase.from('task_attachments').insert({
+  const { data: metadata, error: metadataError } = await supabase.from('task_attachments').insert({
     task_id: taskId,
+    execution_step_id: executionStepId ?? null,
     uploaded_by: authData.user.id,
     file_name: file.name,
     storage_path: path,
     mime_type: file.mimeType,
     size_bytes: file.size,
-  });
+  }).select('id').single();
   if (metadataError) {
     await supabase.storage.from('task-attachments').remove([path]);
     throw metadataError;
   }
-  return { path, name: file.name, mimeType: file.mimeType, size: file.size };
+  return { id: metadata.id as string, path, name: file.name, mimeType: file.mimeType, size: file.size };
 }

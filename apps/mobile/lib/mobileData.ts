@@ -29,12 +29,18 @@ export type MobileTask = {
   position_code: 'owner' | 'admin_followup' | 'accountant' | 'warehouse_keeper' | 'warehouse_worker' | null;
   starts_at: string;
   due_at: string;
-  priority: 'low' | 'normal' | 'high' | 'urgent';
+  priority: 'normal' | 'important' | 'urgent' | 'critical';
   status: 'pending' | 'in_progress' | 'submitted' | 'approved' | 'rejected' | 'cancelled' | 'late';
   proof_required: boolean;
   proof_instructions: string | null;
   report_schema: ReportField[];
+  task_instructions: string | null;
+  report_flow: 'legacy' | 'multi_form';
+  execution_steps: MobileTaskStep[];
+  report_forms: MobileTaskReportForm[];
 };
+export type MobileTaskStep = { id: string; title: string; instructions: string | null; sort_order: number; required: boolean; evidence_required: boolean; evidence_instructions: string | null; completed: boolean };
+export type MobileTaskReportForm = { snapshot_id: string; title: string; sort_order: number; required: boolean; schema: ReportField[]; report_id: string | null; status: 'submitted' | 'approved' | 'returned' | null; values: Record<string, unknown> | null; draft_values: Record<string, unknown> | null; review_note: string | null; submitted_at: string | null };
 
 export type MobileNotification = {
   id: string;
@@ -67,30 +73,29 @@ export async function listMyTasks(): Promise<MobileTask[]> {
   const client = getClient();
   const { data, error } = await client
     .from('tasks')
-    .select('id,title,description,assigned_to,branch_id,position_code,due_at,priority,status,assigned_at,created_at')
+    .select('id,title,description,assigned_to,branch_id,position_code,due_at,priority,status,assigned_at,created_at,starts_at,report_form_snapshot_id,report_flow,task_instructions,proof_required,proof_instructions')
     .order('due_at', { ascending: true });
   if (error) throw error;
   const rows = data ?? [];
   const branchIds = [...new Set(rows.map((task) => task.branch_id).filter((id): id is string => Boolean(id)))];
   const assignedIds = [...new Set(rows.map((task) => task.assigned_to).filter((id): id is string => Boolean(id)))];
   const taskIds = rows.map((task) => task.id);
-  const [branchesResult, membershipsResult, fieldsResult] = await Promise.all([
+  const [branchesResult, membershipsResult, fieldsResult, stepsResult, snapshotsResult, reportsResult, draftsResult] = await Promise.all([
     branchIds.length ? client.from('branches').select('id,name,branch_level').in('id', branchIds) : Promise.resolve({ data: [], error: null }),
     assignedIds.length ? client.from('organization_memberships').select('id,user_id').in('user_id', assignedIds) : Promise.resolve({ data: [], error: null }),
     taskIds.length ? client.from('task_report_fields').select('task_id,label,field_key,field_type,is_required,options,sort_order').in('task_id', taskIds).order('sort_order', { ascending: true }) : Promise.resolve({ data: [], error: null }),
+    taskIds.length ? client.from('task_execution_steps').select('id,task_id,title,instructions,sort_order,is_required,evidence_required,evidence_instructions,completed_at').in('task_id', taskIds).order('sort_order', { ascending: true }).limit(2000) : Promise.resolve({ data: [], error: null }),
+    taskIds.length ? client.from('task_report_form_snapshots').select('id,task_id,title,sort_order,is_required,schema').in('task_id', taskIds).order('sort_order', { ascending: true }).limit(2000) : Promise.resolve({ data: [], error: null }),
+    taskIds.length ? client.from('task_reports').select('id,task_id,report_form_snapshot_id,values,status,review_note,submitted_at').in('task_id', taskIds).order('submitted_at', { ascending: false }).limit(2000) : Promise.resolve({ data: [], error: null }),
+    taskIds.length ? client.from('task_report_drafts').select('task_id,snapshot_id,values,updated_at').in('task_id', taskIds).order('updated_at', { ascending: false }).limit(2000) : Promise.resolve({ data: [], error: null }),
   ]);
   if (branchesResult.error) throw branchesResult.error;
   if (membershipsResult.error) throw membershipsResult.error;
   if (fieldsResult.error) throw fieldsResult.error;
-  const snapshotRows: Array<{ task_id: string; schema: unknown }> = [];
-  const snapshotPageSize = 200;
-  for (let offset = 0; offset < taskIds.length; offset += snapshotPageSize) {
-    const pageIds = taskIds.slice(offset, offset + snapshotPageSize);
-    const snapshotsResult = await client.from('task_report_form_snapshots')
-      .select('task_id,schema').in('task_id', pageIds).order('task_id').limit(snapshotPageSize);
-    if (snapshotsResult.error) throw snapshotsResult.error;
-    snapshotRows.push(...(snapshotsResult.data ?? []));
-  }
+  if (stepsResult.error) throw stepsResult.error;
+  if (snapshotsResult.error) throw snapshotsResult.error;
+  if (reportsResult.error) throw reportsResult.error;
+  if (draftsResult.error) throw draftsResult.error;
   const branches = branchesResult.data ?? [];
   const branchById = new Map((branches ?? []).map((branch) => [branch.id, branch]));
   const membershipByUser = new Map((membershipsResult.data ?? []).map((membership) => [membership.user_id, membership.id]));
@@ -103,9 +108,13 @@ export async function listMyTasks(): Promise<MobileTask[]> {
     const normalized = { key: field.field_key ?? `field_${field.label}`, label: field.label, type, options: Array.isArray(field.options) ? field.options : [], required: field.is_required } as ReportField;
     fieldsByTask.set(field.task_id, [...(fieldsByTask.get(field.task_id) ?? []), normalized]);
   }
-  for (const snapshot of snapshotRows) {
-    const snapshotFields = Array.isArray(snapshot.schema) ? snapshot.schema as Array<Record<string, unknown>> : [];
-    fieldsByTask.set(snapshot.task_id, snapshotFields.map((field) => ({
+  const snapshotsByTask = new Map<string, NonNullable<typeof snapshotsResult.data>>();
+  for (const snapshot of snapshotsResult.data ?? []) snapshotsByTask.set(snapshot.task_id, [...(snapshotsByTask.get(snapshot.task_id) ?? []), snapshot]);
+  for (const task of rows) {
+    if (task.report_flow === 'multi_form' || !task.report_form_snapshot_id) continue;
+    const snapshot = (snapshotsByTask.get(task.id) ?? []).find((item) => item.id === task.report_form_snapshot_id);
+    const snapshotFields = Array.isArray(snapshot?.schema) ? snapshot.schema as Array<Record<string, unknown>> : [];
+    if (snapshot) fieldsByTask.set(task.id, snapshotFields.map((field) => ({
       key: String(field.key ?? ''), label: String(field.label ?? ''), description: (field.description as string | null) ?? null,
       type: String(field.type ?? 'short_text') as ReportField['type'], options: Array.isArray(field.options) ? field.options.map(String) : [],
       required: Boolean(field.required), repeatable: Boolean(field.repeatable), validation: (field.validation as Record<string, unknown>) ?? {}, config: (field.config as Record<string, unknown>) ?? {},
@@ -114,7 +123,14 @@ export async function listMyTasks(): Promise<MobileTask[]> {
   return rows.map((task) => {
     const role = task.assigned_to ? roleByMembership.get(membershipByUser.get(task.assigned_to) ?? '') : null;
     const status = task.status === 'new' || task.status === 'received' ? 'pending' : task.status === 'report_submitted' ? 'submitted' : task.status === 'completed_approved' ? 'approved' : task.status === 'needs_revision' ? 'rejected' : task.status === 'on_hold' ? 'in_progress' : task.status;
-    return { ...task, assignee_employee_id: task.assigned_to, position_code: (task.position_code as MobileTask['position_code'] | null) ?? role ?? null, starts_at: task.assigned_at ?? task.created_at ?? task.due_at, status, proof_required: false, proof_instructions: null, report_schema: fieldsByTask.get(task.id) ?? [], branch_name: branchById.get(task.branch_id)?.name ?? null, branch_level: branchById.get(task.branch_id)?.branch_level ?? null };
+    const executionSteps = (stepsResult.data ?? []).filter((step) => step.task_id === task.id).map((step) => ({ id: step.id, title: step.title, instructions: step.instructions, sort_order: step.sort_order, required: step.is_required, evidence_required: step.evidence_required, evidence_instructions: step.evidence_instructions, completed: Boolean(step.completed_at) }));
+    const reportForms: MobileTaskReportForm[] = task.report_flow === 'multi_form' ? (snapshotsByTask.get(task.id) ?? []).map((snapshot) => {
+      const latest = (reportsResult.data ?? []).find((report) => report.report_form_snapshot_id === snapshot.id);
+      const latestDraft = (draftsResult.data ?? []).find((draft) => draft.snapshot_id === snapshot.id);
+      const rawSchema = Array.isArray(snapshot.schema) ? snapshot.schema as Array<Record<string, unknown>> : [];
+      return { snapshot_id: snapshot.id, title: snapshot.title ?? 'نموذج تقرير', sort_order: snapshot.sort_order ?? 0, required: Boolean(snapshot.is_required), schema: rawSchema.map((field) => ({ key: String(field.key ?? ''), label: String(field.label ?? ''), description: (field.description as string | null) ?? null, type: String(field.type ?? 'short_text') as ReportField['type'], options: Array.isArray(field.options) ? field.options.map(String) : [], required: Boolean(field.required), repeatable: Boolean(field.repeatable), validation: (field.validation as Record<string, unknown>) ?? {}, config: (field.config as Record<string, unknown>) ?? {} })), report_id: latest?.id ?? null, draft_values: (latestDraft?.values as Record<string, unknown> | null) ?? null, status: latest?.status === 'returned' ? 'returned' : latest?.status === 'approved' ? 'approved' : latest?.status === 'submitted' ? 'submitted' : null, values: (latest?.values as Record<string, unknown> | null) ?? null, review_note: latest?.review_note ?? null, submitted_at: latest?.submitted_at ?? null };
+    }) : [];
+    return { ...task, assignee_employee_id: task.assigned_to, position_code: (task.position_code as MobileTask['position_code'] | null) ?? role ?? null, starts_at: task.starts_at ?? task.assigned_at ?? task.created_at ?? task.due_at, status, proof_required: Boolean(task.proof_required), proof_instructions: task.proof_instructions, task_instructions: task.task_instructions, report_flow: task.report_flow === 'multi_form' ? 'multi_form' : 'legacy', execution_steps: executionSteps, report_forms: reportForms, report_schema: fieldsByTask.get(task.id) ?? [], branch_name: branchById.get(task.branch_id)?.name ?? null, branch_level: branchById.get(task.branch_id)?.branch_level ?? null };
   }) as MobileTask[];
 }
 
@@ -138,7 +154,8 @@ function isOffline(error: unknown) { const message = String((error as { message?
 function idempotencyKey(taskId: string, operation: string) { return `${operation}:${taskId}:${Date.now()}`; }
 async function executeQueueItem(item: QueueItem) {
   if (item.kind === 'status') await callRpc('mobile_record_task_update', { p_task_id: item.payload.taskId, p_status: item.payload.status, p_note: item.payload.note ?? null, p_idempotency_key: item.payload.idempotencyKey });
-  if (item.kind === 'report') await callRpc('mobile_submit_task_report', { p_task_id: item.payload.taskId, p_values: item.payload.values, p_idempotency_key: item.payload.idempotencyKey });
+  if (item.kind === 'report' && item.payload.snapshotId) await callRpc('mobile_submit_task_report_form', { p_task_id: item.payload.taskId, p_snapshot_id: item.payload.snapshotId, p_values: item.payload.values, p_idempotency_key: item.payload.idempotencyKey });
+  else if (item.kind === 'report') await callRpc('mobile_submit_task_report', { p_task_id: item.payload.taskId, p_values: item.payload.values, p_idempotency_key: item.payload.idempotencyKey });
 }
 export function syncOfflineQueue() { return flushQueue(executeQueueItem); }
 
@@ -148,10 +165,21 @@ export async function updateTaskStatus(taskId: string, status: 'in_progress' | '
   catch (error) { if (!isOffline(error)) throw error; await queueOperation('status', payload); }
 }
 
-export async function submitTaskReport(taskId: string, values: Record<string, unknown>) {
-  const payload = { taskId, values, idempotencyKey: idempotencyKey(taskId, 'report') };
-  try { await callRpc('mobile_submit_task_report', { p_task_id: taskId, p_values: values, p_idempotency_key: payload.idempotencyKey }); }
+export async function submitTaskReport(taskId: string, values: Record<string, unknown>, snapshotId?: string) {
+  const payload = { taskId, snapshotId, values, idempotencyKey: idempotencyKey(taskId, snapshotId ? `report:${snapshotId}` : 'report') };
+  try {
+    if (snapshotId) await callRpc('mobile_submit_task_report_form', { p_task_id: taskId, p_snapshot_id: snapshotId, p_values: values, p_idempotency_key: payload.idempotencyKey });
+    else await callRpc('mobile_submit_task_report', { p_task_id: taskId, p_values: values, p_idempotency_key: payload.idempotencyKey });
+  }
   catch (error) { if (!isOffline(error)) throw error; await queueOperation('report', payload); }
+}
+
+export function saveTaskReportDraft(taskId: string, snapshotId: string, values: Record<string, unknown>) {
+  return callRpc('save_task_report_draft', { p_task_id: taskId, p_snapshot_id: snapshotId, p_values: values });
+}
+
+export function completeTaskExecutionStep(stepId: string, evidenceAttachmentIds: string[] = []) {
+  return callRpc('mobile_complete_task_step', { p_step_id: stepId, p_evidence_attachment_ids: evidenceAttachmentIds });
 }
 
 export async function listTaskTimeline(taskId: string): Promise<TaskTimelineEntry[]> {
@@ -172,6 +200,10 @@ export function reviewTask(taskId: string, decision: 'approved' | 'rejected', no
     p_decision: decision,
     p_note: note,
   });
+}
+
+export function reviewTaskFormReport(reportId: string, decision: 'approved' | 'returned', note: string | null) {
+  return callRpc('mobile_review_task_form_report', { p_report_id: reportId, p_decision: decision, p_note: note });
 }
 
 export function friendlyDataError(error: unknown, fallback: string): string {
