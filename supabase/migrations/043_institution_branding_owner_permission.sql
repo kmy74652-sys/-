@@ -24,3 +24,13 @@ create policy organizations_update_owner
   to authenticated
   using (alshaari_private.has_permission(id, 'organizations.update', null::uuid))
   with check (alshaari_private.has_permission(id, 'organizations.update', null::uuid));
+
+-- These functions are trigger-only, or an unused legacy permission probe.
+-- Keep trigger execution intact while removing direct API execution grants.
+revoke execute on function public.guard_multi_form_task_completion() from public, anon, authenticated;
+revoke execute on function public.guard_report_signature_mutation() from public, anon, authenticated;
+revoke execute on function public.guard_task_report_snapshot_and_signature() from public, anon, authenticated;
+revoke execute on function public.report_designer_allowed(uuid) from public, anon, authenticated;
+
+-- Pin the non-definer activity guard's lookup path for predictable resolution.
+alter function public.prevent_task_activity_mutation() set search_path = pg_catalog, public;
