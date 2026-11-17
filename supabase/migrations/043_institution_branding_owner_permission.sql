@@ -39,3 +39,49 @@ alter function public.prevent_task_activity_mutation() set search_path = pg_cata
 -- tasks_select_assigned_or_manager and could expose every task in an org
 -- if an organization_id app_metadata claim is ever added to employee JWTs.
 drop policy if exists tasks_read on public.tasks;
+
+-- The executive follow-up role is organization-wide by the agreed management model.
+-- Do not let a bootstrap branch assignment silently restrict its approved role permissions.
+create or replace function alshaari_private.has_permission(
+  p_organization_id uuid,
+  p_permission_code text,
+  p_branch_id uuid
+)
+returns boolean
+language sql
+stable
+security definer
+set search_path to ''
+as $function$
+  select exists (
+    select 1
+    from public.organization_memberships m
+    join public.organizations o
+      on o.id = m.organization_id
+    join public.role_assignments a
+      on a.organization_id = m.organization_id
+     and a.membership_id = m.id
+    join public.role_permissions rp
+      on rp.role_code = a.role_code
+    where m.organization_id = p_organization_id
+      and m.user_id = auth.uid()
+      and m.is_active
+      and o.is_active
+      and rp.permission_code = p_permission_code
+      and (
+        a.branch_id is null
+        or (p_branch_id is not null and a.branch_id = p_branch_id)
+        or a.role_code = 'admin_followup'
+      )
+      and (
+        p_branch_id is null
+        or exists (
+          select 1
+          from public.branches b
+          where b.id = p_branch_id
+            and b.organization_id = p_organization_id
+            and b.is_active
+        )
+      )
+  );
+$function$;
