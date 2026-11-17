@@ -430,7 +430,7 @@ async function ownerOperation(body: Record<string, unknown>, request: Request, c
     const branchId = typeof body.branchId === 'string' ? body.branchId : null;
     const code = typeof body.code === 'string' ? body.code.trim().toUpperCase() : null;
     const name = typeof body.name === 'string' ? body.name.trim() : null;
-    if (!['create','update','archive'].includes(branchAction)) return response({ error: 'invalid_branch_action' }, 400);
+    if (!['create','update','archive','activate'].includes(branchAction)) return response({ error: 'invalid_branch_action' }, 400);
     if (branchAction === 'create' && (!code || !/^[A-Z0-9_-]{2,24}$/.test(code))) return response({ error: 'invalid_branch_code' }, 400);
     const { data, error } = await clients.adminClient.rpc('admin_manage_branch', {
       p_organization_id: owner.institutionId,
