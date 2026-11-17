@@ -617,7 +617,7 @@ Deno.serve(async (request): Promise<Response> => {
     if (body.action === 'login') return await login(body, request, clients);
     if (body.action === 'bootstrap_owner') return await bootstrapOwner(body, clients);
     if (body.action === 'create_employee') return await createEmployee(body, request, clients);
-    if (body.action === 'list' || body.action === 'set_code' || body.action === 'revoke_code' || body.action === 'update_employee' || body.action === 'audit') {
+    if (body.action === 'list' || body.action === 'set_code' || body.action === 'revoke_code' || body.action === 'update_employee' || body.action === 'audit' || body.action === 'manage_branch') {
       return await ownerOperation(body, request, clients);
     }
     return response({ error: 'unsupported_action' }, 400);
