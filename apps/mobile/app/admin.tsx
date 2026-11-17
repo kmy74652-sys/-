@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, AppState, Pressable, RefreshControl, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, AppState, Pressable, RefreshControl, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
 import AdenDeadlinePicker, { adenDateTimeToIso, currentAdenDateTime } from '../components/AdenDeadlinePicker';
 import { friendlyDataError, getMyEmployeeProfile } from '../lib/mobileData';
@@ -97,7 +97,7 @@ export default function AdminScreen() {
       {section === 'tasks' && <>{canManageTaskLibrary && <TaskAssignmentSection templates={taskDesignerTemplates} data={data} onReload={load} onEditTemplates={() => setSection('task-designer')} />}<TasksSection data={data} designerTemplates={designerTemplates} showCreate={showCreate} setShowCreate={setShowCreate} draft={draft} setDraft={setDraft} createTask={createTask} fmt={fmt} onOpenTasks={() => router.push('/tasks')} /></>}
       {section === 'task-designer' && canManageTaskLibrary && <TaskTemplatesSection templates={taskDesignerTemplates} categories={taskCategories} onReload={load} />}
       {section === 'reports' && <ReportsSection data={data} fmt={fmt} />}
-      {section === 'branches' && <BranchesSection data={data} />}
+      {section === 'branches' && <BranchesSection data={data} canManage={permissions.includes('branches.manage')} onReload={load} />}
       {section === 'employees' && <EmployeesSection data={data} />}
       {section === 'activity' && <ActivitySection data={data} fmt={fmt} />}
       <Pressable style={styles.settings} onPress={() => router.push('/settings')}><Text style={styles.settingsText}>الإعدادات والصلاحيات ورموز الموظفين</Text></Pressable>
@@ -114,8 +114,55 @@ function Overview({ counts, data, fmt, onTasks }: { counts: { all: number; new: 
 
 function TasksSection({ data, designerTemplates, showCreate, setShowCreate, draft, setDraft, createTask, fmt, onOpenTasks }: any) { return <><View style={styles.sectionHeader}><Text style={styles.sectionTitle}>إدارة المهام</Text><Pressable style={styles.primarySmall} onPress={() => setShowCreate(!showCreate)}><Text style={styles.primaryText}>{showCreate ? 'إلغاء' : 'إنشاء مهمة'}</Text></Pressable></View>{showCreate && <View style={styles.form}>{[['title', 'عنوان المهمة'], ['description', 'الوصف']].map(([key, label]) => <TextInput key={key} style={styles.input} placeholder={label} value={draft[key]} onChangeText={(value) => setDraft({ ...draft, [key]: value })} multiline={key === 'description'} />)}<AdenDeadlinePicker date={draft.dueDate} time={draft.dueTime} onChange={(dueDate, dueTime) => setDraft({ ...draft, dueDate, dueTime })} /><Text style={styles.fieldLabel}>التصنيف الوظيفي</Text><View style={styles.choices}>{roleCodes.map((role) => <Pressable key={role} style={[styles.choice, draft.roleCode === role && styles.choiceSelected]} onPress={() => setDraft({ ...draft, roleCode: role, templateId: '', reportTemplateId: designerTemplates.some((item: ReportTemplate) => item.id === draft.reportTemplateId && item.role_code === role) ? draft.reportTemplateId : '' })}><Text style={draft.roleCode === role ? styles.choiceSelectedText : styles.choiceText}>{roleLabel(role)}</Text></Pressable>)}</View><Text style={styles.fieldLabel}>الفرع</Text><View style={styles.choices}>{(data?.branches ?? []).map((branch: any) => <Pressable key={branch.id} style={[styles.choice, draft.branchId === branch.id && styles.choiceSelected]} onPress={() => setDraft({ ...draft, branchId: branch.id })}><Text style={draft.branchId === branch.id ? styles.choiceSelectedText : styles.choiceText}>{branch.name}</Text></Pressable>)}</View><Text style={styles.fieldLabel}>نموذج التقرير الديناميكي مع حفظ نسخة للمهمة</Text><View style={styles.choices}><Pressable style={[styles.choice, !draft.reportTemplateId && styles.choiceSelected]} onPress={() => setDraft({ ...draft, reportTemplateId: '' })}><Text style={!draft.reportTemplateId ? styles.choiceSelectedText : styles.choiceText}>بدون نموذج تقرير</Text></Pressable>{designerTemplates.filter((template: ReportTemplate) => template.role_code === draft.roleCode).map((template: ReportTemplate) => <Pressable key={template.id} style={[styles.choice, draft.reportTemplateId === template.id && styles.choiceSelected]} onPress={() => setDraft({ ...draft, reportTemplateId: template.id })}><Text style={draft.reportTemplateId === template.id ? styles.choiceSelectedText : styles.choiceText}>{template.title} · إصدار {template.approved_version_no}</Text></Pressable>)}</View><Pressable style={styles.secondary} onPress={() => setDraft({ ...draft, reportRequired: !draft.reportRequired })}><Text style={styles.secondaryText}>{draft.reportRequired ? 'التقرير مطلوب ✓' : 'التقرير اختياري'}</Text></Pressable><Pressable style={styles.primary} onPress={() => void createTask()}><Text style={styles.primaryText}>حفظ ونشر المهمة للمستخدم</Text></Pressable></View>}<Pressable style={styles.secondary} onPress={onOpenTasks}><Text style={styles.secondaryText}>فتح شاشة التنفيذ والتقارير والمرفقات</Text></Pressable>{(data?.tasks ?? []).map((task: any) => <View style={styles.card} key={task.id}><View style={styles.taskLine}><Text style={styles.cardTitle}>{task.title}</Text><Text style={styles.badge}>{statusLabel(task.status)}</Text></View><Text style={styles.meta}>{task.branchName || 'كل الفروع'} · {priorityLabels[task.priority] || task.priority} · {fmt(task.dueAt)}</Text></View>)}</>; }
 function ReportsSection({ data, fmt }: any) { return <><Text style={styles.sectionTitle}>تقارير الموظفين</Text><Text style={styles.copy}>التقارير المرتبطة بالمهام وتنتظر المراجعة أو تم اعتمادها.</Text>{(data?.reports ?? []).length ? data.reports.map((report: any) => <View style={styles.card} key={report.id}><Text style={styles.cardTitle}>{report.status === 'submitted' ? 'بانتظار المراجعة' : report.status === 'approved' ? 'معتمد' : 'معاد للتصحيح'}</Text><Text style={styles.meta}>{fmt(report.submittedAt)} · {report.id.slice(0, 8)}</Text></View>) : <Text style={styles.muted}>لا توجد تقارير مسجلة حاليًا.</Text>}</>; }
-function BranchesSection({ data }: any) { return <><Text style={styles.sectionTitle}>إدارة الفروع</Text><Text style={styles.copy}>عرض الفروع الثانية والثالثة مع عدد المهام الحالية. الإضافة والتعديل ستستخدم نفس جداول الفروع عند تفعيل صلاحية الإدارة.</Text>{(data?.branches ?? []).map((branch: any) => <View style={styles.card} key={branch.id}><Text style={styles.cardTitle}>{branch.name}</Text><Text style={styles.meta}>الكود: {branch.code} · المستوى: {branch.level || 'غير محدد'} · {branch.isActive ? 'نشط' : 'متوقف'}</Text></View>)}</>; }
-function EmployeesSection({ data }: any) { return <><Text style={styles.sectionTitle}>الموظفون والتصنيفات الوظيفية</Text>{(data?.employees ?? []).map((employee: any) => <View style={styles.card} key={employee.id}><Text style={styles.cardTitle}>{employee.name}</Text><Text style={styles.meta}>{employee.employeeNo || 'بدون رقم'} · {employee.active ? 'نشط' : 'غير نشط'}</Text><Text style={styles.meta}>{employee.roles.length ? employee.roles.map(roleLabel).join('، ') : 'دون تصنيف'}</Text></View>)}</>; }
+function BranchesSection({ data, canManage, onReload }: any) {
+  const [code, setCode] = useState('');
+  const [name, setName] = useState('');
+  const [renames, setRenames] = useState<Record<string, string>>({});
+  const [busy, setBusy] = useState(false);
+  const [branchError, setBranchError] = useState('');
+  const [branchNotice, setBranchNotice] = useState('');
+  async function manage(action: 'create' | 'update' | 'archive' | 'activate', branchId?: string, branchName?: string) {
+    if (!supabase) return;
+    setBusy(true); setBranchError(''); setBranchNotice('');
+    try {
+      const { error } = await supabase.functions.invoke('employee-code-auth', { body: {
+        action: 'manage_branch', branchAction: action, branchId: branchId ?? null,
+        code: action === 'create' ? code.trim().toUpperCase() : null,
+        name: action === 'create' ? name.trim() : branchName?.trim() ?? null,
+      }});
+      if (error) throw error;
+      setBranchNotice(action === 'create' ? 'تمت إضافة الفرع.' : action === 'update' ? 'تم تعديل اسم الفرع.' : action === 'archive' ? 'تم أرشفة الفرع وإيقاف استخدامه.' : 'تمت إعادة تفعيل الفرع.');
+      if (action === 'create') { setCode(''); setName(''); }
+      await onReload();
+    } catch (error) {
+      const status = (error as any)?.context?.status;
+      setBranchError(status === 403 ? 'لا تملك صلاحية إدارة الفروع.' : 'تعذر تنفيذ العملية. تحقق من صلاحية الفرع أو تكرار الكود.');
+    } finally { setBusy(false); }
+  }
+  return <>
+    <Text style={styles.sectionTitle}>إدارة الفروع</Text>
+    <Text style={styles.copy}>يمكن إضافة الفروع وتعديل أسمائها وأرشفتها. الأرشفة توقف استخدام الفرع الجديد وتحافظ على المهام والسجلات السابقة.</Text>
+    {!!branchError && <Text style={styles.error}>{branchError}</Text>}
+    {!!branchNotice && <Text style={styles.notice}>{branchNotice}</Text>}
+    {canManage && <View style={styles.form}>
+      <Text style={styles.fieldLabel}>إضافة فرع جديد</Text>
+      <TextInput style={styles.input} placeholder="كود الفرع مثل BRANCH-2" autoCapitalize="characters" value={code} onChangeText={setCode}/>
+      <TextInput style={styles.input} placeholder="اسم الفرع" value={name} onChangeText={setName}/>
+      <Pressable disabled={busy || !code.trim() || !name.trim()} style={styles.primary} onPress={() => void manage('create')}><Text style={styles.primaryText}>{busy ? 'جارٍ الحفظ…' : 'إضافة الفرع'}</Text></Pressable>
+    </View>}
+    {(data?.branches ?? []).map((branch: any) => <View style={styles.card} key={branch.id}>
+      <Text style={styles.cardTitle}>{branch.name}</Text>
+      <Text style={styles.meta}>الكود: {branch.code} · المستوى: {branch.level || 'غير محدد'} · {branch.isActive ? 'نشط' : 'مؤرشف'}</Text>
+      {canManage && branch.isActive && <>
+        <TextInput style={styles.input} placeholder="الاسم الجديد للفرع" value={renames[branch.id] ?? branch.name} onChangeText={(value) => setRenames((current) => ({...current,[branch.id]:value}))}/>
+        <Pressable disabled={busy || !(renames[branch.id] ?? branch.name).trim()} style={styles.secondary} onPress={() => void manage('update',branch.id,renames[branch.id] ?? branch.name)}><Text style={styles.secondaryText}>حفظ الاسم</Text></Pressable>
+        <Pressable disabled={busy} style={styles.secondary} onPress={() => Alert.alert('أرشفة الفرع','سيتم إيقاف الفرع مع الاحتفاظ بسجلاته ومهامه. هل تريد المتابعة؟',[{text:'إلغاء',style:'cancel'},{text:'أرشفة',style:'destructive',onPress:()=>void manage('archive',branch.id)}])}><Text style={styles.secondaryText}>أرشفة الفرع</Text></Pressable>
+      </>}
+      {canManage && !branch.isActive && <Pressable disabled={busy} style={styles.secondary} onPress={() => void manage('activate',branch.id)}><Text style={styles.secondaryText}>إعادة تفعيل الفرع</Text></Pressable>}
+    </View>)}
+  </>;
+}
+function EmployeesSection({ data }: any) { return <><Text style={styles.sectionTitle}>الموظفون والتصنيفات الوظيفية</Text>{(data?.employees ?? []).map((employee: any) => <View style={styles.card} key={employee.id}><Text style={styles.cardTitle}>{employee.name}</Text><Text style={styles.meta}>{employee.employeeNo || 'بدون رقم'} · {employee.active ? 'نشط' : 'غير نشط'}</Text><Text style={styles.meta}>{employee.roles.length ? employee.roles.map(roleLabel).join('، ') : 'دون تصنيف'} · {employee.branchName ?? 'دون فرع'}</Text></View>)}</>; }
 function ActivitySection({ data, fmt }: any) { return <><Text style={styles.sectionTitle}>سجل النشاط والمرفقات</Text><Text style={styles.copy}>السجل يعرض الأحداث المسموح بها حسب RLS. إدارة المرفقات تتم من داخل تقرير المهمة.</Text>{(data?.activity ?? []).map((item: any) => <View style={styles.row} key={item.id}><Text style={styles.cardTitle}>{item.action}</Text><Text style={styles.meta}>المهمة {item.taskId.slice(0, 8)} · {fmt(item.createdAt)}</Text></View>)}</>; }
 function Unavailable({ title, text }: { title: string; text: string }) { return <View style={styles.unavailable}><Text style={styles.sectionTitle}>{title}</Text><Text style={styles.copy}>{text}</Text></View>; }
 

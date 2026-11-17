@@ -12,7 +12,7 @@ export type AdminTask = {
   status: string;
 };
 export type AdminBranch = { id: string; code: string; name: string; isActive: boolean; level: string | null };
-export type AdminEmployee = { id: string; name: string; employeeNo: string | null; active: boolean; roles: string[] };
+export type AdminEmployee = { id: string; name: string; employeeNo: string | null; active: boolean; roles: string[]; branchId: string | null; branchName: string | null };
 export type AdminActivity = { id: string; taskId: string; action: string; createdAt: string };
 export type DashboardData = {
   tasks: AdminTask[];
@@ -37,11 +37,26 @@ export async function loadDashboardData(): Promise<DashboardData> {
   const branches = (branchesResult.data ?? []).map((row) => ({ id: row.id, code: row.code, name: row.name, isActive: row.is_active, level: row.branch_level }));
   const branchNames = new Map(branches.map((branch) => [branch.id, branch.name]));
   const membershipIds = (employeesResult.data ?? []).map((row) => row.id);
-  const assignments = membershipIds.length ? await db.from('role_assignments').select('membership_id,role_code').in('membership_id', membershipIds).limit(500) : { data: [], error: null };
+  const assignments = membershipIds.length ? await db.from('role_assignments').select('membership_id,role_code,branch_id').in('membership_id', membershipIds).limit(500) : { data: [], error: null };
   if (assignments.error) throw assignments.error;
   const rolesByMembership = new Map<string, string[]>();
-  for (const row of assignments.data ?? []) rolesByMembership.set(row.membership_id, [...(rolesByMembership.get(row.membership_id) ?? []), row.role_code]);
-  const employees = (employeesResult.data ?? []).map((row) => ({ id: row.user_id, name: row.display_name, employeeNo: row.employee_no, active: row.is_active, roles: rolesByMembership.get(row.id) ?? [] }));
+  const branchByMembership = new Map<string, string | null>();
+  for (const row of assignments.data ?? []) {
+    rolesByMembership.set(row.membership_id, [...(rolesByMembership.get(row.membership_id) ?? []), row.role_code]);
+    if (!branchByMembership.has(row.membership_id)) branchByMembership.set(row.membership_id, row.branch_id);
+  }
+  const employees = (employeesResult.data ?? []).map((row) => {
+    const branchId = branchByMembership.get(row.id) ?? null;
+    return {
+      id: row.id,
+      name: row.display_name,
+      employeeNo: row.employee_no,
+      active: row.is_active,
+      roles: rolesByMembership.get(row.id) ?? [],
+      branchId,
+      branchName: branchId ? branchNames.get(branchId) ?? null : null,
+    };
+  });
   const tasks = (tasksResult.data ?? []).map((row) => ({ id: row.id, title: row.title, description: row.description, branchId: row.branch_id, branchName: row.branch_id ? branchNames.get(row.branch_id) ?? null : null, assignedTo: row.assigned_to, dueAt: row.due_at, priority: row.priority, status: row.status }));
   return {
     tasks,

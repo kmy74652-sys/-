@@ -21,6 +21,9 @@ type EmployeeAccess = {
   status: string;
   hasAuthAccount: boolean;
   codeSetAt: string | null;
+  roleCode: string | null;
+  branchId: string | null;
+  branchName: string | null;
 };
 type Branch = { id: string; name: string };
 type AuditEntry = { id: string; action: string; created_at: string; metadata?: Record<string, unknown> };
@@ -32,7 +35,7 @@ const roleOptions = [
   ['warehouse_worker', 'عامل تحميل'],
 ] as const;
 
-type EmployeeListResult = { employees?: EmployeeAccess[] };
+type EmployeeListResult = { employees?: EmployeeAccess[]; branches?: Array<Branch & { code: string; is_active: boolean }> };
 
 function functionStatus(error: unknown) {
   return (error as { context?: { status?: number } } | null)?.context?.status;
@@ -41,7 +44,7 @@ function functionStatus(error: unknown) {
 function functionErrorText(error: unknown) {
   const status = functionStatus(error);
   if (status === 401) return 'انتهت الجلسة. سجّل الدخول مجددًا.';
-  if (status === 403) return 'هذه الإعدادات متاحة لصاحب المؤسسة فقط.';
+  if (status === 403) return 'هذه الإعدادات متاحة لصاحب المؤسسة أو المدير التنفيذي المخوّل.';
   if (status === 404 || status === 503) return 'خدمة الرموز أو تحديث قاعدة البيانات غير جاهز في Supabase بعد.';
   if (status === 429) return 'محاولات كثيرة. انتظر قليلًا ثم حاول مجددًا.';
   return 'تعذر إكمال الطلب. تحقق من الاتصال وحاول مجددًا.';
@@ -57,6 +60,9 @@ function normalizeEmployeeList(data: unknown): EmployeeAccess[] {
     status: typeof employee.status === 'string' ? employee.status : 'inactive',
     hasAuthAccount: employee.hasAuthAccount === true,
     codeSetAt: typeof employee.codeSetAt === 'string' ? employee.codeSetAt : null,
+    roleCode: typeof employee.roleCode === 'string' ? employee.roleCode : null,
+    branchId: typeof employee.branchId === 'string' ? employee.branchId : null,
+    branchName: typeof employee.branchName === 'string' ? employee.branchName : null,
   }));
 }
 
@@ -67,6 +73,7 @@ export default function EmployeeAccessSettings() {
   const [loading, setLoading] = useState(true);
   const [busyEmployeeId, setBusyEmployeeId] = useState<string | null>(null);
   const [isOwner, setIsOwner] = useState(false);
+  const [canAssignOwner, setCanAssignOwner] = useState(false);
   const [branches, setBranches] = useState<Branch[]>([]);
   const [createForm, setCreateForm] = useState({ employeeNo: '', fullName: '', code: '', roleCode: 'warehouse_worker', branchId: '' });
   const [editForms, setEditForms] = useState<Record<string, { employeeNo: string; fullName: string; roleCode: string; branchId: string; status: 'active' | 'suspended' }>>({});
@@ -86,16 +93,17 @@ export default function EmployeeAccessSettings() {
       const identity = await getMyEmployeeProfile();
       if (!identity?.employee) {
         setIsOwner(false);
-        setError('يجب تسجيل الدخول بحساب صاحب المؤسسة لفتح هذه الإعدادات.');
+        setError('يجب تسجيل الدخول بحساب صاحب المؤسسة أو المدير التنفيذي المخوّل لفتح هذه الإعدادات.');
         return;
       }
       const employeeRoles = Array.isArray(identity.employee.roles) ? identity.employee.roles : [];
       const employeePermissions = Array.isArray(identity.employee.permissions) ? identity.employee.permissions : [];
+      setCanAssignOwner(employeeRoles.some((role) => role?.code === 'owner'));
       const owner = employeeRoles.some((role) => role?.code === 'owner' || role?.code === 'admin_followup')
         && employeePermissions.includes('employees.manage');
       setIsOwner(owner);
       if (!owner) {
-        setError('هذه الإعدادات متاحة لصاحب المؤسسة فقط.');
+        setError('هذه الإعدادات متاحة لصاحب المؤسسة أو المدير التنفيذي المخوّل.');
         return;
       }
       const { data, error: listError } = await supabase.functions.invoke('employee-code-auth', {
@@ -107,11 +115,18 @@ export default function EmployeeAccessSettings() {
       }
       const normalized = normalizeEmployeeList(data);
       setEmployees(normalized);
-      const { data: branchRows } = await supabase.from('branches').select('id,name').eq('is_active', true).order('name').limit(100);
-      const nextBranches = (branchRows ?? []) as Branch[];
+      const nextBranches = ((data as EmployeeListResult | null)?.branches ?? [])
+        .filter((branch) => branch.is_active)
+        .map((branch) => ({ id: branch.id, name: branch.name }));
       setBranches(nextBranches);
       if (!createForm.branchId && nextBranches[0]) setCreateForm((current) => ({ ...current, branchId: nextBranches[0].id }));
-      setEditForms((current) => Object.fromEntries(normalized.map((employee) => [employee.id, current[employee.id] ?? { employeeNo: employee.employeeNo ?? '', fullName: employee.fullName ?? '', roleCode: 'warehouse_worker', branchId: nextBranches[0]?.id ?? '', status: employee.status === 'active' ? 'active' : 'suspended' }] )));
+      setEditForms((current) => Object.fromEntries(normalized.map((employee) => [employee.id, {
+        employeeNo: employee.employeeNo ?? '',
+        fullName: employee.fullName ?? '',
+        roleCode: employee.roleCode ?? 'warehouse_worker',
+        branchId: employee.branchId ?? nextBranches[0]?.id ?? '',
+        status: employee.status === 'active' ? 'active' : 'suspended',
+      }] )));
     } catch (cause) {
       setError(friendlyDataError(cause, 'تعذر تحميل قائمة الموظفين. تحقق من الاتصال ثم أعد المحاولة.'));
     } finally {
@@ -247,8 +262,9 @@ export default function EmployeeAccessSettings() {
             <TextInput style={styles.input} placeholder="رقم الموظف الفريد" keyboardType="number-pad" value={createForm.employeeNo} onChangeText={(value) => setCreateForm((current) => ({ ...current, employeeNo: value }))} />
             <TextInput style={styles.input} placeholder="كلمة المرور الأولية" secureTextEntry value={createForm.code} onChangeText={(value) => setCreateForm((current) => ({ ...current, code: value }))} />
             <Text style={styles.employeeMeta}>التصنيف الوظيفي</Text>
-            <View style={styles.roleChoices}>{roleOptions.map(([code, label]) => <Pressable key={code} accessibilityRole="button" style={[styles.roleChoice, createForm.roleCode === code && styles.roleChoiceActive]} onPress={() => setCreateForm((current) => ({ ...current, roleCode: code }))}><Text style={styles.roleChoiceText}>{label}</Text></Pressable>)}</View>
-            <TextInput style={styles.input} placeholder="معرّف الفرع" value={createForm.branchId} onChangeText={(value) => setCreateForm((current) => ({ ...current, branchId: value }))} />
+            <View style={styles.roleChoices}>{roleOptions.filter(([code]) => code !== 'owner' || canAssignOwner).map(([code, label]) => <Pressable key={code} accessibilityRole="button" style={[styles.roleChoice, createForm.roleCode === code && styles.roleChoiceActive]} onPress={() => setCreateForm((current) => ({ ...current, roleCode: code }))}><Text style={styles.roleChoiceText}>{label}</Text></Pressable>)}</View>
+            <Text style={styles.employeeMeta}>الفرع</Text>
+            <View style={styles.roleChoices}>{branches.map((branch) => <Pressable key={branch.id} accessibilityRole="button" style={[styles.roleChoice, createForm.branchId === branch.id && styles.roleChoiceActive]} onPress={() => setCreateForm((current) => ({ ...current, branchId: branch.id }))}><Text style={styles.roleChoiceText}>{branch.name}</Text></Pressable>)}</View>
             <Pressable accessibilityRole="button" disabled={busyEmployeeId !== null} style={styles.primaryButton} onPress={() => void createEmployee()}><Text style={styles.buttonText}>{busyEmployeeId === 'create' ? 'جارٍ الإنشاء…' : 'إنشاء الحساب'}</Text></Pressable>
           </View>
         )}
@@ -269,16 +285,17 @@ export default function EmployeeAccessSettings() {
                 {!active ? ' · الحساب غير نشط' : ''}
               </Text>
               {!employee.hasAuthAccount && (
-                <Text style={styles.warning}>لا يوجد حساب مصادقة مرتبط بملف هذا الموظف؛ لا يمكن تعيين رمز له حتى يربطه مسؤول النظام.</Text>
+                <Text style={styles.warning}>لا يوجد حساب مصادقة مرتبط بملف هذا الموظف؛ لا يمكن تعيين كلمة مرور له حتى يربطه مسؤول النظام.</Text>
               )}
               {isOwner && editForms[employee.id] && (
                 <>
                   <TextInput style={styles.input} placeholder="الاسم" value={editForms[employee.id].fullName} onChangeText={(value) => setEditForms((current) => ({ ...current, [employee.id]: { ...current[employee.id], fullName: value } }))} />
                   <TextInput style={styles.input} placeholder="الرقم الوظيفي" value={editForms[employee.id].employeeNo} onChangeText={(value) => setEditForms((current) => ({ ...current, [employee.id]: { ...current[employee.id], employeeNo: value } }))} />
                   <Text style={styles.employeeMeta}>التصنيف الوظيفي</Text>
-                  <View style={styles.roleChoices}>{roleOptions.map(([code, label]) => <Pressable key={code} accessibilityRole="button" style={[styles.roleChoice, editForms[employee.id].roleCode === code && styles.roleChoiceActive]} onPress={() => setEditForms((current) => ({ ...current, [employee.id]: { ...current[employee.id], roleCode: code } }))}><Text style={styles.roleChoiceText}>{label}</Text></Pressable>)}</View>
-                  <TextInput style={styles.input} placeholder="معرّف الفرع" value={editForms[employee.id].branchId} onChangeText={(value) => setEditForms((current) => ({ ...current, [employee.id]: { ...current[employee.id], branchId: value } }))} />
-                  <Pressable accessibilityRole="button" style={styles.refresh} onPress={() => setEditForms((current) => ({ ...current, [employee.id]: { ...current[employee.id], status: current[employee.id].status === 'active' ? 'suspended' : 'active' } }))}><Text style={styles.refreshText}>{editForms[employee.id].status === 'active' ? 'تجهيز لإيقاف الحساب' : 'تجهيز لإعادة تفعيل الحساب'}</Text></Pressable>
+                  <View style={styles.roleChoices}>{roleOptions.filter(([code]) => code !== 'owner' || canAssignOwner).map(([code, label]) => <Pressable key={code} accessibilityRole="button" style={[styles.roleChoice, editForms[employee.id].roleCode === code && styles.roleChoiceActive]} onPress={() => setEditForms((current) => ({ ...current, [employee.id]: { ...current[employee.id], roleCode: code } }))}><Text style={styles.roleChoiceText}>{label}</Text></Pressable>)}</View>
+                  <Text style={styles.employeeMeta}>الفرع الحالي: {employee.branchName ?? 'غير محدد'}</Text>
+                  <View style={styles.roleChoices}>{branches.map((branch) => <Pressable key={branch.id} accessibilityRole="button" style={[styles.roleChoice, editForms[employee.id].branchId === branch.id && styles.roleChoiceActive]} onPress={() => setEditForms((current) => ({ ...current, [employee.id]: { ...current[employee.id], branchId: branch.id } }))}><Text style={styles.roleChoiceText}>{branch.name}</Text></Pressable>)}</View>
+                  <Pressable accessibilityRole="button" style={styles.refresh} onPress={() => setEditForms((current) => ({ ...current, [employee.id]: { ...current[employee.id], status: current[employee.id].status === 'active' ? 'suspended' : 'active' } }))}><Text style={styles.refreshText}>{editForms[employee.id].status === 'active' ? 'تجهيز لإيقاف الحساب مع حفظ السجلات' : 'تجهيز لإعادة تفعيل الحساب'}</Text></Pressable>
                   <Pressable accessibilityRole="button" disabled={busyEmployeeId !== null} style={styles.primaryButton} onPress={() => void updateEmployee(employee)}><Text style={styles.buttonText}>{busyEmployeeId === employee.id ? 'جارٍ الحفظ…' : 'حفظ بيانات الحساب'}</Text></Pressable>
                   <Pressable accessibilityRole="button" style={styles.refresh} onPress={() => void loadAudit(employee)}><Text style={styles.refreshText}>عرض سجل التعديلات</Text></Pressable>
                   {(audit[employee.id] ?? []).map((entry) => <Text style={styles.employeeMeta} key={entry.id}>{entry.action} · {new Date(entry.created_at).toLocaleString('ar-SA')}</Text>)}

@@ -14,7 +14,8 @@
     "db:verify": "node scripts/verify-remote.mjs",
     "supabase:push": "supabase db push",
     "supabase:reset": "supabase db reset",
-    "test:task-designer": "node scripts/test-task-designer.mjs"
+    "test:task-designer": "node scripts/test-task-designer.mjs",
+    "test:admin-management": "node scripts/test-admin-management.mjs"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",
