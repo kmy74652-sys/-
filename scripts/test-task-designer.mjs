@@ -13,6 +13,8 @@ const checks = [
   ['preview can move and resize', designer.includes('PanResponder') && designer.includes('تغيير الحجم')],
   ['steps support touch reorder', designer.includes('StepDragHandle') && designer.includes('onDrop')],
   ['copy/archive are guarded in admin', admin.includes('نسخ القالب') && admin.includes('setTaskDesignerTemplateActive') && admin.includes('canManageTaskLibrary')],
+  ['dynamic report designer is mounted beside task designer', admin.includes("import ReportDesigner") && admin.includes('<ReportDesigner />')],
+  ['legacy starter catalog is hidden from designer', library.includes('retiredStarterTemplateCodes') && !admin.includes('قالب التقرير القديم')],
 ];
 const failed = checks.filter(([, ok]) => !ok);
 if (failed.length) { console.error(JSON.stringify({ ok: false, failed: failed.map(([name]) => name) })); process.exit(1); }

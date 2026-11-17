@@ -5,6 +5,15 @@ import { approveDesignerVersion, saveDesignerTemplate, type ReportTemplate } fro
 export type TaskCategoryRow = { id: string; code: TaskCategory; title: string; parent_id: string | null; is_main: boolean; active: boolean };
 export type StoredTaskTemplate = TaskTemplateDraft & { categoryId: string; subcategoryId: string | null; version: number; code: string };
 
+// These records came from the old operational starter catalog. They remain in the
+// database only for historical task references and must never appear as designer content.
+const retiredStarterTemplateCodes = new Set([
+  'acct_daily_close', 'acct_sales_collection', 'acct_returns_reconciliation', 'acct_debts_followup', 'acct_purchase_review',
+  'wh_receive_goods', 'wh_issue_goods', 'wh_cycle_count', 'wh_stock_movement_review',
+  'load_order_preparation', 'load_delivery_handover', 'admin_daily_branch_followup',
+  'admin_weekly_consolidated_report', 'admin_supplier_followup', 'owner_final_review', 'owner_monthly_business_review',
+]);
+
 function client() { if (!supabase) throw new Error('supabase_not_configured'); return supabase; }
 
 async function managementOrganization(requiredPermission: 'task_library.read' | 'task_library.manage' = 'task_library.manage') {
@@ -40,7 +49,7 @@ export async function listTaskDesignerTemplates(): Promise<StoredTaskTemplate[]>
   ]);
   if (templatesResult.error) throw templatesResult.error;
   if (categoriesResult.error) throw categoriesResult.error;
-  const rows = templatesResult.data ?? [];
+  const rows = (templatesResult.data ?? []).filter((row) => !retiredStarterTemplateCodes.has(row.code));
   if (!rows.length) return [];
   const ids = rows.map((row) => row.id);
   const [stepsResult, linksResult] = await Promise.all([
