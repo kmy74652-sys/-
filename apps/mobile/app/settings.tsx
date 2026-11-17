@@ -44,7 +44,7 @@ function functionStatus(error: unknown) {
 function functionErrorText(error: unknown) {
   const status = functionStatus(error);
   if (status === 401) return 'انتهت الجلسة. سجّل الدخول مجددًا.';
-  if (status === 403) return 'هذه الإعدادات متاحة لصاحب المؤسسة فقط.';
+  if (status === 403) return 'هذه الإعدادات متاحة لصاحب المؤسسة أو المدير التنفيذي المخوّل.';
   if (status === 404 || status === 503) return 'خدمة الرموز أو تحديث قاعدة البيانات غير جاهز في Supabase بعد.';
   if (status === 429) return 'محاولات كثيرة. انتظر قليلًا ثم حاول مجددًا.';
   return 'تعذر إكمال الطلب. تحقق من الاتصال وحاول مجددًا.';
@@ -92,7 +92,7 @@ export default function EmployeeAccessSettings() {
       const identity = await getMyEmployeeProfile();
       if (!identity?.employee) {
         setIsOwner(false);
-        setError('يجب تسجيل الدخول بحساب صاحب المؤسسة لفتح هذه الإعدادات.');
+        setError('يجب تسجيل الدخول بحساب صاحب المؤسسة أو المدير التنفيذي المخوّل لفتح هذه الإعدادات.');
         return;
       }
       const employeeRoles = Array.isArray(identity.employee.roles) ? identity.employee.roles : [];
@@ -101,7 +101,7 @@ export default function EmployeeAccessSettings() {
         && employeePermissions.includes('employees.manage');
       setIsOwner(owner);
       if (!owner) {
-        setError('هذه الإعدادات متاحة لصاحب المؤسسة فقط.');
+        setError('هذه الإعدادات متاحة لصاحب المؤسسة أو المدير التنفيذي المخوّل.');
         return;
       }
       const { data, error: listError } = await supabase.functions.invoke('employee-code-auth', {
