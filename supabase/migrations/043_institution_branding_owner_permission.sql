@@ -34,3 +34,8 @@ revoke execute on function public.report_designer_allowed(uuid) from public, ano
 
 -- Pin the non-definer activity guard's lookup path for predictable resolution.
 alter function public.prevent_task_activity_mutation() set search_path = pg_catalog, public;
+
+-- Remove the legacy organization-claim policy. It is permissive alongside
+-- tasks_select_assigned_or_manager and could expose every task in an org
+-- if an organization_id app_metadata claim is ever added to employee JWTs.
+drop policy if exists tasks_read on public.tasks;
