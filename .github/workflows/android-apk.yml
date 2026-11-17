@@ -14,7 +14,7 @@ jobs:
     name: Build Alshaeri APK
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write
     env:
       # A Supabase publishable key is intended for client apps; never place a service-role key here.
       EXPO_PUBLIC_SUPABASE_URL: https://fjmryqhdwxsocdzswnkq.supabase.co
@@ -117,3 +117,16 @@ jobs:
           path: apps/mobile/android/app/build/outputs/apk/release/*.apk
           if-no-files-found: error
           retention-days: 14
+
+      - name: Publish direct APK download
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: alshaeri-build-${{ github.run_number }}
+          name: برنامج الشاعري - Android APK build ${{ github.run_number }}
+          body: |
+            نسخة Android جاهزة للتثبيت المباشر.
+            اجتازت اختبارات التطبيق، وبناء Release، واختبار التثبيت والتشغيل على محاكي Android.
+          files: apps/mobile/android/app/build/outputs/apk/release/*.apk
+          fail_on_unmatched_files: true
+          prerelease: true
