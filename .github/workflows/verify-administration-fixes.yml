@@ -1,0 +1,33 @@
+name: Verify administration fixes
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.25.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - name: Install locked dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Static administration checks
+        run: pnpm test:admin-management
+      - name: TypeScript checks
+        run: pnpm typecheck
+      - name: API production compile
+        run: pnpm --filter @alshaeri/api build
+      - name: Android JavaScript bundle export
+        run: pnpm --filter @alshaeri/mobile exec expo export --platform android
