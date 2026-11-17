@@ -71,6 +71,16 @@ jobs:
       - name: TypeScript typecheck
         run: pnpm exec tsc --noEmit
 
+      - name: Run application regression tests
+        run: |
+          pnpm test:admin-management
+          pnpm test:task-workflow
+          pnpm test:task-designer
+          pnpm test:report-designer
+          pnpm typecheck
+          pnpm --filter @alshaeri/api build
+        working-directory: .
+
       - name: Generate native Android project
         run: pnpm exec expo prebuild --platform android --no-install --clean
         env:
@@ -91,9 +101,8 @@ jobs:
         env:
           NODE_ENV: production
 
-      - name: Best-effort install and launch on Android emulator
+      - name: Install and launch on Android emulator (required smoke test)
         uses: reactivecircus/android-emulator-runner@v2
-        continue-on-error: true
         with:
           api-level: 35
           arch: x86_64
