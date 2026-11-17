@@ -98,7 +98,7 @@ begin
   insert into public.employee_access_audit_log(
     organization_id,membership_id,actor_membership_id,action,metadata
   ) values (
-    p_organization_id,p_employee_id,p_actor_membership_id,'updated',
+    p_organization_id,p_employee_id,p_actor_membership_id,case when p_is_active then 'updated' else 'archived' end,
     jsonb_build_object(
       'employee_no',p_employee_no,
       'role_code',p_role_code,
