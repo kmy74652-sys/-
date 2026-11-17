@@ -2,7 +2,7 @@
   "expo": {
     "name": "برنامج الشاعري",
     "slug": "alshaeri-mobile",
-    "version": "0.1.1",
+    "version": "0.1.0",
     "orientation": "portrait",
     "scheme": "alshaeri",
     "userInterfaceStyle": "light",
@@ -22,7 +22,6 @@
     ],
     "android": {
       "package": "com.alshaeri.mobile",
-      "versionCode": 2,
       "adaptiveIcon": {
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundColor": "#17324d"
