@@ -93,7 +93,8 @@ export default function TasksScreen() {
       const identity = await getMyEmployeeProfile();
       if (!identity) throw new Error('not_authenticated');
       if (!identity.employee) throw new Error('employee_not_active');
-      if (!identity.employee.permissions.includes('tasks.read')) throw new Error('permission_denied');
+      const permissions = new Set(identity.employee.permissions);
+      if (!permissions.has('tasks.execute') && !permissions.has('tasks.manage')) throw new Error('permission_denied');
       const [taskRows, notificationRows] = await Promise.all([listMyTasks(), listMyNotifications()]);
       setCanReview(identity.employee.permissions.includes('tasks.review'));
       setTasks(taskRows);
