@@ -52,6 +52,10 @@ begin
     raise exception using errcode='42501', message='owner_role_requires_owner';
   end if;
 
+  if p_employee_id=p_actor_membership_id and (not v_actor_owner or p_role_code<>'owner' or not p_is_active) then
+    raise exception using errcode='42501', message='owner_self_protection';
+  end if;
+
   if not exists (
     select 1 from public.branches
     where id=p_branch_id and organization_id=p_organization_id and is_active
