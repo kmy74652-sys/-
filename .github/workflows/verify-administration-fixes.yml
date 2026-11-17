@@ -1,6 +1,8 @@
 name: Verify administration fixes
 
 on:
+  push:
+    branches: [fix/management-and-workflow-priorities]
   pull_request:
     branches: [main]
   workflow_dispatch:
