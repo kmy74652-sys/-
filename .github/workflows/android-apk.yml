@@ -68,6 +68,9 @@ jobs:
         run: pnpm install --frozen-lockfile
         working-directory: .
 
+      - name: TypeScript typecheck
+        run: pnpm exec tsc --noEmit
+
       - name: Generate native Android project
         run: pnpm exec expo prebuild --platform android --no-install --clean
         env:
