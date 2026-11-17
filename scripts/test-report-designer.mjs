@@ -9,7 +9,6 @@ const currentMigration = read('../supabase/migrations/034_report_builder_integri
 const mobileDesigner = read('../apps/mobile/components/ReportDesigner.tsx');
 const reportInput = read('../apps/mobile/components/ReportFieldInput.tsx');
 const tasks = read('../apps/mobile/app/tasks.tsx');
-const webDesigner = read('../apps/web/src/reportDesigner.tsx');
 const designerApi = read('../apps/mobile/lib/reportDesigner.ts');
 const schemaSource = read('../apps/mobile/lib/reportSchema.ts');
 
@@ -70,7 +69,6 @@ assert(mobileDesigner.includes('saveDesignerTemplate') && mobileDesigner.include
 assert(reportInput.includes('إضافة صف') && reportInput.includes('SignaturePad') && reportInput.includes('react-native-svg'));
 assert(tasks.includes('validateReportFieldValue') && tasks.includes('evaluateReportField') && tasks.includes('reportDefaultDraft'));
 assert(designerApi.includes("rpc('save_report_form_draft'") && designerApi.includes("rpc('approve_report_form_version'"));
-assert(webDesigner.includes("rpc('save_report_form_draft'") && webDesigner.includes("rpc('approve_report_form_version'"));
 
 // DB invariants: org-scoped access, approved versions, immutable snapshots/signatures and server validation.
 for (const token of [

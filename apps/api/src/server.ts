@@ -3,15 +3,10 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import cors from 'cors';
 import express from 'express';
 import { randomUUID } from 'node:crypto';
-import { existsSync } from 'node:fs';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { z } from 'zod';
 
 const port = Number(process.env.PORT ?? (process.env.NODE_ENV === 'production' ? 3000 : 3001));
 const app = express();
-const currentFile = fileURLToPath(import.meta.url);
-const webDist = path.resolve(path.dirname(currentFile), '../../web/dist');
 const normalizedSupabaseUrl = process.env.SUPABASE_URL?.replace(/\/rest\/v1\/?$/, '');
 const supabaseAdmin: SupabaseClient | null = normalizedSupabaseUrl && process.env.SUPABASE_SERVICE_ROLE_KEY
   ? createClient(normalizedSupabaseUrl, process.env.SUPABASE_SERVICE_ROLE_KEY, {
@@ -699,14 +694,6 @@ app.get('/api/audit-logs', requireEmployee, requirePermission('audit.read'), asy
   if (error) return response.status(500).json({ error: 'audit_lookup_failed' });
   return response.json({ logs: data ?? [] });
 });
-
-if (existsSync(webDist)) {
-  app.use(express.static(webDist, { index: 'index.html' }));
-  app.get('*', (request, response, next) => {
-    if (request.path.startsWith('/api/')) return next();
-    response.sendFile(path.join(webDist, 'index.html'));
-  });
-}
 
 app.listen(port, '0.0.0.0', () => {
   console.log(`alshaeri-api listening on ${port}`);
