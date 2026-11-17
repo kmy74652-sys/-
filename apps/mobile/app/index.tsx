@@ -24,9 +24,9 @@ type Profile = {
 };
 
 const modules = [
-  ['المهام والمتابعة', 'tasks.read'],
-  ['العملاء والحسابات', 'customers.read'],
-  ['التقارير والرقابة', 'finance.read'],
+  ['المهام والمتابعة', 'tasks.execute'],
+  ['العمليات المالية', 'finance.prepare'],
+  ['إدارة المخزون', 'inventory.operate'],
 ] as const;
 
 export default function Home() {
@@ -62,7 +62,10 @@ export default function Home() {
       }
       setProfile(identity.employee);
       setError('');
-      router.replace('/admin');
+      const permissions = new Set(identity.employee.permissions);
+      if (permissions.has('tasks.manage')) router.replace('/admin');
+      else if (permissions.has('tasks.execute')) router.replace('/tasks');
+      else setError('حسابك نشط، لكن لم تُربط به صلاحية تشغيلية بعد. اطلب من صاحب المؤسسة مراجعة دورك وصلاحياتك.');
     } catch (cause) {
       setProfile(null);
       setError(friendlyDataError(cause, 'تعذر الاتصال بـSupabase. تحقق من الإنترنت وحاول مرة أخرى.'));
@@ -200,7 +203,7 @@ export default function Home() {
   }
 
   const allowed = new Set(profile.permissions);
-  const isOwner = profile.roles.some((role) => role.code === 'owner' || role.code === 'admin_followup') && allowed.has('employees.manage');
+  const canManageEmployees = profile.roles.some((role) => role.code === 'owner' || role.code === 'admin_followup') && allowed.has('employees.manage');
   return (
     <SafeAreaView style={styles.safe}>
       <ScrollView contentContainerStyle={styles.content}>
@@ -210,19 +213,19 @@ export default function Home() {
         <Text style={styles.title}>مرحبًا، {profile.fullName}</Text>
         <Text style={styles.copy}>الوحدات الظاهرة مرتبطة بصلاحيات حسابك.</Text>
         <View style={styles.grid}>
-          {modules.filter(([, permission]) => allowed.has(permission)).map(([name]) => (
+          {modules.filter(([, permission]) => allowed.has(permission) || (permission === 'tasks.execute' && allowed.has('tasks.manage')) || (permission === 'inventory.operate' && allowed.has('inventory.execute'))).map(([name]) => (
             <View style={styles.card} key={name}>
               <Text style={styles.cardTitle}>{name}</Text>
               <Text style={styles.cardCopy}>{profile.branches.map((branch) => branch.name).join('، ')}</Text>
             </View>
           ))}
         </View>
-        {allowed.has('tasks.read') && (
+        {(allowed.has('tasks.execute') || allowed.has('tasks.manage')) && (
           <Pressable accessibilityRole="button" style={styles.taskLink} onPress={() => router.push('/tasks')}>
             <Text style={styles.taskLinkText}>فتح المهام والتقارير والتنبيهات</Text>
           </Pressable>
         )}
-        {isOwner && (
+        {canManageEmployees && (
           <Pressable accessibilityRole="button" style={styles.settingsLink} onPress={() => router.push('/settings')}>
             <Text style={styles.settingsLinkText}>إدارة الموظفين وحسابات الدخول</Text>
           </Pressable>
