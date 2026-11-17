@@ -121,7 +121,7 @@ function BranchesSection({ data, canManage, onReload }: any) {
   const [busy, setBusy] = useState(false);
   const [branchError, setBranchError] = useState('');
   const [branchNotice, setBranchNotice] = useState('');
-  async function manage(action: 'create' | 'update' | 'archive', branchId?: string, branchName?: string) {
+  async function manage(action: 'create' | 'update' | 'archive' | 'activate', branchId?: string, branchName?: string) {
     if (!supabase) return;
     setBusy(true); setBranchError(''); setBranchNotice('');
     try {
@@ -131,7 +131,7 @@ function BranchesSection({ data, canManage, onReload }: any) {
         name: action === 'create' ? name.trim() : branchName?.trim() ?? null,
       }});
       if (error) throw error;
-      setBranchNotice(action === 'create' ? 'تمت إضافة الفرع.' : action === 'update' ? 'تم تعديل اسم الفرع.' : 'تم أرشفة الفرع وإيقاف استخدامه.');
+      setBranchNotice(action === 'create' ? 'تمت إضافة الفرع.' : action === 'update' ? 'تم تعديل اسم الفرع.' : action === 'archive' ? 'تم أرشفة الفرع وإيقاف استخدامه.' : 'تمت إعادة تفعيل الفرع.');
       if (action === 'create') { setCode(''); setName(''); }
       await onReload();
     } catch (error) {
@@ -158,6 +158,7 @@ function BranchesSection({ data, canManage, onReload }: any) {
         <Pressable disabled={busy || !(renames[branch.id] ?? branch.name).trim()} style={styles.secondary} onPress={() => void manage('update',branch.id,renames[branch.id] ?? branch.name)}><Text style={styles.secondaryText}>حفظ الاسم</Text></Pressable>
         <Pressable disabled={busy} style={styles.secondary} onPress={() => Alert.alert('أرشفة الفرع','سيتم إيقاف الفرع مع الاحتفاظ بسجلاته ومهامه. هل تريد المتابعة؟',[{text:'إلغاء',style:'cancel'},{text:'أرشفة',style:'destructive',onPress:()=>void manage('archive',branch.id)}])}><Text style={styles.secondaryText}>أرشفة الفرع</Text></Pressable>
       </>}
+      {canManage && !branch.isActive && <Pressable disabled={busy} style={styles.secondary} onPress={() => void manage('activate',branch.id)}><Text style={styles.secondaryText}>إعادة تفعيل الفرع</Text></Pressable>}
     </View>)}
   </>;
 }
