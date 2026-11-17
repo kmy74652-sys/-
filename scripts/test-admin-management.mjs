@@ -41,6 +41,7 @@ assert.match(brandingMigration, /revoke execute on function public\.guard_report
 assert.match(brandingMigration, /revoke execute on function public\.guard_task_report_snapshot_and_signature\(\) from public, anon, authenticated/i);
 assert.match(brandingMigration, /revoke execute on function public\.report_designer_allowed\(uuid\) from public, anon, authenticated/i);
 assert.match(brandingMigration, /alter function public\.prevent_task_activity_mutation\(\) set search_path = pg_catalog, public/i);
+assert.match(brandingMigration, /drop policy if exists tasks_read on public\.tasks/i);
 
 assert.match(branding, /from\('organizations'\)/);
 assert.match(branding, /settingsAvailable: false/);
