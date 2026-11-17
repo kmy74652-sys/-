@@ -28,6 +28,12 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Static administration checks
         run: pnpm test:admin-management
+      - name: Existing task workflow tests
+        run: pnpm test:task-workflow
+      - name: Existing task designer tests
+        run: pnpm test:task-designer
+      - name: Existing report designer tests
+        run: pnpm test:report-designer
       - name: TypeScript checks
         run: pnpm typecheck
       - name: API production compile
