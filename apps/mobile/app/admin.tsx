@@ -10,8 +10,8 @@ import ReportDesigner from '../components/ReportDesigner';
 import TaskDesigner, { type TaskTemplateDraft } from '../components/TaskDesigner';
 import { assignTaskFromTemplate, listApprovedTaskReportForms, listTaskDesignerCategories, listTaskDesignerTemplates, saveTaskDesignerTemplate, setTaskDesignerTemplateActive, type StoredTaskTemplate, type TaskCategoryRow } from '../lib/taskDesigner';
 
-type Section = 'overview' | 'tasks' | 'task-designer' | 'reports' | 'branches' | 'employees' | 'activity' | 'warehouse' | 'finance';
-const sections: Array<[Section, string]> = [['overview', 'الرئيسية'], ['tasks', 'إدارة المهام'], ['task-designer', 'مصمم المهام والتقارير'], ['reports', 'تقارير الموظفين'], ['branches', 'الفروع'], ['employees', 'الموظفون'], ['activity', 'السجل والمرفقات'], ['warehouse', 'المخازن والجرد'], ['finance', 'المالية']];
+type Section = 'overview' | 'tasks' | 'task-designer' | 'reports' | 'branches' | 'employees' | 'activity';
+const sections: Array<[Section, string]> = [['overview', 'الرئيسية'], ['tasks', 'إدارة المهام'], ['task-designer', 'مصمم المهام والتقارير'], ['reports', 'تقارير الموظفين'], ['branches', 'الفروع'], ['employees', 'الموظفون'], ['activity', 'السجل والمرفقات']];
 const roleCodes = ['owner', 'admin_followup', 'accountant', 'warehouse_keeper', 'warehouse_worker'];
 const priorityLabels: Record<string, string> = { normal: 'عادية', important: 'مهمة', urgent: 'عاجلة', critical: 'حرجة' };
 
@@ -100,8 +100,6 @@ export default function AdminScreen() {
       {section === 'branches' && <BranchesSection data={data} />}
       {section === 'employees' && <EmployeesSection data={data} />}
       {section === 'activity' && <ActivitySection data={data} fmt={fmt} />}
-      {section === 'warehouse' && <Unavailable title="المخازن والجرد" text="لا توجد جداول مخازن وجرد في مخطط Supabase الحالي، لذلك لم أضع أزرارًا وهمية. يلزم اعتماد مخطط المخازن قبل تفعيل هذا القسم." />}
-      {section === 'finance' && <Unavailable title="التقارير المالية" text="لا توجد جداول مالية في مخطط Supabase الحالي. سيظهر هذا القسم فعليًا بعد تطبيق مخطط الحسابات والتقارير المالية، دون اختلاق أرقام من خارج قاعدة البيانات." />}
       <Pressable style={styles.settings} onPress={() => router.push('/settings')}><Text style={styles.settingsText}>الإعدادات والصلاحيات ورموز الموظفين</Text></Pressable>
     </ScrollView>
   </SafeAreaView>;

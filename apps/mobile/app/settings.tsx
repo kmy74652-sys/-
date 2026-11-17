@@ -374,7 +374,7 @@ const styles = StyleSheet.create({
   dangerText: { color: '#a8443d', fontWeight: '800' },
   refresh: { minHeight: 46, alignItems: 'center', justifyContent: 'center', marginTop: 18, borderWidth: 1, borderColor: '#17324d', borderRadius: 11 },
   refreshText: { color: '#17324d', fontWeight: '800' },
-  roleChoices: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 10 },
+  roleChoices: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 8, marginBottom: 10 },
   roleChoice: { borderWidth: 1, borderColor: '#d6e0e4', borderRadius: 10, paddingVertical: 9, paddingHorizontal: 10, backgroundColor: '#fbfcfc' },
   roleChoiceActive: { backgroundColor: '#dceee7', borderColor: '#2f6654' },
   roleChoiceText: { color: '#39556a', fontSize: 13, fontWeight: '700' },
