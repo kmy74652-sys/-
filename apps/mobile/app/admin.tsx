@@ -187,7 +187,7 @@ function TasksSection({ data, designerTemplates, showCreate, setShowCreate, draf
       const late = task.status === 'late' || (!!task.dueAt && new Date(task.dueAt) < new Date() && !['completed_approved','cancelled'].includes(task.status));
       return <View style={styles.taskListCard} key={task.id}>
         <View style={styles.taskListTop}><View style={[styles.taskStatusDot,{backgroundColor:late?'#c84b4b':task.status==='completed_approved'?'#29936a':task.status==='report_submitted'?'#d49a27':'#3977b8'}]} /><Text style={styles.taskListTitle}>{task.title}</Text><Text style={[styles.taskStatusBadge,late?styles.taskStatusLate:task.status==='completed_approved'?styles.taskStatusDone:task.status==='report_submitted'?styles.taskStatusReview:styles.taskStatusActive]}>{late?'متأخرة':statusLabel(task.status)}</Text></View>
-        <Text style={styles.taskListMeta}>{task.branchName || 'كل الفروع'} · {roleLabel(task.roleCode || task.positionCode || '')} · {priorityLabels[task.priority] || task.priority}</Text>
+        <Text style={styles.taskListMeta}>{task.branchName || 'كل الفروع'} · {task.assignedTo ? 'مُسندة لموظف' : 'بانتظار الإسناد'} · {priorityLabels[task.priority] || task.priority}</Text>
         <View style={styles.taskListFooter}><Text style={styles.taskDueLabel}>الموعد: {fmt(task.dueAt)}</Text><Text style={styles.taskIdLabel}>#{String(task.id).slice(0,8)}</Text></View>
       </View>;
     }) : <View style={styles.taskEmpty}><Text style={styles.taskEmptyGlyph}>▤</Text><Text style={styles.taskEmptyTitle}>لا توجد مهام مطابقة</Text><Text style={styles.taskEmptyText}>{tasks.length?'جرّب تغيير البحث أو حالة المهمة.':'ابدأ بإنشاء أول تكليف للمؤسسة.'}</Text></View>}
