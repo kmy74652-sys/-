@@ -3,6 +3,8 @@ import { readFileSync } from 'node:fs';
 
 const read = (path) => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
 const migration = read('supabase/migrations/036_admin_management_atomicity.sql');
+const brandingMigration = read('supabase/migrations/043_institution_branding_owner_permission.sql');
+const branding = read('apps/mobile/lib/organizationBranding.ts');
 const auth = read('supabase/functions/employee-code-auth/index.ts');
 const settings = read('apps/mobile/app/settings.tsx');
 const admin = read('apps/mobile/app/admin.tsx');
@@ -29,5 +31,25 @@ assert.match(admin, /أرشفة الفرع/);
 assert.match(admin, /إعادة تفعيل الفرع/);
 assert.match(data, /id: row\.id,[\s\S]*name: row\.display_name/);
 assert.doesNotMatch(data, /id: row\.user_id/);
+assert.match(brandingMigration, /alter table public\.organizations[\s\S]*settings jsonb/i);
+assert.match(brandingMigration, /role_permissions \(role_code, permission_code\)/);
+assert.match(brandingMigration, /organizations\.update/);
+assert.match(brandingMigration, /alshaari_private\.has_permission/);
+assert.match(brandingMigration, /grant update \(name, settings\) on public\.organizations to authenticated/i);
+assert.match(brandingMigration, /revoke execute on function public\.guard_multi_form_task_completion\(\) from public, anon, authenticated/i);
+assert.match(brandingMigration, /revoke execute on function public\.guard_report_signature_mutation\(\) from public, anon, authenticated/i);
+assert.match(brandingMigration, /revoke execute on function public\.guard_task_report_snapshot_and_signature\(\) from public, anon, authenticated/i);
+assert.match(brandingMigration, /revoke execute on function public\.report_designer_allowed\(uuid\) from public, anon, authenticated/i);
+assert.match(brandingMigration, /alter function public\.prevent_task_activity_mutation\(\) set search_path = pg_catalog, public/i);
+assert.match(brandingMigration, /drop policy if exists tasks_read on public\.tasks/i);
+
+assert.match(branding, /from\('organizations'\)/);
+assert.match(branding, /settingsAvailable: false/);
+assert.match(admin, /loadOrganizationBranding/);
+assert.doesNotMatch(admin, /from\('institutions'\)/);
+assert.match(settings, /loadOrganizationBranding/);
+assert.match(settings, /saveOrganizationBranding/);
+assert.doesNotMatch(settings, /from\('institutions'\)/);
+
 
 console.log('Admin management static checks passed.');

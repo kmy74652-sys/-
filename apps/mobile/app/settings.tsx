@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { friendlyDataError, getMyEmployeeProfile } from '../lib/mobileData';
 import { supabase } from '../lib/supabase';
+import { loadOrganizationBranding, saveOrganizationBranding } from '../lib/organizationBranding';
 
 type EmployeeAccess = {
   id: string;
@@ -74,6 +75,7 @@ export default function EmployeeAccessSettings() {
   const [busyEmployeeId, setBusyEmployeeId] = useState<string | null>(null);
   const [isOwner, setIsOwner] = useState(false);
   const [canEditBrand, setCanEditBrand] = useState(false);
+  const [brandSettingsReady, setBrandSettingsReady] = useState(false);
   const [institutionId, setInstitutionId] = useState('');
   const [brandName, setBrandName] = useState('مؤسسة الشاعري للتجارة العامة');
   const [brandTagline, setBrandTagline] = useState('معًا... نحو إدارة أفضل');
@@ -108,13 +110,11 @@ export default function EmployeeAccessSettings() {
       setCanAssignOwner(actualOwner);
       setCanEditBrand(actualOwner);
       setInstitutionId(identity.employee.institutionId);
-      const { data: institution, error: institutionError } = await supabase.from('institutions').select('name,settings').eq('id', identity.employee.institutionId).maybeSingle();
-      if (institutionError) throw institutionError;
-      const institutionSettings = (institution?.settings ?? {}) as Record<string, unknown>;
-      const branding = (institutionSettings.branding ?? {}) as Record<string, unknown>;
-      setBrandName(typeof institution?.name === 'string' ? institution.name : 'مؤسسة الشاعري للتجارة العامة');
-      setBrandTagline(typeof branding.tagline === 'string' ? branding.tagline : 'معًا... نحو إدارة أفضل');
-      setBrandLogoUrl(typeof branding.logo_url === 'string' ? branding.logo_url : '');
+      const branding = await loadOrganizationBranding(identity.employee.institutionId);
+      setBrandName(branding.name);
+      setBrandTagline(branding.tagline);
+      setBrandLogoUrl(branding.logoUrl ?? '');
+      setBrandSettingsReady(branding.settingsAvailable);
       const owner = employeeRoles.some((role) => role?.code === 'owner' || role?.code === 'admin_followup')
         && employeePermissions.includes('employees.manage');
       setIsOwner(owner);
@@ -160,17 +160,15 @@ export default function EmployeeAccessSettings() {
     if (cleanLogoUrl && !/^https:\/\//i.test(cleanLogoUrl)) { setError('رابط الشعار يجب أن يبدأ بـ https://'); return; }
     setBrandBusy(true); setError(''); setMessage('');
     try {
-      const { data: current, error: readError } = await supabase.from('institutions').select('settings').eq('id', institutionId).single();
-      if (readError) throw readError;
-      const settings = (current?.settings ?? {}) as Record<string, unknown>;
-      const { error: saveError } = await supabase.from('institutions').update({
-        name: cleanName,
-        settings: { ...settings, branding: { tagline: cleanTagline, logo_url: cleanLogoUrl || null } },
-      }).eq('id', institutionId);
-      if (saveError) throw saveError;
+      if (!brandSettingsReady) throw new Error('organization_branding_migration_required');
+      await saveOrganizationBranding(institutionId, cleanName, cleanTagline, cleanLogoUrl || null);
       setMessage('تم حفظ هوية المؤسسة. ستظهر التغييرات في لوحة الإدارة على أجهزة الموظفين بعد تحديث التطبيق.');
     } catch (cause) {
-      setError(friendlyDataError(cause, 'تعذر حفظ الهوية. تحقق من صلاحية تعديل بيانات المؤسسة وتحديث قاعدة البيانات.'));
+      if (cause instanceof Error && cause.message === 'organization_branding_migration_required') {
+        setError('ميزة حفظ الهوية تحتاج إلى تطبيق تحديث قاعدة البيانات أولاً. يمكنك استخدام لوحة الإدارة وإدارة الموظفين حالياً.');
+      } else {
+        setError(friendlyDataError(cause, 'تعذر حفظ الهوية. تحقق من صلاحية تعديل بيانات المؤسسة وتحديث قاعدة البيانات.'));
+      }
     } finally { setBrandBusy(false); }
   }
 
@@ -289,6 +287,7 @@ export default function EmployeeAccessSettings() {
         {!loading && canEditBrand && <View style={styles.employeeCard}>
           <Text style={styles.employeeName}>هوية المؤسسة والواجهة الرئيسية</Text>
           <Text style={styles.copy}>يمكن لصاحب المؤسسة تغيير الاسم والعبارة التعريفية ورابط الشعار. تُحفظ الإعدادات مركزياً لتظهر في أجهزة المستخدمين.</Text>
+          {!brandSettingsReady && <Text style={styles.warning}>تحديث قاعدة البيانات الخاص بهوية المؤسسة لم يُطبّق بعد؛ ستعمل بقية إعدادات الموظفين بصورة طبيعية.</Text>}
           <Text style={styles.employeeMeta}>اسم المؤسسة</Text>
           <TextInput style={styles.input} value={brandName} onChangeText={setBrandName} maxLength={90} placeholder="اسم المؤسسة" />
           <Text style={styles.employeeMeta}>العبارة التعريفية</Text>
@@ -296,7 +295,7 @@ export default function EmployeeAccessSettings() {
           <Text style={styles.employeeMeta}>رابط الشعار (HTTPS)</Text>
           <TextInput style={styles.input} value={brandLogoUrl} onChangeText={setBrandLogoUrl} autoCapitalize="none" autoCorrect={false} keyboardType="url" placeholder="https://example.com/logo.png" />
           <Text style={styles.employeeMeta}>اترك رابط الشعار فارغًا لاستخدام شعار التطبيق الافتراضي.</Text>
-          <Pressable accessibilityRole="button" disabled={brandBusy} style={styles.primaryButton} onPress={() => void saveBrandSettings()}>{brandBusy ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>حفظ هوية المؤسسة</Text>}</Pressable>
+          <Pressable accessibilityRole="button" disabled={brandBusy || !brandSettingsReady} style={styles.primaryButton} onPress={() => void saveBrandSettings()}>{brandBusy ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>حفظ هوية المؤسسة</Text>}</Pressable>
         </View>}
         <Text style={styles.eyebrow}>إدارة آمنة للدخول</Text>
         <Text style={styles.title}>رموز دخول الموظفين</Text>
