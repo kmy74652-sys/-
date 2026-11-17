@@ -283,7 +283,7 @@ export default function EmployeeAccessSettings() {
                 {!active ? ' · الحساب غير نشط' : ''}
               </Text>
               {!employee.hasAuthAccount && (
-                <Text style={styles.warning}>لا يوجد حساب مصادقة مرتبط بملف هذا الموظف؛ لا يمكن تعيين رمز له حتى يربطه مسؤول النظام.</Text>
+                <Text style={styles.warning}>لا يوجد حساب مصادقة مرتبط بملف هذا الموظف؛ لا يمكن تعيين كلمة مرور له حتى يربطه مسؤول النظام.</Text>
               )}
               {isOwner && editForms[employee.id] && (
                 <>
@@ -293,7 +293,7 @@ export default function EmployeeAccessSettings() {
                   <View style={styles.roleChoices}>{roleOptions.map(([code, label]) => <Pressable key={code} accessibilityRole="button" style={[styles.roleChoice, editForms[employee.id].roleCode === code && styles.roleChoiceActive]} onPress={() => setEditForms((current) => ({ ...current, [employee.id]: { ...current[employee.id], roleCode: code } }))}><Text style={styles.roleChoiceText}>{label}</Text></Pressable>)}</View>
                   <Text style={styles.employeeMeta}>الفرع الحالي: {employee.branchName ?? 'غير محدد'}</Text>
                   <View style={styles.roleChoices}>{branches.map((branch) => <Pressable key={branch.id} accessibilityRole="button" style={[styles.roleChoice, editForms[employee.id].branchId === branch.id && styles.roleChoiceActive]} onPress={() => setEditForms((current) => ({ ...current, [employee.id]: { ...current[employee.id], branchId: branch.id } }))}><Text style={styles.roleChoiceText}>{branch.name}</Text></Pressable>)}</View>
-                  <Pressable accessibilityRole="button" style={styles.refresh} onPress={() => setEditForms((current) => ({ ...current, [employee.id]: { ...current[employee.id], status: current[employee.id].status === 'active' ? 'suspended' : 'active' } }))}><Text style={styles.refreshText}>{editForms[employee.id].status === 'active' ? 'تجهيز لإيقاف الحساب' : 'تجهيز لإعادة تفعيل الحساب'}</Text></Pressable>
+                  <Pressable accessibilityRole="button" style={styles.refresh} onPress={() => setEditForms((current) => ({ ...current, [employee.id]: { ...current[employee.id], status: current[employee.id].status === 'active' ? 'suspended' : 'active' } }))}><Text style={styles.refreshText}>{editForms[employee.id].status === 'active' ? 'تجهيز لإيقاف الحساب مع حفظ السجلات' : 'تجهيز لإعادة تفعيل الحساب'}</Text></Pressable>
                   <Pressable accessibilityRole="button" disabled={busyEmployeeId !== null} style={styles.primaryButton} onPress={() => void updateEmployee(employee)}><Text style={styles.buttonText}>{busyEmployeeId === employee.id ? 'جارٍ الحفظ…' : 'حفظ بيانات الحساب'}</Text></Pressable>
                   <Pressable accessibilityRole="button" style={styles.refresh} onPress={() => void loadAudit(employee)}><Text style={styles.refreshText}>عرض سجل التعديلات</Text></Pressable>
                   {(audit[employee.id] ?? []).map((entry) => <Text style={styles.employeeMeta} key={entry.id}>{entry.action} · {new Date(entry.created_at).toLocaleString('ar-SA')}</Text>)}
