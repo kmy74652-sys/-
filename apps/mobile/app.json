@@ -22,6 +22,8 @@
     ],
     "android": {
       "package": "com.alshaeri.mobile",
+      "versionCode": 2,
+      "supportsRTL": true,
       "adaptiveIcon": {
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundColor": "#17324d"
