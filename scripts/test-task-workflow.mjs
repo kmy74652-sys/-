@@ -10,8 +10,8 @@ for (const role of ['owner', 'admin_followup', 'accountant', 'warehouse_keeper',
 for (const token of ['institution_id', 'branch_id', 'app.current_institution_id', 'app.current_employee_id', 'idempotency']) assert(access.includes(token) || workflow.includes(token), `missing isolation token ${token}`);
 for (const recurrence of ['daily', 'weekly', 'monthly', 'week_day', 'month_day', 'generate_recurring_tasks']) assert(workflow.includes(recurrence), `missing recurrence token ${recurrence}`);
 assert(access.includes('task_attachments') && access.includes('mobile_task_timeline'), 'attachments/timeline migration missing');
-assert(mobile.includes("task.assignee_employee_id === currentUserId"), 'employee task list must be scoped to the signed-in employee');
-assert(mobile.includes("canReview && (task.status === 'submitted' || hasPendingFormReview)"), 'manager review queue must include legacy and dynamic submitted reports');
+assert(mobile.includes("task.assignee_employee_id === currentuserid"), 'employee task list must be scoped to the signed-in employee');
+assert(mobile.includes("canReview && (task.status === 'submitted' || haspendingformreview)"), 'manager review queue must include legacy and dynamic submitted reports');
 assert(mobile.includes("['mine', 'مهامي']") && mobile.includes("['review', 'مراجعة التقارير']"), 'role-based task/review tabs missing');
 const queue = new Map();
 const add = (id) => queue.has(id) || queue.set(id, true);
