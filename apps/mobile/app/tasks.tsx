@@ -70,6 +70,8 @@ export default function TasksScreen() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [canReview, setCanReview] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState('');
+  const [screenMode, setScreenMode] = useState<'mine' | 'all' | 'review'>('mine');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [busyTask, setBusyTask] = useState('');
@@ -93,6 +95,7 @@ export default function TasksScreen() {
       const identity = await getMyEmployeeProfile();
       if (!identity) throw new Error('not_authenticated');
       if (!identity.employee) throw new Error('employee_not_active');
+      setCurrentUserId(identity.userId);
       const permissions = new Set(identity.employee.permissions);
       if (!permissions.has('tasks.execute') && !permissions.has('tasks.manage')) throw new Error('permission_denied');
       const [taskRows, notificationRows] = await Promise.all([listMyTasks(), listMyNotifications()]);
@@ -301,11 +304,18 @@ export default function TasksScreen() {
     const date = new Date(value);
     return Number.isNaN(date.getTime()) ? 'غير محدد' : new Intl.DateTimeFormat('ar-SA', { dateStyle: 'medium', timeStyle: 'short' }).format(date);
   };
-  const filteredTasks = tasks.filter((task) =>
-    (statusFilter === 'all' || task.status === statusFilter) &&
-    (positionFilter === 'all' || task.position_code === positionFilter) &&
-    (!search.trim() || `${task.title} ${task.description ?? ''}`.toLocaleLowerCase('ar').includes(search.trim().toLocaleLowerCase('ar'))),
-  );
+  const filteredTasks = tasks.filter((task) => {
+    const hasPendingFormReview = task.report_forms.some((form) => form.status === 'submitted');
+    const modeMatches = screenMode === 'mine'
+      ? task.assignee_employee_id === currentUserId
+      : screenMode === 'review'
+        ? canReview && (task.status === 'submitted' || hasPendingFormReview)
+        : canReview;
+    return modeMatches &&
+      (statusFilter === 'all' || task.status === statusFilter) &&
+      (positionFilter === 'all' || task.position_code === positionFilter) &&
+      (!search.trim() || `${task.title} ${task.description ?? ''}`.toLocaleLowerCase('ar').includes(search.trim().toLocaleLowerCase('ar')));
+  });
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -326,6 +336,13 @@ export default function TasksScreen() {
         {!!error && <Text accessibilityRole="alert" style={styles.error}>{error}</Text>}
         {!!notice && <Text accessibilityLiveRegion="polite" style={styles.notice}>{notice}</Text>}
         {loading && <View style={styles.loading}><ActivityIndicator size="large" color="#17324d" /><Text style={styles.muted}>جارٍ تحميل المهام…</Text></View>}
+        {!loading && canReview && <View style={styles.modeTabs}>
+          {([
+            ['mine', 'مهامي'],
+            ['review', 'مراجعة التقارير'],
+            ['all', 'متابعة جميع المهام'],
+          ] as const).map(([mode, label]) => <Pressable key={mode} accessibilityRole="button" accessibilityState={{ selected: screenMode === mode }} style={[styles.modeTab, screenMode === mode && styles.modeTabSelected]} onPress={() => { setScreenMode(mode); setStatusFilter('all'); setPositionFilter('all'); }}><Text style={[styles.modeTabText, screenMode === mode && styles.modeTabTextSelected]}>{label}</Text></Pressable>)}
+        </View>}
 
         {!loading && tasks.length > 0 && <>
           <TextInput style={styles.input} value={search} onChangeText={setSearch} placeholder="ابحث عن مهمة…" accessibilityLabel="البحث في المهام" />
@@ -455,6 +472,11 @@ const styles = StyleSheet.create({
   backButton: { minHeight: 44, minWidth: 58, alignItems: 'center', justifyContent: 'center', borderRadius: 10, backgroundColor: '#e5edf0' },
   backText: { color: '#17324d', fontWeight: '700' },
   pending: { color: '#8c4f13', backgroundColor: '#fff1dc', borderRadius: 9, padding: 10, textAlign: 'right' },
+  modeTabs: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 7, paddingVertical: 3 },
+  modeTab: { flex: 1, minWidth: 92, minHeight: 42, borderRadius: 12, borderWidth: 1, borderColor: '#ccd9df', backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 9, paddingVertical: 8 },
+  modeTabSelected: { backgroundColor: '#17324d', borderColor: '#17324d' },
+  modeTabText: { color: '#39556a', fontSize: 12, fontWeight: '700', textAlign: 'center' },
+  modeTabTextSelected: { color: '#fff' },
   filters: { flexDirection: 'row-reverse', gap: 8, paddingVertical: 4 },
   filterChip: { borderRadius: 18, borderWidth: 1, borderColor: '#ccd9df', paddingHorizontal: 12, paddingVertical: 8 },
   filterChipSelected: { backgroundColor: '#17324d', borderColor: '#17324d' },
