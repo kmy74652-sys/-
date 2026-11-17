@@ -464,7 +464,7 @@ async function ownerOperation(body: Record<string, unknown>, request: Request, c
   }
   if (!target || !target.user_id) return response({ error: 'employee_auth_not_linked' }, 404);
   const targetOwner = await targetIsOwner(clients.adminClient, owner.institutionId, employeeId);
-  if (targetOwner && !isOwnerProfile(owner)) return response({ error: 'owner_account_protected' }, 403);
+  if (targetOwner && (!isOwnerProfile(owner) || employeeId === owner.id)) return response({ error: 'owner_account_protected' }, 403);
   if (!target.is_active && !['update_employee', 'audit'].includes(String(body.action))) return response({ error: 'employee_not_active' }, 400);
 
   if (body.action === 'audit') {
