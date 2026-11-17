@@ -169,6 +169,13 @@ begin
       jsonb_build_object('branch_id',v_branch.id,'code',v_branch.code,'name',v_branch.name));
   else
     if p_branch_id is null then raise exception using errcode='22023', message='branch_id_required'; end if;
+    if exists (
+      select 1 from public.role_assignments ra
+      join public.organization_memberships m on m.id=ra.membership_id and m.organization_id=ra.organization_id
+      where ra.organization_id=p_organization_id and ra.branch_id=p_branch_id and m.is_active
+    ) then
+      raise exception using errcode='22023', message='branch_has_active_employees';
+    end if;
     update public.branches set is_active=false
     where id=p_branch_id and organization_id=p_organization_id
     returning * into v_branch;
