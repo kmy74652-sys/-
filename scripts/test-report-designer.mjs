@@ -8,6 +8,7 @@ const migration = ['026_dynamic_report_designer.sql', '027_report_form_approval.
 const currentMigration = read('../supabase/migrations/034_report_builder_integrity.sql');
 const mobileDesigner = read('../apps/mobile/components/ReportDesigner.tsx');
 const reportInput = read('../apps/mobile/components/ReportFieldInput.tsx');
+const livePreview = read('../apps/mobile/components/ReportLivePreview.tsx');
 const tasks = read('../apps/mobile/app/tasks.tsx');
 const designerApi = read('../apps/mobile/lib/reportDesigner.ts');
 const schemaSource = read('../apps/mobile/lib/reportSchema.ts');
@@ -19,6 +20,7 @@ const schemaModule = { exports: {} };
 new Function('exports', 'module', compiled)(schemaModule.exports, schemaModule);
 const {
   calculateFormula,
+  designerFieldsToPreviewFields,
   evaluateReportField,
   validateDesignerFields,
   validateReportFieldValue,
@@ -28,6 +30,24 @@ const designerField = (patch = {}) => ({
   field_key: 'quantity', label: 'الكمية', description: '', field_type: 'quantity', is_required: true,
   repeatable: false, sort_order: 0, options: [], validation: {}, config: {}, ...patch,
 });
+const previewDraftFields = [
+  designerField({ field_key: 'amount', label: 'قيمة', field_type: 'integer', sort_order: 1 }),
+  designerField({ field_key: 'notes', label: 'ملاحظة', field_type: 'short_text', sort_order: 0 }),
+];
+let previewShape = designerFieldsToPreviewFields(previewDraftFields);
+assert.deepEqual(previewShape.map(({ key, label, type, required }) => ({ key, label, type, required })), [
+  { key: 'amount', label: 'قيمة', type: 'integer', required: true },
+  { key: 'notes', label: 'ملاحظة', type: 'short_text', required: true },
+], 'preview uses current field-array order and required state');
+previewShape = designerFieldsToPreviewFields([
+  { ...previewDraftFields[1], label: 'ملاحظات محدثة', field_type: 'money', is_required: false, sort_order: 0 },
+  { ...previewDraftFields[0], label: 'مبلغ محدث', field_type: 'money', is_required: true, sort_order: 1 },
+]);
+assert.deepEqual(previewShape.map(({ key, label, type, required }) => ({ key, label, type, required })), [
+  { key: 'notes', label: 'ملاحظات محدثة', type: 'money', required: false },
+  { key: 'amount', label: 'مبلغ محدث', type: 'money', required: true },
+], 'preview reflects edited labels, types, required markers, and reordered fields immediately');
+assert.deepEqual(designerFieldsToPreviewFields(previewDraftFields.slice(0, 1)).map(({ key }) => key), ['amount'], 'deleted fields are absent from preview input');
 const runtimeField = (patch = {}) => ({
   key: 'quantity', label: 'الكمية', type: 'quantity', required: true, options: [], validation: {}, config: {}, ...patch,
 });
@@ -64,8 +84,16 @@ assert.match(validateReportFieldValue(consentSignature, { strokes: ['M 1 1 L 2 2
 assert.equal(validateReportFieldValue(consentSignature, { strokes: ['M 1 1 L 2 2'], acknowledged: true }), null);
 
 // UI/API coverage: structured editor, server draft RPC, dynamic tables, calculated values and drawn signatures.
-assert(mobileDesigner.includes('مخطط الحقول') && mobileDesigner.includes('خصائص الحقل') && mobileDesigner.includes('معاينة الموظف'));
+assert(mobileDesigner.includes('مخطط الحقول') && mobileDesigner.includes('خصائص الحقل'));
+assert(livePreview.includes('المعاينة المباشرة'));
 assert(mobileDesigner.includes('saveDesignerTemplate') && mobileDesigner.includes('approveDesignerVersion'));
+assert(mobileDesigner.includes('<ReportLivePreview fields={fields} title={title} description={description} />'), 'live preview must receive current unsaved editor fields');
+assert(mobileDesigner.includes('</View>\n      <ReportLivePreview fields={fields} title={title} description={description} />'), 'live preview panel must be mounted directly below the editor');
+assert(!mobileDesigner.includes("setBuilderSection('preview')"), 'preview must not require switching to a separate screen or tab');
+assert(livePreview.includes('designerFieldsToPreviewFields(fields)') && livePreview.includes('previewFields.map'), 'live preview must map current fields in current order');
+assert(livePreview.includes('Modal') && livePreview.includes('PanResponder') && livePreview.includes('setVisible(false)'), 'live preview must support expand, move, hide, and show');
+assert(!livePreview.includes('saveDesignerTemplate') && livePreview.includes('previewMode'), 'preview must remain local and must not save or upload attachments');
+assert(reportInput.includes("field.type === 'money' && previewMode") && reportInput.includes('currencyHint'), 'money preview must show amount and currency input treatment');
 assert(reportInput.includes('إضافة صف') && reportInput.includes('SignaturePad') && reportInput.includes('react-native-svg'));
 assert(tasks.includes('validateReportFieldValue') && tasks.includes('evaluateReportField') && tasks.includes('reportDefaultDraft'));
 assert(designerApi.includes("rpc('save_report_form_draft'") && designerApi.includes("rpc('approve_report_form_version'"));

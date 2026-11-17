@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { approveDesignerVersion, designerFieldTypes, getLatestDesignerVersion, listDesignerTemplates, saveDesignerTemplate, type ReportTemplate } from '../lib/reportDesigner';
 import { normalizeTableColumns, validateDesignerFields, type DesignerField, type ReportTableColumn } from '../lib/reportSchema';
+import ReportLivePreview from './ReportLivePreview';
 
 const roles: Array<[string, string]> = [
   ['owner', 'صاحب المؤسسة'], ['admin_followup', 'المدير التنفيذي'], ['accountant', 'المحاسب'],
@@ -24,7 +25,7 @@ export default function ReportDesigner() {
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
   const [mode, setMode] = useState<'library' | 'builder'>('library');
-  const [builderSection, setBuilderSection] = useState<'fields' | 'properties' | 'preview'>('fields');
+  const [builderSection, setBuilderSection] = useState<'fields' | 'properties'>('fields');
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [roleCode, setRoleCode] = useState('admin_followup');
@@ -123,7 +124,6 @@ export default function ReportDesigner() {
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
         <Chip label={`مخطط الحقول · ${fields.length}`} selected={builderSection === 'fields'} onPress={() => setBuilderSection('fields')} />
         <Chip label="خصائص الحقل" selected={builderSection === 'properties'} disabled={activeField === null} onPress={() => setBuilderSection('properties')} />
-        <Chip label="معاينة الموظف" selected={builderSection === 'preview'} onPress={() => setBuilderSection('preview')} />
       </ScrollView>
       <View style={styles.builderGrid}>
         {builderSection === 'fields' && <View style={styles.panel}>
@@ -138,8 +138,8 @@ export default function ReportDesigner() {
           <Text style={styles.sectionLabel}>{field ? `خصائص: ${field.label.trim() || field.field_key}` : 'خصائص الحقل'}</Text>
           {!field || activeField === null ? <Text style={styles.empty}>اختر حقلًا من المخطط لتعديل نوعه وقواعده.</Text> : <FieldEditor field={field} update={(patch) => updateField(activeField, patch)} />}
         </View>}
-        {builderSection === 'preview' && <View style={styles.panel}><Text style={styles.sectionLabel}>معاينة الموظف</Text><Preview fields={fields} /></View>}
       </View>
+      <ReportLivePreview fields={fields} title={title} description={description} />
       <View style={styles.actions}><Pressable disabled={busy} style={[styles.primary, busy && styles.disabled]} onPress={() => void save()}><Text style={styles.primaryText}>{busy ? 'جارٍ الحفظ…' : templateId ? 'حفظ إصدار جديد' : 'حفظ القالب'}</Text></Pressable>{!!versionId && versionStatus === 'draft' && <Pressable disabled={busy} style={styles.secondary} onPress={() => void approve()}><Text style={styles.secondaryText}>اعتماد الإصدار من المالك</Text></Pressable>}{versionStatus === 'published' && <Text style={styles.approved}>الإصدار معتمد وثابت ✓</Text>}</View>
     </View>;
   }
@@ -229,11 +229,6 @@ function TableColumnsEditor({ columns, onChange }: { columns: ReportTableColumn[
     <Pressable style={styles.ghost} onPress={() => { const serial = columns.length + 1; onChange([...columns, { key: `column_${serial}`, label: '', type: 'short_text', required: false, validation: {} }]); }}><Text style={styles.ghostText}>+ إضافة عمود</Text></Pressable>
   </View>;
 }
-function Preview({ fields }: { fields: DesignerField[] }) {
-  if (!fields.length) return <Text style={styles.panelSub}>ستظهر هنا معاينة موجزة للنموذج كما يراه الموظف.</Text>;
-  return <View style={styles.previewGrid}>{fields.map((field, index) => <View key={`${field.field_key}-${index}`} style={styles.previewField}><Text style={styles.previewLabel}>{field.label.trim() || `حقل ${index + 1}`}{field.is_required ? ' *' : ''}</Text><Text style={styles.panelSub}>{field.description?.trim() || typeName(field.field_type)}</Text>{field.field_type === 'select' || field.field_type === 'multiselect' ? <View style={styles.chips}>{field.options.slice(0, 4).map((option) => <Chip key={option} label={option} selected={false} onPress={() => undefined} />)}</View> : field.field_type === 'table' ? <Text style={styles.panelSub}>{normalizeTableColumns({ config: field.config }).map((column) => column.label).join('  |  ') || 'لا توجد أعمدة'}</Text> : field.field_type === 'calculated' ? <Text style={styles.calculated}>{String(obj(field.config).formula ?? 'أدخل صيغة')}</Text> : field.field_type === 'signature' ? <View style={styles.signaturePlaceholder}><Text style={styles.panelSub}>مساحة توقيع مرسوم + إقرار</Text></View> : <View style={styles.previewInput}><Text style={styles.panelSub}>{field.field_type === 'boolean' ? 'نعم / لا' : 'إدخال الموظف'}</Text></View>}</View>)}</View>;
-}
-
 const styles = StyleSheet.create({
   shell: { gap: 12 }, header: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', gap: 10 }, headerCopy: { flex: 1 }, eyebrow: { color: '#718394', textAlign: 'right', fontWeight: '700', fontSize: 12 }, title: { color: '#17324d', textAlign: 'right', fontSize: 22, fontWeight: '900', marginTop: 2 }, sectionLabel: { color: '#17324d', textAlign: 'right', fontWeight: '900', fontSize: 15 }, panelSub: { color: '#718394', textAlign: 'right', lineHeight: 19, fontSize: 12 },
   metaCard: { backgroundColor: '#fff', borderColor: '#dce6e9', borderWidth: 1, borderRadius: 14, padding: 12, gap: 9 }, builderGrid: { gap: 10 }, panel: { backgroundColor: '#fff', borderColor: '#dce6e9', borderWidth: 1, borderRadius: 14, padding: 12, gap: 10 }, panelHeader: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', gap: 8 },

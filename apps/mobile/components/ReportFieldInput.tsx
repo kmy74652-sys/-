@@ -9,6 +9,7 @@ type TableRow = Record<string, unknown>;
 type SignatureValue = { strokes: string[]; acknowledged: boolean };
 type Props = {
   field: ReportField;
+  previewMode?: boolean;
   raw: string;
   attachments: Attachment[];
   calculated: number | null;
@@ -47,7 +48,7 @@ function validationHint(field: ReportField): string {
 }
 
 export default function ReportFieldInput(props: Props) {
-  const { field, raw, attachments, calculated, calculationError, rows, onDraftChange, onTableChange, onChooseAttachment } = props;
+  const { field, previewMode = false, raw, attachments, calculated, calculationError, rows, onDraftChange, onTableChange, onChooseAttachment } = props;
   const description = field.description?.trim();
   const hint = validationHint(field);
   const setBoolean = () => onDraftChange(raw === 'true' ? 'false' : 'true');
@@ -68,8 +69,8 @@ export default function ReportFieldInput(props: Props) {
         <TableEditor field={field} rows={rows} onChange={onTableChange} />
       ) : ['attachment', 'image', 'file'].includes(field.type) ? (
         <View style={styles.attachmentBox}>
-          <Pressable accessibilityRole="button" style={styles.secondaryButton} onPress={onChooseAttachment}>
-            <Text style={styles.secondaryText}>اختيار مرفق من الهاتف</Text>
+          <Pressable accessibilityRole="button" disabled={previewMode} style={[styles.secondaryButton, previewMode && styles.disabled]} onPress={onChooseAttachment}>
+            <Text style={styles.secondaryText}>{previewMode ? 'معاينة المرفقات فقط — لا يتم الرفع' : 'اختيار مرفق من الهاتف'}</Text>
           </Pressable>
           {!!attachments.length && <Text style={styles.description}>{attachments.map((file) => file.name).join('، ')}</Text>}
         </View>
@@ -92,15 +93,25 @@ export default function ReportFieldInput(props: Props) {
           })}
         </View>
       ) : (
-        <TextInput
-          accessibilityLabel={field.label}
-          style={[styles.input, ['long_text', 'textarea', 'notes', 'decision_notes'].includes(field.type) && styles.multiline]}
-          value={raw}
-          onChangeText={onDraftChange}
-          keyboardType={['number', 'progress', 'integer', 'quantity', 'money'].includes(field.type) ? 'decimal-pad' : 'default'}
-          multiline={['long_text', 'textarea', 'notes', 'decision_notes'].includes(field.type)}
-          placeholder={field.type === 'progress' ? 'أدخل نسبة الإنجاز' : ['date', 'datetime'].includes(field.type) ? 'أدخل التاريخ أو الوقت' : field.required ? 'مطلوب' : 'اختياري'}
-        />
+        field.type === 'money' && previewMode ? <View style={styles.moneyPreview}>
+          <TextInput
+            accessibilityLabel={field.label}
+            style={[styles.input, styles.moneyInput]}
+            value={raw}
+            onChangeText={onDraftChange}
+            keyboardType="decimal-pad"
+            placeholder="أدخل المبلغ"
+          />
+          <View style={styles.currencyHint}><Text style={styles.currencyHintText}>عملة</Text></View>
+        </View> : <TextInput
+            accessibilityLabel={field.label}
+            style={[styles.input, ['long_text', 'textarea', 'notes', 'decision_notes'].includes(field.type) && styles.multiline]}
+            value={raw}
+            onChangeText={onDraftChange}
+            keyboardType={['number', 'progress', 'integer', 'quantity', 'money'].includes(field.type) ? 'decimal-pad' : 'default'}
+            multiline={['long_text', 'textarea', 'notes', 'decision_notes'].includes(field.type)}
+            placeholder={field.type === 'progress' ? 'أدخل نسبة الإنجاز' : ['date', 'datetime'].includes(field.type) ? 'أدخل التاريخ أو الوقت' : field.type === 'money' ? 'أدخل المبلغ' : field.required ? 'مطلوب' : 'اختياري'}
+          />
       )}
     </View>
   );
@@ -254,6 +265,10 @@ const styles = StyleSheet.create({
   addRow: { minHeight: 42, alignItems: 'center', justifyContent: 'center', borderRadius: 9, backgroundColor: '#e8f0f4' },
   addRowText: { color: '#17324d', fontWeight: '800' },
   disabled: { opacity: 0.5 },
+  moneyPreview: { flexDirection: 'row-reverse', alignItems: 'center', gap: 7 },
+  moneyInput: { flex: 1 },
+  currencyHint: { minHeight: 44, minWidth: 58, borderRadius: 9, backgroundColor: '#edf3f5', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 8 },
+  currencyHintText: { color: '#39556a', fontSize: 12, fontWeight: '800' },
   signatureBox: { gap: 8 },
   consentText: { color: '#39556a', textAlign: 'right', lineHeight: 22, padding: 10, backgroundColor: '#f7f9fa', borderRadius: 9 },
   signatureCanvas: { height: 170, borderWidth: 1, borderColor: '#b8c8d0', borderRadius: 10, backgroundColor: '#fff', overflow: 'hidden', justifyContent: 'center' },

@@ -37,6 +37,20 @@ export type DesignerField = {
 };
 export type ReportValues = Record<string, unknown>;
 
+export function designerFieldsToPreviewFields(fields: DesignerField[]): ReportField[] {
+  return fields.map((field) => ({
+    key: field.field_key,
+    label: field.label.trim() || `حقل ${field.sort_order + 1}`,
+    description: field.description,
+    type: field.field_type,
+    options: field.options,
+    required: field.is_required,
+    repeatable: field.repeatable,
+    validation: field.validation,
+    config: field.config,
+  }));
+}
+
 const numericTypes = new Set(['number', 'progress', 'integer', 'quantity', 'money']);
 const textTypes = new Set(['text', 'short_text', 'long_text', 'textarea', 'notes', 'decision_notes', 'status']);
 const validFieldTypes = new Set<ReportFieldType>([
