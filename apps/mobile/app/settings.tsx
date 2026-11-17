@@ -73,6 +73,7 @@ export default function EmployeeAccessSettings() {
   const [loading, setLoading] = useState(true);
   const [busyEmployeeId, setBusyEmployeeId] = useState<string | null>(null);
   const [isOwner, setIsOwner] = useState(false);
+  const [canAssignOwner, setCanAssignOwner] = useState(false);
   const [branches, setBranches] = useState<Branch[]>([]);
   const [createForm, setCreateForm] = useState({ employeeNo: '', fullName: '', code: '', roleCode: 'warehouse_worker', branchId: '' });
   const [editForms, setEditForms] = useState<Record<string, { employeeNo: string; fullName: string; roleCode: string; branchId: string; status: 'active' | 'suspended' }>>({});
@@ -97,6 +98,7 @@ export default function EmployeeAccessSettings() {
       }
       const employeeRoles = Array.isArray(identity.employee.roles) ? identity.employee.roles : [];
       const employeePermissions = Array.isArray(identity.employee.permissions) ? identity.employee.permissions : [];
+      setCanAssignOwner(employeeRoles.some((role) => role?.code === 'owner'));
       const owner = employeeRoles.some((role) => role?.code === 'owner' || role?.code === 'admin_followup')
         && employeePermissions.includes('employees.manage');
       setIsOwner(owner);
@@ -260,7 +262,7 @@ export default function EmployeeAccessSettings() {
             <TextInput style={styles.input} placeholder="رقم الموظف الفريد" keyboardType="number-pad" value={createForm.employeeNo} onChangeText={(value) => setCreateForm((current) => ({ ...current, employeeNo: value }))} />
             <TextInput style={styles.input} placeholder="كلمة المرور الأولية" secureTextEntry value={createForm.code} onChangeText={(value) => setCreateForm((current) => ({ ...current, code: value }))} />
             <Text style={styles.employeeMeta}>التصنيف الوظيفي</Text>
-            <View style={styles.roleChoices}>{roleOptions.map(([code, label]) => <Pressable key={code} accessibilityRole="button" style={[styles.roleChoice, createForm.roleCode === code && styles.roleChoiceActive]} onPress={() => setCreateForm((current) => ({ ...current, roleCode: code }))}><Text style={styles.roleChoiceText}>{label}</Text></Pressable>)}</View>
+            <View style={styles.roleChoices}>{roleOptions.filter(([code]) => code !== 'owner' || canAssignOwner).map(([code, label]) => <Pressable key={code} accessibilityRole="button" style={[styles.roleChoice, createForm.roleCode === code && styles.roleChoiceActive]} onPress={() => setCreateForm((current) => ({ ...current, roleCode: code }))}><Text style={styles.roleChoiceText}>{label}</Text></Pressable>)}</View>
             <Text style={styles.employeeMeta}>الفرع</Text>
             <View style={styles.roleChoices}>{branches.map((branch) => <Pressable key={branch.id} accessibilityRole="button" style={[styles.roleChoice, createForm.branchId === branch.id && styles.roleChoiceActive]} onPress={() => setCreateForm((current) => ({ ...current, branchId: branch.id }))}><Text style={styles.roleChoiceText}>{branch.name}</Text></Pressable>)}</View>
             <Pressable accessibilityRole="button" disabled={busyEmployeeId !== null} style={styles.primaryButton} onPress={() => void createEmployee()}><Text style={styles.buttonText}>{busyEmployeeId === 'create' ? 'جارٍ الإنشاء…' : 'إنشاء الحساب'}</Text></Pressable>
