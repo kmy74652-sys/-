@@ -1,20 +1,26 @@
--- Allow only the institution owner role to edit institution identity settings.
-insert into public.permissions (code, name_ar, domain, action, description)
+-- Store organization branding in the live organizations schema.
+-- The current production model uses organizations/role_code, not institutions/role_id.
+alter table public.organizations
+  add column if not exists settings jsonb not null default '{}'::jsonb;
+
+insert into public.permissions (code, name_ar)
 values (
-  'institutions.update',
-  'تعديل هوية المؤسسة',
-  'institutions',
-  'update',
-  'تعديل اسم المؤسسة وشعارها وعبارتها التعريفية'
+  'organizations.update',
+  'تعديل هوية المؤسسة'
 )
 on conflict (code) do update
-set name_ar = excluded.name_ar,
-    domain = excluded.domain,
-    action = excluded.action,
-    description = excluded.description;
+set name_ar = excluded.name_ar;
 
-insert into public.role_permissions (institution_id, role_id, permission_code)
-select r.institution_id, r.id, 'institutions.update'
-from public.roles r
-where r.code = 'owner'
-on conflict (institution_id, role_id, permission_code) do nothing;
+insert into public.role_permissions (role_code, permission_code)
+values ('owner', 'organizations.update')
+on conflict (role_code, permission_code) do nothing;
+
+grant update (name, settings) on public.organizations to authenticated;
+
+drop policy if exists organizations_update_owner on public.organizations;
+create policy organizations_update_owner
+  on public.organizations
+  for update
+  to authenticated
+  using (alshaari_private.has_permission(id, 'organizations.update', null::uuid))
+  with check (alshaari_private.has_permission(id, 'organizations.update', null::uuid));
