@@ -18,6 +18,7 @@ assert.match(migration, /grant execute on function public\.admin_manage_branch[\
 assert.match(auth, /admin_update_employee/);
 assert.match(auth, /admin_manage_branch/);
 assert.match(auth, /employeeId === owner.id/);
+assert.match(auth, /owner_self_protection/);
 assert.match(auth, /'activate'/);
 assert.match(auth, /roleCode: assignment\?\.role_code/);
 assert.match(settings, /roleCode: employee\.roleCode \?\? 'warehouse_worker'/);
