@@ -128,7 +128,72 @@ function Overview({ counts, data, fmt, onSection, onSettings, canDesign }: { cou
   <View style={styles.activityPreview}><Text style={styles.sectionTitle}>آخر النشاط</Text>{(data?.activity ?? []).slice(0,3).map((item)=><View style={styles.activityPreviewRow} key={item.id}><Text style={styles.cardTitle}>{item.action}</Text><Text style={styles.meta}>{fmt(item.createdAt)}</Text></View>)}{!(data?.activity ?? []).length&&<Text style={styles.muted}>لا توجد أنشطة حديثة.</Text>}</View>
 </>; }
 
-function TasksSection({ data, designerTemplates, showCreate, setShowCreate, draft, setDraft, createTask, fmt, onOpenTasks }: any) { return <><View style={styles.sectionHeader}><Text style={styles.sectionTitle}>إدارة المهام</Text><Pressable style={styles.primarySmall} onPress={() => setShowCreate(!showCreate)}><Text style={styles.primaryText}>{showCreate ? 'إلغاء' : 'إنشاء مهمة'}</Text></Pressable></View>{showCreate && <View style={styles.form}>{[['title', 'عنوان المهمة'], ['description', 'الوصف']].map(([key, label]) => <TextInput key={key} style={styles.input} placeholder={label} value={draft[key]} onChangeText={(value) => setDraft({ ...draft, [key]: value })} multiline={key === 'description'} />)}<AdenDeadlinePicker date={draft.dueDate} time={draft.dueTime} onChange={(dueDate, dueTime) => setDraft({ ...draft, dueDate, dueTime })} /><Text style={styles.fieldLabel}>التصنيف الوظيفي</Text><View style={styles.choices}>{roleCodes.map((role) => <Pressable key={role} style={[styles.choice, draft.roleCode === role && styles.choiceSelected]} onPress={() => setDraft({ ...draft, roleCode: role, templateId: '', reportTemplateId: designerTemplates.some((item: ReportTemplate) => item.id === draft.reportTemplateId && item.role_code === role) ? draft.reportTemplateId : '' })}><Text style={draft.roleCode === role ? styles.choiceSelectedText : styles.choiceText}>{roleLabel(role)}</Text></Pressable>)}</View><Text style={styles.fieldLabel}>الفرع</Text><View style={styles.choices}>{(data?.branches ?? []).map((branch: any) => <Pressable key={branch.id} style={[styles.choice, draft.branchId === branch.id && styles.choiceSelected]} onPress={() => setDraft({ ...draft, branchId: branch.id })}><Text style={draft.branchId === branch.id ? styles.choiceSelectedText : styles.choiceText}>{branch.name}</Text></Pressable>)}</View><Text style={styles.fieldLabel}>نموذج التقرير الديناميكي مع حفظ نسخة للمهمة</Text><View style={styles.choices}><Pressable style={[styles.choice, !draft.reportTemplateId && styles.choiceSelected]} onPress={() => setDraft({ ...draft, reportTemplateId: '' })}><Text style={!draft.reportTemplateId ? styles.choiceSelectedText : styles.choiceText}>بدون نموذج تقرير</Text></Pressable>{designerTemplates.filter((template: ReportTemplate) => template.role_code === draft.roleCode).map((template: ReportTemplate) => <Pressable key={template.id} style={[styles.choice, draft.reportTemplateId === template.id && styles.choiceSelected]} onPress={() => setDraft({ ...draft, reportTemplateId: template.id })}><Text style={draft.reportTemplateId === template.id ? styles.choiceSelectedText : styles.choiceText}>{template.title} · إصدار {template.approved_version_no}</Text></Pressable>)}</View><Pressable style={styles.secondary} onPress={() => setDraft({ ...draft, reportRequired: !draft.reportRequired })}><Text style={styles.secondaryText}>{draft.reportRequired ? 'التقرير مطلوب ✓' : 'التقرير اختياري'}</Text></Pressable><Pressable style={styles.primary} onPress={() => void createTask()}><Text style={styles.primaryText}>حفظ ونشر المهمة للمستخدم</Text></Pressable></View>}<Pressable style={styles.secondary} onPress={onOpenTasks}><Text style={styles.secondaryText}>فتح شاشة التنفيذ والتقارير والمرفقات</Text></Pressable>{(data?.tasks ?? []).map((task: any) => <View style={styles.card} key={task.id}><View style={styles.taskLine}><Text style={styles.cardTitle}>{task.title}</Text><Text style={styles.badge}>{statusLabel(task.status)}</Text></View><Text style={styles.meta}>{task.branchName || 'كل الفروع'} · {priorityLabels[task.priority] || task.priority} · {fmt(task.dueAt)}</Text></View>)}</>; }
+function TasksSection({ data, designerTemplates, showCreate, setShowCreate, draft, setDraft, createTask, fmt, onOpenTasks }: any) {
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const tasks = data?.tasks ?? [];
+  const statusOptions = [
+    ['all','الكل'],['new','جديدة'],['received','مستلمة'],['in_progress','قيد التنفيذ'],
+    ['report_submitted','بانتظار المراجعة'],['completed_approved','مكتملة'],['late','متأخرة'],['cancelled','ملغاة'],
+  ];
+  const filtered = tasks.filter((task: any) =>
+    (statusFilter === 'all' || task.status === statusFilter) &&
+    (!search.trim() || `${task.title ?? ''} ${task.branchName ?? ''}`.toLocaleLowerCase('ar').includes(search.trim().toLocaleLowerCase('ar')))
+  );
+  const counts = {
+    all: tasks.length,
+    active: tasks.filter((task: any) => ['new','received','in_progress','on_hold'].includes(task.status)).length,
+    review: tasks.filter((task: any) => task.status === 'report_submitted').length,
+    late: tasks.filter((task: any) => task.status === 'late' || (!!task.dueAt && new Date(task.dueAt) < new Date() && !['completed_approved','cancelled'].includes(task.status))).length,
+  };
+  return <View style={{ gap: 12 }}>
+    <View style={styles.taskManagementHero}>
+      <View style={styles.taskManagementHeroCopy}>
+        <Text style={styles.taskManagementEyebrow}>إدارة وتنظيم العمل</Text>
+        <Text style={styles.taskManagementTitle}>المهام والتكليفات</Text>
+        <Text style={styles.taskManagementSubtitle}>أنشئ التكليفات، تابع التنفيذ، وراجع التقارير من مكان واحد</Text>
+      </View>
+      <View style={styles.taskManagementHeroIcon}><Text style={styles.taskManagementHeroGlyph}>▣</Text></View>
+    </View>
+    <View style={styles.taskSummaryGrid}>
+      {[{label:'كل المهام',value:counts.all,tone:'blue'},{label:'قيد العمل',value:counts.active,tone:'green'},{label:'بانتظار المراجعة',value:counts.review,tone:'gold'},{label:'متأخرة',value:counts.late,tone:'red'}].map((item:any)=>
+        <View key={item.label} style={[styles.taskSummaryCard, item.tone==='green'?styles.taskSummaryGreen:item.tone==='gold'?styles.taskSummaryGold:item.tone==='red'?styles.taskSummaryRed:styles.taskSummaryBlue]}>
+          <Text style={styles.taskSummaryValue}>{item.value}</Text><Text style={styles.taskSummaryLabel}>{item.label}</Text>
+        </View>
+      )}
+    </View>
+    <View style={styles.taskSectionHeading}>
+      <View style={styles.taskHeadingCopy}><Text style={styles.sectionTitle}>قائمة التكليفات</Text><Text style={styles.taskSectionHint}>المهام المسجلة في المؤسسة</Text></View>
+      <Pressable style={styles.taskCreateButton} onPress={() => setShowCreate(!showCreate)}><Text style={styles.taskCreateButtonText}>{showCreate?'إغلاق':'＋ إنشاء تكليف'}</Text></Pressable>
+    </View>
+    {showCreate && <View style={styles.form}>
+      <View style={styles.formTitleRow}><Text style={styles.formTitle}>بيانات التكليف الجديد</Text><Text style={styles.formStep}>1 · التفاصيل</Text></View>
+      {[['title', 'عنوان المهمة'], ['description', 'وصف وتعليمات التنفيذ']].map(([key, label]) => <TextInput key={key} style={styles.input} placeholder={label} value={draft[key]} onChangeText={(value) => setDraft({ ...draft, [key]: value })} multiline={key === 'description'} />)}
+      <AdenDeadlinePicker date={draft.dueDate} time={draft.dueTime} onChange={(dueDate, dueTime) => setDraft({ ...draft, dueDate, dueTime })} />
+      <Text style={styles.fieldLabel}>التصنيف الوظيفي المستهدف</Text>
+      <View style={styles.choices}>{roleCodes.map((role) => <Pressable key={role} style={[styles.choice, draft.roleCode === role && styles.choiceSelected]} onPress={() => setDraft({ ...draft, roleCode: role, templateId: '', reportTemplateId: designerTemplates.some((item: ReportTemplate) => item.id === draft.reportTemplateId && item.role_code === role) ? draft.reportTemplateId : '' })}><Text style={draft.roleCode === role ? styles.choiceSelectedText : styles.choiceText}>{roleLabel(role)}</Text></Pressable>)}</View>
+      <Text style={styles.fieldLabel}>الفرع</Text>
+      <View style={styles.choices}>{(data?.branches ?? []).map((branch: any) => <Pressable key={branch.id} style={[styles.choice, draft.branchId === branch.id && styles.choiceSelected]} onPress={() => setDraft({ ...draft, branchId: branch.id })}><Text style={draft.branchId === branch.id ? styles.choiceSelectedText : styles.choiceText}>{branch.name}</Text></Pressable>)}</View>
+      <Text style={styles.fieldLabel}>نموذج التقرير المرتبط بالتكليف</Text>
+      <View style={styles.choices}><Pressable style={[styles.choice, !draft.reportTemplateId && styles.choiceSelected]} onPress={() => setDraft({ ...draft, reportTemplateId: '' })}><Text style={!draft.reportTemplateId ? styles.choiceSelectedText : styles.choiceText}>بدون نموذج تقرير</Text></Pressable>{designerTemplates.filter((template: ReportTemplate) => template.role_code === draft.roleCode).map((template: ReportTemplate) => <Pressable key={template.id} style={[styles.choice, draft.reportTemplateId === template.id && styles.choiceSelected]} onPress={() => setDraft({ ...draft, reportTemplateId: template.id })}><Text style={draft.reportTemplateId === template.id ? styles.choiceSelectedText : styles.choiceText}>{template.title} · إصدار {template.approved_version_no}</Text></Pressable>)}</View>
+      <Pressable style={styles.secondary} onPress={() => setDraft({ ...draft, reportRequired: !draft.reportRequired })}><Text style={styles.secondaryText}>{draft.reportRequired ? 'التقرير مطلوب ✓' : 'التقرير اختياري'}</Text></Pressable>
+      <Pressable style={styles.primary} onPress={() => void createTask()}><Text style={styles.primaryText}>حفظ ونشر التكليف</Text></Pressable>
+    </View>}
+    <View style={styles.taskSearchBox}><Text style={styles.taskSearchGlyph}>⌕</Text><TextInput style={styles.taskSearchInput} value={search} onChangeText={setSearch} placeholder="ابحث بعنوان المهمة أو الفرع..." placeholderTextColor="#8493a4" /></View>
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.taskStatusFilters}>
+      {statusOptions.map(([value,label])=><Pressable key={value} style={[styles.taskStatusChip,statusFilter===value&&styles.taskStatusChipActive]} onPress={()=>setStatusFilter(value)}><Text style={[styles.taskStatusChipText,statusFilter===value&&styles.taskStatusChipTextActive]}>{label}</Text></Pressable>)}
+    </ScrollView>
+    {filtered.length ? filtered.map((task: any) => {
+      const late = task.status === 'late' || (!!task.dueAt && new Date(task.dueAt) < new Date() && !['completed_approved','cancelled'].includes(task.status));
+      return <View style={styles.taskListCard} key={task.id}>
+        <View style={styles.taskListTop}><View style={[styles.taskStatusDot,{backgroundColor:late?'#c84b4b':task.status==='completed_approved'?'#29936a':task.status==='report_submitted'?'#d49a27':'#3977b8'}]} /><Text style={styles.taskListTitle}>{task.title}</Text><Text style={[styles.taskStatusBadge,late?styles.taskStatusLate:task.status==='completed_approved'?styles.taskStatusDone:task.status==='report_submitted'?styles.taskStatusReview:styles.taskStatusActive]}>{late?'متأخرة':statusLabel(task.status)}</Text></View>
+        <Text style={styles.taskListMeta}>{task.branchName || 'كل الفروع'} · {task.assignedTo ? 'مُسندة لموظف' : 'بانتظار الإسناد'} · {priorityLabels[task.priority] || task.priority}</Text>
+        <View style={styles.taskListFooter}><Text style={styles.taskDueLabel}>الموعد: {fmt(task.dueAt)}</Text><Text style={styles.taskIdLabel}>#{String(task.id).slice(0,8)}</Text></View>
+      </View>;
+    }) : <View style={styles.taskEmpty}><Text style={styles.taskEmptyGlyph}>▤</Text><Text style={styles.taskEmptyTitle}>لا توجد مهام مطابقة</Text><Text style={styles.taskEmptyText}>{tasks.length?'جرّب تغيير البحث أو حالة المهمة.':'ابدأ بإنشاء أول تكليف للمؤسسة.'}</Text></View>}
+    <Pressable style={styles.taskOpenExecution} onPress={onOpenTasks}><Text style={styles.taskOpenExecutionText}>فتح شاشة تنفيذ المهام والتقارير والمرفقات ←</Text></Pressable>
+  </View>;
+}
 function ReportsSection({ data, fmt }: any) { return <><Text style={styles.sectionTitle}>تقارير الموظفين</Text><Text style={styles.copy}>التقارير المرتبطة بالمهام وتنتظر المراجعة أو تم اعتمادها.</Text>{(data?.reports ?? []).length ? data.reports.map((report: any) => <View style={styles.card} key={report.id}><Text style={styles.cardTitle}>{report.status === 'submitted' ? 'بانتظار المراجعة' : report.status === 'approved' ? 'معتمد' : 'معاد للتصحيح'}</Text><Text style={styles.meta}>{fmt(report.submittedAt)} · {report.id.slice(0, 8)}</Text></View>) : <Text style={styles.muted}>لا توجد تقارير مسجلة حاليًا.</Text>}</>; }
 function BranchesSection({ data, canManage, onReload }: any) {
   const [code, setCode] = useState('');
@@ -299,6 +364,56 @@ const styles = StyleSheet.create({
   metric_red: { backgroundColor:'#ffeaeb', borderColor:'#f3c9ce' },
   metricGlyph: { color:'#174779', fontSize:18, fontWeight:'900' },
   moduleGrid: { flexDirection:'row-reverse', flexWrap:'wrap', gap:9, justifyContent:'space-between' },
+  taskManagementHero:{backgroundColor:'#103967',borderRadius:20,padding:17,flexDirection:'row-reverse',alignItems:'center',gap:12,borderBottomWidth:4,borderBottomColor:'#e7ae28'},
+  taskManagementHeroCopy:{flex:1,alignItems:'flex-end',gap:4},
+  taskManagementEyebrow:{color:'#f4c64d',fontSize:12,fontWeight:'800'},
+  taskManagementTitle:{color:'#fff',fontSize:23,fontWeight:'900',textAlign:'right'},
+  taskManagementSubtitle:{color:'#dce7f2',fontSize:12,lineHeight:19,textAlign:'right'},
+  taskManagementHeroIcon:{width:54,height:54,borderRadius:17,backgroundColor:'#fff2d7',alignItems:'center',justifyContent:'center'},
+  taskManagementHeroGlyph:{color:'#173e6d',fontSize:30,fontWeight:'900'},
+  taskSummaryGrid:{flexDirection:'row-reverse',gap:7},
+  taskSummaryCard:{flex:1,minHeight:78,borderRadius:14,padding:8,alignItems:'center',justifyContent:'center',borderWidth:1},
+  taskSummaryBlue:{backgroundColor:'#e8f0fc',borderColor:'#c8d9f1'},
+  taskSummaryGreen:{backgroundColor:'#e5f4ed',borderColor:'#c5e6d5'},
+  taskSummaryGold:{backgroundColor:'#fff3dc',borderColor:'#f0dfb8'},
+  taskSummaryRed:{backgroundColor:'#ffeded',borderColor:'#f0cccc'},
+  taskSummaryValue:{color:'#173e6d',fontSize:23,fontWeight:'900'},
+  taskSummaryLabel:{color:'#64778a',fontSize:10,fontWeight:'700',textAlign:'center',marginTop:3},
+  taskSectionHeading:{flexDirection:'row-reverse',alignItems:'center',justifyContent:'space-between',gap:8},
+  taskHeadingCopy:{flex:1,alignItems:'flex-end'},
+  taskSectionHint:{color:'#8795a4',fontSize:11,marginTop:3},
+  taskCreateButton:{backgroundColor:'#dba52c',borderRadius:12,paddingHorizontal:13,paddingVertical:11},
+  taskCreateButtonText:{color:'#17324d',fontSize:13,fontWeight:'900'},
+  formTitleRow:{flexDirection:'row-reverse',alignItems:'center',justifyContent:'space-between',marginBottom:3},
+  formTitle:{color:'#103967',fontSize:17,fontWeight:'900'},
+  formStep:{color:'#a87916',fontSize:11,fontWeight:'800'},
+  taskSearchBox:{minHeight:48,backgroundColor:'#fff',borderWidth:1,borderColor:'#d8e2ed',borderRadius:13,flexDirection:'row-reverse',alignItems:'center',paddingHorizontal:12,gap:8},
+  taskSearchGlyph:{color:'#b17c12',fontSize:24},
+  taskSearchInput:{flex:1,minHeight:44,textAlign:'right',color:'#17324d'},
+  taskStatusFilters:{flexDirection:'row-reverse',gap:7,paddingVertical:2},
+  taskStatusChip:{borderRadius:18,borderWidth:1,borderColor:'#d2deea',backgroundColor:'#fff',paddingHorizontal:12,paddingVertical:8},
+  taskStatusChipActive:{backgroundColor:'#103967',borderColor:'#103967'},
+  taskStatusChipText:{color:'#4d6278',fontSize:12,fontWeight:'700'},
+  taskStatusChipTextActive:{color:'#fff'},
+  taskListCard:{backgroundColor:'#fff',borderWidth:1,borderColor:'#dce5ef',borderRadius:16,padding:13,gap:8,shadowColor:'#17324d',shadowOpacity:0.05,shadowRadius:5,shadowOffset:{width:0,height:2},elevation:1},
+  taskListTop:{flexDirection:'row-reverse',alignItems:'center',gap:7},
+  taskStatusDot:{width:8,height:8,borderRadius:4},
+  taskListTitle:{flex:1,color:'#173e6d',fontSize:15,fontWeight:'900',textAlign:'right'},
+  taskStatusBadge:{overflow:'hidden',borderRadius:12,paddingHorizontal:8,paddingVertical:5,fontSize:10,fontWeight:'800'},
+  taskStatusLate:{backgroundColor:'#ffebeb',color:'#a83c3c'},
+  taskStatusDone:{backgroundColor:'#e5f4ed',color:'#26744e'},
+  taskStatusReview:{backgroundColor:'#fff3dc',color:'#946b12'},
+  taskStatusActive:{backgroundColor:'#e8f0fc',color:'#315f94'},
+  taskListMeta:{color:'#74869a',fontSize:11,textAlign:'right'},
+  taskListFooter:{borderTopWidth:1,borderTopColor:'#edf1f5',paddingTop:8,flexDirection:'row-reverse',justifyContent:'space-between',alignItems:'center'},
+  taskDueLabel:{color:'#526b82',fontSize:11,fontWeight:'700'},
+  taskIdLabel:{color:'#9aa6b3',fontSize:10},
+  taskEmpty:{alignItems:'center',backgroundColor:'#fff',borderRadius:16,borderWidth:1,borderColor:'#dce5ef',padding:24,gap:7},
+  taskEmptyGlyph:{color:'#b17c12',fontSize:30},
+  taskEmptyTitle:{color:'#173e6d',fontSize:16,fontWeight:'900'},
+  taskEmptyText:{color:'#8190a1',fontSize:12,textAlign:'center'},
+  taskOpenExecution:{backgroundColor:'#e8eef7',borderRadius:13,padding:13,alignItems:'center'},
+  taskOpenExecutionText:{color:'#173e6d',fontSize:12,fontWeight:'900'},
   moduleCard: { width:'48%', minHeight:102, backgroundColor:'#fff', borderRadius:17, borderWidth:1, borderColor:'#d5e0ef', padding:11, flexDirection:'row-reverse', alignItems:'center', gap:7, shadowColor:'#163b65', shadowOpacity:0.07, shadowRadius:7, shadowOffset:{width:0,height:3}, elevation:2 },
   moduleIcon: { width:42, height:42, borderRadius:13, backgroundColor:'#e7effb', alignItems:'center', justifyContent:'center' },
   moduleIconGold: { backgroundColor:'#fff1d6' },
