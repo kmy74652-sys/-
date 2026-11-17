@@ -397,14 +397,55 @@ async function ownerOperation(body: Record<string, unknown>, request: Request, c
       console.error('employee_code_owner_list_failed');
       return response({ error: 'database_update_required' }, 503);
     }
-    return response({ employees: (data ?? []).map((member) => ({
-      id: member.id,
-      employeeNo: member.employee_no,
-      fullName: member.display_name,
-      status: member.is_active ? 'active' : 'inactive',
-      hasAuthAccount: Boolean(member.user_id),
-      codeSetAt: member.access_code_set_at,
-    })) });
+    const memberIds = (data ?? []).map((member) => member.id);
+    const [{ data: assignments, error: assignmentError }, { data: branches, error: branchError }] = await Promise.all([
+      clients.adminClient.from('role_assignments').select('membership_id,role_code,branch_id').eq('organization_id', owner.institutionId).in('membership_id', memberIds),
+      clients.adminClient.from('branches').select('id,name,code,is_active').eq('organization_id', owner.institutionId).order('name'),
+    ]);
+    if (assignmentError || branchError) return response({ error: 'employee_access_lookup_failed' }, 503);
+    const branchById = new Map((branches ?? []).map((branch) => [branch.id, branch]));
+    const assignmentByMember = new Map((assignments ?? []).map((assignment) => [assignment.membership_id, assignment]));
+    return response({
+      employees: (data ?? []).map((member) => {
+        const assignment = assignmentByMember.get(member.id);
+        const branch = assignment?.branch_id ? branchById.get(assignment.branch_id) : null;
+        return {
+          id: member.id,
+          employeeNo: member.employee_no,
+          fullName: member.display_name,
+          status: member.is_active ? 'active' : 'inactive',
+          hasAuthAccount: Boolean(member.user_id),
+          codeSetAt: member.access_code_set_at,
+          roleCode: assignment?.role_code ?? null,
+          branchId: assignment?.branch_id ?? null,
+          branchName: branch?.name ?? null,
+        };
+      }),
+      branches: branches ?? [],
+    });
+  }
+
+  if (body.action === 'manage_branch') {
+    const branchAction = typeof body.branchAction === 'string' ? body.branchAction : '';
+    const branchId = typeof body.branchId === 'string' ? body.branchId : null;
+    const code = typeof body.code === 'string' ? body.code.trim().toUpperCase() : null;
+    const name = typeof body.name === 'string' ? body.name.trim() : null;
+    if (!['create','update','archive'].includes(branchAction)) return response({ error: 'invalid_branch_action' }, 400);
+    if (branchAction === 'create' && (!code || !/^[A-Z0-9_-]{2,24}$/.test(code))) return response({ error: 'invalid_branch_code' }, 400);
+    const { data, error } = await clients.adminClient.rpc('admin_manage_branch', {
+      p_organization_id: owner.institutionId,
+      p_actor_membership_id: owner.id,
+      p_action: branchAction,
+      p_branch_id: branchId,
+      p_code: code,
+      p_name: name,
+    });
+    if (error) {
+      if (error.message?.includes('duplicate key')) return response({ error: 'branch_code_exists' }, 409);
+      if (error.message?.includes('permission_required')) return response({ error: 'branch_management_permission_required' }, 403);
+      return response({ error: 'branch_operation_failed' }, 400);
+    }
+    return response({ ok: true, result: data });
   }
 
   const employeeId = typeof body.employeeId === 'string' ? body.employeeId : '';
@@ -447,22 +488,25 @@ async function ownerOperation(body: Record<string, unknown>, request: Request, c
     if (fullName.length < 2 || fullName.length > 160 || !/^\d{1,32}$/.test(employeeNo) || !['owner', 'admin_followup', 'accountant', 'warehouse_keeper', 'warehouse_worker'].includes(roleCode ?? '') || (!isOwnerProfile(owner) && roleCode === 'owner') || !/^[0-9a-f-]{36}$/i.test(branchId ?? '')) {
       return response({ error: 'invalid_employee_payload' }, 400);
     }
-    const { data: duplicate } = await clients.adminClient.from('organization_memberships').select('id').eq('organization_id', owner.institutionId).eq('employee_no', employeeNo).neq('id', employeeId).maybeSingle();
-    if (duplicate) return response({ error: 'employee_no_exists' }, 409);
-    const { data: branch } = await clients.adminClient.from('branches').select('id').eq('organization_id', owner.institutionId).eq('id', branchId).eq('is_active', true).maybeSingle();
-    if (!branch) return response({ error: 'branch_not_found' }, 400);
-    const { error: memberError } = await clients.adminClient.from('organization_memberships').update({ display_name: fullName, employee_no: employeeNo, is_active: status }).eq('organization_id', owner.institutionId).eq('id', employeeId);
-    if (memberError) return response({ error: 'employee_update_failed' }, 400);
-    const { data: currentRole } = await clients.adminClient.from('role_assignments').select('role_code,branch_id').eq('organization_id', owner.institutionId).eq('membership_id', employeeId).limit(1).maybeSingle();
-    const { error: roleError } = await clients.adminClient.from('role_assignments').update({ role_code: roleCode, branch_id: branchId }).eq('organization_id', owner.institutionId).eq('membership_id', employeeId);
-    if (roleError) return response({ error: 'employee_access_update_failed' }, 400);
-    const actions = ['updated'];
-    if (currentRole?.role_code !== roleCode) actions.push('role_changed');
-    if (currentRole?.branch_id !== branchId) actions.push('branch_changed');
-    if (status === false) actions.push('suspended');
-    if (status === true) actions.push('reactivated');
-    for (const action of actions) await writeAudit(clients.adminClient, owner.institutionId, employeeId, owner.id, action, { employeeNo, roleCode, branchId });
-    return response({ ok: true });
+    if (status === undefined) return response({ error: 'invalid_employee_status' }, 400);
+    const { data: updateResult, error: updateError } = await clients.adminClient.rpc('admin_update_employee', {
+      p_organization_id: owner.institutionId,
+      p_actor_membership_id: owner.id,
+      p_employee_id: employeeId,
+      p_full_name: fullName,
+      p_employee_no: employeeNo,
+      p_role_code: roleCode,
+      p_branch_id: branchId,
+      p_is_active: status,
+    });
+    if (updateError) {
+      const message = updateError.message ?? '';
+      if (message.includes('employee_no_exists')) return response({ error: 'employee_no_exists' }, 409);
+      if (message.includes('branch_not_found')) return response({ error: 'branch_not_found' }, 400);
+      if (message.includes('owner_role_requires_owner')) return response({ error: 'owner_account_protected' }, 403);
+      return response({ error: 'employee_update_failed' }, 400);
+    }
+    return response({ ok: true, result: updateResult });
   }
 
   const revoke = body.action === 'revoke_code';
