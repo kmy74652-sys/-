@@ -6,12 +6,11 @@ import { friendlyDataError, getMyEmployeeProfile } from '../lib/mobileData';
 import { createAdministrativeTask, loadDashboardData, listTaskTemplates, roleLabel, statusLabel, type DashboardData } from '../lib/adminData';
 import { supabase } from '../lib/supabase';
 import { listApprovedDesignerTemplates, type ReportTemplate } from '../lib/reportDesigner';
-import ReportDesigner from '../components/ReportDesigner';
-import TaskDesigner, { type TaskTemplateDraft, type TaskReportTemplateOption } from '../components/TaskDesigner';
+import TaskDesigner, { type TaskTemplateDraft } from '../components/TaskDesigner';
 import { assignTaskFromTemplate, listApprovedTaskReportForms, listTaskDesignerCategories, listTaskDesignerTemplates, saveTaskDesignerTemplate, setTaskDesignerTemplateActive, type StoredTaskTemplate, type TaskCategoryRow } from '../lib/taskDesigner';
 
-type Section = 'overview' | 'tasks' | 'task-designer' | 'reports' | 'designer' | 'branches' | 'employees' | 'activity' | 'warehouse' | 'finance';
-const sections: Array<[Section, string]> = [['overview', 'الرئيسية'], ['tasks', 'إدارة المهام'], ['task-designer', 'مصمم المهام'], ['reports', 'تقارير الموظفين'], ['designer', 'مصمم التقارير'], ['branches', 'الفروع'], ['employees', 'الموظفون'], ['activity', 'السجل والمرفقات'], ['warehouse', 'المخازن والجرد'], ['finance', 'المالية']];
+type Section = 'overview' | 'tasks' | 'task-designer' | 'reports' | 'branches' | 'employees' | 'activity' | 'warehouse' | 'finance';
+const sections: Array<[Section, string]> = [['overview', 'الرئيسية'], ['tasks', 'إدارة المهام'], ['task-designer', 'مصمم المهام والتقارير'], ['reports', 'تقارير الموظفين'], ['branches', 'الفروع'], ['employees', 'الموظفون'], ['activity', 'السجل والمرفقات'], ['warehouse', 'المخازن والجرد'], ['finance', 'المالية']];
 const roleCodes = ['owner', 'admin_followup', 'accountant', 'warehouse_keeper', 'warehouse_worker'];
 const priorityLabels: Record<string, string> = { normal: 'عادية', important: 'مهمة', urgent: 'عاجلة', critical: 'حرجة' };
 
@@ -84,8 +83,7 @@ export default function AdminScreen() {
     } catch (cause) { setError(friendlyDataError(cause, 'تعذر إنشاء المهمة. تأكد من وجود موظف نشط ضمن التصنيف والفرع المحددين.')); }
   }
   const canManageTaskLibrary = permissions.includes('task_library.manage');
-  const canManageReportForms = permissions.includes('report_forms.manage');
-  const visibleSections = sections.filter(([key]) => key !== 'task-designer' || canManageTaskLibrary).filter(([key]) => key !== 'designer' || canManageReportForms);
+  const visibleSections = sections.filter(([key]) => key !== 'task-designer' || canManageTaskLibrary);
   const fmt = (value: string | null) => value ? new Intl.DateTimeFormat('ar-SA', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value)) : 'غير محدد';
 
   if (loading) return <SafeAreaView style={styles.safe}><View style={styles.center}><ActivityIndicator size="large" color="#17324d" /><Text style={styles.muted}>جارٍ تحميل لوحة الإدارة…</Text></View></SafeAreaView>;
@@ -98,9 +96,8 @@ export default function AdminScreen() {
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.nav}>{visibleSections.map(([key, label]) => <Pressable key={key} onPress={() => setSection(key)} style={[styles.navChip, section === key && styles.navChipSelected]}><Text style={section === key ? styles.navTextSelected : styles.navText}>{label}</Text></Pressable>)}</ScrollView>
       {section === 'overview' && <Overview counts={counts} data={data} fmt={fmt} onTasks={() => setSection('tasks')} />}
       {section === 'tasks' && <>{canManageTaskLibrary && <TaskAssignmentSection templates={taskDesignerTemplates} data={data} onReload={load} onEditTemplates={() => setSection('task-designer')} />}<TasksSection data={data} templates={templates} designerTemplates={designerTemplates} showCreate={showCreate} setShowCreate={setShowCreate} draft={draft} setDraft={setDraft} createTask={createTask} fmt={fmt} onOpenTasks={() => router.push('/tasks')} /></>}
-      {section === 'task-designer' && canManageTaskLibrary && <TaskTemplatesSection templates={taskDesignerTemplates} categories={taskCategories} reports={designerTemplates} onReload={load} />}
+      {section === 'task-designer' && canManageTaskLibrary && <TaskTemplatesSection templates={taskDesignerTemplates} categories={taskCategories} onReload={load} />}
       {section === 'reports' && <ReportsSection data={data} fmt={fmt} />}
-      {section === 'designer' && <DesignerSection />}
       {section === 'branches' && <BranchesSection data={data} />}
       {section === 'employees' && <EmployeesSection data={data} />}
       {section === 'activity' && <ActivitySection data={data} fmt={fmt} />}
@@ -125,15 +122,10 @@ function EmployeesSection({ data }: any) { return <><Text style={styles.sectionT
 function ActivitySection({ data, fmt }: any) { return <><Text style={styles.sectionTitle}>سجل النشاط والمرفقات</Text><Text style={styles.copy}>السجل يعرض الأحداث المسموح بها حسب RLS. إدارة المرفقات تتم من داخل تقرير المهمة.</Text>{(data?.activity ?? []).map((item: any) => <View style={styles.row} key={item.id}><Text style={styles.cardTitle}>{item.action}</Text><Text style={styles.meta}>المهمة {item.taskId.slice(0, 8)} · {fmt(item.createdAt)}</Text></View>)}</>; }
 function Unavailable({ title, text }: { title: string; text: string }) { return <View style={styles.unavailable}><Text style={styles.sectionTitle}>{title}</Text><Text style={styles.copy}>{text}</Text></View>; }
 
-function DesignerSection() {
-  return <ReportDesigner />;
-}
-
-function TaskTemplatesSection({ templates, categories, reports, onReload }: { templates: StoredTaskTemplate[]; categories: TaskCategoryRow[]; reports: ReportTemplate[]; onReload: () => Promise<void> }) {
+function TaskTemplatesSection({ templates, categories, onReload }: { templates: StoredTaskTemplate[]; categories: TaskCategoryRow[]; onReload: () => Promise<void> }) {
   const [selected, setSelected] = useState<StoredTaskTemplate | null>(null);
   const [editing, setEditing] = useState(false);
   const [saveError, setSaveError] = useState('');
-  const availableReports: TaskReportTemplateOption[] = reports.filter((item): item is ReportTemplate & { approved_version_id: string } => Boolean(item.approved_version_id)).map((item) => ({ id: item.id, title: item.title, role_code: item.role_code as TaskReportTemplateOption['role_code'], approved_version_id: item.approved_version_id!, approved_version_no: item.approved_version_no, is_active: item.is_active }));
   const subcategoryOptions = Object.fromEntries(categories.filter((category) => category.parent_id).map((category) => [categories.find((parent) => parent.id === category.parent_id)?.code, [...(categories.filter((item) => item.parent_id === category.parent_id).map((item) => item.title))]])) as Partial<Record<'finance' | 'sales' | 'purchases' | 'warehouse' | 'items' | 'admin' | 'other', string[]>>;
   async function save(draft: TaskTemplateDraft) {
     try {
@@ -147,10 +139,10 @@ function TaskTemplatesSection({ templates, categories, reports, onReload }: { te
     }
   }
   return <View style={{ gap: 12 }}>
-    <View style={styles.card}><Text style={styles.sectionTitle}>مكتبة قوالب المهام</Text><Text style={styles.copy}>حرّر قالبًا مع خطوات مرتبة ونماذج تقارير مستقلة. حفظ القالب لا ينشئ تكليفًا؛ الإسناد يتم من قسم إدارة المهام.</Text><Pressable style={styles.primary} onPress={() => { setSelected(null); setEditing(true); setSaveError(''); }}><Text style={styles.primaryText}>قالب جديد</Text></Pressable></View>
+    <View style={styles.card}><Text style={styles.sectionTitle}>مصمم المهمة والتقرير</Text><Text style={styles.copy}>أنشئ المهمة وخطواتها وحقول تقرير الموظف من شاشة واحدة. حفظ القالب ينشئ نسخة تقرير مرتبطة به تلقائيًا، ولا يغير التقارير القديمة.</Text><Pressable style={styles.primary} onPress={() => { setSelected(null); setEditing(true); setSaveError(''); }}><Text style={styles.primaryText}>قالب جديد</Text></Pressable></View>
     {templates.map((template) => <View key={template.id} style={styles.card}><View style={styles.taskLine}><Text style={styles.cardTitle}>{template.title}</Text><Text style={styles.badge}>{template.isActive ? 'نشط' : 'مؤرشف'}</Text></View><Text style={styles.meta}>{roleLabel(template.roleCode)} · {template.steps.length} خطوات · {template.reports.length} نماذج تقارير · إصدار القالب {template.version}</Text><View style={styles.actionsRow}><Pressable style={styles.secondary} onPress={() => { setSelected(template); setEditing(true); setSaveError(''); }}><Text style={styles.secondaryText}>تعديل القالب</Text></Pressable><Pressable style={styles.secondary} onPress={() => { setSelected({ ...template, id: undefined, title: `نسخة من ${template.title}`, isActive: false }); setEditing(true); setSaveError(''); }}><Text style={styles.secondaryText}>نسخ القالب</Text></Pressable><Pressable style={styles.secondary} onPress={async () => { try { await setTaskDesignerTemplateActive(template.id!, !template.isActive); await onReload(); } catch (cause) { setSaveError(friendlyDataError(cause, 'تعذر تغيير حالة القالب.')); } }}><Text style={styles.secondaryText}>{template.isActive ? 'أرشفة' : 'إعادة تفعيل'}</Text></Pressable></View></View>)}
     {!!saveError && <Text accessibilityRole="alert" style={styles.error}>{saveError}</Text>}
-    {editing && <TaskDesigner key={selected?.id ?? 'new-task-template'} initialTemplate={selected ?? undefined} reportTemplates={availableReports} subcategoryOptions={subcategoryOptions} onSave={save} onList={onReload} />}
+    {editing && <TaskDesigner key={selected?.id ?? 'new-task-template'} initialTemplate={selected ?? undefined} subcategoryOptions={subcategoryOptions} onSave={save} onList={onReload} />}
     {templates.length === 0 && <Text style={styles.muted}>لا توجد قوالب بعد؛ أنشئ قالبًا جديدًا للبدء.</Text>}
   </View>;
 }
