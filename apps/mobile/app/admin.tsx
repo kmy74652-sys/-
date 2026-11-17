@@ -19,6 +19,9 @@ export default function AdminScreen() {
   const router = useRouter();
   const [section, setSection] = useState<Section>('overview');
   const [currentName, setCurrentName] = useState('');
+  const [brandName, setBrandName] = useState('مؤسسة الشاعري للتجارة العامة');
+  const [brandTagline, setBrandTagline] = useState('معًا... نحو إدارة أفضل');
+  const [brandLogoUrl, setBrandLogoUrl] = useState<string | null>(null);
   const [data, setData] = useState<DashboardData | null>(null);
   const [designerTemplates, setDesignerTemplates] = useState<ReportTemplate[]>([]);
   const [taskDesignerTemplates, setTaskDesignerTemplates] = useState<StoredTaskTemplate[]>([]);
@@ -38,6 +41,12 @@ export default function AdminScreen() {
       const identity = await getMyEmployeeProfile();
       if (!identity?.employee) throw new Error('employee_not_active');
       setCurrentName(identity.employee.fullName || 'المستخدم');
+      const { data: institution, error: brandError } = await supabase!.from('institutions').select('name,settings').eq('id', identity.employee.institutionId).maybeSingle();
+      if (brandError) throw brandError;
+      const branding = ((institution?.settings ?? {}) as Record<string, unknown>).branding as Record<string, unknown> | undefined;
+      setBrandName(typeof institution?.name === 'string' ? institution.name : 'مؤسسة الشاعري للتجارة العامة');
+      setBrandTagline(typeof branding?.tagline === 'string' ? branding.tagline : 'معًا... نحو إدارة أفضل');
+      setBrandLogoUrl(typeof branding?.logo_url === 'string' ? branding.logo_url : null);
       const currentPermissions = identity.employee.permissions;
       if (!currentPermissions.includes('tasks.manage')) throw new Error('permission_denied');
       const canManageLibrary = currentPermissions.includes('task_library.manage');
@@ -90,7 +99,7 @@ export default function AdminScreen() {
   return <SafeAreaView style={styles.safe}>
     <Stack.Screen options={{ headerShown: false }} />
     <ScrollView refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); void load(); }} />} contentContainerStyle={styles.content}>
-      <View style={styles.brandHeader}><View style={styles.brandIdentity}><Image source={require('../assets/icon.png')} style={styles.brandLogo} resizeMode="contain" /><View style={styles.brandTitles}><Text style={styles.brandName}>برنامج الشاعري</Text><Text style={styles.brandSubtitle}>مؤسسة الشاعري للتجارة العامة</Text><Text style={styles.brandMotto}>معًا... نحو إدارة أفضل</Text></View></View><Pressable style={styles.notificationButton} onPress={() => setSection('activity')}><Text style={styles.notificationGlyph}>♧</Text></Pressable></View>
+      <View style={styles.brandHeader}><View style={styles.brandIdentity}><Image source={brandLogoUrl ? { uri: brandLogoUrl } : require('../assets/icon.png')} style={styles.brandLogo} resizeMode="contain" /><View style={styles.brandTitles}><Text style={styles.brandName}>برنامج الشاعري</Text><Text style={styles.brandSubtitle}>{brandName}</Text><Text style={styles.brandMotto}>{brandTagline}</Text></View></View><Pressable style={styles.notificationButton} onPress={() => setSection('activity')}><Text style={styles.notificationGlyph}>♧</Text></Pressable></View>
       <View style={styles.welcomeBanner}><View style={styles.welcomeAvatar}><Text style={styles.avatarGlyph}>●</Text></View><View style={styles.welcomeText}><Text style={styles.welcomeTitle}>مرحباً، {currentName || 'بك'}</Text><Text style={styles.welcomeRole}>لوحة إدارة المؤسسة</Text></View></View>
       {!!error && <Text accessibilityRole="alert" style={styles.error}>{error}</Text>}
       {!!notice && <Text style={styles.notice}>{notice}</Text>}
