@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 const read = (path) => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
 const migration = read('supabase/migrations/036_admin_management_atomicity.sql');
 const brandingMigration = read('supabase/migrations/043_institution_branding_owner_permission.sql');
+const archiveMigration = read('supabase/migrations/044_allow_employee_archive_audit.sql');
 const branding = read('apps/mobile/lib/organizationBranding.ts');
 const auth = read('supabase/functions/employee-code-auth/index.ts');
 const settings = read('apps/mobile/app/settings.tsx');
@@ -52,6 +53,11 @@ assert.match(settings, /loadOrganizationBranding/);
 assert.match(settings, /saveOrganizationBranding/);
 assert.doesNotMatch(settings, /from\('institutions'\)/);
 
+
+assert.match(migration, /case when p_is_active then 'updated' else 'archived' end/);
+assert.match(archiveMigration, /drop constraint if exists employee_access_audit_log_action_check/i);
+assert.match(archiveMigration, /'archived'/i);
+assert.match(archiveMigration, /add constraint employee_access_audit_log_action_check/i);
 
 console.log('Admin management static checks passed.');
 
