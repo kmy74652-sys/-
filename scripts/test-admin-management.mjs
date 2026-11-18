@@ -54,3 +54,23 @@ assert.doesNotMatch(settings, /from\('institutions'\)/);
 
 
 console.log('Admin management static checks passed.');
+
+// Dashboard layout regression checks: KPI cards remain readable on phones,
+// the fixed navigation does not cover the final content, and the app is RTL.
+assert.match(admin, /metrics: \{[^}]*flexDirection: 'row-reverse'[^}]*justifyContent: 'space-between'/);
+assert.match(admin, /metric: \{[^}]*width: '48%'[^}]*minHeight: 112/);
+assert.match(admin, /content: \{[^}]*paddingBottom: 124/);
+assert.match(admin, /moduleGrid: \{[^}]*flexDirection:'row-reverse'/);
+assert.match(admin, /bottomBar: \{[^}]*flexDirection:'row-reverse'/);
+const layout = read('apps/mobile/app/_layout.tsx');
+assert.match(layout, /I18nManager\.allowRTL\(true\)/);
+assert.match(layout, /I18nManager\.forceRTL\(true\)/);
+assert.match(layout, /direction: 'rtl'/);
+const tasksScreen = read('apps/mobile/app/tasks.tsx');
+assert.match(admin, /async function signOut\(\)/);
+assert.match(admin, /تسجيل الخروج وتبديل الحساب/);
+assert.match(admin, /supabase\.auth\.signOut\(\)/);
+assert.match(tasksScreen, /async function signOut\(\)/);
+assert.match(tasksScreen, /تسجيل الخروج وتبديل الحساب/);
+assert.match(tasksScreen, /supabase\.auth\.signOut\(\)/);
+
