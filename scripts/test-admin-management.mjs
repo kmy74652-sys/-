@@ -85,11 +85,11 @@ assert.match(tasksScreen, /supabase\.auth\.signOut\(\)/);
 // Suspended accounts may retain an unexpired JWT; task-owned RLS paths
 // must also require an active organization membership.
 const suspendedAccess = read('supabase/migrations/045_revoke_suspended_employee_task_access.sql');
-assert.match(suspendedAccess, /tasks_select_assigned_or_manager[\\s\\S]*organization_memberships[\\s\\S]*m\\.is_active/i);
-assert.match(suspendedAccess, /task_activity_log_read[\\s\\S]*m\\.is_active/i);
-assert.match(suspendedAccess, /task_attachments_insert_uploader_on_visible_task[\\s\\S]*m\\.is_active/i);
-assert.match(suspendedAccess, /task_attachments_read_assigned_or_manager[\\s\\S]*m\\.is_active/i);
-assert.match(suspendedAccess, /task_execution_steps_read[\\s\\S]*m\\.is_active/i);
-assert.match(suspendedAccess, /task_report_drafts_insert[\\s\\S]*m\\.is_active/i);
-assert.match(suspendedAccess, /task_report_drafts_select[\\s\\S]*m\\.is_active/i);
-assert.match(suspendedAccess, /task_report_drafts_update[\\s\\S]*m\\.is_active/i);
+assert.match(suspendedAccess, /tasks_select_assigned_or_manager[\s\\S]*organization_memberships[\s\\S]*m\.is_active/i);
+assert.match(suspendedAccess, /task_activity_log_read[\s\\S]*m\.is_active/i);
+assert.match(suspendedAccess, /task_attachments_insert_uploader_on_visible_task[\s\\S]*m\.is_active/i);
+assert.match(suspendedAccess, /task_attachments_read_assigned_or_manager[\s\\S]*m\.is_active/i);
+assert.match(suspendedAccess, /task_execution_steps_read[\s\\S]*m\.is_active/i);
+assert.match(suspendedAccess, /task_report_drafts_insert[\s\\S]*m\.is_active/i);
+assert.match(suspendedAccess, /task_report_drafts_select[\s\\S]*m\.is_active/i);
+assert.match(suspendedAccess, /task_report_drafts_update[\s\\S]*m\.is_active/i);
