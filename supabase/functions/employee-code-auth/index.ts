@@ -484,8 +484,8 @@ async function ownerOperation(body: Record<string, unknown>, request: Request, c
     const employeeNo = typeof body.employeeNo === 'string' ? body.employeeNo.trim() : '';
     const status = body.status === 'suspended' ? false : body.status === 'active' ? true : undefined;
     const roleCode = typeof body.roleCode === 'string' ? body.roleCode : undefined;
-    const branchId = typeof body.branchId === 'string' ? body.branchId : undefined;
-    if (fullName.length < 2 || fullName.length > 160 || !/^\d{1,32}$/.test(employeeNo) || !['owner', 'admin_followup', 'accountant', 'warehouse_keeper', 'warehouse_worker'].includes(roleCode ?? '') || (!isOwnerProfile(owner) && roleCode === 'owner') || !/^[0-9a-f-]{36}$/i.test(branchId ?? '')) {
+    const branchId = typeof body.branchId === 'string' ? body.branchId : null;
+    if (fullName.length < 2 || fullName.length > 160 || !/^\d{1,32}$/.test(employeeNo) || !['owner', 'admin_followup', 'accountant', 'warehouse_keeper', 'warehouse_worker'].includes(roleCode ?? '') || (!isOwnerProfile(owner) && roleCode === 'owner') || (roleCode !== 'owner' && !/^[0-9a-f-]{36}$/i.test(branchId ?? ''))) {
       return response({ error: 'invalid_employee_payload' }, 400);
     }
     if (status === undefined) return response({ error: 'invalid_employee_status' }, 400);
@@ -499,7 +499,7 @@ async function ownerOperation(body: Record<string, unknown>, request: Request, c
       p_full_name: fullName,
       p_employee_no: employeeNo,
       p_role_code: roleCode,
-      p_branch_id: branchId,
+      p_branch_id: roleCode === 'owner' ? null : branchId,
       p_is_active: status,
     });
     if (updateError) {
@@ -553,19 +553,21 @@ async function createEmployee(body: Record<string, unknown>, request: Request, c
   const employeeNo = typeof body.employeeNo === 'string' ? body.employeeNo.trim() : '';
   const fullName = typeof body.fullName === 'string' ? body.fullName.trim() : '';
   const roleCode = typeof body.roleCode === 'string' ? body.roleCode : '';
-  const branchId = typeof body.branchId === 'string' ? body.branchId : '';
+  const branchId = typeof body.branchId === 'string' ? body.branchId : null;
   const requestedCode = isAccessCode(body.code) ? body.code : null;
   const allowedRoles = new Set(['owner', 'admin_followup', 'accountant', 'warehouse_keeper', 'warehouse_worker']);
-  if (!/^\d{1,32}$/.test(employeeNo) || fullName.length < 2 || fullName.length > 160 || !allowedRoles.has(roleCode) || (roleCode === 'owner' && !isOwnerProfile(owner)) || !/^[0-9a-f-]{36}$/i.test(branchId)) {
+  if (!/^\d{1,32}$/.test(employeeNo) || fullName.length < 2 || fullName.length > 160 || !allowedRoles.has(roleCode) || (roleCode === 'owner' && !isOwnerProfile(owner)) || (roleCode !== 'owner' && !/^[0-9a-f-]{36}$/i.test(branchId ?? ''))) {
     return response({ error: 'invalid_employee_payload' }, 400);
   }
 
-  const [{ data: existing }, { data: branch }] = await Promise.all([
+  const [{ data: existing }, branchResult] = await Promise.all([
     clients.adminClient.from('organization_memberships').select('id').eq('organization_id', owner.institutionId).eq('employee_no', employeeNo).maybeSingle(),
-    clients.adminClient.from('branches').select('id').eq('organization_id', owner.institutionId).eq('id', branchId).eq('is_active', true).maybeSingle(),
+    roleCode === 'owner'
+      ? Promise.resolve({ data: { id: null }, error: null })
+      : clients.adminClient.from('branches').select('id').eq('organization_id', owner.institutionId).eq('id', branchId).eq('is_active', true).maybeSingle(),
   ]);
   if (existing) return response({ error: 'employee_no_exists' }, 409);
-  if (!branch) return response({ error: 'branch_not_found' }, 400);
+  if (!branchResult.data) return response({ error: 'branch_not_found' }, 400);
 
   const syntheticEmail = `employee-${owner.institutionId}-${employeeNo}@employee.invalid`;
   const { data: authData, error: authError } = await clients.adminClient.auth.admin.createUser({
@@ -586,7 +588,7 @@ async function createEmployee(body: Record<string, unknown>, request: Request, c
     return response({ error: 'employee_create_failed' }, 400);
   }
 
-  const { error: roleError } = await clients.adminClient.from('role_assignments').insert({ organization_id: owner.institutionId, membership_id: membership.id, role_code: roleCode, branch_id: branchId });
+  const { error: roleError } = await clients.adminClient.from('role_assignments').insert({ organization_id: owner.institutionId, membership_id: membership.id, role_code: roleCode, branch_id: roleCode === 'owner' ? null : branchId });
   if (roleError) {
     await clients.adminClient.from('organization_memberships').delete().eq('id', membership.id);
     await clients.adminClient.auth.admin.deleteUser(authData.user.id);
