@@ -54,6 +54,11 @@ assert.match(settings, /saveOrganizationBranding/);
 assert.doesNotMatch(settings, /from\('institutions'\)/);
 
 
+assert.match(migration, /case when p_is_active then 'updated' else 'archived' end/);
+assert.match(archiveMigration, /drop constraint if exists employee_access_audit_log_action_check/i);
+assert.match(archiveMigration, /'archived'/i);
+assert.match(archiveMigration, /add constraint employee_access_audit_log_action_check/i);
+
 console.log('Admin management static checks passed.');
 
 // Dashboard layout regression checks: KPI cards remain readable on phones,
