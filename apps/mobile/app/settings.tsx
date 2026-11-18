@@ -135,12 +135,12 @@ export default function EmployeeAccessSettings() {
         .filter((branch) => branch.is_active)
         .map((branch) => ({ id: branch.id, name: branch.name }));
       setBranches(nextBranches);
-      if (!createForm.branchId && nextBranches[0]) setCreateForm((current) => ({ ...current, branchId: nextBranches[0].id }));
+      if (!createForm.branchId && createForm.roleCode !== 'owner' && nextBranches[0]) setCreateForm((current) => ({ ...current, branchId: nextBranches[0].id }));
       setEditForms((current) => Object.fromEntries(normalized.map((employee) => [employee.id, {
         employeeNo: employee.employeeNo ?? '',
         fullName: employee.fullName ?? '',
         roleCode: employee.roleCode ?? 'warehouse_worker',
-        branchId: employee.branchId ?? nextBranches[0]?.id ?? '',
+        branchId: employee.roleCode === 'owner' ? '' : employee.branchId ?? nextBranches[0]?.id ?? '',
         status: employee.status === 'active' ? 'active' : 'suspended',
       }] )));
     } catch (cause) {
@@ -174,13 +174,13 @@ export default function EmployeeAccessSettings() {
 
   async function createEmployee() {
     if (!supabase) return;
-    if (!/^\d{1,32}$/.test(createForm.employeeNo) || createForm.fullName.trim().length < 2 || !/^\S{8,64}$/.test(createForm.code) || !createForm.branchId) {
+    if (!/^\d{1,32}$/.test(createForm.employeeNo) || createForm.fullName.trim().length < 2 || !/^\S{8,64}$/.test(createForm.code) || (createForm.roleCode !== 'owner' && !createForm.branchId)) {
       setError('أدخل رقمًا وظيفيًا واسمًا وكلمة مرور أولية من 8 إلى 64 محرفًا واختر الفرع.');
       return;
     }
     setBusyEmployeeId('create'); setError(''); setMessage('');
     try {
-      const { data, error: createError } = await supabase.functions.invoke('employee-code-auth', { body: { action: 'create_employee', employeeNo: createForm.employeeNo, fullName: createForm.fullName, code: createForm.code, roleCode: createForm.roleCode, branchId: createForm.branchId } });
+      const { data, error: createError } = await supabase.functions.invoke('employee-code-auth', { body: { action: 'create_employee', employeeNo: createForm.employeeNo, fullName: createForm.fullName, code: createForm.code, roleCode: createForm.roleCode, branchId: createForm.roleCode === 'owner' ? null : createForm.branchId } });
       if (createError) { setError(functionErrorText(createError)); return; }
       setCreateForm({ employeeNo: '', fullName: '', code: '', roleCode: 'warehouse_worker', branchId: branches[0]?.id ?? '' });
       setMessage(`تم إنشاء الحساب للموظف ${data?.employee?.fullName ?? ''}. لن تظهر كلمة المرور مرة أخرى.`);
@@ -194,7 +194,7 @@ export default function EmployeeAccessSettings() {
     if (!draft) return;
     setBusyEmployeeId(employee.id); setError(''); setMessage('');
     try {
-      const { error: updateError } = await supabase.functions.invoke('employee-code-auth', { body: { action: 'update_employee', employeeId: employee.id, ...draft } });
+      const { error: updateError } = await supabase.functions.invoke('employee-code-auth', { body: { action: 'update_employee', employeeId: employee.id, ...draft, branchId: draft.roleCode === 'owner' ? null : draft.branchId } });
       if (updateError) { setError(functionErrorText(updateError)); return; }
       setMessage(`تم تحديث بيانات ${draft.fullName}.`);
       await loadSettings();
@@ -315,9 +315,15 @@ export default function EmployeeAccessSettings() {
             <TextInput style={styles.input} placeholder="رقم الموظف الفريد" keyboardType="number-pad" value={createForm.employeeNo} onChangeText={(value) => setCreateForm((current) => ({ ...current, employeeNo: value }))} />
             <TextInput style={styles.input} placeholder="كلمة المرور الأولية" secureTextEntry value={createForm.code} onChangeText={(value) => setCreateForm((current) => ({ ...current, code: value }))} />
             <Text style={styles.employeeMeta}>التصنيف الوظيفي</Text>
-            <View style={styles.roleChoices}>{roleOptions.filter(([code]) => code !== 'owner' || canAssignOwner).map(([code, label]) => <Pressable key={code} accessibilityRole="button" style={[styles.roleChoice, createForm.roleCode === code && styles.roleChoiceActive]} onPress={() => setCreateForm((current) => ({ ...current, roleCode: code }))}><Text style={styles.roleChoiceText}>{label}</Text></Pressable>)}</View>
-            <Text style={styles.employeeMeta}>الفرع</Text>
-            <View style={styles.roleChoices}>{branches.map((branch) => <Pressable key={branch.id} accessibilityRole="button" style={[styles.roleChoice, createForm.branchId === branch.id && styles.roleChoiceActive]} onPress={() => setCreateForm((current) => ({ ...current, branchId: branch.id }))}><Text style={styles.roleChoiceText}>{branch.name}</Text></Pressable>)}</View>
+            <View style={styles.roleChoices}>{roleOptions.filter(([code]) => code !== 'owner' || canAssignOwner).map(([code, label]) => <Pressable key={code} accessibilityRole="button" style={[styles.roleChoice, createForm.roleCode === code && styles.roleChoiceActive]} onPress={() => setCreateForm((current) => ({ ...current, roleCode: code, branchId: code === 'owner' ? '' : current.branchId || branches[0]?.id || '' }))}><Text style={styles.roleChoiceText}>{label}</Text></Pressable>)}</View>
+            {createForm.roleCode === 'owner' ? (
+              <Text style={styles.employeeMeta}>نطاق الصلاحية: المؤسسة بالكامل، دون ربط بفرع.</Text>
+            ) : (
+              <>
+                <Text style={styles.employeeMeta}>الفرع</Text>
+                <View style={styles.roleChoices}>{branches.map((branch) => <Pressable key={branch.id} accessibilityRole="button" style={[styles.roleChoice, createForm.branchId === branch.id && styles.roleChoiceActive]} onPress={() => setCreateForm((current) => ({ ...current, branchId: branch.id }))}><Text style={styles.roleChoiceText}>{branch.name}</Text></Pressable>)}</View>
+              </>
+            )}
             <Pressable accessibilityRole="button" disabled={busyEmployeeId !== null} style={styles.primaryButton} onPress={() => void createEmployee()}><Text style={styles.buttonText}>{busyEmployeeId === 'create' ? 'جارٍ الإنشاء…' : 'إنشاء الحساب'}</Text></Pressable>
           </View>
         )}
@@ -345,9 +351,15 @@ export default function EmployeeAccessSettings() {
                   <TextInput style={styles.input} placeholder="الاسم" value={editForms[employee.id].fullName} onChangeText={(value) => setEditForms((current) => ({ ...current, [employee.id]: { ...current[employee.id], fullName: value } }))} />
                   <TextInput style={styles.input} placeholder="الرقم الوظيفي" value={editForms[employee.id].employeeNo} onChangeText={(value) => setEditForms((current) => ({ ...current, [employee.id]: { ...current[employee.id], employeeNo: value } }))} />
                   <Text style={styles.employeeMeta}>التصنيف الوظيفي</Text>
-                  <View style={styles.roleChoices}>{roleOptions.filter(([code]) => code !== 'owner' || canAssignOwner).map(([code, label]) => <Pressable key={code} accessibilityRole="button" style={[styles.roleChoice, editForms[employee.id].roleCode === code && styles.roleChoiceActive]} onPress={() => setEditForms((current) => ({ ...current, [employee.id]: { ...current[employee.id], roleCode: code } }))}><Text style={styles.roleChoiceText}>{label}</Text></Pressable>)}</View>
-                  <Text style={styles.employeeMeta}>الفرع الحالي: {employee.branchName ?? 'غير محدد'}</Text>
-                  <View style={styles.roleChoices}>{branches.map((branch) => <Pressable key={branch.id} accessibilityRole="button" style={[styles.roleChoice, editForms[employee.id].branchId === branch.id && styles.roleChoiceActive]} onPress={() => setEditForms((current) => ({ ...current, [employee.id]: { ...current[employee.id], branchId: branch.id } }))}><Text style={styles.roleChoiceText}>{branch.name}</Text></Pressable>)}</View>
+                  <View style={styles.roleChoices}>{roleOptions.filter(([code]) => code !== 'owner' || canAssignOwner).map(([code, label]) => <Pressable key={code} accessibilityRole="button" style={[styles.roleChoice, editForms[employee.id].roleCode === code && styles.roleChoiceActive]} onPress={() => setEditForms((current) => ({ ...current, [employee.id]: { ...current[employee.id], roleCode: code, branchId: code === 'owner' ? '' : current[employee.id].branchId || branches[0]?.id || '' } }))}><Text style={styles.roleChoiceText}>{label}</Text></Pressable>)}</View>
+                  {editForms[employee.id].roleCode === 'owner' ? (
+                    <Text style={styles.employeeMeta}>نطاق الصلاحية: المؤسسة بالكامل، دون ربط بفرع.</Text>
+                  ) : (
+                    <>
+                      <Text style={styles.employeeMeta}>الفرع الحالي: {employee.branchName ?? 'غير محدد'}</Text>
+                      <View style={styles.roleChoices}>{branches.map((branch) => <Pressable key={branch.id} accessibilityRole="button" style={[styles.roleChoice, editForms[employee.id].branchId === branch.id && styles.roleChoiceActive]} onPress={() => setEditForms((current) => ({ ...current, [employee.id]: { ...current[employee.id], branchId: branch.id } }))}><Text style={styles.roleChoiceText}>{branch.name}</Text></Pressable>)}</View>
+                    </>
+                  )}
                   <Pressable accessibilityRole="button" style={styles.refresh} onPress={() => setEditForms((current) => ({ ...current, [employee.id]: { ...current[employee.id], status: current[employee.id].status === 'active' ? 'suspended' : 'active' } }))}><Text style={styles.refreshText}>{editForms[employee.id].status === 'active' ? 'تجهيز لإيقاف الحساب مع حفظ السجلات' : 'تجهيز لإعادة تفعيل الحساب'}</Text></Pressable>
                   <Pressable accessibilityRole="button" disabled={busyEmployeeId !== null} style={styles.primaryButton} onPress={() => void updateEmployee(employee)}><Text style={styles.buttonText}>{busyEmployeeId === employee.id ? 'جارٍ الحفظ…' : 'حفظ بيانات الحساب'}</Text></Pressable>
                   <Pressable accessibilityRole="button" style={styles.refresh} onPress={() => void loadAudit(employee)}><Text style={styles.refreshText}>عرض سجل التعديلات</Text></Pressable>
