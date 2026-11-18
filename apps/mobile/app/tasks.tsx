@@ -12,6 +12,7 @@ import {
   View,
 } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
+import { supabase } from '../lib/supabase';
 import {
   friendlyDataError,
   getMyEmployeeProfile,
@@ -300,6 +301,17 @@ export default function TasksScreen() {
     catch (cause) { setError(friendlyDataError(cause, 'تعذر تحميل سجل المهمة.')); }
   }
 
+  async function signOut() {
+    try {
+      if (!supabase) throw new Error('supabase_unavailable');
+      const { error: signOutError } = await supabase.auth.signOut();
+      if (signOutError) throw signOutError;
+      router.replace('/');
+    } catch {
+      setError('تعذر تسجيل الخروج. تحقق من الاتصال ثم حاول مرة أخرى.');
+    }
+  }
+
   const formatDate = (value: string) => {
     const date = new Date(value);
     return Number.isNaN(date.getTime()) ? 'غير محدد' : new Intl.DateTimeFormat('ar-SA', { dateStyle: 'medium', timeStyle: 'short' }).format(date);
@@ -329,9 +341,14 @@ export default function TasksScreen() {
             <Text style={styles.eyebrow}>برنامج الشاعري</Text>
             <Text style={styles.title}>المهام والمتابعة</Text>
           </View>
-          <Pressable accessibilityRole="button" style={styles.backButton} onPress={() => router.back()}>
-            <Text style={styles.backText}>رجوع</Text>
-          </Pressable>
+          <View style={styles.headerActions}>
+            <Pressable accessibilityRole="button" style={styles.backButton} onPress={() => router.back()}>
+              <Text style={styles.backText}>رجوع</Text>
+            </Pressable>
+            <Pressable accessibilityRole="button" accessibilityLabel="تسجيل الخروج وتبديل الحساب" style={styles.signOutButton} onPress={() => void signOut()}>
+              <Text style={styles.signOutText}>تبديل الحساب</Text>
+            </Pressable>
+          </View>
         </View>
         {!!error && <Text accessibilityRole="alert" style={styles.error}>{error}</Text>}
         {!!notice && <Text accessibilityLiveRegion="polite" style={styles.notice}>{notice}</Text>}
@@ -467,6 +484,9 @@ const styles = StyleSheet.create({
   content: { padding: 16, paddingBottom: 36, gap: 12 },
   header: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 },
   headerText: { flex: 1 },
+  headerActions: { flexDirection: 'row-reverse', alignItems: 'center', gap: 7 },
+  signOutButton: { minHeight: 44, borderRadius: 10, borderWidth: 1, borderColor: '#b55248', backgroundColor: '#fff', paddingHorizontal: 10, alignItems: 'center', justifyContent: 'center' },
+  signOutText: { color: '#a8443d', fontSize: 12, fontWeight: '800' },
   eyebrow: { color: '#718394', textAlign: 'right', fontWeight: '700', marginBottom: 4 },
   title: { color: '#17324d', fontSize: 25, fontWeight: '800', textAlign: 'right' },
   backButton: { minHeight: 44, minWidth: 58, alignItems: 'center', justifyContent: 'center', borderRadius: 10, backgroundColor: '#e5edf0' },
