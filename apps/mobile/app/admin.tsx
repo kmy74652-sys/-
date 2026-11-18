@@ -71,7 +71,16 @@ export default function AdminScreen() {
     return { all: tasks.length, new: tasks.filter((task) => ['new', 'received'].includes(task.status)).length, active: tasks.filter((task) => ['in_progress', 'on_hold'].includes(task.status)).length, review: tasks.filter((task) => task.status === 'report_submitted').length, late: tasks.filter((task) => task.status === 'late' || (!!task.dueAt && new Date(task.dueAt) < new Date() && !['completed_approved', 'cancelled'].includes(task.status))).length, done: tasks.filter((task) => task.status === 'completed_approved').length };
   }, [data]);
 
-  async function signOut() { await supabase?.auth.signOut(); router.replace('/'); }
+  async function signOut() {
+    try {
+      if (!supabase) throw new Error('supabase_unavailable');
+      const { error: signOutError } = await supabase.auth.signOut();
+      if (signOutError) throw signOutError;
+      router.replace('/');
+    } catch {
+      setError('تعذر تسجيل الخروج. تحقق من الاتصال ثم حاول مرة أخرى.');
+    }
+  }
   async function createTask() {
     const dueAt = adenDateTimeToIso(draft.dueDate, draft.dueTime);
     if (!draft.title.trim() || !dueAt) { setError('أدخل عنوان المهمة واختر تاريخًا ووقتًا صالحين للموعد النهائي.'); return; }
@@ -99,7 +108,7 @@ export default function AdminScreen() {
   return <SafeAreaView style={styles.safe}>
     <Stack.Screen options={{ headerShown: false }} />
     <ScrollView refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); void load(); }} />} contentContainerStyle={styles.content}>
-      <View style={styles.brandHeader}><View style={styles.brandIdentity}><Image source={brandLogoUrl ? { uri: brandLogoUrl } : require('../assets/icon.png')} style={styles.brandLogo} resizeMode="contain" /><View style={styles.brandTitles}><Text style={styles.brandName}>برنامج الشاعري</Text><Text style={styles.brandSubtitle}>{brandName}</Text><Text style={styles.brandMotto}>{brandTagline}</Text></View></View><Pressable style={styles.notificationButton} onPress={() => setSection('activity')}><Text style={styles.notificationGlyph}>♧</Text></Pressable></View>
+      <View style={styles.brandHeader}><View style={styles.brandIdentity}><Image source={brandLogoUrl ? { uri: brandLogoUrl } : require('../assets/icon.png')} style={styles.brandLogo} resizeMode="contain" /><View style={styles.brandTitles}><Text style={styles.brandName}>برنامج الشاعري</Text><Text style={styles.brandSubtitle}>{brandName}</Text><Text style={styles.brandMotto}>{brandTagline}</Text></View></View><View style={styles.headerActions}><Pressable accessibilityRole="button" accessibilityLabel="سجل النشاط" style={styles.notificationButton} onPress={() => setSection('activity')}><Text style={styles.notificationGlyph}>♧</Text></Pressable><Pressable accessibilityRole="button" accessibilityLabel="تسجيل الخروج وتبديل الحساب" style={styles.signOutButton} onPress={() => void signOut()}><Text style={styles.signOutButtonText}>تبديل الحساب</Text></Pressable></View></View>
       <View style={styles.welcomeBanner}><View style={styles.welcomeAvatar}><Text style={styles.avatarGlyph}>●</Text></View><View style={styles.welcomeText}><Text style={styles.welcomeTitle}>مرحباً، {currentName || 'بك'}</Text><Text style={styles.welcomeRole}>لوحة إدارة المؤسسة</Text></View></View>
       {!!error && <Text accessibilityRole="alert" style={styles.error}>{error}</Text>}
       {!!notice && <Text style={styles.notice}>{notice}</Text>}
@@ -347,7 +356,10 @@ const styles = StyleSheet.create({
   brandName: { color:'#103967', fontSize:24, fontWeight:'900', textAlign:'right' },
   brandSubtitle: { color:'#17324d', fontSize:14, fontWeight:'800', textAlign:'right', marginTop:1 },
   brandMotto: { color:'#b57b08', fontSize:12, fontWeight:'700', textAlign:'right', marginTop:4 },
-  notificationButton: { width:46, height:46, borderRadius:15, backgroundColor:'#123b69', alignItems:'center', justifyContent:'center', marginLeft:8 },
+  headerActions: { flexDirection:'row-reverse', alignItems:'center', gap:7 },
+  notificationButton: { width:42, height:42, borderRadius:14, backgroundColor:'#123b69', alignItems:'center', justifyContent:'center' },
+  signOutButton: { minHeight:42, borderRadius:12, borderWidth:1, borderColor:'#b55248', backgroundColor:'#fff', paddingHorizontal:10, alignItems:'center', justifyContent:'center' },
+  signOutButtonText: { color:'#a8443d', fontSize:12, fontWeight:'800' },
   notificationGlyph: { color:'#fff', fontSize:25, fontWeight:'900' },
   welcomeBanner: { minHeight:108, borderRadius:20, backgroundColor:'#123b69', padding:17, flexDirection:'row-reverse', alignItems:'center', gap:13, borderBottomWidth:4, borderBottomColor:'#e7ae28', shadowColor:'#102f52', shadowOpacity:0.12, shadowRadius:9, shadowOffset:{width:0,height:4}, elevation:3 },
   welcomeAvatar: { width:62, height:62, borderRadius:31, backgroundColor:'#e8f0f8', borderWidth:3, borderColor:'#d7e4f2', alignItems:'center', justifyContent:'center' },
