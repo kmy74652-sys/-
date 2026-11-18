@@ -93,3 +93,13 @@ assert.match(suspendedAccess, /task_execution_steps_read[\s\S]*m\.is_active/i);
 assert.match(suspendedAccess, /task_report_drafts_insert[\s\S]*m\.is_active/i);
 assert.match(suspendedAccess, /task_report_drafts_select[\s\S]*m\.is_active/i);
 assert.match(suspendedAccess, /task_report_drafts_update[\s\S]*m\.is_active/i);
+
+
+// The owner role is organization-wide and must never be assigned a branch.
+const ownerScopeMigration = read('supabase/migrations/046_preserve_owner_organization_scope.sql');
+assert.match(ownerScopeMigration, /p_role_code\s*=\s*'owner'[\s\S]*branch_id\s*=\s*case when p_role_code\s*=\s*'owner' then null/i);
+assert.match(auth, /p_branch_id: roleCode === 'owner' \? null : branchId/);
+assert.match(auth, /branch_id: roleCode === 'owner' \? null : branchId/);
+assert.match(settings, /branchId: employee\.roleCode === 'owner' \? ''/);
+assert.match(settings, /createForm\.roleCode === 'owner' \? null : createForm\.branchId/);
+assert.match(settings, /draft\.roleCode === 'owner' \? null : draft\.branchId/);
