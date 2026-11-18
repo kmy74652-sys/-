@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 const read = (path) => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
 const migration = read('supabase/migrations/036_admin_management_atomicity.sql');
 const brandingMigration = read('supabase/migrations/043_institution_branding_owner_permission.sql');
+const archiveMigration = read('supabase/migrations/044_allow_employee_archive_audit.sql');
 const branding = read('apps/mobile/lib/organizationBranding.ts');
 const auth = read('supabase/functions/employee-code-auth/index.ts');
 const settings = read('apps/mobile/app/settings.tsx');
