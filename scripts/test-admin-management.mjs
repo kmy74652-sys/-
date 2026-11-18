@@ -97,7 +97,8 @@ assert.match(suspendedAccess, /task_report_drafts_update[\s\S]*m\.is_active/i);
 
 // The owner role is organization-wide and must never be assigned a branch.
 const ownerScopeMigration = read('supabase/migrations/046_preserve_owner_organization_scope.sql');
-assert.match(ownerScopeMigration, /v_effective_branch := null/);\nassert.match(ownerScopeMigration, /branch_id=v_effective_branch/);
+assert.match(ownerScopeMigration, /v_effective_branch := null/);
+assert.match(ownerScopeMigration, /branch_id=v_effective_branch/);
 assert.match(auth, /p_branch_id: roleCode === 'owner' \? null : branchId/);
 assert.match(auth, /branch_id: roleCode === 'owner' \? null : branchId/);
 assert.match(settings, /branchId: employee\.roleCode === 'owner' \? ''/);
