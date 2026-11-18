@@ -54,3 +54,15 @@ assert.doesNotMatch(settings, /from\('institutions'\)/);
 
 
 console.log('Admin management static checks passed.');
+
+// Dashboard layout regression checks: KPI cards remain readable on phones,
+// the fixed navigation does not cover the final content, and the app is RTL.
+assert.match(admin, /metrics: \{[^}]*flexDirection: 'row-reverse'[^}]*justifyContent: 'space-between'/);
+assert.match(admin, /metric: \{[^}]*width: '48%'[^}]*minHeight: 112/);
+assert.match(admin, /content: \{[^}]*paddingBottom: 124/);
+assert.match(admin, /moduleGrid: \{[^}]*flexDirection:'row-reverse'/);
+assert.match(admin, /bottomBar: \{[^}]*flexDirection:'row-reverse'/);
+const layout = read('apps/mobile/app/_layout.tsx');
+assert.match(layout, /I18nManager\.allowRTL\(true\)/);
+assert.match(layout, /I18nManager\.forceRTL\(true\)/);
+assert.match(layout, /direction: 'rtl'/);
