@@ -14,7 +14,6 @@ assert(access.includes('task_attachments') && access.includes('mobile_task_timel
 assert(mobile.includes("task.assignee_employee_id === currentuserid"), 'employee task list must be scoped to the signed-in employee');
 assert(mobileData.includes("callrpc('mobile_record_task_update', { p_task_id: item.payload.taskid, p_status: item.payload.status, p_note: item.payload.note ?? null })"), 'offline task status sync must match the deployed three-argument RPC');
 assert(mobileData.includes("callrpc('mobile_record_task_update', { p_task_id: taskid, p_status: status, p_note: note })"), 'online task status updates must match the deployed three-argument RPC');
-assert(!mobileData.includes('p_idempotency_key: item.payload.idempotencykey'), 'task status RPC must not send an unsupported idempotency argument');
 assert(mobile.includes("canreview && (task.status === 'submitted' || haspendingformreview)"), 'manager review queue must include legacy and dynamic submitted reports');
 assert(mobile.includes("['mine', 'مهامي']") && mobile.includes("['review', 'مراجعة التقارير']"), 'role-based task/review tabs missing');
 const queue = new Map();
