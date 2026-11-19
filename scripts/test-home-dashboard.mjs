@@ -90,7 +90,7 @@ assert.doesNotMatch(index, /router\.replace\('\/(admin|tasks)'\)/);
 assert.match(home, /maxWidth: 840/);
 assert.match(home, /paddingBottom: Math\.max\(insets\.bottom, 8\)/);
 assert.match(home, /frame: \{[^}]*direction: 'rtl'/);
-assert.match(home, /moduleGrid: \{[^}]*flexDirection: 'row-reverse'/);
+assert.match(home, /moduleGrid: \{[^}]*flexDirection: 'row'/);
 assert.match(home, /chooseBranch/);
 assert.match(home, /profile\.branches\.some/);
 assert.doesNotMatch(home, /غير متاح حالياً/);
