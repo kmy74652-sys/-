@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { approveDesignerVersion, designerFieldTypes, getLatestDesignerVersion, listDesignerTemplates, saveDesignerTemplate, type ReportTemplate } from '../lib/reportDesigner';
 import { normalizeTableColumns, validateDesignerFields, type DesignerField, type ReportTableColumn } from '../lib/reportSchema';
 import ReportLivePreview from './ReportLivePreview';
+import { deleteManagedReportTemplate } from '../lib/managementData';
 
 const roles: Array<[string, string]> = [
   ['owner', 'صاحب المؤسسة'], ['admin_followup', 'المدير التنفيذي'], ['accountant', 'المحاسب'],
@@ -20,7 +21,7 @@ const emptyField = (index: number, used: Set<string>): DesignerField => {
 };
 const obj = (value: unknown): Record<string, unknown> => value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {};
 
-export default function ReportDesigner() {
+export default function ReportDesigner({ organizationId = '' }: { organizationId?: string }) {
   const [templates, setTemplates] = useState<ReportTemplate[]>([]);
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
@@ -103,6 +104,12 @@ export default function ReportDesigner() {
     catch (cause) { setError(String((cause as { message?: string })?.message ?? 'اعتماد الإصدار متاح لصاحب المؤسسة فقط.')); }
     finally { setBusy(false); }
   }
+  function confirmDelete(template: ReportTemplate) {
+    Alert.alert('حذف قالب التقرير نهائيًا', 'سيُحذف قالب التقرير نهائيًا. إذا كان مرتبطًا بمهمة أو إصدار معتمد سيرفض النظام العملية. هل تريد المتابعة؟', [
+      { text: 'إلغاء', style: 'cancel' },
+      { text: 'حذف نهائي', style: 'destructive', onPress: () => void (async () => { setBusy(true); setError(''); try { await deleteManagedReportTemplate(organizationId, template.id); setNotice('تم حذف قالب التقرير نهائيًا.'); await refreshTemplates(); } catch (cause) { setError(String((cause as { message?: string })?.message ?? 'تعذر حذف القالب؛ قد يكون مرتبطًا بمهام سابقة.')); } finally { setBusy(false); } })() },
+    ]);
+  }
   const visibleTemplates = useMemo(() => templates.filter((template) =>
     (roleFilter === 'all' || template.role_code === roleFilter) &&
     `${template.title} ${template.description ?? ''}`.toLocaleLowerCase('ar').includes(search.trim().toLocaleLowerCase('ar')),
@@ -150,7 +157,7 @@ export default function ReportDesigner() {
     <TextInput style={styles.input} placeholder="ابحث باسم النموذج أو وصفه" value={search} onChangeText={setSearch} />
     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}><Chip label="كل الأدوار" selected={roleFilter === 'all'} onPress={() => setRoleFilter('all')} />{roles.map(([code, label]) => <Chip key={code} label={label} selected={roleFilter === code} onPress={() => setRoleFilter(code)} />)}</ScrollView>
     {!visibleTemplates.length && <View style={styles.emptyCard}><Text style={styles.sectionLabel}>لا توجد قوالب مطابقة</Text><Text style={styles.panelSub}>أنشئ نموذجًا جديدًا أو غيّر عبارة البحث والتصنيف.</Text></View>}
-    {visibleTemplates.map((template) => <View style={styles.templateCard} key={template.id}><View style={styles.templateInfo}><Text style={styles.templateTitle}>{template.title}</Text><Text style={styles.panelSub}>{roleName(template.role_code)}{template.updated_at ? ` · تحديث ${new Date(template.updated_at).toLocaleDateString('ar-SA')}` : ''}</Text>{!!template.description && <Text style={styles.description}>{template.description}</Text>}</View><View style={styles.chips}><Pressable style={styles.ghost} onPress={() => void openTemplate(template)}><Text style={styles.ghostText}>إصدار جديد</Text></Pressable><Pressable style={styles.ghost} onPress={() => void openTemplate(template, true)}><Text style={styles.ghostText}>نسخ</Text></Pressable></View></View>)}
+    {visibleTemplates.map((template) => <View style={styles.templateCard} key={template.id}><View style={styles.templateInfo}><Text style={styles.templateTitle}>{template.title}</Text><Text style={styles.panelSub}>{roleName(template.role_code)}{template.updated_at ? ` · تحديث ${new Date(template.updated_at).toLocaleDateString('ar-SA')}` : ''}</Text>{!!template.description && <Text style={styles.description}>{template.description}</Text>}</View><View style={styles.chips}><Pressable style={styles.ghost} onPress={() => void openTemplate(template)}><Text style={styles.ghostText}>تعديل / إصدار جديد</Text></Pressable><Pressable style={styles.ghost} onPress={() => void openTemplate(template, true)}><Text style={styles.ghostText}>نسخ</Text></Pressable><Pressable style={styles.ghost} onPress={() => confirmDelete(template)}><Text style={styles.ghostText}>حذف نهائي</Text></Pressable></View></View>)}
   </View>;
 }
 

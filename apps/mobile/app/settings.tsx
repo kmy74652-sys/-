@@ -302,6 +302,29 @@ export default function EmployeeAccessSettings() {
     }
   }
 
+  function confirmDeleteEmployee(employee: EmployeeAccess) {
+    Alert.alert(
+      'حذف حساب الموظف نهائيًا',
+      `سيُحذف حساب ${employee.fullName} وملف الموظف ورمز الدخول نهائيًا، ولا يمكن التراجع. هل تريد المتابعة؟`,
+      [
+        { text: 'إلغاء', style: 'cancel' },
+        { text: 'حذف نهائي', style: 'destructive', onPress: () => void deleteEmployee(employee) },
+      ],
+    );
+  }
+
+  async function deleteEmployee(employee: EmployeeAccess) {
+    if (!supabase) return;
+    setBusyEmployeeId(employee.id); setError(''); setMessage('');
+    try {
+      const { error: deleteError } = await supabase.rpc('admin_delete_employee_record', { p_organization_id: institutionId, p_membership_id: employee.id });
+      if (deleteError) { setError(functionErrorText(deleteError)); return; }
+      setMessage(`تم حذف حساب ${employee.fullName} نهائيًا.`);
+      await loadSettings({ force: true });
+    } catch { setError('تعذر حذف حساب الموظف. تحقق من الصلاحية والاتصال.'); }
+    finally { setBusyEmployeeId(null); }
+  }
+
   return (
     <AppShell activeTab="settings" title="الإعدادات" subtitle="إدارة المؤسسة والموظفين">
       <ScreenHeader title="الإعدادات" subtitle="إدارة المؤسسة والموظفين" onBack={() => router.back()} />
@@ -384,6 +407,7 @@ export default function EmployeeAccessSettings() {
                   )}
                   <Pressable accessibilityRole="button" style={styles.refresh} onPress={() => setEditForms((current) => ({ ...current, [employee.id]: { ...current[employee.id], status: current[employee.id].status === 'active' ? 'suspended' : 'active' } }))}><Text style={styles.refreshText}>{editForms[employee.id].status === 'active' ? 'تجهيز لإيقاف الحساب مع حفظ السجلات' : 'تجهيز لإعادة تفعيل الحساب'}</Text></Pressable>
                   <Pressable accessibilityRole="button" disabled={busyEmployeeId !== null} style={styles.primaryButton} onPress={() => void updateEmployee(employee)}><Text style={styles.buttonText}>{busyEmployeeId === employee.id ? 'جارٍ الحفظ…' : 'حفظ بيانات الحساب'}</Text></Pressable>
+                  {employee.roleCode !== 'owner' && <Pressable accessibilityRole="button" disabled={busyEmployeeId !== null} style={styles.dangerButton} onPress={() => confirmDeleteEmployee(employee)}><Text style={styles.dangerText}>حذف الحساب نهائيًا</Text></Pressable>}
                   <Pressable accessibilityRole="button" style={styles.refresh} onPress={() => void loadAudit(employee)}><Text style={styles.refreshText}>عرض سجل التعديلات</Text></Pressable>
                   {(audit[employee.id] ?? []).map((entry) => <Text style={styles.employeeMeta} key={entry.id}>{entry.action} · {new Date(entry.created_at).toLocaleString('ar-SA')}</Text>)}
                 </>
