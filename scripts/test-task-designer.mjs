@@ -24,6 +24,7 @@ const checks = [
   ['save template is explicitly distinguished from sending a task', admin.includes('حفظ القالب يحفظ التصميم فقط ولا يرسل تكليفًا')],
   ['dynamic report designer is mounted beside task designer', admin.includes("import ReportDesigner") && admin.includes('<ReportDesigner />')],
   ['legacy starter catalog is hidden from designer', library.includes('retiredStarterTemplateCodes') && !admin.includes('قالب التقرير القديم')],
+  ['approved report templates can be linked to task templates', designer.includes('reportTemplates') && designer.includes('نموذج التقرير الذي سيعبئه الموظف') && admin.includes('reportTemplates={designerTemplates.flatMap')],
 ];
 const failed = checks.filter(([, ok]) => !ok);
 if (failed.length) { console.error(JSON.stringify({ ok: false, failed: failed.map(([name]) => name) })); process.exit(1); }
