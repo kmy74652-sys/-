@@ -29,7 +29,7 @@ import {
   type MobileTaskReportForm,
 } from '../lib/mobileData';
 import { pickTaskAttachment, uploadTaskAttachment, type PickedAttachment } from '../lib/taskAttachments';
-import { evaluateReportField, normalizeTableColumns, reportDefaultDraft, validateReportFieldValue, type ReportField, type ReportTableColumn } from '../lib/reportSchema';
+import { evaluateReportField, isReportFieldVisible, normalizeTableColumns, reportDefaultDraft, validateReportFieldValue, type ReportField, type ReportTableColumn } from '../lib/reportSchema';
 import ReportFieldInput from '../components/ReportFieldInput';
 import ReportReadOnly from '../components/ReportReadOnly';
 import AppShell, { ScreenHeader } from '../components/AppShell';
@@ -208,9 +208,11 @@ export default function TasksScreen() {
     const values: Record<string, unknown> = {};
     try {
       for (const field of task.report_schema ?? []) {
+        if (!isReportFieldVisible(field, values)) continue;
         if (field.type === 'calculated') continue;
         const raw = drafts[task.id]?.[field.key]?.trim() ?? '';
-        if (['attachment', 'image', 'file'].includes(field.type)) {
+        if (field.type === 'datetime' && field.config?.auto_now === true) { values[field.key] = new Date().toISOString(); continue; }
+        if (['attachment', 'image', 'multi_image', 'file'].includes(field.type)) {
           if (attachments[task.id]?.[field.key]?.length) values[field.key] = attachments[task.id][field.key];
         } else if (field.type === 'table' || field.type === 'multiselect' || field.type === 'signature') {
           if (!raw) continue;
@@ -250,9 +252,11 @@ export default function TasksScreen() {
     const values: Record<string, unknown> = {};
     try {
       for (const field of form.schema) {
+        if (!isReportFieldVisible(field, values)) continue;
         if (field.type === 'calculated') continue;
         const raw = drafts[key]?.[field.key]?.trim() ?? '';
-        if (['attachment', 'image', 'file'].includes(field.type)) {
+        if (field.type === 'datetime' && field.config?.auto_now === true) { values[field.key] = new Date().toISOString(); continue; }
+        if (['attachment', 'image', 'multi_image', 'file'].includes(field.type)) {
           if (attachments[key]?.[field.key]?.length) values[field.key] = attachments[key][field.key];
         } else if (field.type === 'table' || field.type === 'multiselect' || field.type === 'signature') {
           if (raw) values[field.key] = JSON.parse(raw) as unknown;
@@ -450,7 +454,7 @@ export default function TasksScreen() {
             <Pressable style={styles.secondaryButton} onPress={() => void showTimeline(task)}><Text style={styles.secondaryText}>عرض السجل الزمني</Text></Pressable>
             {!!timeline[task.id]?.length && <View style={styles.timeline}>{timeline[task.id].map((entry) => <Text key={entry.id} style={styles.meta}>{formatDate(entry.created_at)} · {entry.status} · {entry.actor_name}{entry.note ? ` — ${entry.note}` : ''}</Text>)}</View>}
 
-            {reportTask === task.id && (task.report_schema ?? []).map((field) => <ReportFieldInput
+            {reportTask === task.id && (task.report_schema ?? []).filter((field) => isReportFieldVisible(field, draftValuesForTask(task))).map((field) => <ReportFieldInput
               key={field.key} field={field} raw={drafts[task.id]?.[field.key] ?? ''}
               attachments={attachments[task.id]?.[field.key] ?? []} calculated={calculatedValue(task.id, field)} calculationError={calculationError(task.id, field)}
               rows={field.type === 'table' ? tableRows(task.id, field) : []}
@@ -472,7 +476,7 @@ export default function TasksScreen() {
                 {form.status==='submitted'&&<ReportReadOnly fields={form.schema} values={form.values}/>}
                 {canReview&&form.status==='submitted'&&form.report_id&&<><TextInput style={styles.input} value={reviewNote} onChangeText={setReviewNote} placeholder="ملاحظة المراجعة" accessibilityLabel={`ملاحظة مراجعة ${form.title}`}/><Pressable disabled={busyTask===task.id} style={styles.primaryButton} onPress={()=>void mutate(task,()=>reviewTaskFormReport(form.report_id!,'approved',reviewNote||null),`تم اعتماد «${form.title}» فقط.`)}><Text style={styles.primaryText}>اعتماد هذا التقرير</Text></Pressable><Pressable disabled={busyTask===task.id||!reviewNote.trim()} style={styles.secondaryButton} onPress={()=>void mutate(task,()=>reviewTaskFormReport(form.report_id!,'returned',reviewNote),`أعيد «${form.title}» للتعديل.`)}><Text style={styles.secondaryText}>إرجاع هذا التقرير مع سبب</Text></Pressable></>}
                 {canEdit&&!opened&&<Pressable style={styles.secondaryButton} onPress={()=>{setError('');setActiveReportForm({taskId:task.id,snapshotId:form.snapshot_id});}}><Text style={styles.secondaryText}>{form.status==='returned'?'تعديل وإعادة إرسال':'فتح هذا التقرير'}</Text></Pressable>}
-                {canEdit&&opened&&<>{form.schema.map((field)=><ReportFieldInput key={field.key} field={field} raw={drafts[key]?.[field.key]??''} attachments={attachments[key]?.[field.key]??[]} calculated={evaluateReportField(field,form.schema,valuesForReportForm(task,form)).value} calculationError={evaluateReportField(field,form.schema,valuesForReportForm(task,form)).error} rows={field.type==='table'?tableRows(key,field):[]} onDraftChange={(value)=>setDrafts((current)=>({...current,[key]:{...current[key],[field.key]:value}}))} onTableChange={(rows)=>updateTable(key,field,rows)} onChooseAttachment={()=>void chooseFormAttachment(task,form,field.key)}/>)}<Pressable style={styles.secondaryButton} onPress={()=>void saveSeparateDraft(task,form)}><Text style={styles.secondaryText}>حفظ المسودة</Text></Pressable><Pressable disabled={busyTask===task.id} style={styles.primaryButton} onPress={()=>submitSeparateReport(task,form)}><Text style={styles.primaryText}>{busyTask===task.id?'جارٍ الإرسال…':'إرسال هذا التقرير فقط'}</Text></Pressable><Pressable style={styles.secondaryButton} onPress={()=>setActiveReportForm(null)}><Text style={styles.secondaryText}>إغلاق النموذج</Text></Pressable></>}
+                {canEdit&&opened&&<>{form.schema.filter((field)=>isReportFieldVisible(field,valuesForReportForm(task,form))).map((field)=><ReportFieldInput key={field.key} field={field} raw={drafts[key]?.[field.key]??''} attachments={attachments[key]?.[field.key]??[]} calculated={evaluateReportField(field,form.schema,valuesForReportForm(task,form)).value} calculationError={evaluateReportField(field,form.schema,valuesForReportForm(task,form)).error} rows={field.type==='table'?tableRows(key,field):[]} onDraftChange={(value)=>setDrafts((current)=>({...current,[key]:{...current[key],[field.key]:value}}))} onTableChange={(rows)=>updateTable(key,field,rows)} onChooseAttachment={()=>void chooseFormAttachment(task,form,field.key)}/>)}<Pressable style={styles.secondaryButton} onPress={()=>void saveSeparateDraft(task,form)}><Text style={styles.secondaryText}>حفظ المسودة</Text></Pressable><Pressable disabled={busyTask===task.id} style={styles.primaryButton} onPress={()=>submitSeparateReport(task,form)}><Text style={styles.primaryText}>{busyTask===task.id?'جارٍ الإرسال…':'إرسال هذا التقرير فقط'}</Text></Pressable><Pressable style={styles.secondaryButton} onPress={()=>setActiveReportForm(null)}><Text style={styles.secondaryText}>إغلاق النموذج</Text></Pressable></>}
               </View>;
             })}</View>}
 

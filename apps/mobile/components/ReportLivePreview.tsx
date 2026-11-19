@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState } from 'react';
 import { Animated, Modal, PanResponder, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import ReportFieldInput from './ReportFieldInput';
-import { designerFieldsToPreviewFields, evaluateReportField, reportDefaultDraft, type DesignerField } from '../lib/reportSchema';
+import { designerFieldsToPreviewFields, evaluateReportField, isReportFieldVisible, reportDefaultDraft, type DesignerField } from '../lib/reportSchema';
 
 type Props = { fields: DesignerField[]; title: string; description: string };
 
@@ -27,7 +27,7 @@ export default function ReportLivePreview({ fields, title, description }: Props)
         try { result[field.key] = JSON.parse(raw); } catch { /* incomplete preview input */ }
       } else if (['boolean', 'checkbox'].includes(field.type)) {
         if (raw === 'true' || raw === 'false') result[field.key] = raw === 'true';
-      } else if (['number', 'progress', 'integer', 'quantity', 'money'].includes(field.type)) {
+      } else if (['number', 'progress', 'integer', 'decimal', 'percentage', 'quantity', 'money'].includes(field.type)) {
         result[field.key] = /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/.test(raw) ? Number(raw) : raw;
       } else result[field.key] = raw;
     }
@@ -42,6 +42,7 @@ export default function ReportLivePreview({ fields, title, description }: Props)
         <Text style={styles.localOnly}>معاينة تجريبية — لا تُحفظ أي قيمة أو تغييرات</Text>
       </View>
       {!previewFields.length ? <Text style={styles.empty}>أضف حقلًا إلى المخطط لتراه هنا فورًا.</Text> : previewFields.map((field) => {
+        if (!isReportFieldVisible(field, previewValues)) return null;
         const raw = values[field.key] ?? reportDefaultDraft(field);
         const calculation = field.type === 'calculated' ? evaluateReportField(field, previewFields, previewValues) : { value: null, error: null };
         let rows: Array<Record<string, unknown>> = [];

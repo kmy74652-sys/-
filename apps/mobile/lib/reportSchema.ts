@@ -1,9 +1,10 @@
 export type ReportFieldType =
   | 'text' | 'number' | 'progress' | 'status' | 'notes' | 'textarea' | 'date' | 'select' | 'multiselect'
-  | 'checkbox' | 'attachment' | 'short_text' | 'long_text' | 'integer' | 'quantity' | 'money' | 'datetime'
+  | 'checkbox' | 'attachment' | 'short_text' | 'long_text' | 'integer' | 'decimal' | 'percentage' | 'quantity' | 'money' | 'datetime'
+  | 'date_range' | 'system_reference' | 'barcode' | 'multi_image'
   | 'boolean' | 'table' | 'image' | 'file' | 'signature' | 'calculated' | 'decision_notes';
 
-export type ReportColumnType = 'short_text' | 'long_text' | 'integer' | 'quantity' | 'money' | 'select' | 'boolean';
+export type ReportColumnType = 'short_text' | 'long_text' | 'integer' | 'decimal' | 'quantity' | 'money' | 'select' | 'boolean';
 export type ReportTableColumn = {
   key: string;
   label: string;
@@ -51,14 +52,14 @@ export function designerFieldsToPreviewFields(fields: DesignerField[]): ReportFi
   }));
 }
 
-const numericTypes = new Set(['number', 'progress', 'integer', 'quantity', 'money']);
+const numericTypes = new Set(['number', 'progress', 'integer', 'decimal', 'percentage', 'quantity', 'money']);
 const textTypes = new Set(['text', 'short_text', 'long_text', 'textarea', 'notes', 'decision_notes', 'status']);
 const validFieldTypes = new Set<ReportFieldType>([
   'text', 'number', 'progress', 'status', 'notes', 'textarea', 'date', 'select', 'multiselect', 'checkbox', 'attachment',
-  'short_text', 'long_text', 'integer', 'quantity', 'money', 'datetime', 'boolean', 'table', 'image', 'file', 'signature',
+  'short_text', 'long_text', 'integer', 'decimal', 'percentage', 'quantity', 'money', 'datetime', 'date_range', 'system_reference', 'barcode', 'multi_image', 'boolean', 'table', 'image', 'file', 'signature',
   'calculated', 'decision_notes',
 ]);
-const validColumnTypes = new Set<ReportColumnType>(['short_text', 'long_text', 'integer', 'quantity', 'money', 'select', 'boolean']);
+const validColumnTypes = new Set<ReportColumnType>(['short_text', 'long_text', 'integer', 'decimal', 'quantity', 'money', 'select', 'boolean']);
 
 function asObject(value: unknown): Record<string, unknown> {
   return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {};
@@ -188,6 +189,17 @@ export function validateReportFieldValue(field: ReportField, value: unknown): st
     if (typeof value !== 'string' || !value.trim() || Number.isNaN(Date.parse(value))) return message(field, 'type', 'أدخل تاريخًا صالحًا.');
     return null;
   }
+  if (field.type === 'date_range') {
+    const range = asObject(value);
+    if (typeof range.from !== 'string' || Number.isNaN(Date.parse(range.from)) || typeof range.to !== 'string' || Number.isNaN(Date.parse(range.to))) return message(field, 'type', 'حدد تاريخ البداية والنهاية بصيغة صحيحة.');
+    if (new Date(range.from).getTime() > new Date(range.to).getTime()) return message(field, 'type', 'تاريخ البداية يجب ألا يتجاوز تاريخ النهاية.');
+    return null;
+  }
+  if (field.type === 'system_reference') {
+    const reference = asObject(value);
+    return String(reference.id ?? value ?? '').trim() ? null : message(field, 'type', 'اختر مرجعًا من النظام.');
+  }
+  if (field.type === 'barcode') return typeof value === 'string' && value.trim() ? null : message(field, 'type', 'أدخل رمز الصنف.');
   if (field.type === 'table') {
     if (!Array.isArray(value)) return message(field, 'type', 'أدخل صفوف الجدول بصيغة صحيحة.');
     const config = asObject(field.config);
@@ -222,7 +234,7 @@ export function validateReportFieldValue(field: ReportField, value: unknown): st
     if (consentText && signature.acknowledged !== true) return message(field, 'consent', 'وافق على نص الإقرار قبل التوقيع.');
     return null;
   }
-  if (field.type === 'image' || field.type === 'file' || field.type === 'attachment') {
+  if (field.type === 'image' || field.type === 'file' || field.type === 'attachment' || field.type === 'multi_image') {
     return Array.isArray(value) || (typeof value === 'object' && value !== null) ? null : message(field, 'type', 'اختر مرفقًا صالحًا.');
   }
   return null;
@@ -332,6 +344,17 @@ export function evaluateReportField(field: ReportField, allFields: ReportField[]
 
 export function calculateReportField(field: ReportField, allFields: ReportField[], values: ReportValues): number | null {
   return evaluateReportField(field, allFields, values).value;
+}
+
+export function isReportFieldVisible(field: ReportField, values: ReportValues): boolean {
+  const config = asObject(field.config);
+  const visibility = asObject(config.visibility ?? config.visible_when);
+  const dependsOn = String(visibility.depends_on ?? visibility.field ?? '').trim();
+  if (!dependsOn) return true;
+  const expected = visibility.equals ?? visibility.value;
+  const actual = values[dependsOn];
+  if (Array.isArray(expected)) return expected.map(String).includes(String(actual));
+  return expected === undefined ? !isEmpty(actual) : String(actual) === String(expected);
 }
 
 export function validateDesignerFields(fields: DesignerField[]): string | null {

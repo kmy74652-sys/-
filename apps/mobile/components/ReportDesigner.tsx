@@ -10,7 +10,7 @@ const roles: Array<[string, string]> = [
   ['warehouse_keeper', 'أمين المخازن'], ['warehouse_worker', 'عمال التحميل'],
 ];
 const columnTypes: Array<[ReportTableColumn['type'], string]> = [
-  ['short_text', 'نص'], ['long_text', 'نص طويل'], ['integer', 'عدد صحيح'], ['quantity', 'كمية'], ['money', 'مبلغ'], ['select', 'قائمة'], ['boolean', 'نعم/لا'],
+  ['short_text', 'نص'], ['long_text', 'نص طويل'], ['integer', 'عدد صحيح'], ['decimal', 'رقم عشري'], ['quantity', 'كمية'], ['money', 'مبلغ'], ['select', 'قائمة'], ['boolean', 'نعم/لا'],
 ];
 const roleName = (code: string) => roles.find(([value]) => value === code)?.[1] ?? code;
 const typeName = (code: string) => designerFieldTypes.find(([value]) => value === code)?.[1] ?? code;
@@ -175,7 +175,7 @@ function FieldEditor({ field, update }: { field: DesignerField; update: (patch: 
   const changeConfig = (key: string, value: unknown) => update({ config: { ...config, [key]: value } });
   const changeRule = (key: string, value: unknown) => update({ validation: setRule(field, key, value) });
   const textType = ['short_text', 'long_text', 'decision_notes'].includes(field.field_type);
-  const numericType = ['integer', 'quantity', 'money'].includes(field.field_type);
+  const numericType = ['integer', 'decimal', 'percentage', 'quantity', 'money'].includes(field.field_type);
   const listType = field.field_type === 'select' || field.field_type === 'multiselect';
   const selectedDefaults = Array.isArray(config.default_value) ? config.default_value.map(String) : [];
   return <View style={styles.editor}>
@@ -207,8 +207,11 @@ function FieldEditor({ field, update }: { field: DesignerField; update: (patch: 
       <View style={styles.twoColumns}><RuleInput label="أقل عدد صفوف" value={config.min_rows} onChange={(value) => changeConfig('min_rows', value)} integer /><RuleInput label="أقصى عدد صفوف" value={config.max_rows} onChange={(value) => changeConfig('max_rows', value)} integer /></View>
     </>}
     {field.field_type === 'calculated' && <><Text style={styles.sectionLabel}>صيغة حساب آمنة</Text><TextInput style={styles.input} value={String(config.formula ?? '')} onChangeText={(formula) => changeConfig('formula', formula)} placeholder="مثال: {quantity} * {unit_price} - {discount}" autoCapitalize="none" /><Text style={styles.panelSub}>يدعم + و− و× و÷ والأقواس. اكتب مفتاح الحقل الرقمي بين {'{'} و{'}'}؛ لا تُنفذ شيفرات أو eval.</Text></>}
+    {field.field_type === 'datetime' && <Pressable style={styles.toggle} onPress={() => changeConfig('auto_now', config.auto_now !== true)}><Text style={styles.toggleText}>{config.auto_now === true ? 'يُسجل تلقائيًا عند الإرسال ✓' : 'إدخال التاريخ والوقت يدويًا'}</Text></Pressable>}
+    {field.field_type === 'system_reference' && <><Text style={styles.sectionLabel}>نوع المرجع من النظام</Text><View style={styles.chips}>{[['branch', 'فرع'], ['employee', 'موظف'], ['product', 'صنف / منتج'], ['customer', 'عميل / مورد']].map(([value, label]) => <Chip key={value} label={label} selected={config.reference_type === value} onPress={() => changeConfig('reference_type', value)} />)}</View></>}
+    {!['calculated', 'datetime', 'date_range'].includes(field.field_type) && <><Text style={styles.sectionLabel}>الإظهار المشروط (اختياري)</Text><TextInput style={styles.input} placeholder="مفتاح الحقل السابق" value={String(obj(config.visibility).depends_on ?? '')} onChangeText={(value) => changeConfig('visibility', { ...obj(config.visibility), depends_on: value })} autoCapitalize="none" /><TextInput style={styles.input} placeholder="يظهر عندما تساوي القيمة" value={String(obj(config.visibility).equals ?? '')} onChangeText={(value) => changeConfig('visibility', { ...obj(config.visibility), equals: value })} /></>}
     {field.field_type === 'signature' && <><Text style={styles.sectionLabel}>الإقرار والتوقيع</Text><TextInput style={[styles.input, styles.multiline]} value={String(config.consent_text ?? '')} onChangeText={(consent_text) => changeConfig('consent_text', consent_text)} placeholder="نص الإقرار الاختياري قبل التوقيع" multiline /><Text style={styles.panelSub}>عند وجود نص إقرار، يلزم تأكيده قبل إرسال توقيع مرسوم.</Text></>}
-    {['short_text', 'long_text', 'integer', 'quantity', 'money', 'datetime', 'boolean', 'select', 'multiselect'].includes(field.field_type) && <>
+    {['short_text', 'long_text', 'integer', 'decimal', 'percentage', 'quantity', 'money', 'datetime', 'boolean', 'select', 'multiselect'].includes(field.field_type) && <>
       <Text style={styles.sectionLabel}>قيمة افتراضية (اختيارية)</Text>
       {field.field_type === 'boolean' ? <View style={styles.chips}><Chip label="نعم" selected={config.default_value === true} onPress={() => changeConfig('default_value', true)} /><Chip label="لا" selected={config.default_value === false} onPress={() => changeConfig('default_value', false)} /><Chip label="بدون افتراضي" selected={config.default_value === undefined} onPress={() => changeConfig('default_value', undefined)} /></View> : !listType && <TextInput style={styles.input} value={config.default_value == null ? '' : String(config.default_value)} onChangeText={(value) => changeConfig('default_value', value)} placeholder="القيمة الافتراضية" keyboardType={numericType ? 'decimal-pad' : 'default'} />}
     </>}
@@ -231,9 +234,9 @@ function TableColumnsEditor({ columns, onChange }: { columns: ReportTableColumn[
       <View style={styles.optionRow}><TextInput style={[styles.input, styles.optionInput]} value={column.label} onChangeText={(label) => update(index, { label })} placeholder="اسم العمود" /><SmallAction label="↑" disabled={index === 0} onPress={() => { const next = [...columns]; [next[index - 1], next[index]] = [next[index], next[index - 1]]; onChange(next); }} /><SmallAction label="↓" disabled={index === columns.length - 1} onPress={() => { const next = [...columns]; [next[index + 1], next[index]] = [next[index], next[index + 1]]; onChange(next); }} /><SmallAction label="×" danger onPress={() => onChange(columns.filter((_, columnIndex) => columnIndex !== index))} /></View>
       <Text style={styles.key}>المفتاح: {column.key}</Text><View style={styles.chips}>{columnTypes.map(([type, label]) => <Chip key={type} label={label} selected={column.type === type} onPress={() => update(index, { type })} />)}<Chip label={column.required ? 'إلزامي ✓' : 'اختياري'} selected={Boolean(column.required)} onPress={() => update(index, { required: !column.required })} /></View>
       {column.type === 'select' && <TextInput style={styles.input} value={(column.options ?? []).join('، ')} onChangeText={(value) => update(index, { options: value.split('،').map((item) => item.trim()).filter(Boolean) })} placeholder="خيارات العمود مفصولة بعلامة ،" />}
-      {['integer', 'quantity', 'money'].includes(column.type) && <View style={styles.twoColumns}><RuleInput label="حد أدنى" value={column.validation?.min} onChange={(value) => update(index, { validation: { ...column.validation, min: value } })} /><RuleInput label="حد أقصى" value={column.validation?.max} onChange={(value) => update(index, { validation: { ...column.validation, max: value } })} /></View>}
+      {['integer', 'decimal', 'quantity', 'money'].includes(column.type) && <View style={styles.twoColumns}><RuleInput label="حد أدنى" value={column.validation?.min} onChange={(value) => update(index, { validation: { ...column.validation, min: value } })} /><RuleInput label="حد أقصى" value={column.validation?.max} onChange={(value) => update(index, { validation: { ...column.validation, max: value } })} /></View>}
     </View>)}
-    <Pressable style={styles.ghost} onPress={() => { const serial = columns.length + 1; onChange([...columns, { key: `column_${serial}`, label: '', type: 'short_text', required: false, validation: {} }]); }}><Text style={styles.ghostText}>+ إضافة عمود</Text></Pressable>
+    <Pressable style={styles.ghost} onPress={() => { const serial = columns.length + 1; onChange([...columns, { key: `column_${serial}`, label: `عمود ${serial}`, type: 'short_text', required: false, validation: {} }]); }}><Text style={styles.ghostText}>+ إضافة عمود</Text></Pressable>
   </View>;
 }
 const styles = StyleSheet.create({

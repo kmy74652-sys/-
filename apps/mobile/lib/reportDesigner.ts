@@ -141,7 +141,8 @@ export async function approveDesignerVersion(versionId: string) {
 }
 export const designerFieldTypes: Array<[DesignerFieldType, string]> = [
   ['short_text', 'نص قصير'], ['long_text', 'نص طويل وملاحظات'], ['integer', 'رقم صحيح'], ['quantity', 'كمية ووحدة قياس'],
-  ['money', 'مبلغ وعملة'], ['datetime', 'تاريخ ووقت'], ['select', 'قائمة اختيار'], ['multiselect', 'اختيار متعدد'],
-  ['boolean', 'نعم أو لا'], ['table', 'جدول متعدد الصفوف'], ['image', 'صورة'], ['file', 'ملف أو مستند'],
+  ['money', 'مبلغ وعملة'], ['decimal', 'رقم عشري'], ['percentage', 'نسبة مئوية'], ['datetime', 'تاريخ ووقت تلقائي'], ['date_range', 'نطاق تاريخ / فترة'],
+  ['system_reference', 'مرجع من النظام'], ['barcode', 'باركود / رمز صنف'], ['select', 'قائمة اختيار'], ['multiselect', 'اختيار متعدد'],
+  ['boolean', 'نعم أو لا'], ['table', 'جدول متعدد الصفوف'], ['image', 'صورة'], ['multi_image', 'صور متعددة'], ['file', 'ملف أو مستند'],
   ['signature', 'توقيع أو إقرار'], ['calculated', 'حقل محسوب'], ['decision_notes', 'ملاحظات وقرارات'],
 ];

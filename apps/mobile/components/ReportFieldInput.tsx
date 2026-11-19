@@ -1,8 +1,9 @@
-import { useMemo, useRef, useState } from 'react';
-import { PanResponder, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Alert, PanResponder, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import type { PickedAttachment } from '../lib/taskAttachments';
 import { normalizeTableColumns, type ReportField, type ReportTableColumn } from '../lib/reportSchema';
+import { supabase } from '../lib/supabase';
 
 type Attachment = PickedAttachment & { path?: string };
 type TableRow = Record<string, unknown>;
@@ -51,6 +52,8 @@ export default function ReportFieldInput(props: Props) {
   const { field, previewMode = false, raw, attachments, calculated, calculationError, rows, onDraftChange, onTableChange, onChooseAttachment } = props;
   const description = field.description?.trim();
   const hint = validationHint(field);
+  const autoTimestamp = field.type === 'datetime' && objectValue(field.config).auto_now === true;
+  const displayedRaw = autoTimestamp && !raw ? new Date().toISOString() : raw;
   const setBoolean = () => onDraftChange(raw === 'true' ? 'false' : 'true');
   return (
     <View style={styles.field}>
@@ -67,15 +70,21 @@ export default function ReportFieldInput(props: Props) {
         </View>
       ) : field.type === 'table' ? (
         <TableEditor field={field} rows={rows} onChange={onTableChange} />
-      ) : ['attachment', 'image', 'file'].includes(field.type) ? (
+      ) : ['attachment', 'image', 'multi_image', 'file'].includes(field.type) ? (
         <View style={styles.attachmentBox}>
           <Pressable accessibilityRole="button" disabled={previewMode} style={[styles.secondaryButton, previewMode && styles.disabled]} onPress={onChooseAttachment}>
-            <Text style={styles.secondaryText}>{previewMode ? 'معاينة المرفقات فقط — لا يتم الرفع' : 'اختيار مرفق من الهاتف'}</Text>
+            <Text style={styles.secondaryText}>{previewMode ? 'معاينة المرفقات فقط — لا يتم الرفع' : field.type === 'multi_image' ? 'إضافة صورة أخرى' : 'اختيار مرفق من الهاتف'}</Text>
           </Pressable>
           {!!attachments.length && <Text style={styles.description}>{attachments.map((file) => file.name).join('، ')}</Text>}
         </View>
       ) : field.type === 'signature' ? (
         <SignaturePad value={parseSignature(raw)} consentText={String(objectValue(field.config).consent_text ?? '')} onChange={(value) => onDraftChange(JSON.stringify(value))} />
+      ) : field.type === 'date_range' ? (
+        <DateRangeInput raw={raw} onChange={onDraftChange} />
+      ) : field.type === 'system_reference' ? (
+        <SystemReferenceInput field={field} raw={raw} onChange={onDraftChange} />
+      ) : field.type === 'barcode' ? (
+        <View style={styles.barcodeBox}><TextInput accessibilityLabel={field.label} style={styles.input} value={raw} onChangeText={onDraftChange} placeholder="امسح أو أدخل رمز الصنف" autoCapitalize="characters" /><Text style={styles.hint}>يمكن ربط قارئ الباركود أو إدخال الرمز يدويًا.</Text></View>
       ) : field.type === 'boolean' || field.type === 'checkbox' ? (
         <Pressable accessibilityRole="checkbox" accessibilityState={{ checked: raw === 'true' }} style={[styles.booleanButton, raw === 'true' && styles.booleanSelected]} onPress={setBoolean}>
           <Text style={[styles.booleanText, raw === 'true' && styles.booleanTextSelected]}>{raw === '' ? 'لم يتم الاختيار' : raw === 'true' ? 'نعم ✓' : 'لا ✓'}</Text>
@@ -106,15 +115,41 @@ export default function ReportFieldInput(props: Props) {
         </View> : <TextInput
             accessibilityLabel={field.label}
             style={[styles.input, ['long_text', 'textarea', 'notes', 'decision_notes'].includes(field.type) && styles.multiline]}
-            value={raw}
+            value={displayedRaw}
             onChangeText={onDraftChange}
-            keyboardType={['number', 'progress', 'integer', 'quantity', 'money'].includes(field.type) ? 'decimal-pad' : 'default'}
+            editable={!autoTimestamp}
+            keyboardType={['number', 'progress', 'integer', 'decimal', 'percentage', 'quantity', 'money'].includes(field.type) ? 'decimal-pad' : 'default'}
             multiline={['long_text', 'textarea', 'notes', 'decision_notes'].includes(field.type)}
-            placeholder={field.type === 'progress' ? 'أدخل نسبة الإنجاز' : ['date', 'datetime'].includes(field.type) ? 'أدخل التاريخ أو الوقت' : field.type === 'money' ? 'أدخل المبلغ' : field.required ? 'مطلوب' : 'اختياري'}
+            placeholder={autoTimestamp ? 'يُسجل تلقائيًا عند الإرسال' : field.type === 'progress' || field.type === 'percentage' ? 'أدخل النسبة' : ['date', 'datetime'].includes(field.type) ? 'أدخل التاريخ أو الوقت' : field.type === 'money' ? 'أدخل المبلغ' : field.required ? 'مطلوب' : 'اختياري'}
           />
       )}
     </View>
   );
+}
+
+function DateRangeInput({ raw, onChange }: { raw: string; onChange: (value: string) => void }) {
+  let range: { from?: string; to?: string } = {};
+  try { range = JSON.parse(raw || '{}') as { from?: string; to?: string }; } catch { /* incomplete range */ }
+  const update = (key: 'from' | 'to', value: string) => onChange(JSON.stringify({ ...range, [key]: value }));
+  return <View style={styles.rangeBox}><TextInput style={styles.input} value={range.from ?? ''} onChangeText={(value) => update('from', value)} placeholder="من تاريخ / بداية الفترة" /><TextInput style={styles.input} value={range.to ?? ''} onChangeText={(value) => update('to', value)} placeholder="إلى تاريخ / نهاية الفترة" /><Text style={styles.hint}>اكتب التاريخ بصيغة YYYY-MM-DD أو الفترة المطلوبة.</Text></View>;
+}
+
+function SystemReferenceInput({ field, raw, onChange }: { field: ReportField; raw: string; onChange: (value: string) => void }) {
+  const [items, setItems] = useState<Array<{ id: string; label: string }>>([]);
+  const referenceType = String(objectValue(field.config).reference_type ?? 'product');
+  useEffect(() => {
+    let active = true;
+    const load = async () => {
+      if (!supabase) return;
+      const table = referenceType === 'branch' ? 'branches' : referenceType === 'employee' ? 'organization_memberships' : referenceType === 'customer' ? 'customers' : referenceType === 'supplier' ? 'suppliers' : 'products';
+      const select = table === 'products' ? 'id,name,sku' : table === 'organization_memberships' ? 'id,display_name,employee_no' : 'id,name,code';
+      const { data } = await supabase.from(table).select(select).limit(100);
+      if (active) setItems((data ?? []).map((item: Record<string, unknown>) => ({ id: String(item.id), label: String(item.name ?? item.display_name ?? item.sku ?? item.code ?? item.employee_no ?? item.id) })));
+    };
+    void load();
+    return () => { active = false; };
+  }, [referenceType]);
+  return <View style={styles.referenceBox}><TextInput accessibilityLabel={field.label} style={styles.input} value={raw} onChangeText={onChange} placeholder="ابحث أو أدخل المعرّف" />{items.length > 0 && <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.choices}>{items.map((item) => <Pressable key={item.id} style={[styles.choice, raw === item.id && styles.choiceSelected]} onPress={() => onChange(item.id)}><Text style={raw === item.id ? styles.choiceSelectedText : styles.choiceText}>{item.label}</Text></Pressable>)}</ScrollView>}</View>;
 }
 
 function TableEditor({ field, rows, onChange }: { field: ReportField; rows: TableRow[]; onChange: (rows: TableRow[]) => void }) {
@@ -122,16 +157,19 @@ function TableEditor({ field, rows, onChange }: { field: ReportField; rows: Tabl
   const columns = normalizedColumns.length ? normalizedColumns : [{ key: 'value', label: 'القيمة', type: 'short_text' as const, required: false }];
   const config = objectValue(field.config);
   const maxRows = Number(config.max_rows);
+  const minRows = Number(config.min_rows);
   const canAdd = !Number.isFinite(maxRows) || maxRows <= 0 || rows.length < maxRows;
+  const canDelete = rows.length > 0 && (!Number.isFinite(minRows) || rows.length > minRows);
   const numericColumns = columns.filter((column) => ['integer', 'quantity', 'money'].includes(column.type));
   const updateCell = (rowIndex: number, key: string, value: unknown) => onChange(rows.map((row, index) => index === rowIndex ? { ...row, [key]: value } : row));
-  const addRow = () => onChange([...rows, Object.fromEntries(columns.map((column) => [column.key, column.type === 'boolean' ? null : '']))]);
+  const addRow = () => { if (!canAdd) { Alert.alert('حد الصفوف', `بلغت الحد الأقصى المحدد (${maxRows}) صفًا.`); return; } onChange([...rows, Object.fromEntries(columns.map((column) => [column.key, column.type === 'boolean' ? null : '']))]); };
+  const deleteRow = (rowIndex: number) => { if (!canDelete) { Alert.alert('الحد الأدنى للصفوف', `لا يمكن الحذف؛ يجب إبقاء ${minRows} صفًا على الأقل.`); return; } onChange(rows.filter((_, index) => index !== rowIndex)); };
   return (
     <View style={styles.tableEditor}>
       {!!config.min_rows && <Text style={styles.hint}>الحد الأدنى: {String(config.min_rows)} صفوف</Text>}
       {rows.map((row, rowIndex) => (
         <View style={styles.tableRow} key={`${field.key}-${rowIndex}`}>
-          <View style={styles.rowHeading}><Text style={styles.rowTitle}>صف {rowIndex + 1}</Text><Pressable accessibilityRole="button" style={styles.deleteRow} onPress={() => onChange(rows.filter((_, index) => index !== rowIndex))}><Text style={styles.deleteText}>حذف الصف</Text></Pressable></View>
+          <View style={styles.rowHeading}><Text style={styles.rowTitle}>صف {rowIndex + 1}</Text><Pressable accessibilityRole="button" style={[styles.deleteRow, !canDelete && styles.disabled]} onPress={() => deleteRow(rowIndex)}><Text style={styles.deleteText}>حذف الصف</Text></Pressable></View>
           <ScrollView horizontal showsHorizontalScrollIndicator contentContainerStyle={styles.tableCells}>
             {columns.map((column) => <TableCell key={column.key} column={column} value={row[column.key]} onChange={(value) => updateCell(rowIndex, column.key, value)} />)}
           </ScrollView>
@@ -245,7 +283,7 @@ const styles = StyleSheet.create({
   calculated: { backgroundColor: '#eef5f7', borderRadius: 10, padding: 12, gap: 4 },
   calculatedValue: { color: '#17324d', fontSize: 19, fontWeight: '900', textAlign: 'right' },
   calculationError: { color: '#a8443d', fontSize: 13, fontWeight: '700', textAlign: 'right', lineHeight: 20 },
-  attachmentBox: { gap: 8 },
+  attachmentBox: { gap: 8 }, barcodeBox: { gap: 6 }, rangeBox: { gap: 7 }, referenceBox: { gap: 7 },
   secondaryButton: { minHeight: 42, borderRadius: 10, padding: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: '#e9f0f4' },
   secondaryText: { color: '#17324d', fontWeight: '800' },
   tableEditor: { gap: 10, borderWidth: 1, borderColor: '#dce6e9', borderRadius: 12, padding: 10, backgroundColor: '#fff' },
