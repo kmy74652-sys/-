@@ -232,7 +232,7 @@ export default function HomeDashboard({ profile: initialProfile, onNavigate, onS
             {profile.roles.map((role) => <Pressable key={role.code} accessibilityRole="radio" accessibilityState={{ checked: currentRole?.code === role.code }} style={[styles.contextChoice, currentRole?.code === role.code && styles.contextSelected]} onPress={() => setRoleCode(role.code)}><Text style={styles.contextText}>{role.nameAr}</Text>{currentRole?.code === role.code && <HomeIcon name="check" size={22} color="#146b50" />}</Pressable>)}
             <Text style={styles.fieldLabel}>الفرع الحالي</Text><Text style={styles.modalHint}>يصفّي هذا الاختيار ملخص الرئيسية وقائمة المهام.</Text>
             {[{ id: null, name: 'كل الفروع المسموح بها' }, ...profile.branches].map((branch) => <Pressable key={branch.id ?? 'all'} accessibilityRole="radio" accessibilityState={{ checked: branchId === branch.id }} style={[styles.contextChoice, branchId === branch.id && styles.contextSelected]} onPress={() => chooseBranch(branch.id)}><Text style={styles.contextText}>{branch.name}</Text>{branchId === branch.id && <HomeIcon name="check" size={22} color="#146b50" />}</Pressable>)}
-            <Pressable accessibilityRole="button" accessibilityLabel="تسجيل الخروج وتبديل الحساب" disabled={signingOut} style={styles.signOutButton} onPress={() => void signOut()}><Text style={styles.signOutText}>{signingOut ? 'جارٍ تسجيل الخروج…' : 'تسجيل الخروج وتبديل الحساب'}</Text></Pressable>
+            <Pressable accessibilityRole="button" accessibilityLabel="تبديل الحساب" accessibilityHint="تسجيل الخروج وفتح حساب آخر" disabled={signingOut} style={styles.signOutButton} onPress={() => void signOut()}><HomeIcon name="avatar" size={25} color="#a62636" /></Pressable>
           </> : <>
             {notificationsBusy && <ActivityIndicator color={NAVY} />}
             {!!notificationError && <Text accessibilityRole="alert" style={styles.error}>{notificationError}</Text>}
@@ -325,8 +325,7 @@ const styles = StyleSheet.create({
   contextChoice: { minHeight: 48, flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', borderWidth: 1, borderColor: '#d6dfed', borderRadius: 11, padding: 10, gap: 9 },
   contextSelected: { borderColor: '#146b50', backgroundColor: '#e2f3ee' },
   contextText: { flexShrink: 1, color: NAVY, fontSize: 14, fontWeight: '700', writingDirection: 'rtl', textAlign: 'right' },
-  signOutButton: { minHeight: 48, alignItems: 'center', justifyContent: 'center', borderColor: '#b32f3d', borderWidth: 1, borderRadius: 11, marginTop: 10 },
-  signOutText: { color: '#a62636', fontWeight: '800', textAlign: 'center', writingDirection: 'rtl' },
+  signOutButton: { width: 52, height: 48, alignSelf: 'flex-end', alignItems: 'center', justifyContent: 'center', borderColor: '#b32f3d', borderWidth: 1, borderRadius: 11, marginTop: 10 },
   notificationCard: { padding: 12, backgroundColor: '#f5f7fd', borderRadius: 12, gap: 5 },
   notificationDate: { color: '#4e596c', fontSize: 11, textAlign: 'right', writingDirection: 'rtl' },
 });
