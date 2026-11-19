@@ -84,11 +84,12 @@ assert.match(layout, /I18nManager\.forceRTL\(true\)/);
 assert.match(layout, /direction: 'rtl'/);
 const tasksScreen = read('apps/mobile/app/tasks.tsx');
 assert.match(admin, /async function signOut\(\)/);
-assert.match(admin, /تسجيل الخروج وتبديل الحساب/);
-assert.match(admin, /supabase\.auth\.signOut\(\)/);
-assert.match(tasksScreen, /async function signOut\(\)/);
-assert.match(tasksScreen, /تسجيل الخروج وتبديل الحساب/);
-assert.match(tasksScreen, /supabase\.auth\.signOut\(\)/);
+assert.doesNotMatch(admin, /تسجيل الخروج وتبديل الحساب/);
+assert.doesNotMatch(tasksScreen, /تسجيل الخروج وتبديل الحساب/);
+const home = read('apps/mobile/components/HomeDashboard.tsx');
+assert.match(home, /accessibilityLabel="تبديل الحساب"/);
+assert.match(home, /async function signOut\(\)/);
+assert.match(home, /supabase\.auth\.signOut\(\)/);
 
 
 
