@@ -59,7 +59,6 @@ export default function ReportFieldInput(props: Props) {
     <View style={styles.field}>
       <View style={styles.labelLine}>
         <Text style={styles.label}>{field.label}{field.required ? ' *' : ''}</Text>
-        <Text style={styles.typeBadge}>{field.type.replace('_', ' ')}</Text>
       </View>
       {!!description && <Text style={styles.description}>{description}</Text>}
       {!!hint && <Text style={styles.hint}>{hint}</Text>}
@@ -266,7 +265,6 @@ const styles = StyleSheet.create({
   field: { gap: 7, padding: 12, backgroundColor: '#fbfcfc', borderWidth: 1, borderColor: '#e2e9eb', borderRadius: 12 },
   labelLine: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
   label: { color: '#263f52', textAlign: 'right', fontWeight: '800', flex: 1 },
-  typeBadge: { color: '#557184', backgroundColor: '#edf3f5', borderRadius: 12, paddingHorizontal: 8, paddingVertical: 4, fontSize: 11 },
   description: { color: '#657988', textAlign: 'right', lineHeight: 20 },
   hint: { color: '#718394', fontSize: 12, textAlign: 'right', lineHeight: 18 },
   input: { minHeight: 46, borderWidth: 1, borderColor: '#d6e0e4', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, textAlign: 'right', color: '#17324d', backgroundColor: '#fff' },

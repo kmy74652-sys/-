@@ -6,7 +6,7 @@ import { designerFieldsToPreviewFields, evaluateReportField, isReportFieldVisibl
 type Props = { fields: DesignerField[]; title: string; description: string };
 
 export default function ReportLivePreview({ fields, title, description }: Props) {
-  const [visible, setVisible] = useState(true);
+  const [visible, setVisible] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [values, setValues] = useState<Record<string, string>>({});
   const position = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
@@ -66,7 +66,7 @@ export default function ReportLivePreview({ fields, title, description }: Props)
     </View>;
   }
 
-  if (!visible) return <View style={styles.hiddenRow}><Text style={styles.hiddenHint}>المعاينة المباشرة مخفية مؤقتًا</Text><Pressable accessibilityRole="button" onPress={() => setVisible(true)} style={styles.smallButton}><Text style={styles.smallButtonText}>إظهار المعاينة</Text></Pressable></View>;
+  if (!visible) return <View style={styles.hiddenRow}><Text style={styles.hiddenHint}>المعاينة مخفية لتقليل التمرير</Text><Pressable accessibilityRole="button" onPress={() => setVisible(true)} style={styles.smallButton}><Text style={styles.smallButtonText}>معاينة النموذج</Text></Pressable></View>;
 
   return <View style={styles.panel}>
     <View style={styles.panelHeader}>

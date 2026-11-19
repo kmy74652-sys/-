@@ -93,6 +93,12 @@ assert(!mobileDesigner.includes("setBuilderSection('preview')"), 'preview must n
 assert(livePreview.includes('designerFieldsToPreviewFields(fields)') && livePreview.includes('previewFields.map'), 'live preview must map current fields in current order');
 assert(livePreview.includes('Modal') && livePreview.includes('PanResponder') && livePreview.includes('setVisible(false)'), 'live preview must support expand, move, hide, and show');
 assert(!livePreview.includes('saveDesignerTemplate') && livePreview.includes('previewMode'), 'preview must remain local and must not save or upload attachments');
+assert(livePreview.includes('useState(false)') && livePreview.includes('معاينة النموذج'), 'preview must be collapsed by default with an Arabic open action');
+assert(mobileDesigner.includes('إعدادات متقدمة (اختياري)') && mobileDesigner.includes('advancedOpen'), 'advanced field settings must be collapsed behind an accordion');
+assert(!mobileDesigner.includes('المفتاح الداخلي') && !mobileDesigner.includes('field_key}</Text>'), 'internal field keys must stay hidden from the editor UI');
+assert(mobileDesigner.includes('ensureFieldKeys') && mobileDesigner.includes('fields: normalizedFields'), 'internal field keys must be generated before saving');
+for (const label of ['نص قصير', 'نص طويل وملاحظات', 'مبلغ وعملة', 'كمية ووحدة قياس', 'نسبة مئوية', 'نعم أو لا', 'قائمة اختيار', 'صورة', 'ملف أو مستند', 'جدول متعدد الصفوف']) assert(designerApi.includes(label), `basic field type missing: ${label}`);
+assert(!reportInput.includes('field.type.replace'), 'technical type badges must not be shown in report previews');
 assert(reportInput.includes("field.type === 'money' && previewMode") && reportInput.includes('currencyHint'), 'money preview must show amount and currency input treatment');
 assert(reportInput.includes('إضافة صف') && reportInput.includes('SignaturePad') && reportInput.includes('react-native-svg'));
 assert(tasks.includes('validateReportFieldValue') && tasks.includes('evaluateReportField') && tasks.includes('reportDefaultDraft'));
