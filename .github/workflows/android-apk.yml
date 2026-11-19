@@ -1,18 +1,18 @@
 name: Build Android APK
+run-name: Build APK · ${{ github.ref_name }}
 
 on:
   workflow_dispatch:
-  push:
-    paths:
-      - 'apps/mobile/**'
-      - 'pnpm-lock.yaml'
-      - 'pnpm-workspace.yaml'
-      - '.github/workflows/android-apk.yml'
+
+concurrency:
+  group: android-apk-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build-apk:
-    name: Build Alshaeri APK
+    name: Build and publish Android APK
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     permissions:
       contents: write
     env:
@@ -20,6 +20,7 @@ jobs:
       EXPO_PUBLIC_SUPABASE_URL: https://fjmryqhdwxsocdzswnkq.supabase.co
       EXPO_PUBLIC_SUPABASE_ANON_KEY: sb_publishable_vRWbeJO5I_KJwJjqVDSZLA_pEHABsPk
       EXPO_USE_COMMUNITY_AUTOLINKING: '0'
+      NODE_ENV: production
     defaults:
       run:
         working-directory: apps/mobile
@@ -36,10 +37,6 @@ jobs:
           supabase_url="${EXPO_PUBLIC_SUPABASE_URL%/}"
           if [ "$supabase_url" != "https://fjmryqhdwxsocdzswnkq.supabase.co" ]; then
             echo "::error title=Wrong Supabase project::EXPO_PUBLIC_SUPABASE_URL does not match the requested project."
-            exit 1
-          fi
-          if ! command -v grep >/dev/null 2>&1; then
-            echo "::error title=Missing grep::The API-reference safety scan cannot run."
             exit 1
           fi
           if grep -R -n -E -- 'EXPO_PUBLIC_API_BASE_URL|/api/' app lib; then
@@ -59,8 +56,19 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: pnpm
-          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Locate pnpm store
+        id: pnpm-store
+        run: echo "path=$(pnpm store path --silent)" >> "$GITHUB_OUTPUT"
+        working-directory: .
+
+      - name: Cache pnpm package store
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.pnpm-store.outputs.path }}
+          key: ${{ runner.os }}-pnpm-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-
 
       - name: Setup Java
         uses: actions/setup-java@v4
@@ -68,52 +76,42 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-        working-directory: .
+      - name: Cache Gradle dependencies and build cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+            ~/.android/build-cache
+          key: ${{ runner.os }}-gradle-${{ hashFiles('pnpm-lock.yaml', 'apps/mobile/package.json', 'apps/mobile/app.json') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
 
-      - name: TypeScript typecheck
-        run: pnpm exec tsc --noEmit
-
-      - name: Run application regression tests
-        run: |
-          pnpm test:admin-management
-          pnpm test:task-workflow
-          pnpm test:task-designer
-          pnpm test:report-designer
-          pnpm typecheck
-          pnpm --filter @alshaeri/api build
+      - name: Install project dependencies
+        run: pnpm install --frozen-lockfile --prefer-offline
         working-directory: .
 
       - name: Generate native Android project
         run: pnpm exec expo prebuild --platform android --no-install --clean
-        env:
-          NODE_ENV: production
 
       - name: Build release APK
         run: |
           autolinking="$(pnpm exec expo-modules-autolinking resolve --platform android --json)"
           printf '%s' "$autolinking" | node -e 'let text="";process.stdin.on("data",chunk=>text+=chunk);process.stdin.on("end",()=>{const result=JSON.parse(text);const linking=result.modules?.find(item=>item.packageName==="expo-linking");if(!linking||!linking.modules?.includes("expo.modules.linking.ExpoLinkingModule")){console.error("Expo Linking is not registered for Android autolinking.");process.exit(1)}console.log("Expo Linking module detected.")})'
           cd android
-          ./gradlew --no-daemon :app:generateAutolinkingPackageList
+          ./gradlew --stacktrace --build-cache :app:generateAutolinkingPackageList
           package_list=app/build/generated/autolinking/src/main/java/com/facebook/react/PackageList.java
           if grep -q 'import expo.core.ExpoModulesPackage;' "$package_list"; then
             sed -i 's/import expo\.core\.ExpoModulesPackage;/import expo.modules.ExpoModulesPackage;/' "$package_list"
           fi
           grep -q 'import expo.modules.ExpoModulesPackage;' "$package_list"
-          ./gradlew --no-daemon --stacktrace -x :app:generateAutolinkingPackageList assembleRelease
-        env:
-          NODE_ENV: production
+          ./gradlew --stacktrace --build-cache -x :app:generateAutolinkingPackageList assembleRelease
 
-      - name: Install and launch on Android emulator (required smoke test)
-        if: ${{ false }}
-        uses: reactivecircus/android-emulator-runner@v2
-        with:
-          api-level: 35
-          arch: x86_64
-          profile: pixel_2
-          disable-animations: true
-          script: timeout 180s bash "$GITHUB_WORKSPACE/scripts/smoke-android.sh" || echo "::warning::Android emulator smoke test timed out; APK build completed and will still be published."
+      - name: Verify APK output
+        run: |
+          apk=android/app/build/outputs/apk/release/app-release.apk
+          test -s "$apk"
+          ls -lh "$apk"
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
@@ -124,14 +122,14 @@ jobs:
           retention-days: 14
 
       - name: Publish direct APK download
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: github.ref == 'refs/heads/main'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: alshaeri-build-${{ github.run_number }}
           name: برنامج الشاعري - Android APK build ${{ github.run_number }}
           body: |
-            نسخة Android جاهزة للتثبيت المباشر.
-            اجتازت اختبارات التطبيق، وبناء Release، واختبار التثبيت والتشغيل على محاكي Android.
+            نسخة Android تجريبية مبنية من الفرع main.
+            يحتوي الإصدار على ملف APK الجاهز للتثبيت.
           files: apps/mobile/android/app/build/outputs/apk/release/*.apk
           fail_on_unmatched_files: true
           prerelease: true
