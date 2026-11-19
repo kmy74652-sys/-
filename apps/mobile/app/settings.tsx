@@ -339,7 +339,7 @@ export default function EmployeeAccessSettings() {
     <AppShell activeTab={activeTab} title={activeTab === 'employees' ? 'الموظفون' : 'الإعدادات'} subtitle="إدارة المؤسسة والموظفين">
       <ScreenHeader title={activeTab === 'employees' ? 'الموظفون' : 'الإعدادات'} subtitle="إدارة المؤسسة والموظفين" onBack={() => { if (router.canGoBack()) router.back(); else router.replace('/'); }} />
       <View style={styles.content}>
-        {!loading && canEditBrand && <View style={styles.employeeCard}>
+        {activeTab === 'settings' && !loading && canEditBrand && <View style={styles.employeeCard}>
           <Text style={styles.employeeName}>هوية المؤسسة والواجهة الرئيسية</Text>
           <Text style={styles.copy}>يمكن لصاحب المؤسسة تغيير الاسم والعبارة التعريفية ورابط الشعار. تُحفظ الإعدادات مركزياً لتظهر في أجهزة المستخدمين.</Text>
           {!brandSettingsReady && <Text style={styles.warning}>تحديث قاعدة البيانات الخاص بهوية المؤسسة لم يُطبّق بعد؛ ستعمل بقية إعدادات الموظفين بصورة طبيعية.</Text>}
@@ -363,7 +363,7 @@ export default function EmployeeAccessSettings() {
         {!!error && <Text accessibilityRole="alert" style={styles.error}>{error}</Text>}
         {!!message && <Text accessibilityLiveRegion="polite" style={styles.success}>{message}</Text>}
 
-        {!loading && isOwner && (
+        {activeTab === 'employees' && !loading && isOwner && (
           <View style={styles.employeeCard}>
             <Text style={styles.employeeName}>إنشاء حساب موظف</Text>
             <TextInput style={styles.input} placeholder="اسم الموظف" value={createForm.fullName} onChangeText={(value) => setCreateForm((current) => ({ ...current, fullName: value }))} />
