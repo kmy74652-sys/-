@@ -12,7 +12,7 @@ export type AdminTask = {
   status: string;
 };
 export type AdminBranch = { id: string; code: string; name: string; isActive: boolean; level: string | null };
-export type AdminEmployee = { id: string; name: string; employeeNo: string | null; active: boolean; roles: string[]; branchId: string | null; branchName: string | null };
+export type AdminEmployee = { id: string; userId: string | null; name: string; employeeNo: string | null; active: boolean; roles: string[]; branchId: string | null; branchName: string | null; assignments: Array<{ roleCode: string; branchId: string | null }> };
 export type AdminActivity = { id: string; taskId: string; action: string; createdAt: string };
 export type DashboardData = {
   tasks: AdminTask[];
@@ -41,20 +41,24 @@ export async function loadDashboardData(): Promise<DashboardData> {
   if (assignments.error) throw assignments.error;
   const rolesByMembership = new Map<string, string[]>();
   const branchByMembership = new Map<string, string | null>();
+  const assignmentsByMembership = new Map<string, Array<{ roleCode: string; branchId: string | null }>>();
   for (const row of assignments.data ?? []) {
     rolesByMembership.set(row.membership_id, [...(rolesByMembership.get(row.membership_id) ?? []), row.role_code]);
+    assignmentsByMembership.set(row.membership_id, [...(assignmentsByMembership.get(row.membership_id) ?? []), { roleCode: row.role_code, branchId: row.branch_id }]);
     if (!branchByMembership.has(row.membership_id)) branchByMembership.set(row.membership_id, row.branch_id);
   }
   const employees = (employeesResult.data ?? []).map((row) => {
     const branchId = branchByMembership.get(row.id) ?? null;
     return {
       id: row.id,
+      userId: row.user_id,
       name: row.display_name,
       employeeNo: row.employee_no,
       active: row.is_active,
       roles: rolesByMembership.get(row.id) ?? [],
       branchId,
       branchName: branchId ? branchNames.get(branchId) ?? null : null,
+      assignments: assignmentsByMembership.get(row.id) ?? [],
     };
   });
   const tasks = (tasksResult.data ?? []).map((row) => ({ id: row.id, title: row.title, description: row.description, branchId: row.branch_id, branchName: row.branch_id ? branchNames.get(row.branch_id) ?? null : null, assignedTo: row.assigned_to, dueAt: row.due_at, priority: row.priority, status: row.status }));
