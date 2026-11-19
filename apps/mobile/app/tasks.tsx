@@ -393,11 +393,6 @@ export default function TasksScreen() {
           subtitle="تنفيذ التكليفات ومراجعة التقارير"
           onBack={() => { if (router.canGoBack()) router.back(); else router.replace('/'); }}
         />
-        <View style={styles.headerActions}>
-          <Pressable accessibilityRole="button" accessibilityLabel="تسجيل الخروج وتبديل الحساب" style={styles.signOutButton} onPress={() => void signOut()}>
-            <Text style={styles.signOutText}>تبديل الحساب</Text>
-          </Pressable>
-        </View>
         {!!error && <Text accessibilityRole="alert" style={styles.error}>{error}</Text>}
         {!!notice && <Text accessibilityLiveRegion="polite" style={styles.notice}>{notice}</Text>}
         {!loading && <View style={styles.employeeIntro}><Text style={styles.employeeIntroTitle}>مساحة تنفيذك اليومية</Text><Text style={styles.employeeIntroText}>اقرأ التكليف، ابدأ التنفيذ، ثم عبّئ التقرير المطلوب وأرسله للمسؤول للمراجعة.</Text></View>}

@@ -151,7 +151,7 @@ export default function AdminScreen() {
   return <AppShell activeTab={shellTab} title={sectionTitles[section]} subtitle="لوحة إدارة المؤسسة" profileName={currentName} onRefresh={() => { setRefreshing(true); void load(true); }}>
     <Stack.Screen options={{ headerShown: false }} />
     <ScreenHeader title={sectionTitles[section]} subtitle={`${brandName} · ${brandTagline}`} profileName={currentName} onBack={section === 'overview' ? undefined : () => setSection('overview')} />
-    <View style={styles.shellActions}><Pressable accessibilityRole="button" accessibilityLabel="تحديث لوحة الإدارة" style={styles.secondary} onPress={() => { setRefreshing(true); void load(true); }}><Text style={styles.secondaryText}>{refreshing ? 'جارٍ التحديث…' : 'تحديث البيانات'}</Text></Pressable><Pressable accessibilityRole="button" accessibilityLabel="تسجيل الخروج وتبديل الحساب" style={styles.signOutButton} onPress={() => void signOut()}><Text style={styles.signOutButtonText}>تبديل الحساب</Text></Pressable></View>
+    <View style={styles.shellActions}><Pressable accessibilityRole="button" accessibilityLabel="تحديث لوحة الإدارة" style={styles.secondary} onPress={() => { setRefreshing(true); void load(true); }}><Text style={styles.secondaryText}>{refreshing ? 'جارٍ التحديث…' : 'تحديث البيانات'}</Text></Pressable></View>
     {!!error && <Text accessibilityRole="alert" style={styles.error}>{error}</Text>}
     {!!notice && <Text style={styles.notice}>{notice}</Text>}
 
