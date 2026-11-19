@@ -2,7 +2,6 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { ActivityIndicator, Alert, Image, Modal, Pressable, RefreshControl, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import Svg, { Defs, LinearGradient, Path, Rect, Stop } from 'react-native-svg';
 import { friendlyDataError, getMyEmployeeProfile, listMyNotifications, type MobileNotification, type MobileProfile } from '../lib/mobileData';
 import { countUnreadNotifications, loadHomeSummary } from '../lib/homeData';
 import { homeAccess, type HomeDestination, type TaskFilter } from '../lib/homeModel';
@@ -160,6 +159,9 @@ export default function HomeDashboard({ profile: initialProfile, onNavigate, onS
       <ScrollView style={styles.scroll} contentContainerStyle={styles.content} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void load(true)} tintColor={NAVY} colors={[NAVY]} />}>
         <View style={[styles.brandHeader, compact && styles.compactHeader]}>
           <Image source={require('../assets/alshaeri-official-logo.png')} style={[styles.logo, compact && styles.compactLogo]} resizeMode="contain" accessibilityLabel="الشعار الرسمي لمؤسسة الشاعري" />
+          <Pressable accessibilityRole="button" accessibilityLabel="تبديل الحساب" accessibilityHint="تسجيل الخروج وفتح حساب آخر" disabled={signingOut} style={({ pressed }) => [styles.accountSwitchButton, compact && styles.compactAccountSwitch, pressed && styles.pressed]} onPress={() => void signOut()}>
+            <HomeIcon name="avatar" size={24} color={NAVY} />
+          </Pressable>
           <View style={styles.brandCopy}>
             <Text style={[styles.brandTitle, compact && styles.compactTitle]}>برنامج الشاعري</Text>
             <Text style={[styles.brandSubtitle, compact && styles.compactSubtitle]}>{branding?.name || 'مؤسسة الشاعري للتجارة العامة'}</Text>
@@ -169,20 +171,6 @@ export default function HomeDashboard({ profile: initialProfile, onNavigate, onS
             <HomeIcon name="bell" size={28} color="#fff" />
             {unread !== null && unread > 0 && <View style={styles.badge}><Text style={styles.badgeText}>{unread > 99 ? '99+' : unread}</Text></View>}
           </Pressable>
-        </View>
-
-        <View style={styles.hero}>
-          <Image source={require('../assets/home-warehouse.jpg')} style={styles.warehouse} resizeMode="cover" accessibilityLabel="رفوف المستودع" />
-          <Svg width="58%" height="100%" style={styles.heroFade}><Defs><LinearGradient id="warehouseFade" x1="0" y1="0" x2="1" y2="0"><Stop offset="0" stopColor={NAVY} stopOpacity="0" /><Stop offset="0.8" stopColor={NAVY} stopOpacity="1" /></LinearGradient></Defs><Rect width="100%" height="100%" fill="url(#warehouseFade)" /></Svg>
-          <View style={styles.welcomeRow}>
-            <View style={styles.avatar}><HomeIcon name="avatar" size={43} color="#f4f7ff" /></View>
-            <View style={styles.welcomeCopy}>
-              <Text style={styles.welcomeTitle}>مرحباً، {profile.fullName}</Text>
-              <Pressable accessibilityRole="button" accessibilityLabel="اختيار الدور أو الفرع" style={styles.rolePicker} onPress={() => setModal('context')}><Text style={styles.welcomeRole}>{currentRole?.nameAr || 'موظف المؤسسة'}</Text><Text style={styles.downArrow}>⌄</Text></Pressable>
-            </View>
-          </View>
-          <Svg width="100%" height={22} viewBox="0 0 600 22" preserveAspectRatio="none" style={styles.heroTop}><Path d="M0 0H600V7C510 36 464-3 350 10S187 40 0 2Z" fill="#f5f7fd" /><Path d="M0 2C75 8 142 32 230 20" stroke={GOLD} strokeWidth={3} fill="none" /></Svg>
-          <Svg width="100%" height={20} viewBox="0 0 600 20" preserveAspectRatio="none" style={styles.heroBottom}><Path d="M0 20V17C90-11 206 6 300 11S505 30 600 0V20Z" fill="#f5f7fd" /></Svg>
         </View>
 
         <View style={styles.main}>
@@ -254,7 +242,9 @@ const styles = StyleSheet.create({
   brandHeader: { position: 'relative', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 92, paddingTop: 12, paddingBottom: 9, minHeight: 145, direction: 'rtl' },
   compactHeader: { paddingHorizontal: 72, minHeight: 126 },
   logo: { position: 'absolute', left: 12, top: 13, width: 92, height: 104 },
-  compactLogo: { right: 8, top: 10, width: 68, height: 82 },
+  compactLogo: { left: 8, top: 10, width: 68, height: 82 },
+  accountSwitchButton: { position: 'absolute', left: 116, top: 49, width: 42, height: 42, borderRadius: 22, borderWidth: 1, borderColor: '#c6d3e3', backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' },
+  compactAccountSwitch: { left: 82, top: 42, width: 36, height: 36, borderRadius: 19 },
   brandCopy: { width: '100%', gap: 4, alignItems: 'center' },
   brandTitle: { color: NAVY, fontSize: 26, fontWeight: '900', textAlign: 'center', writingDirection: 'rtl' },
   compactTitle: { fontSize: 21 },
@@ -266,18 +256,6 @@ const styles = StyleSheet.create({
   notificationButton: { position: 'absolute', right: 14, top: 31, width: 52, height: 52, borderRadius: 27, backgroundColor: NAVY, alignItems: 'center', justifyContent: 'center' },
   badge: { position: 'absolute', right: -3, top: -5, borderRadius: 13, backgroundColor: '#c32f32', minWidth: 24, minHeight: 24, paddingHorizontal: 4, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#f5f7fd' },
   badgeText: { color: '#fff', fontSize: 12, fontWeight: '800' },
-  hero: { backgroundColor: NAVY, minHeight: 154, paddingTop: 36, paddingBottom: 28, overflow: 'hidden' },
-  warehouse: { position: 'absolute', left: 0, top: 0, bottom: 0, width: '55%', height: '100%' },
-  heroFade: { position: 'absolute', left: 0, top: 0 },
-  heroTop: { position: 'absolute', top: -1, left: 0 },
-  heroBottom: { position: 'absolute', bottom: -1, left: 0 },
-  welcomeRow: { position: 'relative', minHeight: 90, width: '100%', direction: 'rtl' },
-  avatar: { position: 'absolute', left: 24, top: 3, width: 78, height: 78, borderRadius: 40, backgroundColor: '#31618b', borderWidth: 2, borderColor: '#91b9e0', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
-  welcomeCopy: { position: 'absolute', right: 22, top: 4, width: '58%', maxWidth: '58%', alignItems: 'flex-end', gap: 3 },
-  welcomeTitle: { color: '#fff', fontSize: 23, fontWeight: '800', textAlign: 'right', writingDirection: 'rtl' },
-  rolePicker: { flexDirection: 'row-reverse', alignItems: 'center', gap: 14, minHeight: 44 },
-  welcomeRole: { color: '#f6d472', fontSize: 19, fontWeight: '800', textAlign: 'right', writingDirection: 'rtl', flexShrink: 1 },
-  downArrow: { color: '#fff', fontSize: 25, fontWeight: '700' },
   main: { paddingHorizontal: 10, gap: 11, paddingTop: 8 },
   metrics: { flexDirection: 'row', gap: 7, direction: 'rtl' },
   metric: { flex: 1, minWidth: 0, minHeight: 122, borderWidth: 1, borderRadius: 15, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3, paddingVertical: 10, gap: 3 },
