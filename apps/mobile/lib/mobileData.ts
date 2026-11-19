@@ -141,7 +141,19 @@ export async function listMyNotifications(): Promise<MobileNotification[]> {
     .select('id,title,body,severity,read_at,created_at')
     .order('created_at', { ascending: false })
     .limit(50);
-  if (error) throw error;
+  // Notifications are an optional screen enhancement. Older production
+  // databases may not have the notifications relation yet; that must not
+  // prevent the employee's task list from loading.
+  if (error) {
+    const detail = error as { code?: string; message?: string };
+    const missingNotificationsRelation =
+      detail.code === 'PGRST205' ||
+      (detail.code === '42P01' && (detail.message ?? '').toLowerCase().includes('notifications')) ||
+      ((detail.message ?? '').toLowerCase().includes('notifications') &&
+        (detail.message ?? '').toLowerCase().includes('schema cache'));
+    if (missingNotificationsRelation) return [];
+    throw error;
+  }
   return (data ?? []) as MobileNotification[];
 }
 
