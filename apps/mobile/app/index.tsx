@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Image,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -149,10 +150,10 @@ export default function Home() {
             keyboardShouldPersistTaps="handled"
           >
             <View style={styles.auth}>
-              <Text style={styles.mark}>ش</Text>
-              <Text style={styles.eyebrow}>دخول المالك والموظفين</Text>
+              <Image source={require('../assets/alshaeri-official-logo.png')} style={styles.loginLogo} resizeMode="contain" accessibilityLabel="شعار الشاعري للتجارة العامة" />
+              <Text style={styles.eyebrow}>دخول آمن للمالك والموظفين</Text>
               <Text style={styles.title}>برنامج الشاعري</Text>
-              <Text style={styles.copy}>لصاحب المؤسسة: رقم الموظف الافتراضي هو 1. أدخل كلمة المرور التي عيّنها لك النظام. وبقية الموظفين يستخدمون رقمهم وكلمة المرور التي يحددها المسؤول.</Text>
+              <Text style={styles.copy}>أدخل رقم الموظف ورمز الدخول الذي حدده مسؤول المؤسسة.</Text>
               {!!error && <Text accessibilityRole="alert" style={styles.error}>{error}</Text>}
               <TextInput
                 style={styles.input}
@@ -217,8 +218,9 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     borderWidth: 1,
     borderColor: '#e2e9eb',
+    direction: 'rtl',
   },
-  mark: { color: '#17324d', fontSize: 42, fontWeight: '800', textAlign: 'right' },
+  loginLogo: { width: 150, height: 105, alignSelf: 'center', marginBottom: 4 },
   eyebrow: { color: '#718394', fontSize: 13, fontWeight: '700', marginBottom: 8, textAlign: 'right', lineHeight: 20 },
   title: { color: '#17324d', fontSize: 28, fontWeight: '800', textAlign: 'right', marginBottom: 12, lineHeight: 40 },
   copy: { color: '#718394', fontSize: 15, lineHeight: 24, textAlign: 'right', marginBottom: 18 },
@@ -233,10 +235,11 @@ const styles = StyleSheet.create({
     textAlign: 'right',
     fontSize: 16,
     backgroundColor: '#fbfcfc',
+    writingDirection: 'rtl',
   },
   error: { color: '#a8443d', minHeight: 22, textAlign: 'right', lineHeight: 22, marginBottom: 4 },
   helpText: { color: '#718394', fontSize: 13, textAlign: 'right', lineHeight: 20, marginTop: 14 },
-  button: { minHeight: 50, backgroundColor: '#17324d', borderRadius: 12, padding: 14, alignItems: 'center', justifyContent: 'center' },
+  button: { minHeight: 50, backgroundColor: '#0D2C54', borderRadius: 12, padding: 14, alignItems: 'center', justifyContent: 'center', borderBottomWidth: 3, borderBottomColor: '#E5A93C' },
   buttonText: { color: '#fff', fontWeight: '800', fontSize: 16 },
   resetButton: { minHeight: 44, alignItems: 'center', justifyContent: 'center', marginTop: 6 },
   resetText: { color: '#39556a', fontWeight: '700', textDecorationLine: 'underline' },

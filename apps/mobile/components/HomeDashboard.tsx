@@ -159,7 +159,7 @@ export default function HomeDashboard({ profile: initialProfile, onNavigate, onS
     <View style={styles.frame}>
       <ScrollView style={styles.scroll} contentContainerStyle={styles.content} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void load(true)} tintColor={NAVY} colors={[NAVY]} />}>
         <View style={[styles.brandHeader, compact && styles.compactHeader]}>
-          <Image source={branding?.logoUrl ? { uri: branding.logoUrl } : require('../assets/alshaeri-reference-logo.png')} style={[styles.logo, compact && styles.compactLogo]} resizeMode="contain" accessibilityLabel="شعار مؤسسة الشاعري بالذهبي والأزرق" />
+          <Image source={branding?.logoUrl ? { uri: branding.logoUrl } : require('../assets/alshaeri-official-logo.png')} style={[styles.logo, compact && styles.compactLogo]} resizeMode="contain" accessibilityLabel="شعار مؤسسة الشاعري بالذهبي والأزرق" />
           <View style={styles.brandCopy}>
             <Text style={[styles.brandTitle, compact && styles.compactTitle]}>برنامج الشاعري</Text>
             <Text style={[styles.brandSubtitle, compact && styles.compactSubtitle]}>{branding?.name || 'مؤسسة الشاعري للتجارة العامة'}</Text>
@@ -197,11 +197,11 @@ export default function HomeDashboard({ profile: initialProfile, onNavigate, onS
 
           <View style={styles.moduleGrid}>
             {services.map((item) => {
-              const enabled = item.key !== 'inventory' && access[item.key];
+              const enabled = item.key === 'inventory' ? true : access[item.key];
               const unavailable = item.key === 'inventory';
-              return <Pressable key={item.key} accessibilityRole="button" accessibilityState={{ disabled: !enabled }} accessibilityLabel={`${item.title}، ${item.subtitle}${!enabled ? unavailable ? '، غير متاح في الإصدار الحالي' : '، غير متاح حسب صلاحياتك' : ''}`} disabled={!enabled && !unavailable} style={({ pressed }) => [styles.moduleCard, largeText && styles.largeModuleCard, !enabled && styles.unavailableCard, pressed && styles.pressed]} onPress={() => unavailable ? Alert.alert('المخزون غير متاح', 'وحدة المخزون غير موجودة في الإصدار الحالي. لم تتغير بيانات التطبيق أو صلاحياته.') : navigate(item.key as HomeDestination)}>
+              return <Pressable key={item.key} accessibilityRole="button" accessibilityState={{ disabled: false }} accessibilityLabel={`${item.title}، ${item.subtitle}`} style={({ pressed }) => [styles.moduleCard, largeText && styles.largeModuleCard, !enabled && styles.unavailableCard, pressed && styles.pressed]} onPress={() => unavailable ? Alert.alert('المخزون', 'وحدة المخزون مرتبطة بإدارة المؤسسة وسيتم فتحها عند توفر صلاحية المخزون.') : navigate(item.key as HomeDestination)}>
                 <HomeIcon name={item.icon} size={compact ? 31 : 37} />
-                <View style={styles.moduleCopy}><Text style={[styles.moduleTitle, compact && styles.compactModuleTitle]}>{item.title}</Text><Text style={[styles.moduleSubtitle, compact && styles.compactModuleSubtitle]}>{item.subtitle}</Text>{!enabled && <Text style={styles.unavailableText}>{unavailable ? 'غير متاح حالياً' : 'غير متاح لحسابك'}</Text>}</View>
+                <View style={styles.moduleCopy}><Text style={[styles.moduleTitle, compact && styles.compactModuleTitle]}>{item.title}</Text><Text style={[styles.moduleSubtitle, compact && styles.compactModuleSubtitle]}>{item.subtitle}</Text>{!enabled && !unavailable && <Text style={styles.unavailableText}>غير متاح لحسابك</Text>}</View>
               </Pressable>;
             })}
           </View>
@@ -248,9 +248,7 @@ export default function HomeDashboard({ profile: initialProfile, onNavigate, onS
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: '#f5f7fd' },
-  // Explicit local LTR geometry plus row-reverse guarantees the same physical
-  // RTL order on Arabic devices and on a first launch before forceRTL reloads.
-  frame: { flex: 1, width: '100%', maxWidth: 840, alignSelf: 'center', direction: 'ltr' },
+  frame: { flex: 1, width: '100%', maxWidth: 840, alignSelf: 'center', direction: 'rtl' },
   scroll: { flex: 1 },
   content: { flexGrow: 1, paddingBottom: 16 },
   brandHeader: { flexDirection: 'row-reverse', alignItems: 'center', gap: 7, paddingHorizontal: 10, paddingTop: 12, paddingBottom: 9, minHeight: 119 },
