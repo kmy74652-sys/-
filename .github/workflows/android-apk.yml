@@ -134,8 +134,9 @@ jobs:
           tag_name: alshaeri-build-${{ github.run_number }}
           name: برنامج الشاعري - Android APK build ${{ github.run_number }}
           body: |
-            نسخة Android تجريبية مبنية من الفرع main.
-            يحتوي الإصدار على ملف APK الجاهز للتثبيت.
+            نسخة Android الرسمية المبنية من الفرع main بعد آخر التعديلات.
+            يحتوي الإصدار على ملف APK الجاهز للتثبيت والاختبار الفعلي.
           files: apps/artifacts/alshaeri-release.apk
           fail_on_unmatched_files: true
-          prerelease: true
+          prerelease: false
+          make_latest: true
