@@ -22,7 +22,7 @@ type Profile = MobileProfile;
 export default function Home() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [checkingSession, setCheckingSession] = useState(true);
-  const [employeeNo, setEmployeeNo] = useState('1');
+  const [employeeNo, setEmployeeNo] = useState('');
   const [code, setCode] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -79,7 +79,7 @@ export default function Home() {
       return;
     }
     if (!employeeNo.trim() || !code) {
-      setError('أدخل رقم الموظف وكلمة المرور.');
+      setError('أدخل اسم الموظف ورمز الدخول.');
       return;
     }
     if (!/^\S{8,64}$/.test(code)) {
@@ -96,7 +96,7 @@ export default function Home() {
       if (functionError) {
         const status = (functionError as { context?: { status?: number } }).context?.status;
         if (status === 429) setError('محاولات كثيرة. انتظر 15 دقيقة ثم حاول مجددًا.');
-        else if (status === 401) setError('رقم الموظف أو رمز الدخول غير صحيح، أو لم يعيّن المالك رمزًا لهذا الموظف.');
+        else if (status === 401) setError('اسم الموظف أو رمز الدخول غير صحيح.');
         else if (status === 404 || status === 503) setError('خدمة الدخول بالرمز أو تحديث قاعدة البيانات غير جاهز في Supabase بعد.');
         else setError('تعذر الاتصال بخدمة تسجيل الدخول. تحقق من الإنترنت وحاول مجددًا.');
         return;
@@ -151,13 +151,13 @@ export default function Home() {
           >
             <View style={styles.auth}>
               <Image source={require('../assets/alshaeri-official-logo.png')} style={styles.loginLogo} resizeMode="contain" accessibilityLabel="شعار الشاعري للتجارة العامة" />
-              <Text style={styles.eyebrow}>دخول آمن للمالك والموظفين</Text>
+              <Text style={styles.eyebrow}>بوابة العمل والتواصل الإداري</Text>
               <Text style={styles.title}>برنامج الشاعري</Text>
-              <Text style={styles.copy}>أدخل رقم الموظف ورمز الدخول الذي حدده مسؤول المؤسسة.</Text>
+              <Text style={styles.copy}>سجّل دخولك للوصول إلى مهامك، تقاريرك، وتنبيهات العمل في مكان واحد.</Text>
               {!!error && <Text accessibilityRole="alert" style={styles.error}>{error}</Text>}
               <TextInput
                 style={styles.input}
-                placeholder="رقم الموظف"
+                placeholder="اسم الموظف"
                 autoCapitalize="none"
                 autoCorrect={false}
                 autoComplete="off"
@@ -193,7 +193,7 @@ export default function Home() {
               {!!error && <Pressable accessibilityRole="button" disabled={busy} style={styles.resetButton} onPress={() => void retrySession()}>
                 <Text style={styles.resetText}>إعادة الاتصال بـSupabase</Text>
               </Pressable>}
-              <Text style={styles.helpText}>نسيت الرمز أو لم يُعيّن لك بعد؟ تواصل مع صاحب المؤسسة.</Text>
+              <Text style={styles.helpText}>نسيت الرمز أو لم يُعيّن لك بعد؟ تواصل مع الإدارة.</Text>
             </View>
           </ScrollView>
         </KeyboardAvoidingView>
