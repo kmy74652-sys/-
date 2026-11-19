@@ -5,12 +5,12 @@ import {
   Alert,
   Pressable,
   SafeAreaView,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from 'react-native';
+import AppShell, { ScreenHeader } from '../components/AppShell';
 import { friendlyDataError, getMyEmployeeProfile } from '../lib/mobileData';
 import { supabase } from '../lib/supabase';
 import { loadOrganizationBranding, saveOrganizationBranding } from '../lib/organizationBranding';
@@ -37,6 +37,13 @@ const roleOptions = [
 ] as const;
 
 type EmployeeListResult = { employees?: EmployeeAccess[]; branches?: Array<Branch & { code: string; is_active: boolean }> };
+type SettingsSnapshot = {
+  employees: EmployeeAccess[];
+  branches: Branch[];
+  editForms: Record<string, { employeeNo: string; fullName: string; roleCode: string; branchId: string; status: 'active' | 'suspended' }>;
+};
+
+let settingsCache: SettingsSnapshot | null = null;
 
 function functionStatus(error: unknown) {
   return (error as { context?: { status?: number } } | null)?.context?.status;
@@ -93,7 +100,27 @@ export default function EmployeeAccessSettings() {
     void loadSettings();
   }, []);
 
-  async function loadSettings() {
+  function applySnapshot(snapshot: SettingsSnapshot) {
+    setEmployees(snapshot.employees);
+    setBranches(snapshot.branches);
+    setEditForms(snapshot.editForms);
+    if (!createForm.branchId && createForm.roleCode !== 'owner' && snapshot.branches[0]) {
+      setCreateForm((current) => ({ ...current, branchId: snapshot.branches[0].id }));
+    }
+  }
+
+  function applyEmployeeList(data: unknown) {
+    const nextEmployees = normalizeEmployeeList(data);
+    setEmployees(nextEmployees);
+    if (settingsCache) settingsCache = { ...settingsCache, employees: nextEmployees };
+  }
+
+  async function loadSettings(options: { force?: boolean } = {}) {
+    if (!options.force && settingsCache) {
+      applySnapshot(settingsCache);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     setError('');
     try {
@@ -130,19 +157,18 @@ export default function EmployeeAccessSettings() {
         return;
       }
       const normalized = normalizeEmployeeList(data);
-      setEmployees(normalized);
       const nextBranches = ((data as EmployeeListResult | null)?.branches ?? [])
         .filter((branch) => branch.is_active)
         .map((branch) => ({ id: branch.id, name: branch.name }));
-      setBranches(nextBranches);
-      if (!createForm.branchId && createForm.roleCode !== 'owner' && nextBranches[0]) setCreateForm((current) => ({ ...current, branchId: nextBranches[0].id }));
-      setEditForms((current) => Object.fromEntries(normalized.map((employee) => [employee.id, {
+      const snapshot: SettingsSnapshot = { employees: normalized, branches: nextBranches, editForms: Object.fromEntries(normalized.map((employee) => [employee.id, {
         employeeNo: employee.employeeNo ?? '',
         fullName: employee.fullName ?? '',
         roleCode: employee.roleCode ?? 'warehouse_worker',
         branchId: employee.roleCode === 'owner' ? '' : employee.branchId ?? nextBranches[0]?.id ?? '',
         status: employee.status === 'active' ? 'active' : 'suspended',
-      }] )));
+      }])) };
+      settingsCache = snapshot;
+      applySnapshot(snapshot);
     } catch (cause) {
       setError(friendlyDataError(cause, 'تعذر تحميل قائمة الموظفين. تحقق من الاتصال ثم أعد المحاولة.'));
     } finally {
@@ -184,7 +210,7 @@ export default function EmployeeAccessSettings() {
       if (createError) { setError(functionErrorText(createError)); return; }
       setCreateForm({ employeeNo: '', fullName: '', code: '', roleCode: 'warehouse_worker', branchId: branches[0]?.id ?? '' });
       setMessage(`تم إنشاء الحساب للموظف ${data?.employee?.fullName ?? ''}. لن تظهر كلمة المرور مرة أخرى.`);
-      await loadSettings();
+      await loadSettings({ force: true });
     } catch { setError('تعذر إنشاء حساب الموظف.'); } finally { setBusyEmployeeId(null); }
   }
 
@@ -197,7 +223,7 @@ export default function EmployeeAccessSettings() {
       const { error: updateError } = await supabase.functions.invoke('employee-code-auth', { body: { action: 'update_employee', employeeId: employee.id, ...draft, branchId: draft.roleCode === 'owner' ? null : draft.branchId } });
       if (updateError) { setError(functionErrorText(updateError)); return; }
       setMessage(`تم تحديث بيانات ${draft.fullName}.`);
-      await loadSettings();
+      await loadSettings({ force: true });
     } catch { setError('تعذر تحديث بيانات الموظف.'); } finally { setBusyEmployeeId(null); }
   }
 
@@ -225,7 +251,7 @@ export default function EmployeeAccessSettings() {
       const { data, error: refreshError } = await supabase.functions.invoke('employee-code-auth', {
         body: { action: 'list' },
       });
-      if (!refreshError) setEmployees(normalizeEmployeeList(data));
+      if (!refreshError) applyEmployeeList(data);
     } catch {
       setError('تعذر حفظ الرمز. تحقق من الاتصال ثم حاول مجددًا.');
     } finally {
@@ -268,7 +294,7 @@ export default function EmployeeAccessSettings() {
       const { data, error: refreshError } = await supabase.functions.invoke('employee-code-auth', {
         body: { action: 'list' },
       });
-      if (!refreshError) setEmployees(normalizeEmployeeList(data));
+      if (!refreshError) applyEmployeeList(data);
     } catch {
       setError('تعذر إلغاء الرمز. تحقق من الاتصال ثم حاول مجددًا.');
     } finally {
@@ -277,13 +303,9 @@ export default function EmployeeAccessSettings() {
   }
 
   return (
-    <SafeAreaView style={styles.safe}>
-      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-        <Pressable accessibilityRole="button" onPress={() => router.back()} style={styles.back}>
-          <Text style={styles.backText}>العودة</Text>
-        </Pressable>
-        <Text style={styles.eyebrow}>إدارة المؤسسة</Text>
-        <Text style={styles.title}>الإعدادات</Text>
+    <AppShell activeTab="settings" title="الإعدادات" subtitle="إدارة المؤسسة والموظفين">
+      <ScreenHeader title="الإعدادات" subtitle="إدارة المؤسسة والموظفين" onBack={() => router.back()} />
+      <View style={styles.content}>
         {!loading && canEditBrand && <View style={styles.employeeCard}>
           <Text style={styles.employeeName}>هوية المؤسسة والواجهة الرئيسية</Text>
           <Text style={styles.copy}>يمكن لصاحب المؤسسة تغيير الاسم والعبارة التعريفية ورابط الشعار. تُحفظ الإعدادات مركزياً لتظهر في أجهزة المستخدمين.</Text>
@@ -408,12 +430,12 @@ export default function EmployeeAccessSettings() {
         }) : null}
 
         {!loading && isOwner && (
-          <Pressable accessibilityRole="button" disabled={busyEmployeeId !== null} style={styles.refresh} onPress={() => void loadSettings()}>
+          <Pressable accessibilityRole="button" disabled={busyEmployeeId !== null} style={styles.refresh} onPress={() => void loadSettings({ force: true })}>
             <Text style={styles.refreshText}>تحديث قائمة الموظفين</Text>
           </Pressable>
         )}
-      </ScrollView>
-    </SafeAreaView>
+      </View>
+    </AppShell>
   );
 }
 
@@ -435,7 +457,7 @@ export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: '#f4f7f8' },
-  content: { padding: 18, paddingTop: 20, paddingBottom: 36 },
+  content: { padding: 18, paddingTop: 4, paddingBottom: 36, direction: 'rtl' },
   back: { alignSelf: 'flex-end', paddingVertical: 8, paddingHorizontal: 4, marginBottom: 12 },
   backText: { color: '#39556a', fontSize: 15, fontWeight: '700' },
   eyebrow: { color: '#718394', fontSize: 13, fontWeight: '700', marginBottom: 6, textAlign: 'right' },

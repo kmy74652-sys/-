@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, AppState, Image, Pressable, RefreshControl, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import AdenDeadlinePicker, { adenDateTimeToIso, currentAdenDateTime } from '../components/AdenDeadlinePicker';
 import HomeDashboard from '../components/HomeDashboard';
+import AppShell, { ScreenHeader, type ShellTab } from '../components/AppShell';
 import { friendlyDataError, getMyEmployeeProfile, type MobileProfile } from '../lib/mobileData';
 import { createAdministrativeTask, loadDashboardData, roleLabel, statusLabel, type DashboardData } from '../lib/adminData';
 import { supabase } from '../lib/supabase';
@@ -39,6 +40,8 @@ export default function AdminScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  const lastLoadedAt = useRef(0);
+  const loadInFlight = useRef<Promise<void> | null>(null);
   const [showCreate, setShowCreate] = useState(false);
   const [initialDeadline] = useState(currentAdenDateTime);
   const [draft, setDraft] = useState({ title: '', description: '', dueDate: initialDeadline.date, dueTime: initialDeadline.time, priority: 'normal', roleCode: 'admin_followup', branchId: '', assignedEmployeeId: '', templateId: '', reportTemplateId: '', reportRequired: true });
@@ -47,9 +50,13 @@ export default function AdminScreen() {
     if (isSection(requestedSection)) setSection(requestedSection);
   }, [requestedSection]);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (force = false) => {
+    const now = Date.now();
+    if (loadInFlight.current) return loadInFlight.current;
+    if (!force && now - lastLoadedAt.current < 30_000) return;
     setError('');
-    try {
+    const request = (async () => {
+      try {
       const identity = await getMyEmployeeProfile();
       if (!identity?.employee) throw new Error('employee_not_active');
       setProfile(identity.employee);
@@ -72,10 +79,14 @@ export default function AdminScreen() {
       setDesignerTemplates(reportTemplates);
       setTaskDesignerTemplates(editableTaskTemplates);
       setTaskCategories(categories);
-    } catch (cause) { setError(friendlyDataError(cause, 'تعذر تحميل لوحة الإدارة من Supabase.')); }
-    finally { setLoading(false); setRefreshing(false); }
+        lastLoadedAt.current = Date.now();
+      } catch (cause) { setError(friendlyDataError(cause, 'تعذر تحميل لوحة الإدارة من Supabase.')); }
+      finally { setLoading(false); setRefreshing(false); }
+    })();
+    loadInFlight.current = request;
+    try { await request; } finally { if (loadInFlight.current === request) loadInFlight.current = null; }
   }, []);
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => { void load(true); }, [load]);
   useEffect(() => { const sub = AppState.addEventListener('change', (state) => { if (state === 'active') void load(); }); return () => sub.remove(); }, [load]);
 
   const counts = useMemo(() => {
@@ -111,7 +122,7 @@ export default function AdminScreen() {
       });
       const nextDeadline = currentAdenDateTime();
       setDraft({ title: '', description: '', dueDate: nextDeadline.date, dueTime: nextDeadline.time, priority: 'normal', roleCode: 'admin_followup', branchId: '', assignedEmployeeId: '', templateId: '', reportTemplateId: '', reportRequired: true });
-      setShowCreate(false); setNotice('تم إنشاء المهمة وإسنادها للموظف المحدد.'); await load();
+      setShowCreate(false); setNotice('تم إنشاء المهمة وإسنادها للموظف المحدد.'); await load(true);
     } catch (cause) { setError(friendlyDataError(cause, 'تعذر إنشاء المهمة. تأكد من وجود موظف نشط ضمن التصنيف والفرع المحددين.')); }
   }
   const canManageTaskLibrary = permissions.includes('task_library.manage');
@@ -135,13 +146,14 @@ export default function AdminScreen() {
 
   if (loading) return <SafeAreaView style={styles.safe}><View style={styles.center}><ActivityIndicator size="large" color="#17324d" /><Text style={styles.muted}>جارٍ تحميل لوحة الإدارة…</Text></View></SafeAreaView>;
   if (section === 'overview' && profile) return <HomeDashboard profile={profile} onNavigate={navigateFromHome} />;
-  return <SafeAreaView style={styles.safe}>
+  const shellTab: ShellTab = section === 'tasks' ? 'tasks' : section === 'employees' ? 'employees' : section === 'overview' ? 'home' : 'settings';
+  const sectionTitles: Record<Section, string> = { overview: 'الرئيسية', tasks: 'إدارة المهام', 'task-designer': 'مصمم المهام', 'report-designer': 'مصمم التقارير', reports: 'تقارير الموظفين', branches: 'إدارة الفروع', employees: 'الموظفون', activity: 'السجل والمرفقات' };
+  return <AppShell activeTab={shellTab} title={sectionTitles[section]} subtitle="لوحة إدارة المؤسسة" profileName={currentName} onRefresh={() => { setRefreshing(true); void load(true); }}>
     <Stack.Screen options={{ headerShown: false }} />
-    <ScrollView refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); void load(); }} />} contentContainerStyle={styles.content}>
-      <View style={styles.brandHeader}><View style={styles.brandIdentity}><Image source={brandLogoUrl ? { uri: brandLogoUrl } : require('../assets/icon.png')} style={styles.brandLogo} resizeMode="contain" /><View style={styles.brandTitles}><Text style={styles.brandName}>برنامج الشاعري</Text><Text style={styles.brandSubtitle}>{brandName}</Text><Text style={styles.brandMotto}>{brandTagline}</Text></View></View><View style={styles.headerActions}><Pressable accessibilityRole="button" accessibilityLabel="سجل النشاط" style={styles.notificationButton} onPress={() => setSection('activity')}><Text style={styles.notificationGlyph}>♧</Text></Pressable><Pressable accessibilityRole="button" accessibilityLabel="تسجيل الخروج وتبديل الحساب" style={styles.signOutButton} onPress={() => void signOut()}><Text style={styles.signOutButtonText}>تبديل الحساب</Text></Pressable></View></View>
-      <View style={styles.welcomeBanner}><View style={styles.welcomeAvatar}><Text style={styles.avatarGlyph}>●</Text></View><View style={styles.welcomeText}><Text style={styles.welcomeTitle}>مرحباً، {currentName || 'بك'}</Text><Text style={styles.welcomeRole}>لوحة إدارة المؤسسة</Text></View></View>
-      {!!error && <Text accessibilityRole="alert" style={styles.error}>{error}</Text>}
-      {!!notice && <Text style={styles.notice}>{notice}</Text>}
+    <ScreenHeader title={sectionTitles[section]} subtitle={`${brandName} · ${brandTagline}`} profileName={currentName} onBack={section === 'overview' ? undefined : () => setSection('overview')} />
+    <View style={styles.shellActions}><Pressable accessibilityRole="button" accessibilityLabel="تحديث لوحة الإدارة" style={styles.secondary} onPress={() => { setRefreshing(true); void load(true); }}><Text style={styles.secondaryText}>{refreshing ? 'جارٍ التحديث…' : 'تحديث البيانات'}</Text></Pressable><Pressable accessibilityRole="button" accessibilityLabel="تسجيل الخروج وتبديل الحساب" style={styles.signOutButton} onPress={() => void signOut()}><Text style={styles.signOutButtonText}>تبديل الحساب</Text></Pressable></View>
+    {!!error && <Text accessibilityRole="alert" style={styles.error}>{error}</Text>}
+    {!!notice && <Text style={styles.notice}>{notice}</Text>}
 
       {section === 'overview' && !profile && <Overview counts={counts} data={data} fmt={fmt} onSection={setSection} onSettings={() => router.push('/settings')} canDesign={canManageTaskLibrary} />}
       {section === 'tasks' && <>{canManageTaskLibrary && <TaskAssignmentSection templates={taskDesignerTemplates} data={data} onReload={load} onEditTemplates={() => setSection('task-designer')} />}<TasksSection data={data} designerTemplates={designerTemplates} showCreate={showCreate} setShowCreate={setShowCreate} draft={draft} setDraft={setDraft} createTask={createTask} fmt={fmt} onOpenTasks={() => router.push('/tasks')} /></>}
@@ -151,9 +163,7 @@ export default function AdminScreen() {
       {section === 'branches' && (canViewBranches ? <BranchesSection data={data} canManage={permissions.includes('branches.manage')} onReload={load} /> : <Unavailable title="إدارة الفروع" text="لا تملك صلاحية عرض الفروع." />)}
       {section === 'employees' && (canViewEmployees ? <EmployeesSection data={data} /> : <Unavailable title="الموظفون" text="لا تملك صلاحية عرض الموظفين." />)}
       {section === 'activity' && (canViewActivity ? <ActivitySection data={data} fmt={fmt} /> : <Unavailable title="سجل النشاط" text="لا تملك صلاحية قراءة سجل النشاط." />)}
-    </ScrollView>
-    <View style={styles.bottomBar}><Pressable style={[styles.bottomItem, section === 'overview' && styles.bottomItemActive]} onPress={() => router.replace('/')}><Text style={[styles.bottomGlyph, section === 'overview' && styles.bottomGlyphActive]}>⌂</Text><Text style={[styles.bottomLabel, section === 'overview' && styles.bottomLabelActive]}>الرئيسية</Text></Pressable><Pressable style={[styles.bottomItem, section === 'tasks' && styles.bottomItemActive]} onPress={() => setSection('tasks')}><Text style={[styles.bottomGlyph, section === 'tasks' && styles.bottomGlyphActive]}>▣</Text><Text style={[styles.bottomLabel, section === 'tasks' && styles.bottomLabelActive]}>المهام</Text></Pressable><Pressable style={[styles.bottomItem, section === 'employees' && styles.bottomItemActive]} onPress={() => setSection('employees')}><Text style={[styles.bottomGlyph, section === 'employees' && styles.bottomGlyphActive]}>♟</Text><Text style={[styles.bottomLabel, section === 'employees' && styles.bottomLabelActive]}>الموظفون</Text></Pressable><Pressable style={styles.bottomItem} onPress={() => router.push('/settings')}><Text style={styles.bottomGlyph}>⚙</Text><Text style={styles.bottomLabel}>الإعدادات</Text></Pressable></View>
-  </SafeAreaView>;
+  </AppShell>;
 }
 
 function Overview({ counts, data, fmt, onSection, onSettings, canDesign }: { counts: { all: number; new: number; active: number; review: number; late: number; done: number }; data: DashboardData | null; fmt: (v: string | null) => string; onSection: (section: Section) => void; onSettings: () => void; canDesign: boolean }) { return <>
@@ -400,6 +410,7 @@ function TaskAssignmentSection({ templates, data, onReload, onEditTemplates }: {
 }
 
 const styles = StyleSheet.create({
+  shellActions: { flexDirection:'row-reverse', alignItems:'center', justifyContent:'space-between', gap:8 },
   brandHeader: { flexDirection:'row-reverse', alignItems:'center', justifyContent:'space-between', paddingVertical:10, paddingHorizontal:2, minHeight:82 },
   brandIdentity: { flexDirection:'row-reverse', alignItems:'center', flex:1, gap:10 },
   brandLogo: { width:68, height:68, borderRadius:18, backgroundColor:'#fff', borderWidth:1, borderColor:'#e2e9f2' },

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { ActivityIndicator, Alert, AppState, Image, Modal, Pressable, RefreshControl, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { ActivityIndicator, Alert, Image, Modal, Pressable, RefreshControl, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Defs, LinearGradient, Path, Rect, Stop } from 'react-native-svg';
 import { friendlyDataError, getMyEmployeeProfile, listMyNotifications, type MobileNotification, type MobileProfile } from '../lib/mobileData';
@@ -52,11 +52,14 @@ export default function HomeDashboard({ profile: initialProfile, onNavigate, onS
   const [notificationsBusy, setNotificationsBusy] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
   const request = useRef(0);
+  const lastLoadedAt = useRef(0);
+  const hasLoaded = useRef(false);
   const access = homeAccess(profile);
   const currentBranch = profile.branches.find((branch) => branch.id === branchId);
   const currentRole = profile.roles.find((role) => role.code === roleCode) ?? profile.roles[0];
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (force = false) => {
+    if (!force && hasLoaded.current && Date.now() - lastLoadedAt.current < 30_000) return;
     const ticket = ++request.current;
     setError('');
     setRefreshing(true);
@@ -77,6 +80,7 @@ export default function HomeDashboard({ profile: initialProfile, onNavigate, onS
         setBranchId(authorizedBranch);
         setSummary(null);
         setLastUpdated(null);
+        hasLoaded.current = false;
         return;
       }
       const [counts, brand, badge] = await Promise.all([
@@ -90,6 +94,8 @@ export default function HomeDashboard({ profile: initialProfile, onNavigate, onS
       setUnread(badge);
       setNotificationError(badge === null ? 'تعذر تحديث عداد التنبيهات. أعد المحاولة.' : '');
       setLastUpdated(new Date());
+      lastLoadedAt.current = Date.now();
+      hasLoaded.current = true;
     } catch (cause) {
       if (ticket === request.current) setError(friendlyDataError(cause, 'تعذر تحديث الرئيسية. تحقق من الاتصال واسحب لأسفل لإعادة المحاولة.'));
     } finally {
@@ -99,10 +105,7 @@ export default function HomeDashboard({ profile: initialProfile, onNavigate, onS
 
   useFocusEffect(useCallback(() => {
     void load();
-    const appState = AppState.addEventListener('change', (state) => { if (state === 'active') void load(); });
-    // Refresh while visible, including automatically computed overdue tasks.
-    const timer = setInterval(() => { if (AppState.currentState === 'active') void load(); }, 60000);
-    return () => { ++request.current; appState.remove(); clearInterval(timer); };
+    return () => { ++request.current; };
   }, [load]));
   useEffect(() => { setProfile(initialProfile); }, [initialProfile]);
 
@@ -154,7 +157,7 @@ export default function HomeDashboard({ profile: initialProfile, onNavigate, onS
 
   return <SafeAreaView edges={['top', 'left', 'right']} style={styles.safe}>
     <View style={styles.frame}>
-      <ScrollView style={styles.scroll} contentContainerStyle={styles.content} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void load()} tintColor={NAVY} colors={[NAVY]} />}>
+      <ScrollView style={styles.scroll} contentContainerStyle={styles.content} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void load(true)} tintColor={NAVY} colors={[NAVY]} />}>
         <View style={[styles.brandHeader, compact && styles.compactHeader]}>
           <Image source={branding?.logoUrl ? { uri: branding.logoUrl } : require('../assets/alshaeri-reference-logo.png')} style={[styles.logo, compact && styles.compactLogo]} resizeMode="contain" accessibilityLabel="شعار مؤسسة الشاعري بالذهبي والأزرق" />
           <View style={styles.brandCopy}>

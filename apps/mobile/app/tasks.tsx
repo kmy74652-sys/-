@@ -1,10 +1,9 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   AppState,
   ActivityIndicator,
   Pressable,
   RefreshControl,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
@@ -33,6 +32,7 @@ import { pickTaskAttachment, uploadTaskAttachment, type PickedAttachment } from 
 import { evaluateReportField, normalizeTableColumns, reportDefaultDraft, validateReportFieldValue, type ReportField, type ReportTableColumn } from '../lib/reportSchema';
 import ReportFieldInput from '../components/ReportFieldInput';
 import ReportReadOnly from '../components/ReportReadOnly';
+import AppShell, { ScreenHeader } from '../components/AppShell';
 
 type Task = {
   id: string;
@@ -120,8 +120,13 @@ export default function TasksScreen() {
   const [attachments, setAttachments] = useState<Record<string, Record<string, Array<PickedAttachment & { path?: string }>>>>({});
   const [stepAttachments, setStepAttachments] = useState<Record<string, Record<string, { id: string; name: string }>>>({});
   const [timeline, setTimeline] = useState<Record<string, Awaited<ReturnType<typeof listTaskTimeline>>>>({});
+  const lastLoadAt = useRef(0);
+  const loadInFlight = useRef(false);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async ({ force = false }: { force?: boolean } = {}) => {
+    if (loadInFlight.current) return;
+    if (!force && Date.now() - lastLoadAt.current < 15_000) return;
+    loadInFlight.current = true;
     setError('');
     try {
       await syncOfflineQueue();
@@ -160,6 +165,8 @@ export default function TasksScreen() {
     } catch (cause) {
       setError(friendlyDataError(cause, 'تعذر تحميل البيانات مباشرة من Supabase. تحقق من الاتصال والصلاحيات.'));
     } finally {
+      lastLoadAt.current = Date.now();
+      loadInFlight.current = false;
       setLoading(false);
       setRefreshing(false);
     }
@@ -189,7 +196,7 @@ export default function TasksScreen() {
       setReportTask('');
       setActiveReportForm(null);
       setReviewNote('');
-      await load();
+      await load({ force: true });
     } catch (cause) {
       setError(friendlyDataError(cause, 'تعذر تنفيذ الإجراء عبر Supabase. تحقق من الاتصال والصلاحيات.'));
     } finally {
@@ -375,25 +382,21 @@ export default function TasksScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.safe}>
+    <AppShell activeTab="tasks" title="المهام والمتابعة" scroll={false}>
       <Stack.Screen options={{ title: 'المهام', headerShown: false }} />
       <ScrollView
         contentContainerStyle={styles.content}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); void load(); }} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); void load({ force: true }); }} />}
       >
-        <View style={styles.header}>
-          <View style={styles.headerText}>
-            <Text style={styles.eyebrow}>برنامج الشاعري</Text>
-            <Text style={styles.title}>المهام والمتابعة</Text>
-          </View>
-          <View style={styles.headerActions}>
-            <Pressable accessibilityRole="button" style={styles.backButton} onPress={() => { if (router.canGoBack()) router.back(); else router.replace('/'); }}>
-              <Text style={styles.backText}>رجوع</Text>
-            </Pressable>
-            <Pressable accessibilityRole="button" accessibilityLabel="تسجيل الخروج وتبديل الحساب" style={styles.signOutButton} onPress={() => void signOut()}>
-              <Text style={styles.signOutText}>تبديل الحساب</Text>
-            </Pressable>
-          </View>
+        <ScreenHeader
+          title="المهام والمتابعة"
+          subtitle="تنفيذ التكليفات ومراجعة التقارير"
+          onBack={() => { if (router.canGoBack()) router.back(); else router.replace('/'); }}
+        />
+        <View style={styles.headerActions}>
+          <Pressable accessibilityRole="button" accessibilityLabel="تسجيل الخروج وتبديل الحساب" style={styles.signOutButton} onPress={() => void signOut()}>
+            <Text style={styles.signOutText}>تبديل الحساب</Text>
+          </Pressable>
         </View>
         {!!error && <Text accessibilityRole="alert" style={styles.error}>{error}</Text>}
         {!!notice && <Text accessibilityLiveRegion="polite" style={styles.notice}>{notice}</Text>}
@@ -526,22 +529,15 @@ export default function TasksScreen() {
           ))}
         </View>
       </ScrollView>
-    </SafeAreaView>
+    </AppShell>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#f4f7f8' },
-  content: { padding: 16, paddingBottom: 36, gap: 12 },
-  header: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 },
-  headerText: { flex: 1 },
-  headerActions: { flexDirection: 'row-reverse', alignItems: 'center', gap: 7 },
+  content: { padding: 12, paddingBottom: 32, gap: 12 },
+  headerActions: { flexDirection: 'row-reverse', alignItems: 'center', marginBottom: 2 },
   signOutButton: { minHeight: 44, borderRadius: 10, borderWidth: 1, borderColor: '#b55248', backgroundColor: '#fff', paddingHorizontal: 10, alignItems: 'center', justifyContent: 'center' },
   signOutText: { color: '#a8443d', fontSize: 12, fontWeight: '800' },
-  eyebrow: { color: '#718394', textAlign: 'right', fontWeight: '700', marginBottom: 4 },
-  title: { color: '#17324d', fontSize: 25, fontWeight: '800', textAlign: 'right' },
-  backButton: { minHeight: 44, minWidth: 58, alignItems: 'center', justifyContent: 'center', borderRadius: 10, backgroundColor: '#e5edf0' },
-  backText: { color: '#17324d', fontWeight: '700' },
   pending: { color: '#8c4f13', backgroundColor: '#fff1dc', borderRadius: 9, padding: 10, textAlign: 'right' },
   modeTabs: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 7, paddingVertical: 3 },
   modeTab: { flex: 1, minWidth: 92, minHeight: 42, borderRadius: 12, borderWidth: 1, borderColor: '#ccd9df', backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 9, paddingVertical: 8 },
