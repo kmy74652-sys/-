@@ -67,6 +67,7 @@ const positionLabels: Record<NonNullable<Task['position_code']>, string> = {
 };
 
 export default function TasksScreen() {
+  // Employee flow: read task, execute steps, complete the requested report.
   const router = useRouter();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
