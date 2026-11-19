@@ -3,7 +3,6 @@ import { Image, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View, u
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import HomeIcon, { type HomeIconName } from './HomeIcon';
-import { supabase } from '../lib/supabase';
 
 const NAVY = '#0b3458';
 const GOLD = '#e5b336';
@@ -42,15 +41,9 @@ export default function AppShell({ children, activeTab, title, subtitle, profile
   </SafeAreaView>;
 }
 
-export function ScreenHeader({ title, subtitle, profileName, onBack }: { title: string; subtitle?: string; profileName?: string; onBack?: () => void }) {
-  const router = useRouter();
-  async function switchAccount() {
-    if (supabase) await supabase.auth.signOut();
-    router.replace('/');
-  }
+export function ScreenHeader({ title, subtitle, profileName }: { title: string; subtitle?: string; profileName?: string; onBack?: () => void }) {
   return <View style={styles.header}>
     <View style={styles.headerIdentity}><Image source={require('../assets/alshaeri-official-logo.png')} style={styles.logo} resizeMode="contain" /><View style={styles.headerCopy}><Text style={styles.brand}>برنامج الشاعري</Text><Text style={styles.org}>مؤسسة الشاعري للتجارة العامة</Text><Text style={styles.title}>{title}</Text>{!!subtitle && <Text style={styles.subtitle}>{subtitle}</Text>}{!!profileName && <Text style={styles.profile}>مرحباً، {profileName}</Text>}</View></View>
-    <View style={styles.headerActions}>{onBack && <Pressable accessibilityRole="button" style={styles.back} onPress={onBack}><Text style={styles.backText}>رجوع</Text></Pressable>}<Pressable accessibilityRole="button" accessibilityLabel="تسجيل الخروج وتبديل الحساب" style={styles.switchAccount} onPress={() => void switchAccount()}><Text style={styles.switchAccountText}>تبديل الحساب</Text></Pressable></View>
   </View>;
 }
 
