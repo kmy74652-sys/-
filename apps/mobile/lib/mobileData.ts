@@ -165,7 +165,8 @@ async function callRpc(name: string, args: Record<string, unknown>) {
 function isOffline(error: unknown) { const message = String((error as { message?: string })?.message ?? error).toLowerCase(); return message.includes('network') || message.includes('fetch') || message.includes('offline') || message.includes('timeout'); }
 function idempotencyKey(taskId: string, operation: string) { return `${operation}:${taskId}:${Date.now()}`; }
 async function executeQueueItem(item: QueueItem) {
-  if (item.kind === 'status') await callRpc('mobile_record_task_update', { p_task_id: item.payload.taskId, p_status: item.payload.status, p_note: item.payload.note ?? null, p_idempotency_key: item.payload.idempotencyKey });
+  // The deployed production RPC accepts exactly these three arguments.
+  if (item.kind === 'status') await callRpc('mobile_record_task_update', { p_task_id: item.payload.taskId, p_status: item.payload.status, p_note: item.payload.note ?? null });
   if (item.kind === 'report' && item.payload.snapshotId) await callRpc('mobile_submit_task_report_form', { p_task_id: item.payload.taskId, p_snapshot_id: item.payload.snapshotId, p_values: item.payload.values, p_idempotency_key: item.payload.idempotencyKey });
   else if (item.kind === 'report') await callRpc('mobile_submit_task_report', { p_task_id: item.payload.taskId, p_values: item.payload.values, p_idempotency_key: item.payload.idempotencyKey });
 }
@@ -173,7 +174,7 @@ export function syncOfflineQueue() { return flushQueue(executeQueueItem); }
 
 export async function updateTaskStatus(taskId: string, status: 'in_progress' | 'submitted', note: string | null = null) {
   const payload = { taskId, status, note, idempotencyKey: idempotencyKey(taskId, `status:${status}`) };
-  try { await callRpc('mobile_record_task_update', { p_task_id: taskId, p_status: status, p_note: note, p_idempotency_key: payload.idempotencyKey }); }
+  try { await callRpc('mobile_record_task_update', { p_task_id: taskId, p_status: status, p_note: note }); }
   catch (error) { if (!isOffline(error)) throw error; await queueOperation('status', payload); }
 }
 
