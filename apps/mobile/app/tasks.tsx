@@ -328,6 +328,11 @@ export default function TasksScreen() {
       (positionFilter === 'all' || task.position_code === positionFilter) &&
       (!search.trim() || `${task.title} ${task.description ?? ''}`.toLocaleLowerCase('ar').includes(search.trim().toLocaleLowerCase('ar')));
   });
+  const employeeSummary = {
+    pending: tasks.filter((task) => ['pending', 'rejected'].includes(task.status)).length,
+    active: tasks.filter((task) => task.status === 'in_progress').length,
+    submitted: tasks.filter((task) => task.status === 'submitted' || task.report_forms.some((form) => form.status === 'submitted')).length,
+  };
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -352,6 +357,8 @@ export default function TasksScreen() {
         </View>
         {!!error && <Text accessibilityRole="alert" style={styles.error}>{error}</Text>}
         {!!notice && <Text accessibilityLiveRegion="polite" style={styles.notice}>{notice}</Text>}
+        {!loading && <View style={styles.employeeIntro}><Text style={styles.employeeIntroTitle}>مساحة تنفيذك اليومية</Text><Text style={styles.employeeIntroText}>اقرأ التكليف، ابدأ التنفيذ، ثم عبّئ التقرير المطلوب وأرسله للمسؤول للمراجعة.</Text></View>}
+        {!loading && <View style={styles.summaryRow}><View style={styles.summaryCard}><Text style={styles.summaryValue}>{employeeSummary.pending}</Text><Text style={styles.summaryLabel}>جديدة</Text></View><View style={styles.summaryCard}><Text style={styles.summaryValue}>{employeeSummary.active}</Text><Text style={styles.summaryLabel}>قيد التنفيذ</Text></View><View style={styles.summaryCard}><Text style={styles.summaryValue}>{employeeSummary.submitted}</Text><Text style={styles.summaryLabel}>بانتظار المراجعة</Text></View></View>}
         {loading && <View style={styles.loading}><ActivityIndicator size="large" color="#17324d" /><Text style={styles.muted}>جارٍ تحميل المهام…</Text></View>}
         {!loading && canReview && <View style={styles.modeTabs}>
           {([
@@ -363,14 +370,14 @@ export default function TasksScreen() {
 
         {!loading && tasks.length > 0 && <>
           <TextInput style={styles.input} value={search} onChangeText={setSearch} placeholder="ابحث عن مهمة…" accessibilityLabel="البحث في المهام" />
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filters}>
+          {canReview && screenMode !== 'mine' && <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filters}>
             {([['all', 'كل المناصب'], ['owner', 'صاحب المؤسسة'], ['admin_followup', 'المدير التنفيذي'], ['accountant', 'المحاسب'], ['warehouse_keeper', 'أمين المخازن'], ['warehouse_worker', 'عمال التحميل']] as const).map(([code, label]) => {
               const selected = positionFilter === code;
               return <Pressable key={code} accessibilityRole="button" accessibilityState={{ selected }} style={[styles.filterChip, selected && styles.filterChipSelected]} onPress={() => setPositionFilter(code)}>
                 <Text style={selected ? styles.filterChipTextSelected : styles.filterChipText}>{label}</Text>
               </Pressable>;
             })}
-          </ScrollView>
+          </ScrollView>}
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filters}>
             {(['all', 'pending', 'in_progress', 'submitted', 'rejected', 'approved', 'late'] as const).map((status) => {
               const selected = statusFilter === status;
@@ -387,10 +394,12 @@ export default function TasksScreen() {
               <Text style={styles.taskTitle}>{task.title}</Text>
               <Text style={[styles.badge, task.status === 'approved' ? styles.goodBadge : task.status === 'rejected' ? styles.warnBadge : styles.neutralBadge]}>{statusLabels[task.status]}</Text>
             </View>
+            <Text style={styles.cardSectionLabel}>1 · اقرأ التكليف</Text>
             {!!task.description && <Text style={styles.body}>{task.description}</Text>}
             <Text style={styles.meta}>المنصب: {task.position_code ? positionLabels[task.position_code] : 'بحاجة إلى تصنيف'}{task.branch_name ? ` · الفرع: ${task.branch_name}${task.branch_level ? ` (المستوى ${task.branch_level})` : ''}` : task.branch_id ? ' · فرع محدد' : ''}</Text>
             <Text style={styles.meta}>الأولوية: {priorityLabels[task.priority]} · الموعد: {formatDate(task.due_at)}</Text>
             {task.proof_required && <Text style={styles.proof}>{task.proof_instructions || 'يتطلب إرفاق دليل إنجاز.'}</Text>}
+            {(!!task.task_instructions || !!task.execution_steps.length) && <Text style={styles.cardSectionLabel}>2 · نفّذ المهمة</Text>}
             {!!task.task_instructions && <View style={styles.timeline}><Text style={styles.fieldLabel}>تعليمات التنفيذ</Text><Text style={styles.body}>{task.task_instructions}</Text></View>}
             {!!task.execution_steps.length && <View style={styles.timeline}><Text style={styles.fieldLabel}>خطوات التنفيذ</Text>{task.execution_steps.map((step,index)=><View key={step.id} style={styles.stepCard}>
               <Text style={styles.fieldLabel}>{index+1}. {step.title}{step.required?' · إلزامية':' · اختيارية'}{step.completed?' · مكتملة':''}</Text>
@@ -411,6 +420,7 @@ export default function TasksScreen() {
               onChooseAttachment={() => void chooseAttachment(task, field.key)}
             />)}
 
+            {(!!task.report_forms.length || (!!task.report_schema?.length && ['in_progress', 'rejected'].includes(task.status))) && <Text style={styles.cardSectionLabel}>3 · عبّئ التقرير وأرسله</Text>}
             {!!task.report_forms.length && <View style={styles.timeline}><Text style={styles.fieldLabel}>نماذج التقارير المرتبطة</Text>{task.report_forms.map((form)=>{
               const key=formDraftKey(task,form); const opened=activeReportForm?.taskId===task.id&&activeReportForm.snapshotId===form.snapshot_id;
               const statusLabel=form.status==='submitted'?'بانتظار مراجعة هذا النموذج':form.status==='approved'?'تم اعتماد هذا النموذج':form.status==='returned'?'أُعيد هذا النموذج للتعديل':form.required?'مطلوب الإرسال':'اختياري';
@@ -432,7 +442,7 @@ export default function TasksScreen() {
               </Pressable>
             )}
 
-            <View style={styles.actions}>
+            <View style={styles.actions}><Text style={styles.cardSectionLabel}>الإجراء التالي</Text>
               {['pending', 'rejected'].includes(task.status) && (
                 <Pressable disabled={busyTask === task.id} style={styles.primaryButton} onPress={() => void mutate(task, () => updateTaskStatus(task.id, 'in_progress'), 'تم تسجيل بدء تنفيذ المهمة.')}>
                   <Text style={styles.primaryText}>بدء التنفيذ</Text>
@@ -506,6 +516,7 @@ const styles = StyleSheet.create({
   taskCard: { backgroundColor: '#fff', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#e2e9eb', gap: 10 },
   taskHeading: { flexDirection: 'row-reverse', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 },
   taskTitle: { flex: 1, color: '#17324d', fontSize: 18, fontWeight: '800', textAlign: 'right', lineHeight: 27 },
+  cardSectionLabel: { color: '#17324d', fontSize: 15, fontWeight: '900', textAlign: 'right', marginTop: 3 },
   badge: { overflow: 'hidden', borderRadius: 20, paddingHorizontal: 10, paddingVertical: 5, fontSize: 12, fontWeight: '700' },
   goodBadge: { color: '#23633c', backgroundColor: '#e5f4e9' },
   warnBadge: { color: '#8c4f13', backgroundColor: '#fff1dc' },
@@ -529,6 +540,13 @@ const styles = StyleSheet.create({
   secondaryText: { color: '#17324d', fontWeight: '800' },
   error: { color: '#a8443d', backgroundColor: '#fff0ef', borderRadius: 10, padding: 12, textAlign: 'right', lineHeight: 22 },
   notice: { color: '#23633c', backgroundColor: '#e8f5eb', borderRadius: 10, padding: 12, textAlign: 'right', lineHeight: 22 },
+  employeeIntro: { backgroundColor: '#17324d', borderRadius: 16, padding: 16, gap: 6 },
+  employeeIntroTitle: { color: '#fff', fontSize: 18, fontWeight: '900', textAlign: 'right' },
+  employeeIntroText: { color: '#dceaf0', lineHeight: 22, textAlign: 'right' },
+  summaryRow: { flexDirection: 'row-reverse', gap: 8 },
+  summaryCard: { flex: 1, minHeight: 74, backgroundColor: '#fff', borderRadius: 14, borderWidth: 1, borderColor: '#e2e9eb', padding: 10, alignItems: 'center', justifyContent: 'center', gap: 2 },
+  summaryValue: { color: '#17324d', fontSize: 22, fontWeight: '900' },
+  summaryLabel: { color: '#718394', fontSize: 12, fontWeight: '700', textAlign: 'center' },
   empty: { color: '#718394', textAlign: 'center', paddingVertical: 22 },
   muted: { color: '#718394', textAlign: 'center' },
   timeline: { borderTopWidth: 1, borderTopColor: '#edf1f3', paddingTop: 8, gap: 4 },
