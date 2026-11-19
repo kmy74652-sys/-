@@ -7,6 +7,7 @@ const admin = readFileSync('apps/mobile/app/admin.tsx', 'utf8');
 const adminData = readFileSync('apps/mobile/lib/adminData.ts', 'utf8');
 const mobileData = readFileSync('apps/mobile/lib/mobileData.ts', 'utf8');
 const tasks = readFileSync('apps/mobile/app/tasks.tsx', 'utf8');
+const reportCycle = readFileSync('supabase/migrations/054_report_cycle_notifications.sql', 'utf8');
 const checks = [
   ['permission RPC is separate from report designer', sql.includes('task_library_allowed_for_org') && library.includes('task_library_allowed_for_org')],
   ['approved report RPC is safe', sql.includes('list_task_library_report_forms') && sql.includes('security definer')],
@@ -25,6 +26,8 @@ const checks = [
   ['dynamic report designer is mounted beside task designer', admin.includes("import ReportDesigner") && admin.includes('<ReportDesigner />')],
   ['legacy starter catalog is hidden from designer', library.includes('retiredStarterTemplateCodes') && !admin.includes('قالب التقرير القديم')],
   ['approved report templates can be linked to task templates', designer.includes('reportTemplates') && designer.includes('نموذج التقرير الذي سيعبئه الموظف') && admin.includes('reportTemplates={designerTemplates.flatMap')],
+  ['admin report review has search and status filters', admin.includes('ابحث باسم الموظف أو المهمة') && admin.includes("setStatus(value)") && adminData.includes('taskTitle') && adminData.includes('values')],
+  ['report submission and review notifications are automatic', reportCycle.includes('task_reports_notify_cycle') && reportCycle.includes("new.status in ('approved', 'returned')")],
 ];
 const failed = checks.filter(([, ok]) => !ok);
 if (failed.length) { console.error(JSON.stringify({ ok: false, failed: failed.map(([name]) => name) })); process.exit(1); }
