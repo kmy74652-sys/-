@@ -240,6 +240,7 @@ export function friendlyDataError(error: unknown, fallback: string): string {
     task_reviewer_not_independent: 'لا يمكن لمنشئ المهمة أو منفذها اعتمادها.',
     required_report_field_missing: 'أكمل جميع حقول التقرير المطلوبة.',
     task_report_required_without_fields: 'اختر نموذجًا يحتوي حقول تقرير أو اجعل التقرير اختياريًا.',
+    employee_assignment_invalid: 'الموظف المحدد لا يطابق التصنيف أو الفرع أو لم يعد نشطًا.',
     task_title_or_due_date_invalid: 'تحقق من عنوان المهمة والموعد النهائي.',
     task_template_role_mismatch: 'قالب المهمة لا يطابق التصنيف الوظيفي المحدد.',
     no_employee_for_role: 'لا يوجد موظف نشط بهذا التصنيف في الفرع المحدد.',

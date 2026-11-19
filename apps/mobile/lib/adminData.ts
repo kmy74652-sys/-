@@ -73,27 +73,31 @@ export async function listTaskTemplates() {
   return data ?? [];
 }
 
-export async function createAdministrativeTask(input: { title: string; description: string; dueAt: string; priority: string; branchId: string | null; roleCode: string; templateId: string | null; reportTemplateId?: string | null; reportVersionId?: string | null; reportRequired?: boolean }) {
+export async function createAdministrativeTask(input: { title: string; description: string; dueAt: string; priority: string; branchId: string | null; roleCode: string; assignedEmployeeId: string; templateId: string | null; reportTemplateId?: string | null; reportVersionId?: string | null; reportRequired?: boolean }) {
   const db = client();
   const { data: authData, error: authError } = await db.auth.getUser();
   if (authError || !authData.user) throw authError ?? new Error('not_authenticated');
+  const { data: profileData, error: profileError } = await db.rpc('mobile_my_profile');
+  if (profileError) throw profileError;
+  const organizationId = (profileData as { employee?: { institutionId?: string } } | null)?.employee?.institutionId;
+  if (!organizationId) throw new Error('employee_not_active');
   const reportTemplateId = input.reportTemplateId ?? null;
   const reportVersionId = input.reportVersionId ?? null;
   if ((reportTemplateId === null) !== (reportVersionId === null)) throw new Error('report_form_version_required');
   if (input.reportRequired && !reportTemplateId && !input.templateId) throw new Error('task_report_required_without_fields');
-  let assignmentQuery = db.from('role_assignments').select('membership_id,organization_id,branch_id').eq('role_code', input.roleCode).limit(20);
+  let assignmentQuery = db.from('role_assignments').select('membership_id,organization_id,branch_id').eq('organization_id', organizationId).eq('membership_id', input.assignedEmployeeId).eq('role_code', input.roleCode).limit(20);
   if (input.branchId) assignmentQuery = assignmentQuery.eq('branch_id', input.branchId);
   const { data: assignments, error: assignmentError } = await assignmentQuery;
   if (assignmentError) throw assignmentError;
-  if (!assignments?.length) throw new Error('no_employee_for_role');
+  if (!assignments?.length) throw new Error('employee_assignment_invalid');
   const membershipIds = assignments.map((row) => row.membership_id);
-  const { data: memberships, error: membershipError } = await db.from('organization_memberships').select('id,user_id,is_active').in('id', membershipIds).eq('is_active', true).limit(20);
+  const { data: memberships, error: membershipError } = await db.from('organization_memberships').select('id,user_id,is_active').eq('organization_id', organizationId).in('id', membershipIds).eq('is_active', true).limit(20);
   if (membershipError) throw membershipError;
   const assignee = memberships?.[0];
   const assignment = assignments.find((row) => row.membership_id === assignee?.id);
-  if (!assignee || !assignment) throw new Error('no_employee_for_role');
+  if (!assignee || !assignment) throw new Error('employee_not_active');
   const { data: task, error } = await db.rpc('create_task_with_report_form', {
-    p_organization_id: assignment.organization_id,
+    p_organization_id: organizationId,
     p_title: input.title.trim(),
     p_description: input.description.trim() || null,
     p_due_at: input.dueAt,

@@ -34,7 +34,7 @@ export default function AdminScreen() {
   const [notice, setNotice] = useState('');
   const [showCreate, setShowCreate] = useState(false);
   const [initialDeadline] = useState(currentAdenDateTime);
-  const [draft, setDraft] = useState({ title: '', description: '', dueDate: initialDeadline.date, dueTime: initialDeadline.time, priority: 'normal', roleCode: 'admin_followup', branchId: '', templateId: '', reportTemplateId: '', reportRequired: true });
+  const [draft, setDraft] = useState({ title: '', description: '', dueDate: initialDeadline.date, dueTime: initialDeadline.time, priority: 'normal', roleCode: 'admin_followup', branchId: '', assignedEmployeeId: '', templateId: '', reportTemplateId: '', reportRequired: true });
 
   const load = useCallback(async () => {
     setError('');
@@ -84,6 +84,7 @@ export default function AdminScreen() {
   async function createTask() {
     const dueAt = adenDateTimeToIso(draft.dueDate, draft.dueTime);
     if (!draft.title.trim() || !dueAt) { setError('أدخل عنوان المهمة واختر تاريخًا ووقتًا صالحين للموعد النهائي.'); return; }
+    if (!draft.assignedEmployeeId) { setError('اختر الموظف المستلم للمهمة قبل النشر.'); return; }
     const startAt = new Date();
     if (new Date(dueAt).getTime() < startAt.getTime()) { setError('لا يمكن أن يسبق الموعد النهائي بداية المهمة. اختر موعدًا الآن أو لاحقًا بتوقيت عدن.'); return; }
     try {
@@ -92,13 +93,13 @@ export default function AdminScreen() {
       if (draft.reportTemplateId && !selectedReport?.approved_version_id) throw new Error('report_form_version_requires_approval');
       await createAdministrativeTask({
         title: draft.title, description: draft.description, dueAt, priority: draft.priority,
-        roleCode: draft.roleCode, branchId: draft.branchId || null, templateId: draft.templateId || null,
+        roleCode: draft.roleCode, branchId: draft.branchId || null, assignedEmployeeId: draft.assignedEmployeeId, templateId: draft.templateId || null,
         reportTemplateId: selectedReport?.id ?? null, reportVersionId: selectedReport?.approved_version_id ?? null,
         reportRequired: draft.reportRequired,
       });
       const nextDeadline = currentAdenDateTime();
-      setDraft({ title: '', description: '', dueDate: nextDeadline.date, dueTime: nextDeadline.time, priority: 'normal', roleCode: 'admin_followup', branchId: '', templateId: '', reportTemplateId: '', reportRequired: true });
-      setShowCreate(false); setNotice('تم إنشاء المهمة وربطها بأول موظف نشط ضمن التصنيف المحدد.'); await load();
+      setDraft({ title: '', description: '', dueDate: nextDeadline.date, dueTime: nextDeadline.time, priority: 'normal', roleCode: 'admin_followup', branchId: '', assignedEmployeeId: '', templateId: '', reportTemplateId: '', reportRequired: true });
+      setShowCreate(false); setNotice('تم إنشاء المهمة وإسنادها للموظف المحدد.'); await load();
     } catch (cause) { setError(friendlyDataError(cause, 'تعذر إنشاء المهمة. تأكد من وجود موظف نشط ضمن التصنيف والفرع المحددين.')); }
   }
   const canManageTaskLibrary = permissions.includes('task_library.manage');
@@ -180,9 +181,12 @@ function TasksSection({ data, designerTemplates, showCreate, setShowCreate, draf
       {[['title', 'عنوان المهمة'], ['description', 'وصف وتعليمات التنفيذ']].map(([key, label]) => <TextInput key={key} style={styles.input} placeholder={label} value={draft[key]} onChangeText={(value) => setDraft({ ...draft, [key]: value })} multiline={key === 'description'} />)}
       <AdenDeadlinePicker date={draft.dueDate} time={draft.dueTime} onChange={(dueDate, dueTime) => setDraft({ ...draft, dueDate, dueTime })} />
       <Text style={styles.fieldLabel}>التصنيف الوظيفي المستهدف</Text>
-      <View style={styles.choices}>{roleCodes.map((role) => <Pressable key={role} style={[styles.choice, draft.roleCode === role && styles.choiceSelected]} onPress={() => setDraft({ ...draft, roleCode: role, templateId: '', reportTemplateId: designerTemplates.some((item: ReportTemplate) => item.id === draft.reportTemplateId && item.role_code === role) ? draft.reportTemplateId : '' })}><Text style={draft.roleCode === role ? styles.choiceSelectedText : styles.choiceText}>{roleLabel(role)}</Text></Pressable>)}</View>
+      <View style={styles.choices}>{roleCodes.map((role) => <Pressable key={role} style={[styles.choice, draft.roleCode === role && styles.choiceSelected]} onPress={() => setDraft({ ...draft, roleCode: role, assignedEmployeeId: '', templateId: '', reportTemplateId: designerTemplates.some((item: ReportTemplate) => item.id === draft.reportTemplateId && item.role_code === role) ? draft.reportTemplateId : '' })}><Text style={draft.roleCode === role ? styles.choiceSelectedText : styles.choiceText}>{roleLabel(role)}</Text></Pressable>)}</View>
       <Text style={styles.fieldLabel}>الفرع</Text>
-      <View style={styles.choices}>{(data?.branches ?? []).map((branch: any) => <Pressable key={branch.id} style={[styles.choice, draft.branchId === branch.id && styles.choiceSelected]} onPress={() => setDraft({ ...draft, branchId: branch.id })}><Text style={draft.branchId === branch.id ? styles.choiceSelectedText : styles.choiceText}>{branch.name}</Text></Pressable>)}</View>
+      <View style={styles.choices}><Pressable style={[styles.choice, !draft.branchId && styles.choiceSelected]} onPress={() => setDraft({ ...draft, branchId: '', assignedEmployeeId: '' })}><Text style={!draft.branchId ? styles.choiceSelectedText : styles.choiceText}>كل الفروع</Text></Pressable>{(data?.branches ?? []).map((branch: any) => <Pressable key={branch.id} style={[styles.choice, draft.branchId === branch.id && styles.choiceSelected]} onPress={() => setDraft({ ...draft, branchId: branch.id, assignedEmployeeId: '' })}><Text style={draft.branchId === branch.id ? styles.choiceSelectedText : styles.choiceText}>{branch.name}</Text></Pressable>)}</View>
+      <Text style={styles.fieldLabel}>الموظف المستلم</Text>
+      <View style={styles.choices}>{(data?.employees ?? []).filter((employee: any) => employee.active && employee.roles.includes(draft.roleCode) && (!draft.branchId || employee.branchId === draft.branchId)).map((employee: any) => <Pressable key={employee.id} style={[styles.choice, draft.assignedEmployeeId === employee.id && styles.choiceSelected]} onPress={() => setDraft({ ...draft, assignedEmployeeId: employee.id })}><Text style={draft.assignedEmployeeId === employee.id ? styles.choiceSelectedText : styles.choiceText}>{employee.name} · رقم {employee.employeeNo ?? 'غير مسجل'}</Text></Pressable>)}</View>
+      {!((data?.employees ?? []).some((employee: any) => employee.active && employee.roles.includes(draft.roleCode) && (!draft.branchId || employee.branchId === draft.branchId))) && <Text style={styles.error}>لا يوجد موظف نشط بهذا التصنيف والفرع.</Text>}
       <Text style={styles.fieldLabel}>نموذج التقرير المرتبط بالتكليف</Text>
       <View style={styles.choices}><Pressable style={[styles.choice, !draft.reportTemplateId && styles.choiceSelected]} onPress={() => setDraft({ ...draft, reportTemplateId: '' })}><Text style={!draft.reportTemplateId ? styles.choiceSelectedText : styles.choiceText}>بدون نموذج تقرير</Text></Pressable>{designerTemplates.filter((template: ReportTemplate) => template.role_code === draft.roleCode).map((template: ReportTemplate) => <Pressable key={template.id} style={[styles.choice, draft.reportTemplateId === template.id && styles.choiceSelected]} onPress={() => setDraft({ ...draft, reportTemplateId: template.id })}><Text style={draft.reportTemplateId === template.id ? styles.choiceSelectedText : styles.choiceText}>{template.title} · إصدار {template.approved_version_no}</Text></Pressable>)}</View>
       <Pressable style={styles.secondary} onPress={() => setDraft({ ...draft, reportRequired: !draft.reportRequired })}><Text style={styles.secondaryText}>{draft.reportRequired ? 'التقرير مطلوب ✓' : 'التقرير اختياري'}</Text></Pressable>
