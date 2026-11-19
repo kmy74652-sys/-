@@ -36,14 +36,14 @@
 المشروع الصحيح هو المشروع الذي يطابق عنوان Supabase:
 
 ```text
-https://fjmryqhdwxsocdzswnkq.supabase.co
+https://qoeruidmtsasvhxejyga.supabase.co
 ```
 
 طبّق جميع migrations غير المنفذة بالترتيب من جذر المستودع باستخدام حساب يملك المشروع، لا باستخدام مفتاح publishable:
 
 ```bash
 supabase login
-supabase link --project-ref fjmryqhdwxsocdzswnkq
+supabase link --project-ref qoeruidmtsasvhxejyga
 supabase db push
 ```
 
