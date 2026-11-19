@@ -69,7 +69,7 @@ function firstSearchParam(value: string | string[] | undefined) {
 }
 
 function parseTaskFilter(value: string | undefined): TaskFilter {
-  return value === 'in_progress' || value === 'submitted' || value === 'late' ? value : 'all';
+  return value === 'pending' || value === 'in_progress' || value === 'submitted' || value === 'rejected' || value === 'approved' || value === 'late' ? value : 'all';
 }
 
 function parseBranchId(value: string | undefined) {
@@ -397,7 +397,7 @@ export default function TasksScreen() {
           subtitle="تنفيذ التكليفات ومراجعة التقارير"
           onBack={() => { if (router.canGoBack()) router.back(); else router.replace('/'); }}
         />
-        {!!error && <Text accessibilityRole="alert" style={styles.error}>{error}</Text>}
+        {!!error && <View style={styles.errorBox}><Text accessibilityRole="alert" style={styles.error}>{error}</Text><Pressable style={styles.retryButton} onPress={() => { setRefreshing(true); void load({ force: true }); }}><Text style={styles.retryText}>إعادة المحاولة</Text></Pressable></View>}
         {!!notice && <Text accessibilityLiveRegion="polite" style={styles.notice}>{notice}</Text>}
         {!loading && <View style={styles.employeeIntro}><Text style={styles.employeeIntroTitle}>مساحة تنفيذك اليومية</Text><Text style={styles.employeeIntroText}>اقرأ التكليف، ابدأ التنفيذ، ثم عبّئ التقرير المطلوب وأرسله للمسؤول للمراجعة.</Text></View>}
         {!loading && <View style={styles.summaryRow}><View style={styles.summaryCard}><Text style={styles.summaryValue}>{employeeSummary.pending}</Text><Text style={styles.summaryLabel}>جديدة</Text></View><View style={styles.summaryCard}><Text style={styles.summaryValue}>{employeeSummary.active}</Text><Text style={styles.summaryLabel}>قيد التنفيذ</Text></View><View style={styles.summaryCard}><Text style={styles.summaryValue}>{employeeSummary.submitted}</Text><Text style={styles.summaryLabel}>بانتظار المراجعة</Text></View></View>}
@@ -578,7 +578,7 @@ const styles = StyleSheet.create({
   primaryText: { color: '#fff', fontWeight: '800' },
   secondaryButton: { minHeight: 44, borderRadius: 10, padding: 11, alignItems: 'center', justifyContent: 'center', backgroundColor: '#e9f0f4' },
   secondaryText: { color: '#17324d', fontWeight: '800' },
-  error: { color: '#a8443d', backgroundColor: '#fff0ef', borderRadius: 10, padding: 12, textAlign: 'right', lineHeight: 22 },
+  errorBox: { backgroundColor: '#fff0ef', borderRadius: 10, padding: 10, gap: 8 }, error: { color: '#a8443d', padding: 2, textAlign: 'right', lineHeight: 22 }, retryButton: { minHeight: 38, borderRadius: 8, backgroundColor: '#fff', borderWidth: 1, borderColor: '#b55248', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 12 }, retryText: { color: '#a8443d', fontWeight: '800' },
   notice: { color: '#23633c', backgroundColor: '#e8f5eb', borderRadius: 10, padding: 12, textAlign: 'right', lineHeight: 22 },
   employeeIntro: { backgroundColor: '#17324d', borderRadius: 16, padding: 16, gap: 6 },
   employeeIntroTitle: { color: '#fff', fontSize: 18, fontWeight: '900', textAlign: 'right' },

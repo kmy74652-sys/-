@@ -29,7 +29,7 @@ export default function AppShell({ children, activeTab, title, subtitle, profile
   const navigate = (tab: ShellTab) => {
     if (tab === 'home') router.replace('/');
     else if (tab === 'tasks') router.push('/tasks');
-    else if (tab === 'employees') router.push('/settings');
+    else if (tab === 'employees') router.push('/settings?tab=employees');
     else router.push('/settings');
   };
   return <SafeAreaView edges={['top', 'left', 'right']} style={styles.safe}>

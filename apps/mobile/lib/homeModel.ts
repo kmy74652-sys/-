@@ -1,6 +1,6 @@
 import type { MobileProfile } from './mobileData';
 
-export type TaskFilter = 'all' | 'in_progress' | 'submitted' | 'late';
+export type TaskFilter = 'all' | 'pending' | 'in_progress' | 'submitted' | 'rejected' | 'approved' | 'late';
 export type HomeDestination = 'tasks' | 'reports' | 'employees' | 'branches' | 'task-designer' | 'report-designer' | 'permissions' | 'settings';
 export type TaskSummaryRow = {
   status: string;

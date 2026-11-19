@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useRouter, type ErrorBoundaryProps } from 'expo-router';
+import { useLocalSearchParams, useRouter, type ErrorBoundaryProps } from 'expo-router';
 import {
   ActivityIndicator,
   Alert,
@@ -76,10 +76,13 @@ function normalizeEmployeeList(data: unknown): EmployeeAccess[] {
 
 export default function EmployeeAccessSettings() {
   const router = useRouter();
+  const params = useLocalSearchParams<{ tab?: string | string[] }>();
+  const activeTab = (Array.isArray(params.tab) ? params.tab[0] : params.tab) === 'employees' ? 'employees' : 'settings';
   const [employees, setEmployees] = useState<EmployeeAccess[]>([]);
   const [codes, setCodes] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [busyEmployeeId, setBusyEmployeeId] = useState<string | null>(null);
+  const [expandedEmployeeId, setExpandedEmployeeId] = useState<string | null>(null);
   const [isOwner, setIsOwner] = useState(false);
   const [canEditBrand, setCanEditBrand] = useState(false);
   const [brandSettingsReady, setBrandSettingsReady] = useState(false);
@@ -325,9 +328,16 @@ export default function EmployeeAccessSettings() {
     finally { setBusyEmployeeId(null); }
   }
 
+  if (!loading && !isOwner) {
+    return <AppShell activeTab={activeTab} title={activeTab === 'employees' ? 'الموظفون' : 'الإعدادات'} subtitle="إدارة المؤسسة والموظفين">
+      <ScreenHeader title={activeTab === 'employees' ? 'الموظفون' : 'الإعدادات'} subtitle="إدارة المؤسسة والموظفين" onBack={() => { if (router.canGoBack()) router.back(); else router.replace('/'); }} />
+      <View style={styles.unavailable}><Text style={styles.title}>هذه الصفحة غير متاحة</Text><Text style={styles.copy}>{error || 'تحتاج إلى صلاحية صاحب المؤسسة أو المدير التنفيذي المخوّل.'}</Text><Pressable style={styles.refresh} onPress={() => void loadSettings({ force: true })}><Text style={styles.refreshText}>إعادة المحاولة</Text></Pressable></View>
+    </AppShell>;
+  }
+
   return (
-    <AppShell activeTab="settings" title="الإعدادات" subtitle="إدارة المؤسسة والموظفين">
-      <ScreenHeader title="الإعدادات" subtitle="إدارة المؤسسة والموظفين" onBack={() => router.back()} />
+    <AppShell activeTab={activeTab} title={activeTab === 'employees' ? 'الموظفون' : 'الإعدادات'} subtitle="إدارة المؤسسة والموظفين">
+      <ScreenHeader title={activeTab === 'employees' ? 'الموظفون' : 'الإعدادات'} subtitle="إدارة المؤسسة والموظفين" onBack={() => { if (router.canGoBack()) router.back(); else router.replace('/'); }} />
       <View style={styles.content}>
         {!loading && canEditBrand && <View style={styles.employeeCard}>
           <Text style={styles.employeeName}>هوية المؤسسة والواجهة الرئيسية</Text>
@@ -388,10 +398,11 @@ export default function EmployeeAccessSettings() {
                 {employee.codeSetAt ? 'تم تعيين رمز دخول' : 'لم يُعيّن رمز دخول بعد'}
                 {!active ? ' · الحساب غير نشط' : ''}
               </Text>
+              <Pressable accessibilityRole="button" accessibilityState={{ expanded: expandedEmployeeId === employee.id }} style={styles.manageToggle} onPress={() => setExpandedEmployeeId((current) => current === employee.id ? null : employee.id)}><Text style={styles.manageToggleText}>{expandedEmployeeId === employee.id ? 'إغلاق إدارة الحساب' : 'إدارة الحساب والرمز'}</Text></Pressable>
               {!employee.hasAuthAccount && (
                 <Text style={styles.warning}>لا يوجد حساب مصادقة مرتبط بملف هذا الموظف؛ لا يمكن تعيين كلمة مرور له حتى يربطه مسؤول النظام.</Text>
               )}
-              {isOwner && editForms[employee.id] && (
+              {isOwner && expandedEmployeeId === employee.id && editForms[employee.id] && (
                 <>
                   <TextInput style={styles.input} placeholder="الاسم" value={editForms[employee.id].fullName} onChangeText={(value) => setEditForms((current) => ({ ...current, [employee.id]: { ...current[employee.id], fullName: value } }))} />
                   <TextInput style={styles.input} placeholder="الرقم الوظيفي" value={editForms[employee.id].employeeNo} onChangeText={(value) => setEditForms((current) => ({ ...current, [employee.id]: { ...current[employee.id], employeeNo: value } }))} />
@@ -412,7 +423,7 @@ export default function EmployeeAccessSettings() {
                   {(audit[employee.id] ?? []).map((entry) => <Text style={styles.employeeMeta} key={entry.id}>{entry.action} · {new Date(entry.created_at).toLocaleString('ar-SA')}</Text>)}
                 </>
               )}
-              {active && employee.hasAuthAccount && (
+              {expandedEmployeeId === employee.id && active && employee.hasAuthAccount && (
                 <>
                   <TextInput
                     style={styles.input}
@@ -490,7 +501,7 @@ const styles = StyleSheet.create({
   note: { color: '#73521f', backgroundColor: '#fff5df', borderColor: '#f0dfb8', borderWidth: 1, borderRadius: 12, padding: 12, textAlign: 'right', lineHeight: 21, marginBottom: 14 },
   error: { color: '#a8443d', textAlign: 'right', lineHeight: 22, marginBottom: 10 },
   success: { color: '#23633c', textAlign: 'right', lineHeight: 22, marginBottom: 10 },
-  loading: { alignItems: 'center', paddingVertical: 28 },
+  loading: { alignItems: 'center', paddingVertical: 28 }, unavailable: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#e2e9eb', borderRadius: 16, padding: 18, gap: 10, marginTop: 12 },
   employeeCard: { backgroundColor: '#fff', borderRadius: 16, padding: 16, marginTop: 12, borderWidth: 1, borderColor: '#e2e9eb' },
   employeeName: { color: '#17324d', fontSize: 17, fontWeight: '800', textAlign: 'right', lineHeight: 25 },
   employeeMeta: { color: '#718394', fontSize: 13, textAlign: 'right', marginTop: 5, lineHeight: 20 },
@@ -502,7 +513,7 @@ const styles = StyleSheet.create({
   dangerText: { color: '#a8443d', fontWeight: '800' },
   refresh: { minHeight: 46, alignItems: 'center', justifyContent: 'center', marginTop: 18, borderWidth: 1, borderColor: '#17324d', borderRadius: 11 },
   refreshText: { color: '#17324d', fontWeight: '800' },
-  roleChoices: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 8, marginBottom: 10 },
+  manageToggle: { minHeight: 40, borderRadius: 10, backgroundColor: '#e9f0f4', alignItems: 'center', justifyContent: 'center', marginTop: 12, paddingHorizontal: 10 }, manageToggleText: { color: '#17324d', fontWeight: '800' }, roleChoices: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 8, marginBottom: 10 },
   roleChoice: { borderWidth: 1, borderColor: '#d6e0e4', borderRadius: 10, paddingVertical: 9, paddingHorizontal: 10, backgroundColor: '#fbfcfc' },
   roleChoiceActive: { backgroundColor: '#dceee7', borderColor: '#2f6654' },
   roleChoiceText: { color: '#39556a', fontSize: 13, fontWeight: '700' },

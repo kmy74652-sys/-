@@ -188,9 +188,9 @@ export default function HomeDashboard({ profile: initialProfile, onNavigate, onS
         <View style={styles.main}>
           {!!error && <View style={styles.errorPanel}><Text accessibilityRole="alert" style={styles.error}>{error}{lastUpdated ? ' الأرقام المعروضة من آخر تحديث ناجح.' : ''}</Text><Pressable style={styles.retry} onPress={() => void load()} accessibilityRole="button"><Text style={styles.retryText}>إعادة المحاولة</Text></Pressable></View>}
           <View style={styles.metrics}>
-            {metrics.map((item) => <Pressable key={item.filter} accessibilityRole="button" accessibilityState={{ disabled: !access.tasks || summary === null }} accessibilityLabel={`${item.title}: ${summary?.[item.filter] ?? 'لم تحمل بعد'}`} disabled={!access.tasks || summary === null} style={({ pressed }) => [styles.metric, { backgroundColor: item.background, borderColor: `${item.foreground}25` }, pressed && styles.pressed]} onPress={() => openTasks(item.filter)}>
+            {metrics.map((item) => <Pressable key={item.filter} accessibilityRole="button" accessibilityState={{ disabled: !access.tasks || summary === null }} accessibilityLabel={`${item.title}: ${summary?.[item.filter as keyof Summary] ?? 'لم تحمل بعد'}`} disabled={!access.tasks || summary === null} style={({ pressed }) => [styles.metric, { backgroundColor: item.background, borderColor: `${item.foreground}25` }, pressed && styles.pressed]} onPress={() => openTasks(item.filter)}>
               <HomeIcon name={item.icon} size={compact ? 27 : 31} color={item.foreground} />
-              <Text style={[styles.metricValue, { color: item.foreground }]}>{summary?.[item.filter] ?? '—'}</Text>
+              <Text style={[styles.metricValue, { color: item.foreground }]}>{summary?.[item.filter as keyof Summary] ?? '—'}</Text>
               <Text style={[styles.metricLabel, compact && styles.compactMetricLabel, { color: item.foreground }]}>{item.title}</Text>
             </Pressable>)}
           </View>
