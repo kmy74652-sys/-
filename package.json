@@ -15,7 +15,8 @@
     "supabase:push": "supabase db push",
     "supabase:reset": "supabase db reset",
     "test:task-designer": "node scripts/test-task-designer.mjs",
-    "test:admin-management": "node scripts/test-admin-management.mjs"
+    "test:admin-management": "node scripts/test-admin-management.mjs",
+    "test:home-dashboard": "node scripts/test-home-dashboard.mjs"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",

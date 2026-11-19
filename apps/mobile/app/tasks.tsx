@@ -11,8 +11,9 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { Stack, useRouter } from 'expo-router';
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { supabase } from '../lib/supabase';
+import { normalizeTaskStatus, taskMatchesFilter, type TaskFilter } from '../lib/homeModel';
 import {
   friendlyDataError,
   getMyEmployeeProfile,
@@ -56,6 +57,30 @@ type Task = {
 };
 type Notification = { id: string; title: string; body: string; severity: string; read_at: string | null; created_at: string };
 
+type TasksSearchParams = {
+  status?: string | string[];
+  branchId?: string | string[];
+  mode?: string | string[];
+  view?: string | string[];
+};
+
+function firstSearchParam(value: string | string[] | undefined) {
+  return Array.isArray(value) ? value[0] : value;
+}
+
+function parseTaskFilter(value: string | undefined): TaskFilter {
+  return value === 'in_progress' || value === 'submitted' || value === 'late' ? value : 'all';
+}
+
+function parseBranchId(value: string | undefined) {
+  const normalized = value?.trim();
+  return normalized || '';
+}
+
+function parseTaskMode(value: string | undefined): 'all' | 'mine' | undefined {
+  return value === 'all' || value === 'mine' ? value : undefined;
+}
+
 const statusLabels: Record<Task['status'], string> = {
   pending: 'معلقة', in_progress: 'قيد التنفيذ', submitted: 'بانتظار المراجعة',
   approved: 'معتمدة', rejected: 'تحتاج استكمالًا', cancelled: 'ملغاة', late: 'متأخرة',
@@ -69,9 +94,14 @@ const positionLabels: Record<NonNullable<Task['position_code']>, string> = {
 export default function TasksScreen() {
   // Employee flow: read task, execute steps, complete the requested report.
   const router = useRouter();
+  const routeParams = useLocalSearchParams<TasksSearchParams>();
+  const requestedStatus = parseTaskFilter(firstSearchParam(routeParams.status));
+  const requestedBranchId = parseBranchId(firstSearchParam(routeParams.branchId));
+  const requestedMode = parseTaskMode(firstSearchParam(routeParams.mode));
   const [tasks, setTasks] = useState<Task[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [canReview, setCanReview] = useState(false);
+  const [canManage, setCanManage] = useState(false);
   const [currentUserId, setCurrentUserId] = useState('');
   const [screenMode, setScreenMode] = useState<'mine' | 'all' | 'review'>('mine');
   const [loading, setLoading] = useState(true);
@@ -83,6 +113,7 @@ export default function TasksScreen() {
   const [reviewNote, setReviewNote] = useState('');
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<Task['status'] | 'all'>('all');
+  const [branchFilter, setBranchFilter] = useState('');
   const [positionFilter, setPositionFilter] = useState<Task['position_code'] | 'all'>('all');
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
@@ -100,8 +131,9 @@ export default function TasksScreen() {
       setCurrentUserId(identity.userId);
       const permissions = new Set(identity.employee.permissions);
       if (!permissions.has('tasks.execute') && !permissions.has('tasks.manage')) throw new Error('permission_denied');
-      const [taskRows, notificationRows] = await Promise.all([listMyTasks(), listMyNotifications()]);
+      const [taskRows, notificationRows] = await Promise.all([listMyTasks(identity.employee.institutionId), listMyNotifications()]);
       setCanReview(identity.employee.permissions.includes('tasks.review'));
+      setCanManage(permissions.has('tasks.manage'));
       setTasks(taskRows);
       setDrafts((current) => {
         const next = { ...current };
@@ -134,6 +166,12 @@ export default function TasksScreen() {
   }, []);
 
   useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    if (!currentUserId) return;
+    setScreenMode(requestedMode === 'all' && (canManage || canReview) ? 'all' : 'mine');
+    setStatusFilter(requestedStatus);
+    setBranchFilter(requestedBranchId);
+  }, [canManage, canReview, currentUserId, requestedBranchId, requestedMode, requestedStatus]);
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (state) => {
       if (state === 'active') void load();
@@ -323,16 +361,17 @@ export default function TasksScreen() {
       ? task.assignee_employee_id === currentUserId
       : screenMode === 'review'
         ? canReview && (task.status === 'submitted' || hasPendingFormReview)
-        : canReview;
+        : canManage || canReview;
     return modeMatches &&
-      (statusFilter === 'all' || task.status === statusFilter) &&
+      taskMatchesFilter(task, statusFilter) &&
+      (!branchFilter || task.branch_id === branchFilter) &&
       (positionFilter === 'all' || task.position_code === positionFilter) &&
       (!search.trim() || `${task.title} ${task.description ?? ''}`.toLocaleLowerCase('ar').includes(search.trim().toLocaleLowerCase('ar')));
   });
   const employeeSummary = {
-    pending: tasks.filter((task) => ['pending', 'rejected'].includes(task.status)).length,
-    active: tasks.filter((task) => task.status === 'in_progress').length,
-    submitted: tasks.filter((task) => task.status === 'submitted' || task.report_forms.some((form) => form.status === 'submitted')).length,
+    pending: filteredTasks.filter((task) => ['pending', 'rejected'].includes(normalizeTaskStatus(task.status))).length,
+    active: filteredTasks.filter((task) => taskMatchesFilter(task, 'in_progress')).length,
+    submitted: filteredTasks.filter((task) => taskMatchesFilter(task, 'submitted')).length,
   };
 
   return (
@@ -348,7 +387,7 @@ export default function TasksScreen() {
             <Text style={styles.title}>المهام والمتابعة</Text>
           </View>
           <View style={styles.headerActions}>
-            <Pressable accessibilityRole="button" style={styles.backButton} onPress={() => router.back()}>
+            <Pressable accessibilityRole="button" style={styles.backButton} onPress={() => { if (router.canGoBack()) router.back(); else router.replace('/'); }}>
               <Text style={styles.backText}>رجوع</Text>
             </Pressable>
             <Pressable accessibilityRole="button" accessibilityLabel="تسجيل الخروج وتبديل الحساب" style={styles.signOutButton} onPress={() => void signOut()}>
@@ -361,14 +400,15 @@ export default function TasksScreen() {
         {!loading && <View style={styles.employeeIntro}><Text style={styles.employeeIntroTitle}>مساحة تنفيذك اليومية</Text><Text style={styles.employeeIntroText}>اقرأ التكليف، ابدأ التنفيذ، ثم عبّئ التقرير المطلوب وأرسله للمسؤول للمراجعة.</Text></View>}
         {!loading && <View style={styles.summaryRow}><View style={styles.summaryCard}><Text style={styles.summaryValue}>{employeeSummary.pending}</Text><Text style={styles.summaryLabel}>جديدة</Text></View><View style={styles.summaryCard}><Text style={styles.summaryValue}>{employeeSummary.active}</Text><Text style={styles.summaryLabel}>قيد التنفيذ</Text></View><View style={styles.summaryCard}><Text style={styles.summaryValue}>{employeeSummary.submitted}</Text><Text style={styles.summaryLabel}>بانتظار المراجعة</Text></View></View>}
         {loading && <View style={styles.loading}><ActivityIndicator size="large" color="#17324d" /><Text style={styles.muted}>جارٍ تحميل المهام…</Text></View>}
-        {!loading && canReview && <View style={styles.modeTabs}>
+        {!loading && (canReview || canManage) && <View style={styles.modeTabs}>
           {([
             ['mine', 'مهامي'],
             ['review', 'مراجعة التقارير'],
             ['all', 'متابعة جميع المهام'],
-          ] as const).map(([mode, label]) => <Pressable key={mode} accessibilityRole="button" accessibilityState={{ selected: screenMode === mode }} style={[styles.modeTab, screenMode === mode && styles.modeTabSelected]} onPress={() => { setScreenMode(mode); setStatusFilter('all'); setPositionFilter('all'); }}><Text style={[styles.modeTabText, screenMode === mode && styles.modeTabTextSelected]}>{label}</Text></Pressable>)}
+          ] as const).filter(([mode]) => mode === 'mine' || (mode === 'review' ? canReview : canManage || canReview)).map(([mode, label]) => <Pressable key={mode} accessibilityRole="button" accessibilityState={{ selected: screenMode === mode }} style={[styles.modeTab, screenMode === mode && styles.modeTabSelected]} onPress={() => { setScreenMode(mode); setStatusFilter('all'); setPositionFilter('all'); }}><Text style={[styles.modeTabText, screenMode === mode && styles.modeTabTextSelected]}>{label}</Text></Pressable>)}
         </View>}
 
+        {!loading && !!branchFilter && <View style={styles.activeFilter}><Text style={styles.meta}>الفرع المحدد: {tasks.find((task) => task.branch_id === branchFilter)?.branch_name ?? branchFilter}</Text><Pressable accessibilityRole="button" onPress={() => setBranchFilter('')} style={styles.clearFilterButton}><Text style={styles.clearFilterText}>مسح الفرع</Text></Pressable></View>}
         {!loading && tasks.length > 0 && <>
           <TextInput style={styles.input} value={search} onChangeText={setSearch} placeholder="ابحث عن مهمة…" accessibilityLabel="البحث في المهام" />
           {canReview && screenMode !== 'mine' && <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filters}>
@@ -513,6 +553,9 @@ const styles = StyleSheet.create({
   filterChipSelected: { backgroundColor: '#17324d', borderColor: '#17324d' },
   filterChipText: { color: '#39556a', fontSize: 13 },
   filterChipTextSelected: { color: '#fff', fontSize: 13, fontWeight: '700' },
+  activeFilter: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', gap: 8, backgroundColor: '#fff', borderRadius: 10, borderWidth: 1, borderColor: '#d6e0e4', padding: 10 },
+  clearFilterButton: { minHeight: 36, borderRadius: 8, backgroundColor: '#e9f0f4', paddingHorizontal: 10, alignItems: 'center', justifyContent: 'center' },
+  clearFilterText: { color: '#17324d', fontSize: 12, fontWeight: '800' },
   loading: { padding: 26, alignItems: 'center', gap: 12 },
   taskCard: { backgroundColor: '#fff', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#e2e9eb', gap: 10 },
   taskHeading: { flexDirection: 'row-reverse', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 },

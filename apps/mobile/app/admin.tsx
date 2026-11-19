@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, AppState, Image, Pressable, RefreshControl, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { Stack, useRouter } from 'expo-router';
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import AdenDeadlinePicker, { adenDateTimeToIso, currentAdenDateTime } from '../components/AdenDeadlinePicker';
-import { friendlyDataError, getMyEmployeeProfile } from '../lib/mobileData';
+import HomeDashboard from '../components/HomeDashboard';
+import { friendlyDataError, getMyEmployeeProfile, type MobileProfile } from '../lib/mobileData';
 import { createAdministrativeTask, loadDashboardData, roleLabel, statusLabel, type DashboardData } from '../lib/adminData';
 import { supabase } from '../lib/supabase';
 import { loadOrganizationBranding } from '../lib/organizationBranding';
@@ -11,14 +12,20 @@ import ReportDesigner from '../components/ReportDesigner';
 import TaskDesigner, { type TaskTemplateDraft } from '../components/TaskDesigner';
 import { assignTaskFromTemplate, listApprovedTaskReportForms, listTaskDesignerCategories, listTaskDesignerTemplates, saveTaskDesignerTemplate, setTaskDesignerTemplateActive, type StoredTaskTemplate, type TaskCategoryRow } from '../lib/taskDesigner';
 
-type Section = 'overview' | 'tasks' | 'task-designer' | 'reports' | 'branches' | 'employees' | 'activity';
-const sections: Array<[Section, string]> = [['overview', 'الرئيسية'], ['tasks', 'إدارة المهام'], ['task-designer', 'مصمم المهام والتقارير'], ['reports', 'تقارير الموظفين'], ['branches', 'الفروع'], ['employees', 'الموظفون'], ['activity', 'السجل والمرفقات']];
+type Section = 'overview' | 'tasks' | 'task-designer' | 'report-designer' | 'reports' | 'branches' | 'employees' | 'activity';
+const sections: Array<[Section, string]> = [['overview', 'الرئيسية'], ['tasks', 'إدارة المهام'], ['task-designer', 'مصمم المهام'], ['report-designer', 'مصمم التقارير'], ['reports', 'تقارير الموظفين'], ['branches', 'الفروع'], ['employees', 'الموظفون'], ['activity', 'السجل والمرفقات']];
+const allowedSections: readonly Section[] = sections.map(([value]) => value);
+function isSection(value: string | undefined): value is Section { return Boolean(value && allowedSections.includes(value as Section)); }
+type HomeDestination = 'tasks' | 'reports' | 'employees' | 'branches' | 'task-designer' | 'report-designer' | 'permissions' | 'settings';
 const roleCodes = ['owner', 'admin_followup', 'accountant', 'warehouse_keeper', 'warehouse_worker'];
 const priorityLabels: Record<string, string> = { normal: 'عادية', important: 'مهمة', urgent: 'عاجلة', critical: 'حرجة' };
 
 export default function AdminScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams<{ section?: string | string[] }>();
+  const requestedSection = Array.isArray(params.section) ? params.section[0] : params.section;
   const [section, setSection] = useState<Section>('overview');
+  const [profile, setProfile] = useState<MobileProfile | null>(null);
   const [currentName, setCurrentName] = useState('');
   const [brandName, setBrandName] = useState('مؤسسة الشاعري للتجارة العامة');
   const [brandTagline, setBrandTagline] = useState('معًا... نحو إدارة أفضل');
@@ -36,11 +43,16 @@ export default function AdminScreen() {
   const [initialDeadline] = useState(currentAdenDateTime);
   const [draft, setDraft] = useState({ title: '', description: '', dueDate: initialDeadline.date, dueTime: initialDeadline.time, priority: 'normal', roleCode: 'admin_followup', branchId: '', assignedEmployeeId: '', templateId: '', reportTemplateId: '', reportRequired: true });
 
+  useEffect(() => {
+    if (isSection(requestedSection)) setSection(requestedSection);
+  }, [requestedSection]);
+
   const load = useCallback(async () => {
     setError('');
     try {
       const identity = await getMyEmployeeProfile();
       if (!identity?.employee) throw new Error('employee_not_active');
+      setProfile(identity.employee);
       setCurrentName(identity.employee.fullName || 'المستخدم');
       const branding = await loadOrganizationBranding(identity.employee.institutionId);
       setBrandName(branding.name);
@@ -103,9 +115,26 @@ export default function AdminScreen() {
     } catch (cause) { setError(friendlyDataError(cause, 'تعذر إنشاء المهمة. تأكد من وجود موظف نشط ضمن التصنيف والفرع المحددين.')); }
   }
   const canManageTaskLibrary = permissions.includes('task_library.manage');
+  const canManageReports = permissions.includes('report_forms.manage');
+  const canViewReports = permissions.includes('reports.read_all') || permissions.includes('tasks.review');
+  const canManageEmployees = Boolean(profile?.roles.some((role) => role.code === 'owner' || role.code === 'admin_followup') && permissions.includes('employees.manage'));
+  const canViewEmployees = canManageEmployees || permissions.includes('employees.read');
+  const canViewBranches = permissions.includes('branches.read_all') || permissions.includes('branches.manage');
+  const canViewActivity = permissions.includes('audit.read');
   const fmt = (value: string | null) => value ? new Intl.DateTimeFormat('ar-SA', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value)) : 'غير محدد';
 
+  function navigateFromHome(destination: HomeDestination) {
+    if (destination === 'settings' || destination === 'permissions') { router.push('/settings'); return; }
+    if (destination === 'employees') { if (canManageEmployees) router.push('/settings'); else if (canViewEmployees) setSection('employees'); return; }
+    if (destination === 'tasks') { setSection('tasks'); return; }
+    if (destination === 'reports') { if (canViewReports) setSection('reports'); return; }
+    if (destination === 'branches') { if (canViewBranches) setSection('branches'); return; }
+    if (destination === 'task-designer') { if (canManageTaskLibrary) setSection('task-designer'); return; }
+    if (destination === 'report-designer') { if (canManageReports) setSection('report-designer'); }
+  }
+
   if (loading) return <SafeAreaView style={styles.safe}><View style={styles.center}><ActivityIndicator size="large" color="#17324d" /><Text style={styles.muted}>جارٍ تحميل لوحة الإدارة…</Text></View></SafeAreaView>;
+  if (section === 'overview' && profile) return <HomeDashboard profile={profile} onNavigate={navigateFromHome} />;
   return <SafeAreaView style={styles.safe}>
     <Stack.Screen options={{ headerShown: false }} />
     <ScrollView refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); void load(); }} />} contentContainerStyle={styles.content}>
@@ -114,15 +143,16 @@ export default function AdminScreen() {
       {!!error && <Text accessibilityRole="alert" style={styles.error}>{error}</Text>}
       {!!notice && <Text style={styles.notice}>{notice}</Text>}
 
-      {section === 'overview' && <Overview counts={counts} data={data} fmt={fmt} onSection={setSection} onSettings={() => router.push('/settings')} canDesign={canManageTaskLibrary} /> }
+      {section === 'overview' && !profile && <Overview counts={counts} data={data} fmt={fmt} onSection={setSection} onSettings={() => router.push('/settings')} canDesign={canManageTaskLibrary} />}
       {section === 'tasks' && <>{canManageTaskLibrary && <TaskAssignmentSection templates={taskDesignerTemplates} data={data} onReload={load} onEditTemplates={() => setSection('task-designer')} />}<TasksSection data={data} designerTemplates={designerTemplates} showCreate={showCreate} setShowCreate={setShowCreate} draft={draft} setDraft={setDraft} createTask={createTask} fmt={fmt} onOpenTasks={() => router.push('/tasks')} /></>}
-      {section === 'task-designer' && canManageTaskLibrary && <TaskTemplatesSection templates={taskDesignerTemplates} categories={taskCategories} onReload={load} />}
-      {section === 'reports' && <ReportsSection data={data} fmt={fmt} />}
-      {section === 'branches' && <BranchesSection data={data} canManage={permissions.includes('branches.manage')} onReload={load} />}
-      {section === 'employees' && <EmployeesSection data={data} />}
-      {section === 'activity' && <ActivitySection data={data} fmt={fmt} />}
+      {section === 'task-designer' && (canManageTaskLibrary ? <TaskTemplatesSection templates={taskDesignerTemplates} categories={taskCategories} onReload={load} canManageReports={canManageReports} /> : <Unavailable title="مصمم المهام" text="لا تملك صلاحية إدارة مكتبة المهام." />)}
+      {section === 'report-designer' && (canManageReports ? <ReportDesigner /> : <Unavailable title="مصمم التقارير" text="لا تملك صلاحية إدارة نماذج التقارير." />)}
+      {section === 'reports' && (canViewReports ? <ReportsSection data={data} fmt={fmt} /> : <Unavailable title="تقارير الموظفين" text="لا تملك صلاحية قراءة تقارير المؤسسة أو مراجعتها." />)}
+      {section === 'branches' && (canViewBranches ? <BranchesSection data={data} canManage={permissions.includes('branches.manage')} onReload={load} /> : <Unavailable title="إدارة الفروع" text="لا تملك صلاحية عرض الفروع." />)}
+      {section === 'employees' && (canViewEmployees ? <EmployeesSection data={data} /> : <Unavailable title="الموظفون" text="لا تملك صلاحية عرض الموظفين." />)}
+      {section === 'activity' && (canViewActivity ? <ActivitySection data={data} fmt={fmt} /> : <Unavailable title="سجل النشاط" text="لا تملك صلاحية قراءة سجل النشاط." />)}
     </ScrollView>
-    <View style={styles.bottomBar}><Pressable style={[styles.bottomItem, section === 'overview' && styles.bottomItemActive]} onPress={() => setSection('overview')}><Text style={[styles.bottomGlyph, section === 'overview' && styles.bottomGlyphActive]}>⌂</Text><Text style={[styles.bottomLabel, section === 'overview' && styles.bottomLabelActive]}>الرئيسية</Text></Pressable><Pressable style={[styles.bottomItem, section === 'tasks' && styles.bottomItemActive]} onPress={() => setSection('tasks')}><Text style={[styles.bottomGlyph, section === 'tasks' && styles.bottomGlyphActive]}>▣</Text><Text style={[styles.bottomLabel, section === 'tasks' && styles.bottomLabelActive]}>المهام</Text></Pressable><Pressable style={[styles.bottomItem, section === 'employees' && styles.bottomItemActive]} onPress={() => setSection('employees')}><Text style={[styles.bottomGlyph, section === 'employees' && styles.bottomGlyphActive]}>♟</Text><Text style={[styles.bottomLabel, section === 'employees' && styles.bottomLabelActive]}>الموظفون</Text></Pressable><Pressable style={styles.bottomItem} onPress={() => router.push('/settings')}><Text style={styles.bottomGlyph}>⚙</Text><Text style={styles.bottomLabel}>الإعدادات</Text></Pressable></View>
+    <View style={styles.bottomBar}><Pressable style={[styles.bottomItem, section === 'overview' && styles.bottomItemActive]} onPress={() => router.replace('/')}><Text style={[styles.bottomGlyph, section === 'overview' && styles.bottomGlyphActive]}>⌂</Text><Text style={[styles.bottomLabel, section === 'overview' && styles.bottomLabelActive]}>الرئيسية</Text></Pressable><Pressable style={[styles.bottomItem, section === 'tasks' && styles.bottomItemActive]} onPress={() => setSection('tasks')}><Text style={[styles.bottomGlyph, section === 'tasks' && styles.bottomGlyphActive]}>▣</Text><Text style={[styles.bottomLabel, section === 'tasks' && styles.bottomLabelActive]}>المهام</Text></Pressable><Pressable style={[styles.bottomItem, section === 'employees' && styles.bottomItemActive]} onPress={() => setSection('employees')}><Text style={[styles.bottomGlyph, section === 'employees' && styles.bottomGlyphActive]}>♟</Text><Text style={[styles.bottomLabel, section === 'employees' && styles.bottomLabelActive]}>الموظفون</Text></Pressable><Pressable style={styles.bottomItem} onPress={() => router.push('/settings')}><Text style={styles.bottomGlyph}>⚙</Text><Text style={styles.bottomLabel}>الإعدادات</Text></Pressable></View>
   </SafeAreaView>;
 }
 
@@ -261,7 +291,7 @@ function EmployeesSection({ data }: any) { return <><Text style={styles.sectionT
 function ActivitySection({ data, fmt }: any) { return <><Text style={styles.sectionTitle}>سجل النشاط والمرفقات</Text><Text style={styles.copy}>السجل يعرض الأحداث المسموح بها حسب RLS. إدارة المرفقات تتم من داخل تقرير المهمة.</Text>{(data?.activity ?? []).map((item: any) => <View style={styles.row} key={item.id}><Text style={styles.cardTitle}>{item.action}</Text><Text style={styles.meta}>المهمة {item.taskId.slice(0, 8)} · {fmt(item.createdAt)}</Text></View>)}</>; }
 function Unavailable({ title, text }: { title: string; text: string }) { return <View style={styles.unavailable}><Text style={styles.sectionTitle}>{title}</Text><Text style={styles.copy}>{text}</Text></View>; }
 
-function TaskTemplatesSection({ templates, categories, onReload }: { templates: StoredTaskTemplate[]; categories: TaskCategoryRow[]; onReload: () => Promise<void> }) {
+function TaskTemplatesSection({ templates, categories, onReload, canManageReports }: { templates: StoredTaskTemplate[]; categories: TaskCategoryRow[]; onReload: () => Promise<void>; canManageReports: boolean }) {
   const [selected, setSelected] = useState<StoredTaskTemplate | null>(null);
   const [editing, setEditing] = useState(false);
   const [mode, setMode] = useState<'tasks' | 'reports'>('tasks');
@@ -279,8 +309,8 @@ function TaskTemplatesSection({ templates, categories, onReload }: { templates: 
     }
   }
   return <View style={{ gap: 12 }}>
-    <View style={styles.choices}><Pressable style={[styles.choice, mode === 'tasks' && styles.choiceSelected]} onPress={() => setMode('tasks')}><Text style={mode === 'tasks' ? styles.choiceSelectedText : styles.choiceText}>مصمم المهام</Text></Pressable><Pressable style={[styles.choice, mode === 'reports' && styles.choiceSelected]} onPress={() => setMode('reports')}><Text style={mode === 'reports' ? styles.choiceSelectedText : styles.choiceText}>مصمم التقارير الديناميكي</Text></Pressable></View>
-    {mode === 'reports' ? <ReportDesigner /> : <>
+    <View style={styles.choices}><Pressable style={[styles.choice, mode === 'tasks' && styles.choiceSelected]} onPress={() => setMode('tasks')}><Text style={mode === 'tasks' ? styles.choiceSelectedText : styles.choiceText}>مصمم المهام</Text></Pressable>{canManageReports && <Pressable style={[styles.choice, mode === 'reports' && styles.choiceSelected]} onPress={() => setMode('reports')}><Text style={mode === 'reports' ? styles.choiceSelectedText : styles.choiceText}>مصمم التقارير الديناميكي</Text></Pressable>}</View>
+    {mode === 'reports' && canManageReports ? <ReportDesigner /> : <>
     <View style={styles.card}><Text style={styles.sectionTitle}>مصمم المهمة والتقرير</Text><Text style={styles.copy}>أنشئ المهمة وخطواتها وحقول تقرير الموظف من شاشة واحدة. حفظ القالب يحفظ التصميم فقط ولا يرسل تكليفًا؛ لإرسال مهمة فعلية اختر «إسناد من قالب مهام» وحدد الموظفين والفرع. تحفظ نسخة ثابتة من التقرير لكل تكليف جديد.</Text><Pressable style={styles.primary} onPress={() => { setSelected(null); setEditing(true); setSaveError(''); }}><Text style={styles.primaryText}>قالب جديد</Text></Pressable></View>
     {templates.map((template) => <View key={template.id} style={styles.card}><View style={styles.taskLine}><Text style={styles.cardTitle}>{template.title}</Text><Text style={styles.badge}>{template.isActive ? 'نشط' : 'مؤرشف'}</Text></View><Text style={styles.meta}>{roleLabel(template.roleCode)} · {template.steps.length} خطوات · {template.reports.length} نماذج تقارير · إصدار القالب {template.version}</Text><View style={styles.actionsRow}><Pressable style={styles.secondary} onPress={() => { setSelected(template); setEditing(true); setSaveError(''); }}><Text style={styles.secondaryText}>تعديل القالب</Text></Pressable><Pressable style={styles.secondary} onPress={() => { setSelected({ ...template, id: undefined, title: `نسخة من ${template.title}`, isActive: false }); setEditing(true); setSaveError(''); }}><Text style={styles.secondaryText}>نسخ القالب</Text></Pressable><Pressable style={styles.secondary} onPress={async () => { try { await setTaskDesignerTemplateActive(template.id!, !template.isActive); await onReload(); } catch (cause) { setSaveError(friendlyDataError(cause, 'تعذر تغيير حالة القالب.')); } }}><Text style={styles.secondaryText}>{template.isActive ? 'أرشفة' : 'إعادة تفعيل'}</Text></Pressable></View></View>)}
     {!!saveError && <Text accessibilityRole="alert" style={styles.error}>{saveError}</Text>}

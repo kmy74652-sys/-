@@ -1,5 +1,4 @@
-import { useEffect, useState } from 'react';
-import { useRouter } from 'expo-router';
+import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -14,32 +13,26 @@ import {
 } from 'react-native';
 import { supabase } from '../lib/supabase';
 import { friendlyDataError, getMyEmployeeProfile } from '../lib/mobileData';
+import type { MobileProfile } from '../lib/mobileData';
+import HomeDashboard from '../components/HomeDashboard';
 
-type Profile = {
-  fullName: string;
-  employeeNo: string;
-  roles: { code: string; nameAr: string }[];
-  permissions: string[];
-  branches: { name: string }[];
-};
-
-const modules = [
-  ['المهام والمتابعة', 'tasks.execute'],
-  ['العمليات المالية', 'finance.prepare'],
-  ['إدارة المخزون', 'inventory.operate'],
-] as const;
+type Profile = MobileProfile;
 
 export default function Home() {
-  const router = useRouter();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [checkingSession, setCheckingSession] = useState(true);
   const [employeeNo, setEmployeeNo] = useState('1');
   const [code, setCode] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const clearHomeProfile = useCallback(() => { setProfile(null); setCode(''); setError(''); }, []);
 
   useEffect(() => {
     void load();
+    const subscription = supabase?.auth.onAuthStateChange((event) => {
+      if (event === 'SIGNED_OUT') { setProfile(null); setCode(''); setError(''); }
+    });
+    return () => subscription?.data.subscription.unsubscribe();
   }, []);
 
   async function load(options: { showConnectionError?: boolean } = {}) {
@@ -63,9 +56,9 @@ export default function Home() {
       setProfile(identity.employee);
       setError('');
       const permissions = new Set(identity.employee.permissions);
-      if (permissions.has('tasks.manage')) router.replace('/admin');
-      else if (permissions.has('tasks.execute')) router.replace('/tasks');
-      else setError('حسابك نشط، لكن لم تُربط به صلاحية تشغيلية بعد. اطلب من صاحب المؤسسة مراجعة دورك وصلاحياتك.');
+      if (!permissions.has('tasks.manage') && !permissions.has('tasks.execute')) {
+        setError('حسابك نشط، لكن لم تُربط به صلاحية تشغيلية بعد. اطلب من صاحب المؤسسة مراجعة دورك وصلاحياتك.');
+      }
     } catch (cause) {
       setProfile(null);
       // Restoring a persisted session is best-effort. A transient network/auth
@@ -207,54 +200,7 @@ export default function Home() {
     );
   }
 
-  const allowed = new Set(profile.permissions);
-  const canManageEmployees = profile.roles.some((role) => role.code === 'owner' || role.code === 'admin_followup') && allowed.has('employees.manage');
-  return (
-    <SafeAreaView style={styles.safe}>
-      <ScrollView contentContainerStyle={styles.content}>
-        <Text style={styles.eyebrow}>
-          {profile.employeeNo} · {profile.roles.map((role) => role.nameAr).join('، ')}
-        </Text>
-        <Text style={styles.title}>مرحبًا، {profile.fullName}</Text>
-        <Text style={styles.copy}>الوحدات الظاهرة مرتبطة بصلاحيات حسابك.</Text>
-        <View style={styles.grid}>
-          {modules.filter(([, permission]) => allowed.has(permission) || (permission === 'tasks.execute' && allowed.has('tasks.manage')) || (permission === 'inventory.operate' && allowed.has('inventory.execute'))).map(([name]) => (
-            <View style={styles.card} key={name}>
-              <Text style={styles.cardTitle}>{name}</Text>
-              <Text style={styles.cardCopy}>{profile.branches.map((branch) => branch.name).join('، ')}</Text>
-            </View>
-          ))}
-        </View>
-        {(allowed.has('tasks.execute') || allowed.has('tasks.manage')) && (
-          <Pressable accessibilityRole="button" style={styles.taskLink} onPress={() => router.push('/tasks')}>
-            <Text style={styles.taskLinkText}>فتح المهام والتقارير والتنبيهات</Text>
-          </Pressable>
-        )}
-        {canManageEmployees && (
-          <Pressable accessibilityRole="button" style={styles.settingsLink} onPress={() => router.push('/settings')}>
-            <Text style={styles.settingsLinkText}>إدارة الموظفين وحسابات الدخول</Text>
-          </Pressable>
-        )}
-        <Pressable
-          accessibilityRole="button"
-          style={({ pressed }) => [styles.outline, pressed && styles.pressed]}
-          onPress={() => void (async () => {
-            try {
-              const { error: signOutError } = await supabase?.auth.signOut() ?? {};
-              if (signOutError) throw signOutError;
-              setProfile(null);
-              setError('');
-            } catch {
-              setError('تعذر تسجيل الخروج بأمان. تحقق من الاتصال ثم أعد المحاولة.');
-            }
-          })()}
-        >
-          <Text style={styles.outlineText}>تسجيل الخروج</Text>
-        </Pressable>
-        {!!error && <Text accessibilityRole="alert" style={styles.error}>{error}</Text>}
-      </ScrollView>
-    </SafeAreaView>
-  );
+  return <HomeDashboard profile={profile} onSignOut={clearHomeProfile} />;
 }
 
 const styles = StyleSheet.create({
@@ -272,7 +218,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#e2e9eb',
   },
-  content: { padding: 18, paddingTop: 28, paddingBottom: 32 },
   mark: { color: '#17324d', fontSize: 42, fontWeight: '800', textAlign: 'right' },
   eyebrow: { color: '#718394', fontSize: 13, fontWeight: '700', marginBottom: 8, textAlign: 'right', lineHeight: 20 },
   title: { color: '#17324d', fontSize: 28, fontWeight: '800', textAlign: 'right', marginBottom: 12, lineHeight: 40 },
@@ -296,14 +241,4 @@ const styles = StyleSheet.create({
   resetButton: { minHeight: 44, alignItems: 'center', justifyContent: 'center', marginTop: 6 },
   resetText: { color: '#39556a', fontWeight: '700', textDecorationLine: 'underline' },
   pressed: { opacity: 0.82 },
-  grid: { gap: 12 },
-  taskLink: { minHeight: 52, marginTop: 16, borderRadius: 12, padding: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: '#17324d' },
-  taskLinkText: { color: '#fff', fontWeight: '800', fontSize: 16 },
-  settingsLink: { minHeight: 52, marginTop: 12, borderRadius: 12, padding: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: '#2f6654' },
-  settingsLinkText: { color: '#fff', fontWeight: '800', fontSize: 16 },
-  card: { backgroundColor: '#fff', borderRadius: 16, padding: 18, borderWidth: 1, borderColor: '#e2e9eb' },
-  cardTitle: { color: '#17324d', fontSize: 17, fontWeight: '800', textAlign: 'right', lineHeight: 26 },
-  cardCopy: { color: '#718394', marginTop: 8, textAlign: 'right', lineHeight: 22 },
-  outline: { minHeight: 48, marginTop: 24, borderWidth: 1, borderColor: '#17324d', borderRadius: 12, padding: 12, alignItems: 'center', justifyContent: 'center' },
-  outlineText: { color: '#17324d', fontWeight: '800' },
 });

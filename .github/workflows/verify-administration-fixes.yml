@@ -24,6 +24,8 @@ jobs:
           cache-dependency-path: pnpm-lock.yaml
       - name: Install locked dependencies
         run: pnpm install --frozen-lockfile
+      - name: Home dashboard checks
+        run: pnpm test:home-dashboard
       - name: Static administration checks
         run: pnpm test:admin-management
       - name: Existing task workflow tests

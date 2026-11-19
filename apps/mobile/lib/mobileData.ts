@@ -69,26 +69,55 @@ export async function getMyEmployeeProfile(): Promise<MobileIdentity | null> {
   return { userId: authData.user.id, employee: result?.employee ?? null };
 }
 
-export async function listMyTasks(): Promise<MobileTask[]> {
+async function readRelatedRows<T>(ids: string[], query: (chunk: string[], start: number, end: number) => PromiseLike<{ data: T[] | null; error: unknown }>): Promise<T[]> {
+  const rows: T[] = [];
+  // Keep IN URLs bounded and read past the PostgREST response-size limit.
+  for (let index = 0; index < ids.length; index += 200) {
+    const chunk = ids.slice(index, index + 200);
+    for (let offset = 0; ; offset += 500) {
+      const { data, error } = await query(chunk, offset, offset + 499);
+      if (error) throw error;
+      rows.push(...(data ?? []));
+      if (!data || data.length < 500) break;
+    }
+  }
+  return rows;
+}
+
+export async function listMyTasks(institutionId?: string): Promise<MobileTask[]> {
   const client = getClient();
-  const { data, error } = await client
-    .from('tasks')
-    .select('id,title,description,assigned_to,branch_id,position_code,due_at,priority,status,assigned_at,created_at,starts_at,report_form_snapshot_id,report_flow,task_instructions,proof_required,proof_instructions')
-    .order('due_at', { ascending: true });
-  if (error) throw error;
-  const rows = data ?? [];
+  const taskQuery = () => {
+    const query = client.from('tasks')
+      .select('id,title,description,assigned_to,branch_id,position_code,due_at,priority,status,assigned_at,created_at,starts_at,report_form_snapshot_id,report_flow,task_instructions,proof_required,proof_instructions')
+      .order('due_at', { ascending: true }).order('id', { ascending: true });
+    return institutionId ? query.eq('organization_id', institutionId) : query;
+  };
+  const rows: NonNullable<Awaited<ReturnType<typeof taskQuery>>['data']> = [];
+  for (let offset = 0; ; offset += 500) {
+    const { data, error } = await taskQuery().range(offset, offset + 499);
+    if (error) throw error;
+    rows.push(...(data ?? []));
+    if (!data || data.length < 500) break;
+  }
   const branchIds = [...new Set(rows.map((task) => task.branch_id).filter((id): id is string => Boolean(id)))];
   const assignedIds = [...new Set(rows.map((task) => task.assigned_to).filter((id): id is string => Boolean(id)))];
   const taskIds = rows.map((task) => task.id);
-  const [branchesResult, membershipsResult, fieldsResult, stepsResult, snapshotsResult, reportsResult, draftsResult] = await Promise.all([
-    branchIds.length ? client.from('branches').select('id,name,branch_level').in('id', branchIds) : Promise.resolve({ data: [], error: null }),
-    assignedIds.length ? client.from('organization_memberships').select('id,user_id').in('user_id', assignedIds) : Promise.resolve({ data: [], error: null }),
-    taskIds.length ? client.from('task_report_fields').select('task_id,label,field_key,field_type,is_required,options,sort_order').in('task_id', taskIds).order('sort_order', { ascending: true }) : Promise.resolve({ data: [], error: null }),
-    taskIds.length ? client.from('task_execution_steps').select('id,task_id,title,instructions,sort_order,is_required,evidence_required,evidence_instructions,completed_at').in('task_id', taskIds).order('sort_order', { ascending: true }).limit(2000) : Promise.resolve({ data: [], error: null }),
-    taskIds.length ? client.from('task_report_form_snapshots').select('id,task_id,title,sort_order,is_required,schema').in('task_id', taskIds).order('sort_order', { ascending: true }).limit(2000) : Promise.resolve({ data: [], error: null }),
-    taskIds.length ? client.from('task_reports').select('id,task_id,report_form_snapshot_id,values,status,review_note,submitted_at').in('task_id', taskIds).order('submitted_at', { ascending: false }).limit(2000) : Promise.resolve({ data: [], error: null }),
-    taskIds.length ? client.from('task_report_drafts').select('task_id,snapshot_id,values,updated_at').in('task_id', taskIds).order('updated_at', { ascending: false }).limit(2000) : Promise.resolve({ data: [], error: null }),
+  const [branchRows, membershipRows, fieldRows, stepRows, snapshotRows, reportRows, draftRows] = await Promise.all([
+    readRelatedRows(branchIds, (ids, start, end) => client.from('branches').select('id,name,branch_level').in('id', ids).order('id').range(start, end)),
+    readRelatedRows(assignedIds, (ids, start, end) => client.from('organization_memberships').select('id,user_id').in('user_id', ids).order('id').range(start, end)),
+    readRelatedRows(taskIds, (ids, start, end) => client.from('task_report_fields').select('task_id,label,field_key,field_type,is_required,options,sort_order').in('task_id', ids).order('sort_order', { ascending: true }).order('id').range(start, end)),
+    readRelatedRows(taskIds, (ids, start, end) => client.from('task_execution_steps').select('id,task_id,title,instructions,sort_order,is_required,evidence_required,evidence_instructions,completed_at').in('task_id', ids).order('sort_order', { ascending: true }).order('id').range(start, end)),
+    readRelatedRows(taskIds, (ids, start, end) => client.from('task_report_form_snapshots').select('id,task_id,title,sort_order,is_required,schema').in('task_id', ids).order('sort_order', { ascending: true }).order('id').range(start, end)),
+    readRelatedRows(taskIds, (ids, start, end) => client.from('task_reports').select('id,task_id,report_form_snapshot_id,values,status,review_note,submitted_at').in('task_id', ids).order('submitted_at', { ascending: false }).order('id').range(start, end)),
+    readRelatedRows(taskIds, (ids, start, end) => client.from('task_report_drafts').select('task_id,snapshot_id,values,updated_at').in('task_id', ids).order('updated_at', { ascending: false }).order('id').range(start, end)),
   ]);
+  const branchesResult = { data: branchRows, error: null };
+  const membershipsResult = { data: membershipRows, error: null };
+  const fieldsResult = { data: fieldRows, error: null };
+  const stepsResult = { data: stepRows, error: null };
+  const snapshotsResult = { data: snapshotRows, error: null };
+  const reportsResult = { data: reportRows, error: null };
+  const draftsResult = { data: draftRows, error: null };
   if (branchesResult.error) throw branchesResult.error;
   if (membershipsResult.error) throw membershipsResult.error;
   if (fieldsResult.error) throw fieldsResult.error;
@@ -99,7 +128,7 @@ export async function listMyTasks(): Promise<MobileTask[]> {
   const branches = branchesResult.data ?? [];
   const branchById = new Map((branches ?? []).map((branch) => [branch.id, branch]));
   const membershipByUser = new Map((membershipsResult.data ?? []).map((membership) => [membership.user_id, membership.id]));
-  const roleAssignments = membershipByUser.size ? await client.from('role_assignments').select('membership_id,role_code').in('membership_id', [...membershipByUser.values()]).limit(100) : { data: [], error: null };
+  const roleAssignments = { data: await readRelatedRows([...membershipByUser.values()], (ids, start, end) => client.from('role_assignments').select('membership_id,role_code').in('membership_id', ids).order('id').range(start, end)), error: null };
   if (roleAssignments.error) throw roleAssignments.error;
   const roleByMembership = new Map((roleAssignments.data ?? []).map((assignment) => [assignment.membership_id, assignment.role_code]));
   const fieldsByTask = new Map<string, ReportField[]>();
