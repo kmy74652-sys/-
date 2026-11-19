@@ -17,8 +17,8 @@ jobs:
       contents: write
     env:
       # A Supabase publishable key is intended for client apps; never place a service-role key here.
-      EXPO_PUBLIC_SUPABASE_URL: https://qoeruidmtsasvhxejyga.supabase.co
-      EXPO_PUBLIC_SUPABASE_ANON_KEY: sb_publishable_9eVggM535cGiWxO6GBe9TA_o8HL_o6y
+      EXPO_PUBLIC_SUPABASE_URL: https://fjmryqhdwxsocdzswnkq.supabase.co
+      EXPO_PUBLIC_SUPABASE_ANON_KEY: sb_publishable_vRWbeJO5I_KJwJjqVDSZLA_pEHABsPk
       EXPO_USE_COMMUNITY_AUTOLINKING: '0'
     defaults:
       run:
@@ -34,7 +34,7 @@ jobs:
             exit 1
           fi
           supabase_url="${EXPO_PUBLIC_SUPABASE_URL%/}"
-          if [ "$supabase_url" != "https://qoeruidmtsasvhxejyga.supabase.co" ]; then
+          if [ "$supabase_url" != "https://fjmryqhdwxsocdzswnkq.supabase.co" ]; then
             echo "::error title=Wrong Supabase project::EXPO_PUBLIC_SUPABASE_URL does not match the requested project."
             exit 1
           fi
