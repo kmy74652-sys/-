@@ -42,7 +42,7 @@ export default function Home() {
     void load();
   }, []);
 
-  async function load() {
+  async function load(options: { showConnectionError?: boolean } = {}) {
     try {
       if (!supabase) {
         setError('إعدادات Supabase غير متاحة.');
@@ -68,7 +68,12 @@ export default function Home() {
       else setError('حسابك نشط، لكن لم تُربط به صلاحية تشغيلية بعد. اطلب من صاحب المؤسسة مراجعة دورك وصلاحياتك.');
     } catch (cause) {
       setProfile(null);
-      setError(friendlyDataError(cause, 'تعذر الاتصال بـSupabase. تحقق من الإنترنت وحاول مرة أخرى.'));
+      // Restoring a persisted session is best-effort. A transient network/auth
+      // lookup failure must not block the login screen before credentials are entered.
+      // After an explicit login or manual retry, show the actionable connection error.
+      setError(options.showConnectionError
+        ? friendlyDataError(cause, 'تعذر الاتصال بـSupabase. تحقق من الإنترنت وحاول مرة أخرى.')
+        : '');
     } finally {
       setCheckingSession(false);
     }
@@ -112,7 +117,7 @@ export default function Home() {
       });
       if (sessionError) throw sessionError;
       setCode('');
-      await load();
+      await load({ showConnectionError: true });
     } catch {
       setError('تعذر إكمال تسجيل الدخول بسبب انقطاع الاتصال. تحقق من الإنترنت وحاول مجددًا.');
     } finally {
@@ -124,7 +129,7 @@ export default function Home() {
     setBusy(true);
     setError('');
     try {
-      await load();
+      await load({ showConnectionError: true });
     } finally {
       setBusy(false);
     }
