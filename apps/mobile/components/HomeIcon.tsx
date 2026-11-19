@@ -1,6 +1,6 @@
 import Svg, { Circle, G, Path, Rect } from 'react-native-svg';
 
-export type HomeIconName = 'tasks' | 'reports' | 'employees' | 'branches' | 'inventory' | 'task-designer' | 'report-designer' | 'permissions' | 'settings' | 'home' | 'bell' | 'clock' | 'play' | 'check' | 'calendar' | 'chevron' | 'avatar';
+export type HomeIconName = 'tasks' | 'reports' | 'employees' | 'branches' | 'inventory' | 'task-designer' | 'report-designer' | 'agreement' | 'permissions' | 'settings' | 'home' | 'bell' | 'clock' | 'play' | 'check' | 'calendar' | 'chevron' | 'avatar';
 
 export default function HomeIcon({ name, size = 32, color = '#0b3458', accent = '#dba62a' }: { name: HomeIconName; size?: number; color?: string; accent?: string }) {
   return <Svg width={size} height={size} viewBox="0 0 48 48" accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
@@ -12,6 +12,7 @@ export default function HomeIcon({ name, size = 32, color = '#0b3458', accent = 
       {name === 'inventory' && <><Path d="M5 42V17L24 4l19 13v25M12 42V22h24v20" fill={color} /><Path d="M14 42V24h20v18" stroke="white" /><Path d="M16 29h6m4 0h6m-16 6h6m4 0h6m-16 6h6" stroke={accent} /></>}
       {name === 'task-designer' && <><Path d="M24 4C11 4 3 14 3 26c0 11 7 17 15 17 5 0 6-4 5-7-1-3 1-6 5-6h7c9 0 12-5 10-11C42 10 34 4 24 4Z" fill={color} /><Circle cx={14} cy={15} r={3} fill="white" strokeWidth={0} /><Circle cx={26} cy={11} r={3} fill="white" strokeWidth={0} /><Circle cx={9} cy={27} r={3} fill="white" strokeWidth={0} /><Path d="m23 39 19-20 4 4-19 20Z" fill={accent} stroke="white" strokeWidth={2} /></>}
       {name === 'report-designer' && <><Path d="M10 4h20l9 10v28H10Z" fill={color} /><Path d="M29 4v12h10M16 22h15m-15 7h12m-12 7h8" stroke="white" /><Circle cx={37} cy={37} r={10} fill={accent} stroke="white" strokeWidth={2} /><Path d="M37 32v10m-5-5h10" stroke="white" /></>}
+      {name === 'agreement' && <><Path d="M12 5h20l8 8v30H12Z" fill={color} /><Path d="M32 5v10h8M18 24h16M18 31h16M18 38h10" stroke="white" strokeWidth={2} /><Path d="m28 42 4 4 9-10" stroke={accent} strokeWidth={3} /></>}
       {name === 'permissions' && <><Path d="m24 3 18 7v15c0 10-11 17-18 21C17 42 6 35 6 25V10Z" fill={color} /><Rect x={16} y={21} width={16} height={14} rx={3} fill="white" strokeWidth={0} /><Path d="M19 21v-5a5 5 0 0 1 10 0v5" stroke="white" /><Path d="M24 27v3" stroke={color} /></>}
       {name === 'settings' && <><Path d="m20 4 8 0 2 6 5 3 6-1 4 7-4 5v6l4 5-4 7-6-1-5 3-2 6h-8l-2-6-5-3-6 1-4-7 4-5v-6l-4-5 4-7 6 1 5-3Z" fill={color} transform="translate(0 -3) scale(1 .94)" /><Circle cx={24} cy={23} r={8} fill="white" strokeWidth={0} /></>}
       {name === 'home' && <><Path d="m4 23 20-18 20 18M9 21v22h12V30h8v13h10V21" fill={color} /></>}

@@ -19,7 +19,7 @@ type Section = 'overview' | 'tasks' | 'task-designer' | 'report-designer' | 'rep
 const sections: Array<[Section, string]> = [['overview', 'الرئيسية'], ['tasks', 'إدارة المهام'], ['task-designer', 'مصمم المهام'], ['report-designer', 'مصمم التقارير'], ['reports', 'تقارير الموظفين'], ['branches', 'الفروع'], ['employees', 'الموظفون'], ['activity', 'السجل والمرفقات']];
 const allowedSections: readonly Section[] = sections.map(([value]) => value);
 function isSection(value: string | undefined): value is Section { return Boolean(value && allowedSections.includes(value as Section)); }
-type HomeDestination = 'tasks' | 'reports' | 'employees' | 'branches' | 'task-designer' | 'report-designer' | 'permissions' | 'settings';
+type HomeDestination = 'tasks' | 'reports' | 'employees' | 'branches' | 'task-designer' | 'report-designer' | 'agreements' | 'permissions' | 'settings';
 const roleCodes = ['owner', 'admin_followup', 'accountant', 'warehouse_keeper', 'warehouse_worker'];
 const priorityLabels: Record<string, string> = { normal: 'عادية', important: 'مهمة', urgent: 'عاجلة', critical: 'حرجة' };
 
@@ -138,6 +138,7 @@ export default function AdminScreen() {
 
   function navigateFromHome(destination: HomeDestination) {
     if (destination === 'settings' || destination === 'permissions') { router.push('/settings'); return; }
+    if (destination === 'agreements') { router.push('/agreement' as never); return; }
     if (destination === 'employees') { if (canManageEmployees) router.push('/settings?tab=employees'); else if (canViewEmployees) setSection('employees'); return; }
     if (destination === 'tasks') { setSection('tasks'); return; }
     if (destination === 'reports') { if (canViewReports) setSection('reports'); return; }

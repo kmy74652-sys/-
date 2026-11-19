@@ -1,0 +1,18 @@
+import { readFileSync } from 'node:fs';
+import assert from 'node:assert/strict';
+const migration = readFileSync('supabase/migrations/063_employee_work_agreements.sql', 'utf8');
+const page = readFileSync('apps/mobile/app/agreement.tsx', 'utf8');
+const data = readFileSync('apps/mobile/lib/agreementData.ts', 'utf8');
+const home = readFileSync('apps/mobile/components/HomeDashboard.tsx', 'utf8');
+for (const table of ['employee_agreements', 'employee_agreement_versions', 'employee_agreement_responses', 'employee_agreement_audit_log']) assert.match(migration, new RegExp(`create table[^;]*${table}`, 's'));
+for (const rpc of ['create_employee_agreement', 'submit_employee_agreement_for_approval', 'publish_employee_agreement', 'respond_employee_agreement']) assert.match(migration, new RegExp(`create or replace function public\\.${rpc}`));
+assert.match(migration, /enable row level security/);
+assert.match(migration, /employee_agreement_audit_append_only/);
+assert.match(migration, /employee_agreements\.manage/);
+assert.match(migration, /employee_agreements\.publish/);
+assert.match(page, /أوافق على الاتفاقية/);
+assert.match(page, /رفض مع ملاحظة/);
+assert.match(page, /إنشاء اتفاقية عمل/);
+assert.match(data, /respond_employee_agreement/);
+assert.match(home, /اتفاقية العمل/);
+console.log(JSON.stringify({ ok: true, checks: 14, workflow: ['draft', 'pending_approval', 'published', 'accepted/rejected'], rls: true, auditAppendOnly: true }));

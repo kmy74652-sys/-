@@ -19,6 +19,7 @@ const services: Array<{ key: HomeDestination | 'inventory'; title: string; subti
   { key: 'inventory', title: 'المخزون', subtitle: 'إدارة المخزون والجرد', icon: 'inventory' },
   { key: 'task-designer', title: 'مصمم المهام', subtitle: 'تصميم مهام دورية ومخصصة', icon: 'task-designer' },
   { key: 'report-designer', title: 'مصمم التقارير', subtitle: 'إنشاء تقارير ديناميكية', icon: 'report-designer' },
+  { key: 'agreements', title: 'اتفاقية العمل', subtitle: 'عرض وقبول اتفاقية الموظف', icon: 'agreement' },
   { key: 'permissions', title: 'الصلاحيات', subtitle: 'إدارة صلاحيات المستخدمين', icon: 'permissions' },
 ];
 const metrics: Array<{ filter: TaskFilter; title: string; icon: HomeIconName; background: string; foreground: string }> = [
@@ -115,6 +116,7 @@ export default function HomeDashboard({ profile: initialProfile, onNavigate, onS
   function navigate(destination: HomeDestination) {
     if (!access[destination]) return;
     if (destination === 'settings' || destination === 'permissions') router.push('/settings');
+    else if (destination === 'agreements') router.push('/agreement' as never);
     else if (onNavigate) onNavigate(destination);
     else if (destination === 'tasks') {
       if (access.manageTasks) router.push({ pathname: '/admin', params: { section: 'tasks' } });
