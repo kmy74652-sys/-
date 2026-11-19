@@ -80,12 +80,20 @@ create index if not exists employee_agreements_member_idx on public.employee_agr
 create index if not exists employee_agreement_versions_agreement_idx on public.employee_agreement_versions (agreement_id, version_no desc);
 create index if not exists employee_agreement_audit_org_idx on public.employee_agreement_audit_log (organization_id, created_at desc);
 
-insert into public.permissions(code, name_ar, domain, action, description)
-values
-  ('employee_agreements.manage', 'إدارة اتفاقيات العمل', 'employee_agreements', 'manage', 'إنشاء وإرسال مسودات اتفاقيات العمل'),
-  ('employee_agreements.publish', 'نشر اتفاقيات العمل', 'employee_agreements', 'publish', 'اعتماد ونشر الاتفاقيات'),
-  ('employee_agreements.read_all', 'قراءة اتفاقيات المؤسسة', 'employee_agreements', 'read_all', 'قراءة اتفاقيات المؤسسة')
-on conflict (code) do nothing;
+do $$
+begin
+  if exists (select 1 from information_schema.columns where table_schema='public' and table_name='permissions' and column_name='domain') then
+    execute $q$insert into public.permissions(code,name_ar,domain,action,description) values
+      ('employee_agreements.manage','إدارة اتفاقيات العمل','employee_agreements','manage','إنشاء وإرسال مسودات اتفاقيات العمل'),
+      ('employee_agreements.publish','نشر اتفاقيات العمل','employee_agreements','publish','اعتماد ونشر الاتفاقيات'),
+      ('employee_agreements.read_all','قراءة اتفاقيات المؤسسة','employee_agreements','read_all','قراءة اتفاقيات المؤسسة') on conflict(code) do nothing$q$;
+  else
+    execute $q$insert into public.permissions(code,name_ar) values
+      ('employee_agreements.manage','إدارة اتفاقيات العمل'),
+      ('employee_agreements.publish','نشر اتفاقيات العمل'),
+      ('employee_agreements.read_all','قراءة اتفاقيات المؤسسة') on conflict(code) do nothing$q$;
+  end if;
+end $$;
 do $$
 begin
   if exists (select 1 from information_schema.columns where table_schema='public' and table_name='role_permissions' and column_name='role_code') then
@@ -102,8 +110,18 @@ begin
 end $$;
 
 create or replace function public.employee_agreement_can(p_org uuid, p_permission text, p_branch_id uuid default null)
-returns boolean language sql stable security definer set search_path=public,auth
-as $$ select public.has_org_permission(p_org, p_permission, p_branch_id) $$;
+returns boolean language plpgsql stable security definer set search_path=public,auth,alshaari_private
+as $$
+declare v_allowed boolean;
+begin
+  if to_regprocedure('alshaari_private.has_permission(uuid,text,uuid)') is not null then
+    execute 'select alshaari_private.has_permission($1,$2,$3)' into v_allowed using p_org,p_permission,p_branch_id;
+  else
+    execute 'select public.has_org_permission($1,$2,$3)' into v_allowed using p_org,p_permission,p_branch_id;
+  end if;
+  return coalesce(v_allowed,false);
+end;
+$$;
 
 alter table public.employee_agreements enable row level security;
 alter table public.employee_agreement_versions enable row level security;
