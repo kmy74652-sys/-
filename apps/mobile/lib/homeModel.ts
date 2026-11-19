@@ -1,7 +1,7 @@
 import type { MobileProfile } from './mobileData';
 
 export type TaskFilter = 'all' | 'pending' | 'in_progress' | 'submitted' | 'rejected' | 'approved' | 'late';
-export type HomeDestination = 'tasks' | 'reports' | 'employees' | 'branches' | 'task-designer' | 'report-designer' | 'agreements' | 'permissions' | 'settings';
+export type HomeDestination = 'tasks' | 'reports' | 'employees' | 'branches' | 'task-designer' | 'report-designer' | 'agreements' | 'hr' | 'permissions' | 'settings';
 export type TaskSummaryRow = {
   status: string;
   due_at?: string | null;
@@ -47,6 +47,7 @@ export function homeAccess(profile: MobileProfile) {
     'task-designer': manages && allowed.has('task_library.manage'),
     'report-designer': manages && allowed.has('report_forms.manage'),
     agreements: true,
+    hr: employeeManager && allowed.has('employee_hr.read_all'),
     permissions: employeeManager,
     settings: employeeManager,
   };

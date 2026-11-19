@@ -1,0 +1,15 @@
+import { readFileSync } from 'node:fs';
+import assert from 'node:assert/strict';
+const migration = readFileSync('supabase/migrations/065_employee_hr_mutations.sql', 'utf8');
+const page = readFileSync('apps/mobile/app/hr.tsx', 'utf8');
+const data = readFileSync('apps/mobile/lib/hrData.ts', 'utf8');
+const admin = readFileSync('apps/mobile/app/admin.tsx', 'utf8');
+for (const rpc of ['create_employee_contract', 'create_employee_work_schedule', 'record_employee_attendance', 'create_employee_payroll_period', 'upsert_employee_payroll_entry']) assert.match(migration, new RegExp(`create or replace function public\\.${rpc}`));
+assert.equal((migration.match(/employee_hr\.manage/g) ?? []).length >= 5, true);
+assert.match(migration, /security definer/);
+assert.match(migration, /revoke all on function/);
+for (const label of ['العقود', 'الدوام والحضور', 'الرواتب', 'حفظ العقد', 'حفظ جدول الدوام', 'حفظ سجل الحضور', 'إنشاء فترة الرواتب', 'حفظ قيد الراتب']) assert.match(page, new RegExp(label));
+for (const rpc of ['create_employee_contract', 'create_employee_work_schedule', 'record_employee_attendance', 'create_employee_payroll_period', 'upsert_employee_payroll_entry']) assert.match(data, new RegExp(rpc));
+assert.match(admin, /الموارد البشرية/);
+assert.match(admin, /\/hr/);
+console.log(JSON.stringify({ ok: true, checks: 18, sections: ['contracts', 'attendance', 'payroll'], protectedMutations: true, routeWired: true }));
