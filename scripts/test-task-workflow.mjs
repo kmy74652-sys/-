@@ -4,6 +4,7 @@ const read = (name) => fs.readFileSync(new URL(`../${name}`, import.meta.url), '
 const workflow = read('supabase/migrations/001_extensions.sql') + read('supabase/migrations/003_tasks.sql') + read('supabase/migrations/008_task_workflow.sql') + read('supabase/migrations/022_mobile_modern_task_workflows.sql') + read('supabase/migrations/023_task_workflow_schema_hardening.sql');
 const access = read('supabase/migrations/005_security.sql') + read('supabase/seed/001_roles_permissions.sql') + read('supabase/migrations/007_task_authorization.sql') + read('supabase/migrations/025_production_task_attachments_timeline.sql');
 const mobile = read('apps/mobile/app/tasks.tsx');
+const mobileData = read('apps/mobile/lib/mobileData.ts');
 for (const status of ['pending', 'in_progress', 'submitted', 'approved', 'rejected', 'cancelled']) assert(workflow.includes(`'${status}'`), `missing status ${status}`);
 assert(workflow.includes('late'), 'missing computed late status');
 for (const role of ['owner', 'admin_followup', 'accountant', 'warehouse_keeper', 'warehouse_worker']) assert(workflow.includes(role) || access.includes(role), `missing role ${role}`);
@@ -11,6 +12,8 @@ for (const token of ['institution_id', 'branch_id', 'app.current_institution_id'
 for (const recurrence of ['daily', 'weekly', 'monthly', 'week_day', 'month_day', 'generate_recurring_tasks']) assert(workflow.includes(recurrence), `missing recurrence token ${recurrence}`);
 assert(access.includes('task_attachments') && access.includes('mobile_task_timeline'), 'attachments/timeline migration missing');
 assert(mobile.includes("task.assignee_employee_id === currentuserid"), 'employee task list must be scoped to the signed-in employee');
+assert(mobileData.includes("callrpc('mobile_record_task_update', { p_task_id: item.payload.taskid, p_status: item.payload.status, p_note: item.payload.note ?? null })"), 'offline task status sync must match the deployed three-argument RPC');
+assert(mobileData.includes("callrpc('mobile_record_task_update', { p_task_id: taskid, p_status: status, p_note: note })"), 'online task status updates must match the deployed three-argument RPC');
 assert(mobile.includes("canreview && (task.status === 'submitted' || haspendingformreview)"), 'manager review queue must include legacy and dynamic submitted reports');
 assert(mobile.includes("['mine', 'مهامي']") && mobile.includes("['review', 'مراجعة التقارير']"), 'role-based task/review tabs missing');
 const queue = new Map();
