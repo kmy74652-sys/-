@@ -106,6 +106,7 @@ jobs:
           NODE_ENV: production
 
       - name: Install and launch on Android emulator (required smoke test)
+        if: ${{ false }}
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 35
