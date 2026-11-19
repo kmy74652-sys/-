@@ -14,11 +14,12 @@ export type AdminTask = {
 export type AdminBranch = { id: string; code: string; name: string; isActive: boolean; level: string | null };
 export type AdminEmployee = { id: string; userId: string | null; name: string; employeeNo: string | null; active: boolean; roles: string[]; branchId: string | null; branchName: string | null; assignments: Array<{ roleCode: string; branchId: string | null }> };
 export type AdminActivity = { id: string; taskId: string; action: string; createdAt: string };
+export type AdminReport = { id: string; taskId: string; taskTitle: string; employeeName: string; status: string; submittedAt: string | null; reviewNote: string | null; values: Record<string, unknown>; fields: Array<{ key: string; label: string }> };
 export type DashboardData = {
   tasks: AdminTask[];
   branches: AdminBranch[];
   employees: AdminEmployee[];
-  reports: Array<{ id: string; status: string; submittedAt: string }>;
+  reports: AdminReport[];
   activity: AdminActivity[];
 };
 
@@ -30,7 +31,7 @@ export async function loadDashboardData(): Promise<DashboardData> {
     db.from('tasks').select('id,title,description,branch_id,assigned_to,due_at,priority,status').order('due_at', { ascending: true }).limit(200),
     db.from('branches').select('id,code,name,is_active,branch_level').order('code', { ascending: true }).limit(100),
     db.from('organization_memberships').select('id,user_id,display_name,employee_no,is_active').order('display_name', { ascending: true }).limit(200),
-    db.from('task_reports').select('id,status,submitted_at').order('submitted_at', { ascending: false }).limit(100),
+    db.from('task_reports').select('id,task_id,status,submitted_at,review_note,values,report_form_snapshot_id').order('submitted_at', { ascending: false }).limit(100),
     db.from('task_activity_log').select('id,task_id,action,created_at').order('created_at', { ascending: false }).limit(100),
   ]);
   for (const result of [tasksResult, branchesResult, employeesResult, reportsResult, activityResult]) if (result.error) throw result.error;
@@ -62,11 +63,22 @@ export async function loadDashboardData(): Promise<DashboardData> {
     };
   });
   const tasks = (tasksResult.data ?? []).map((row) => ({ id: row.id, title: row.title, description: row.description, branchId: row.branch_id, branchName: row.branch_id ? branchNames.get(row.branch_id) ?? null : null, assignedTo: row.assigned_to, dueAt: row.due_at, priority: row.priority, status: row.status }));
+  const snapshotIds = (reportsResult.data ?? []).map((row) => row.report_form_snapshot_id).filter((id): id is string => Boolean(id));
+  const snapshotsResult = snapshotIds.length ? await db.from('task_report_form_snapshots').select('id,title,schema').in('id', snapshotIds).limit(500) : { data: [], error: null };
+  if (snapshotsResult.error) throw snapshotsResult.error;
+  const snapshots = new Map((snapshotsResult.data ?? []).map((row) => [row.id, row]));
+  const taskById = new Map(tasks.map((task) => [task.id, task]));
+  const employeeByUserId = new Map(employees.filter((employee) => employee.userId).map((employee) => [employee.userId!, employee.name]));
   return {
     tasks,
     branches,
     employees,
-    reports: (reportsResult.data ?? []).map((row) => ({ id: row.id, status: row.status, submittedAt: row.submitted_at })),
+    reports: (reportsResult.data ?? []).map((row) => {
+      const task = taskById.get(row.task_id);
+      const snapshot = row.report_form_snapshot_id ? snapshots.get(row.report_form_snapshot_id) : null;
+      const schema = Array.isArray(snapshot?.schema) ? snapshot.schema as Array<Record<string, unknown>> : [];
+      return { id: row.id, taskId: row.task_id, taskTitle: task?.title ?? 'مهمة غير معروفة', employeeName: task?.assignedTo ? employeeByUserId.get(task.assignedTo) ?? 'موظف غير معروف' : 'موظف غير معروف', status: row.status, submittedAt: row.submitted_at, reviewNote: row.review_note, values: (row.values as Record<string, unknown> | null) ?? {}, fields: schema.map((field) => ({ key: String(field.key ?? ''), label: String(field.label ?? field.key ?? 'حقل') })) };
+    }),
     activity: (activityResult.data ?? []).map((row) => ({ id: row.id, taskId: row.task_id, action: row.action, createdAt: row.created_at })),
   };
 }
