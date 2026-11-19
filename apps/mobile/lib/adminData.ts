@@ -98,6 +98,7 @@ export async function createAdministrativeTask(input: { title: string; descripti
   const { data: memberships, error: membershipError } = await db.from('organization_memberships').select('id,user_id,is_active').eq('organization_id', organizationId).in('id', membershipIds).eq('is_active', true).limit(20);
   if (membershipError) throw membershipError;
   const assignee = memberships?.[0];
+  if (!assignee?.user_id) throw new Error('employee_login_not_linked');
   const assignment = assignments.find((row) => row.membership_id === assignee?.id);
   if (!assignee || !assignment) throw new Error('employee_not_active');
   const { data: task, error } = await db.rpc('create_task_with_report_form', {

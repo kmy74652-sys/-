@@ -18,6 +18,8 @@ const checks = [
   ['assignee uses auth user id rather than membership id', adminData.includes('userId: row.user_id') && admin.includes('assignedTo: employee.userId!')],
   ['multi-recipient send reports success and partial failures', admin.includes('employeeIds') && admin.includes('assignedCount') && admin.includes('تعذر الإسناد إلى')],
   ['employee choices respect role and branch assignment', adminData.includes('assignments: assignmentsByMembership.get(row.id)') && admin.includes('assignment.roleCode === selectedTemplate.roleCode && (!branchId || assignment.branchId === branchId)')],
+  ['manual task assignment clears stale branch and matches role-specific assignments', admin.includes("roleCode: role, branchId: '', assignedEmployeeId: ''") && admin.includes('const employeesForDraft') && admin.includes('assignment.roleCode === draft.roleCode && (!draft.branchId || assignment.branchId === draft.branchId)')],
+  ['manual task assignment requires a linked login and explains missing employees', admin.includes('Boolean(employee.userId)') && adminData.includes("employee_login_not_linked") && mobileData.includes('no_employee_for_role:')],
   ['assignment failures have clear Arabic causes', mobileData.includes('no_employee_for_role_branch:') && mobileData.includes('invalid_task_schedule:')],
   ['save template is explicitly distinguished from sending a task', admin.includes('حفظ القالب يحفظ التصميم فقط ولا يرسل تكليفًا')],
   ['dynamic report designer is mounted beside task designer', admin.includes("import ReportDesigner") && admin.includes('<ReportDesigner />')],
