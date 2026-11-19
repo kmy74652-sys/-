@@ -460,6 +460,7 @@ export default function TasksScreen() {
             />)}
 
             {(!!task.report_forms.length || (!!task.report_schema?.length && ['in_progress', 'rejected'].includes(task.status))) && <Text style={styles.cardSectionLabel}>3 · عبّئ التقرير وأرسله</Text>}
+            {!!task.report_forms.length && ['in_progress', 'rejected'].includes(task.status) && (() => { const firstForm = task.report_forms.find((form) => Boolean(form.snapshot_id) && !['submitted', 'approved'].includes(form.status ?? '')); const snapshotId = firstForm?.snapshot_id; return firstForm && snapshotId ? <Pressable accessibilityRole="button" style={styles.reportQuickButton} onPress={() => { setError(''); setActiveReportForm({ taskId: task.id, snapshotId }); }}><Text style={styles.reportQuickTitle}>التقرير المطلوب من الإدارة</Text><Text style={styles.reportQuickText}>اضغط هنا لفتح النموذج وتعبئته ثم إرساله للمراجعة</Text><Text style={styles.reportQuickAction}>فتح التقرير الآن ←</Text></Pressable> : null; })()}
             {!!task.report_forms.length && <View style={styles.timeline}><Text style={styles.fieldLabel}>نماذج التقارير المرتبطة</Text>{task.report_forms.map((form)=>{
               const key=formDraftKey(task,form); const opened=activeReportForm?.taskId===task.id&&activeReportForm.snapshotId===form.snapshot_id;
               const statusLabel=form.status==='submitted'?'بانتظار مراجعة هذا النموذج':form.status==='approved'?'تم اعتماد هذا النموذج':form.status==='returned'?'أُعيد هذا النموذج للتعديل':form.required?'مطلوب الإرسال':'اختياري';
@@ -587,6 +588,10 @@ const styles = StyleSheet.create({
   timeline: { borderTopWidth: 1, borderTopColor: '#edf1f3', paddingTop: 8, gap: 4 },
   stepCard: { backgroundColor: '#f8fafb', borderWidth: 1, borderColor: '#e2eaed', borderRadius: 11, padding: 11, gap: 8 },
   reportCard: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#e2eaed', borderRadius: 12, padding: 12, gap: 8 },
+  reportQuickButton: { backgroundColor: '#fff4d7', borderWidth: 2, borderColor: '#dba62a', borderRadius: 14, padding: 14, gap: 4, alignItems: 'flex-end' },
+  reportQuickTitle: { color: '#17324d', fontSize: 16, fontWeight: '900', textAlign: 'right' },
+  reportQuickText: { color: '#52687a', fontSize: 13, textAlign: 'right', lineHeight: 20 },
+  reportQuickAction: { color: '#9a6814', fontSize: 14, fontWeight: '900', textAlign: 'right', marginTop: 4 },
   notifications: { marginTop: 10, padding: 16, backgroundColor: '#fff', borderWidth: 1, borderColor: '#e2e9eb', borderRadius: 16, gap: 10 },
   sectionTitle: { color: '#17324d', fontSize: 18, fontWeight: '800', textAlign: 'right' },
   notification: { borderTopWidth: 1, borderTopColor: '#edf1f3', paddingTop: 10, gap: 4 },
