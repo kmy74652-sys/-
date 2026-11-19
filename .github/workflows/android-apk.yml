@@ -51,6 +51,7 @@ jobs:
         uses: pnpm/action-setup@v4
         with:
           version: 11.25.0
+          run_install: false
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -66,9 +67,9 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ${{ steps.pnpm-store.outputs.path }}
-          key: ${{ runner.os }}-pnpm-${{ hashFiles('pnpm-lock.yaml') }}
+          key: ${{ runner.os }}-pnpm-node22-${{ hashFiles('pnpm-lock.yaml', 'package.json', 'pnpm-workspace.yaml') }}
           restore-keys: |
-            ${{ runner.os }}-pnpm-
+            ${{ runner.os }}-pnpm-node22-
 
       - name: Setup Java
         uses: actions/setup-java@v4
@@ -76,16 +77,18 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Cache Gradle dependencies and build cache
+      - name: Cache Gradle and Android dependencies
         uses: actions/cache@v4
         with:
           path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
+            ~/.gradle
+            ~/.android/cache
             ~/.android/build-cache
-          key: ${{ runner.os }}-gradle-${{ hashFiles('pnpm-lock.yaml', 'apps/mobile/package.json', 'apps/mobile/app.json') }}
+            apps/mobile/android/.gradle
+          key: ${{ runner.os }}-android-node22-java17-${{ hashFiles('pnpm-lock.yaml', 'apps/mobile/package.json', 'apps/mobile/app.json', 'apps/mobile/android/gradle/wrapper/gradle-wrapper.properties') }}
           restore-keys: |
-            ${{ runner.os }}-gradle-
+            ${{ runner.os }}-android-node22-java17-
+            ${{ runner.os }}-android-
 
       - name: Install project dependencies
         run: pnpm install --frozen-lockfile --prefer-offline
@@ -94,31 +97,34 @@ jobs:
       - name: Generate native Android project
         run: pnpm exec expo prebuild --platform android --no-install --clean
 
-      - name: Build release APK
+      - name: Prepare and build release APK
         run: |
+          set -euo pipefail
           autolinking="$(pnpm exec expo-modules-autolinking resolve --platform android --json)"
           printf '%s' "$autolinking" | node -e 'let text="";process.stdin.on("data",chunk=>text+=chunk);process.stdin.on("end",()=>{const result=JSON.parse(text);const linking=result.modules?.find(item=>item.packageName==="expo-linking");if(!linking||!linking.modules?.includes("expo.modules.linking.ExpoLinkingModule")){console.error("Expo Linking is not registered for Android autolinking.");process.exit(1)}console.log("Expo Linking module detected.")})'
           cd android
-          ./gradlew --stacktrace --build-cache :app:generateAutolinkingPackageList
+          ./gradlew --no-daemon --parallel --build-cache :app:generateAutolinkingPackageList
           package_list=app/build/generated/autolinking/src/main/java/com/facebook/react/PackageList.java
           if grep -q 'import expo.core.ExpoModulesPackage;' "$package_list"; then
             sed -i 's/import expo\.core\.ExpoModulesPackage;/import expo.modules.ExpoModulesPackage;/' "$package_list"
           fi
           grep -q 'import expo.modules.ExpoModulesPackage;' "$package_list"
-          ./gradlew --stacktrace --build-cache -x :app:generateAutolinkingPackageList assembleRelease
+          ./gradlew --no-daemon --parallel --build-cache -x :app:generateAutolinkingPackageList :app:assembleRelease
 
-      - name: Verify APK output
+      - name: Copy APK to a stable output path
         run: |
-          apk=android/app/build/outputs/apk/release/app-release.apk
-          test -s "$apk"
-          ls -lh "$apk"
+          mkdir -p ../artifacts
+          cp android/app/build/outputs/apk/release/app-release.apk ../artifacts/alshaeri-release.apk
+          test -s ../artifacts/alshaeri-release.apk
+          ls -lh ../artifacts/alshaeri-release.apk
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: alshaeri-preview-apk
-          path: apps/mobile/android/app/build/outputs/apk/release/*.apk
+          name: alshaeri-release-apk
+          path: apps/artifacts/alshaeri-release.apk
           if-no-files-found: error
+          compression-level: 0
           retention-days: 14
 
       - name: Publish direct APK download
@@ -130,6 +136,6 @@ jobs:
           body: |
             نسخة Android تجريبية مبنية من الفرع main.
             يحتوي الإصدار على ملف APK الجاهز للتثبيت.
-          files: apps/mobile/android/app/build/outputs/apk/release/*.apk
+          files: apps/artifacts/alshaeri-release.apk
           fail_on_unmatched_files: true
           prerelease: true
