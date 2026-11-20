@@ -199,6 +199,9 @@ export default function EmployeeAccessSettings() {
       if (!brandSettingsReady) throw new Error('organization_branding_migration_required');
       const logoUrl = brandLogoAsset ? await uploadOrganizationLogo(institutionId, brandLogoAsset) : (brandLogoUrl || null);
       await saveOrganizationBranding(institutionId, cleanName, cleanTagline, logoUrl);
+      const savedBranding = await loadOrganizationBranding(institutionId);
+      if (logoUrl && savedBranding.logoUrl !== logoUrl) throw new Error('organization_branding_verification_failed');
+      setBrandLogoUrl(savedBranding.logoUrl ?? logoUrl ?? '');
       setBrandLogoAsset(null);
       setBrandLogoName('تم حفظ الشعار الحالي');
       setMessage('تم حفظ هوية المؤسسة. ستظهر التغييرات في لوحة الإدارة على أجهزة الموظفين بعد تحديث التطبيق.');

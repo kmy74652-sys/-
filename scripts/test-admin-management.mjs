@@ -67,6 +67,11 @@ assert.doesNotMatch(settings, /from\('institutions'\)/);
 assert.match(brandingRpcMigration, /create or replace function public\.save_organization_branding/i);
 assert.match(brandingRpcMigration, /organizations\.update/i);
 assert.match(branding, /rpc\('save_organization_branding'/i);
+assert.match(branding, /readAsStringAsync\(asset\.uri/);
+assert.match(branding, /EncodingType\.Base64/);
+assert.match(branding, /upload\(path, bytes/);
+assert.doesNotMatch(branding, /const blob = await response\.blob\(\)/);
+assert.match(settings, /organization_branding_verification_failed/);
 assert.match(admin, /setSelected\(null\); setEditing\(false\); await onReload\(\)/);
 
 
