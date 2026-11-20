@@ -84,6 +84,8 @@ export async function listTaskDesignerTemplates(): Promise<StoredTaskTemplate[]>
       reportTemplateId, approvedVersionId: row.version_id, required: row.is_required,
     }]);
   }
+  // The legacy task designer is retired. Only organizational schedules enter
+  // the management and assignment UI.
   return rows.map((row) => {
     const mainCategory = categoryById.get(row.category_id);
     const subcategory = row.subcategory_id ? categoryById.get(row.subcategory_id) : undefined;
@@ -99,7 +101,7 @@ export async function listTaskDesignerTemplates(): Promise<StoredTaskTemplate[]>
       reportFields: (() => { const first = reportsByTemplate.get(row.id)?.[0]; return first ? fieldsByVersion.get(first.approvedVersionId) ?? [] : []; })(),
       reportRequired: reportsByTemplate.get(row.id)?.some((item) => item.required) ?? true, isActive: row.is_active,
     };
-  });
+  }).filter((row) => row.category === 'admin' && row.subcategory === 'الدوام والمهام اليومية');
 }
 
 async function ensureSubcategory(categoryId: string, title: string) {
@@ -120,6 +122,7 @@ async function ensureSubcategory(categoryId: string, title: string) {
 
 export async function saveTaskDesignerTemplate(draft: TaskTemplateDraft, categories: TaskCategoryRow[]) {
   const { db, organizationId } = await managementOrganization('task_library.manage');
+  if (draft.category !== 'admin' || draft.subcategory.trim() !== 'الدوام والمهام اليومية') throw new Error('organizational_schedule_only');
   const title = draft.title.trim();
   if (title.length < 2 || title.length > 200) throw new Error('task_template_title_invalid');
   if (draft.steps.some((step) => !step.title.trim())) throw new Error('task_step_title_required');
@@ -144,7 +147,7 @@ export async function saveTaskDesignerTemplate(draft: TaskTemplateDraft, categor
   }
   const payload = {
     title, description: draft.description.trim() || null, instructions: draft.instructions.trim() || null,
-    role_code: draft.roleCode, task_type: draft.category === 'finance' ? 'financial' : draft.category === 'admin' ? 'administrative' : draft.category === 'other' ? 'other' : 'operational',
+    role_code: draft.roleCode, task_type: 'administrative',
     default_priority: draft.priority, default_duration_minutes: draft.expectedDurationMinutes,
     category_id: main.id, subcategory_id: subcategoryId, is_active: draft.isActive,
     steps: draft.steps.map((step, sort_order) => ({ title: step.title.trim(), instructions: step.instructions.trim() || null, sort_order, is_required: step.required, evidence_required: step.evidenceRequired, evidence_instructions: step.evidenceInstructions.trim() || null })),

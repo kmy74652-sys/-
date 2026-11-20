@@ -13,7 +13,7 @@ import { listApprovedDesignerTemplates, type ReportTemplate } from '../lib/repor
 import ReportDesigner from '../components/ReportDesigner';
 import { type TaskTemplateDraft } from '../components/TaskDesigner';
 import OrganizationalTaskDesigner from '../components/OrganizationalTaskDesigner';
-import { assignTaskFromTemplate, listApprovedTaskReportForms, listTaskDesignerCategories, listTaskDesignerTemplates, saveTaskDesignerTemplate, setTaskDesignerTemplateActive, type StoredTaskTemplate, type TaskCategoryRow } from '../lib/taskDesigner';
+import { listApprovedTaskReportForms, listTaskDesignerCategories, listTaskDesignerTemplates, saveTaskDesignerTemplate, setTaskDesignerTemplateActive, type StoredTaskTemplate, type TaskCategoryRow } from '../lib/taskDesigner';
 import { deleteManagedBranch, deleteManagedReport, deleteManagedTask, updateManagedTask } from '../lib/managementData';
 
 type Section = 'overview' | 'tasks' | 'task-designer' | 'report-designer' | 'reports' | 'hr' | 'branches' | 'employees' | 'activity';
@@ -160,8 +160,8 @@ export default function AdminScreen() {
     {!!notice && <Text style={styles.notice}>{notice}</Text>}
 
       {section === 'overview' && !profile && <Overview counts={counts} data={data} fmt={fmt} onSection={setSection} onSettings={() => router.push('/settings')} onHR={() => router.push('/hr' as never)} canDesign={canManageTaskLibrary} canDesignReports={canManageReports} />}
-      {section === 'tasks' && <><TasksSection data={data} designerTemplates={designerTemplates} showCreate={showCreate} setShowCreate={setShowCreate} draft={draft} setDraft={setDraft} createTask={createTask} fmt={fmt} onOpenTasks={() => router.push('/tasks')} canManage={canManageEmployees} institutionId={profile?.institutionId ?? ''} onReload={load} />{canManageTaskLibrary && <TaskAssignmentSection templates={taskDesignerTemplates} data={data} onReload={load} onEditTemplates={() => setSection('task-designer')} />}</>}
-      {section === 'task-designer' && (canManageTaskLibrary ? <TaskTemplatesSection templates={taskDesignerTemplates} categories={taskCategories} onReload={load} /> : <Unavailable title="الجدول التنظيمي" text="لا تملك صلاحية إدارة الجداول التنظيمية." />)}
+      {section === 'tasks' && <TasksSection data={data} designerTemplates={designerTemplates} showCreate={showCreate} setShowCreate={setShowCreate} draft={draft} setDraft={setDraft} createTask={createTask} fmt={fmt} onOpenTasks={() => router.push('/tasks')} canManage={canManageEmployees} institutionId={profile?.institutionId ?? ''} onReload={load} />}
+      {section === 'task-designer' && (canManageTaskLibrary ? <TaskTemplatesSection templates={taskDesignerTemplates} categories={taskCategories} employees={data?.employees ?? []} reportTemplates={designerTemplates} onReload={load} /> : <Unavailable title="الجدول التنظيمي" text="لا تملك صلاحية إدارة الجداول التنظيمية." />)}
       {section === 'report-designer' && (canManageReports && canManageEmployees ? <ReportDesigner organizationId={profile?.institutionId ?? ''} /> : <Unavailable title="مصمم التقارير" text="لا تملك صلاحية إدارة نماذج التقارير." />)}
       {section === 'reports' && (canViewReports ? <ReportsSection data={data} fmt={fmt} onOpenTasks={() => router.push('/tasks')} canManage={canManageEmployees} institutionId={profile?.institutionId ?? ''} onReload={load} /> : <Unavailable title="تقارير الموظفين" text="لا تملك صلاحية قراءة تقارير المؤسسة أو مراجعتها." />)}
       {section === 'branches' && (canViewBranches ? <BranchesSection data={data} institutionId={profile?.institutionId ?? ''} canManage={canManageEmployees} onReload={load} /> : <Unavailable title="إدارة الفروع" text="لا تملك صلاحية عرض الفروع." />)}
@@ -327,7 +327,7 @@ function EmployeesSection({ data }: any) { return <><Text style={styles.sectionT
 function ActivitySection({ data, fmt }: any) { return <><Text style={styles.sectionTitle}>سجل النشاط والمرفقات</Text><Text style={styles.copy}>السجل يعرض الأحداث المسموح بها حسب RLS. إدارة المرفقات تتم من داخل تقرير المهمة.</Text>{(data?.activity ?? []).map((item: any) => <View style={styles.row} key={item.id}><Text style={styles.cardTitle}>{item.action}</Text><Text style={styles.meta}>المهمة {item.taskId.slice(0, 8)} · {fmt(item.createdAt)}</Text></View>)}</>; }
 function Unavailable({ title, text }: { title: string; text: string }) { return <View style={styles.unavailable}><Text style={styles.sectionTitle}>{title}</Text><Text style={styles.copy}>{text}</Text></View>; }
 
-function TaskTemplatesSection({ templates, categories, onReload }: { templates: StoredTaskTemplate[]; categories: TaskCategoryRow[]; onReload: () => Promise<void> }) {
+function TaskTemplatesSection({ templates, categories, employees, reportTemplates, onReload }: { templates: StoredTaskTemplate[]; categories: TaskCategoryRow[]; employees: NonNullable<DashboardData>['employees']; reportTemplates: ReportTemplate[]; onReload: () => Promise<void> }) {
   const [selected, setSelected] = useState<StoredTaskTemplate | null>(null);
   const [editing, setEditing] = useState(false);
   const [saveError, setSaveError] = useState('');
@@ -342,91 +342,17 @@ function TaskTemplatesSection({ templates, categories, onReload }: { templates: 
       setSaveError(friendlyDataError(cause, 'تعذر حفظ قالب المهمة. تحقق من الصلاحيات ونماذج التقارير المعتمدة.'));
     }
   }
+  async function sendDirectly(draft: TaskTemplateDraft, employeeId: string, branchId: string | null, dueAt: string) {
+    const selectedReport = reportTemplates.find((template) => template.role_code === draft.roleCode && template.approved_version_id && template.is_active !== false);
+    await createAdministrativeTask({ title: draft.title, description: draft.description, dueAt, priority: draft.priority, roleCode: draft.roleCode, branchId, assignedEmployeeId: employeeId, templateId: null, reportTemplateId: selectedReport?.id ?? null, reportVersionId: selectedReport?.approved_version_id ?? null, reportRequired: Boolean(selectedReport?.approved_version_id) });
+    await onReload();
+  }
   return <View style={{ gap: 12 }}>
     <View style={styles.card}><Text style={styles.sectionTitle}>مصمم الجدول التنظيمي للمهام</Text><Text style={styles.copy}>أنشئ جدول الدوام، المهام اليومية، المسؤوليات، مؤشرات الأداء، متطلبات الإثبات وبنود التقرير اليومي. أما حقول التقرير نفسها فتُصمم من «مصمم التقارير» وتصل تلقائياً إلى الموظف.</Text><Pressable style={styles.primary} onPress={() => { setSelected(null); setEditing(true); setSaveError(''); }}><Text style={styles.primaryText}>جدول تنظيمي جديد</Text></Pressable></View>
     {templates.map((template) => <View key={template.id} style={styles.card}><View style={styles.taskLine}><Text style={styles.cardTitle}>{template.title}</Text><Text style={styles.badge}>{template.isActive ? 'نشط' : 'مؤرشف'}</Text></View><Text style={styles.meta}>{roleLabel(template.roleCode)} · {template.steps.length} خطوات · {template.reports.length} نماذج تقارير · إصدار القالب {template.version}</Text><View style={styles.actionsRow}><Pressable style={styles.secondary} onPress={() => { setSelected(template); setEditing(true); setSaveError(''); }}><Text style={styles.secondaryText}>تعديل القالب</Text></Pressable><Pressable style={styles.secondary} onPress={() => { setSelected({ ...template, id: undefined, title: `نسخة من ${template.title}`, isActive: false }); setEditing(true); setSaveError(''); }}><Text style={styles.secondaryText}>نسخ القالب</Text></Pressable><Pressable style={styles.secondary} onPress={async () => { try { await setTaskDesignerTemplateActive(template.id!, !template.isActive); await onReload(); } catch (cause) { setSaveError(friendlyDataError(cause, 'تعذر تغيير حالة القالب.')); } }}><Text style={styles.secondaryText}>{template.isActive ? 'أرشفة' : 'إعادة تفعيل'}</Text></Pressable></View></View>)}
     {!!saveError && <Text accessibilityRole="alert" style={styles.error}>{saveError}</Text>}
-    {editing && <OrganizationalTaskDesigner key={selected?.id ?? 'new-organizational-schedule'} initialTemplate={selected ?? undefined} onSave={save} onList={onReload} />}
+    {editing && <OrganizationalTaskDesigner key={selected?.id ?? 'new-organizational-schedule'} initialTemplate={selected ?? undefined} employees={employees} onSave={save} onSend={sendDirectly} onList={onReload} />}
     {templates.length === 0 && <Text style={styles.muted}>لا توجد قوالب بعد؛ أنشئ قالبًا جديدًا للبدء.</Text>}
-  </View>;
-}
-
-function TaskAssignmentSection({ templates, data, onReload, onEditTemplates }: { templates: StoredTaskTemplate[]; data: DashboardData | null; onReload: () => Promise<void>; onEditTemplates: () => void }) {
-  const initial = currentAdenDateTime();
-  const [templateId, setTemplateId] = useState('');
-  const [employeeIds, setEmployeeIds] = useState<string[]>([]);
-  const [branchId, setBranchId] = useState('');
-  const [startDate, setStartDate] = useState(initial.date);
-  const [startTime, setStartTime] = useState(initial.time);
-  const [dueDate, setDueDate] = useState(initial.date);
-  const [dueTime, setDueTime] = useState(initial.time);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState('');
-  const [notice, setNotice] = useState('');
-  const [priority, setPriority] = useState<StoredTaskTemplate['priority']>('normal');
-  const [instructions, setInstructions] = useState('');
-  const [reportRequired, setReportRequired] = useState<Record<string, boolean>>({});
-  const selectedTemplate = templates.find((item) => item.id === templateId && item.isActive);
-  const reportChoices = selectedTemplate?.reports ?? [];
-  const employees = (data?.employees ?? []).filter((item) => item.active && Boolean(item.userId) && (!selectedTemplate || item.assignments.some((assignment) => assignment.roleCode === selectedTemplate.roleCode && (!branchId || assignment.branchId === branchId))));
-  const selectedEmployees = employees.filter((item) => employeeIds.includes(item.id));
-  async function assign() {
-    setError(''); setNotice('');
-    const startsAt = adenDateTimeToIso(startDate, startTime);
-    const dueAt = adenDateTimeToIso(dueDate, dueTime);
-    if (!selectedTemplate) { setError('اختر قالبًا نشطًا أولًا.'); return; }
-    if (!selectedEmployees.length) { setError('اختر موظفًا واحدًا على الأقل لإرسال المهمة إليه.'); return; }
-    if (!startsAt || !dueAt) { setError('أدخل تاريخًا ووقتًا صالحين لبداية المهمة وموعدها النهائي.'); return; }
-    if (new Date(dueAt).getTime() < new Date(startsAt).getTime()) { setError('لا يمكن أن يسبق الموعد النهائي بداية المهمة.'); return; }
-    setBusy(true);
-    try {
-      let assignedCount = 0;
-      const failures: Array<{ id: string; name: string; message: string }> = [];
-      for (const employee of selectedEmployees) {
-        try {
-          await assignTaskFromTemplate({ templateId: selectedTemplate.id!, assignedTo: employee.userId!, branchId: branchId || null, startsAt, dueAt, priority, instructions, reportOverrides: reportChoices.map((report) => ({ approvedVersionId: report.approvedVersionId, required: report.required || reportRequired[report.approvedVersionId] === true })) });
-          assignedCount += 1;
-        } catch (cause) {
-          failures.push({ id: employee.id, name: employee.name, message: friendlyDataError(cause, 'تعذر إنشاء المهمة لهذا الموظف.') });
-        }
-      }
-      if (assignedCount > 0) {
-        setNotice(`تم إرسال «${selectedTemplate.title}» وإسنادها إلى ${assignedCount} من ${selectedEmployees.length} موظفًا. ستظهر في شاشة الموظف ضمن المهام النشطة.`);
-        if (assignedCount === selectedEmployees.length) {
-          setTemplateId(''); setEmployeeIds([]); setBranchId(''); setInstructions(''); setPriority('normal'); setReportRequired({});
-        } else setEmployeeIds(failures.map((item) => item.id));
-        await onReload();
-      }
-      if (failures.length) setError(`تعذر الإسناد إلى ${failures.length} موظفًا: ${failures.map((item) => `${item.name} — ${item.message}`).join('؛ ')}`);
-      if (!assignedCount && failures.length === 0) setError('لم تُنشأ أي مهمة. اختر موظفًا نشطًا مرتبطًا بحساب موظف قبل الإرسال.');
-    } catch (cause) {
-      setError(friendlyDataError(cause, 'تعذر إسناد القالب. تأكد من تطابق الدور والفرع وصلاحية إدارة المهام.'));
-    } finally { setBusy(false); }
-  }
-  return <View style={styles.form}>
-    <Text style={styles.sectionTitle}>إسناد من قالب مهام</Text>
-    <Text style={styles.copy}>يُنشأ التكليف مع نسخة ثابتة من خطواته وكل نموذج تقرير مرتبط به. يمكن تعديل القالب لاحقًا دون تغيير التكليفات السابقة.</Text>
-    <Text style={styles.fieldLabel}>القالب</Text>
-    <View style={styles.choices}>{templates.filter((item) => item.isActive).map((item) => <Pressable key={item.id} style={[styles.choice, templateId === item.id && styles.choiceSelected]} onPress={() => { setTemplateId(item.id ?? ''); setEmployeeIds([]); }}><Text style={templateId === item.id ? styles.choiceSelectedText : styles.choiceText}>{item.title} · {roleLabel(item.roleCode)}</Text></Pressable>)}</View>
-    {!templates.some((item) => item.isActive) && <Text style={styles.muted}>لا توجد قوالب نشطة.</Text>}
-    <Pressable style={styles.secondary} onPress={onEditTemplates}><Text style={styles.secondaryText}>إدارة قوالب المهام</Text></Pressable>
-    {selectedTemplate && <>
-      <Text style={styles.fieldLabel}>الموظفون المستهدفون ({roleLabel(selectedTemplate.roleCode)}) · يمكن اختيار أكثر من موظف</Text>
-      <View style={styles.choices}>{employees.map((employee) => { const selected = employeeIds.includes(employee.id); return <Pressable key={employee.id} style={[styles.choice, selected && styles.choiceSelected]} onPress={() => setEmployeeIds((current) => selected ? current.filter((id) => id !== employee.id) : [...current, employee.id])}><Text style={selected ? styles.choiceSelectedText : styles.choiceText}>{selected ? '✓ ' : ''}{employee.name}{employee.employeeNo ? ` · ${employee.employeeNo}` : ''}</Text></Pressable>; })}</View>
-      {!employees.length && <Text style={styles.muted}>{branchId ? 'لا يوجد موظف نشط مرتبط بحساب وله هذا الدور في الفرع المحدد.' : 'لا يوجد موظف نشط مرتبط بحساب وله هذا الدور.'}</Text>}
-      <Text style={styles.fieldLabel}>الأولوية لهذا التكليف</Text><View style={styles.choices}>{(['normal','important','urgent','critical'] as const).map((value) => <Pressable key={value} style={[styles.choice, priority === value && styles.choiceSelected]} onPress={() => setPriority(value)}><Text style={priority === value ? styles.choiceSelectedText : styles.choiceText}>{priorityLabels[value]}</Text></Pressable>)}</View>
-      <TextInput style={[styles.input, { minHeight: 70 }]} value={instructions} onChangeText={setInstructions} placeholder="تعليمات إضافية لهذا التكليف (اختياري)" multiline accessibilityLabel="تعليمات إضافية لهذا التكليف" />
-      {!!reportChoices.length && <><Text style={styles.fieldLabel}>اختيارات التقارير لهذا التكليف</Text><View style={styles.choices}>{reportChoices.map((report) => { const required = report.required || reportRequired[report.approvedVersionId] === true; return <Pressable key={report.approvedVersionId} style={[styles.choice, required && styles.choiceSelected]} onPress={() => { if (report.required) return; setReportRequired((current) => ({ ...current, [report.approvedVersionId]: !required })); }}><Text style={required ? styles.choiceSelectedText : styles.choiceText}>{required ? 'إلزامي' : 'اختياري'} · {report.approvedVersionId.slice(0, 8)}</Text></Pressable>; })}</View></>}
-      {reportChoices.some((report) => report.required) && <Text style={styles.meta}>التقارير الإلزامية في القالب لا يمكن تحويلها إلى اختيارية أثناء التكليف.</Text>}
-      <Text style={styles.fieldLabel}>الفرع (اختياري، يتحقق الخادم من تكليف الموظف به)</Text>
-    <View style={styles.choices}><Pressable style={[styles.choice, !branchId && styles.choiceSelected]} onPress={() => { setBranchId(''); setEmployeeIds([]); }}><Text style={!branchId ? styles.choiceSelectedText : styles.choiceText}>كل الفروع</Text></Pressable>{(data?.branches ?? []).filter((branch) => branch.isActive).map((branch) => <Pressable key={branch.id} style={[styles.choice, branchId === branch.id && styles.choiceSelected]} onPress={() => { setBranchId(branch.id); setEmployeeIds([]); }}><Text style={branchId === branch.id ? styles.choiceSelectedText : styles.choiceText}>{branch.name}</Text></Pressable>)}</View>
-      <Text style={styles.fieldLabel}>بداية المهمة · توقيت عدن</Text><AdenDeadlinePicker date={startDate} time={startTime} onChange={(date, time) => { setStartDate(date); setStartTime(time); }} />
-      <Text style={styles.fieldLabel}>الموعد النهائي · توقيت عدن</Text><AdenDeadlinePicker date={dueDate} time={dueTime} onChange={(date, time) => { setDueDate(date); setDueTime(time); }} />
-      <Text style={styles.meta}>الأولوية الافتراضية: {priorityLabels[selectedTemplate.priority] ?? selectedTemplate.priority} · {selectedTemplate.steps.length} خطوات · {selectedTemplate.reports.length} تقارير مستقلة</Text>
-    <Pressable disabled={busy} style={[styles.primary, busy && { opacity: 0.6 }]} onPress={() => void assign()}><Text style={styles.primaryText}>{busy ? 'جارٍ الإرسال…' : employeeIds.length ? `إرسال وإسناد المهمة إلى ${employeeIds.length} موظف` : 'إرسال وإسناد المهمة'}</Text></Pressable>
-    </>}
-    {!!error && <Text accessibilityRole="alert" style={styles.error}>{error}</Text>}
-    {!!notice && <Text style={styles.notice}>{notice}</Text>}
   </View>;
 }
 
