@@ -103,6 +103,11 @@ jobs:
           # Direct-install APK: modern Android devices use arm64-v8a.
           # Excluding duplicate x86/32-bit native libraries reduces APK size substantially.
           export ORG_GRADLE_PROJECT_reactNativeArchitectures=arm64-v8a
+          # Expo prebuild writes all four ABIs to gradle.properties. Override that
+          # generated default explicitly; relying only on -P is not sufficient for
+          # the React Native 0.76 native packaging tasks.
+          sed -i 's/^reactNativeArchitectures=.*/reactNativeArchitectures=arm64-v8a/' android/gradle.properties
+          grep -q '^reactNativeArchitectures=arm64-v8a$' android/gradle.properties
           autolinking="$(pnpm exec expo-modules-autolinking resolve --platform android --json)"
           printf '%s' "$autolinking" | node -e 'let text="";process.stdin.on("data",chunk=>text+=chunk);process.stdin.on("end",()=>{const result=JSON.parse(text);const linking=result.modules?.find(item=>item.packageName==="expo-linking");if(!linking||!linking.modules?.includes("expo.modules.linking.ExpoLinkingModule")){console.error("Expo Linking is not registered for Android autolinking.");process.exit(1)}console.log("Expo Linking module detected.")})'
           cd android
@@ -113,6 +118,10 @@ jobs:
           fi
           grep -q 'import expo.modules.ExpoModulesPackage;' "$package_list"
           ./gradlew --no-daemon --parallel --build-cache -PreactNativeArchitectures=arm64-v8a -x :app:generateAutolinkingPackageList :app:assembleRelease
+          if unzip -l app/build/outputs/apk/release/app-release.apk | grep -E 'lib/(x86|x86_64|armeabi-v7a)/'; then
+            echo 'Unexpected non-arm64 native libraries found in APK.'
+            exit 1
+          fi
 
       - name: Copy APK to a stable output path
         run: |
