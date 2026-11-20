@@ -418,6 +418,9 @@ function TaskTemplatesSection({ templates, categories, employees, branches, onRe
   const [selected, setSelected] = useState<StoredTaskTemplate | null>(null);
   const [editing, setEditing] = useState(false);
   const [saveError, setSaveError] = useState('');
+  const visibleTemplates = Array.from(new Map([...templates]
+    .sort((left, right) => Number(right.isActive) - Number(left.isActive) || right.version - left.version)
+    .map((template) => [`${template.roleCode}:${template.title.trim().toLocaleLowerCase('ar')}`, template] as const)).values());
   async function save(draft: TaskTemplateDraft) {
     try {
       setSaveError('');
@@ -441,10 +444,10 @@ function TaskTemplatesSection({ templates, categories, employees, branches, onRe
   }
   return <View style={{ gap: 12 }}>
     <View style={styles.card}><Text style={styles.sectionTitle}>مصمم الجدول التنظيمي للمهام</Text><Text style={styles.copy}>أنشئ جدول الدوام، المهام اليومية، المسؤوليات، مؤشرات الأداء، متطلبات الإثبات وبنود التقرير اليومي. أما حقول التقرير نفسها فتُصمم من «مصمم التقارير» وتصل تلقائياً إلى الموظف.</Text><Pressable style={styles.primary} onPress={() => { setSelected(null); setEditing(true); setSaveError(''); }}><Text style={styles.primaryText}>جدول تنظيمي جديد</Text></Pressable></View>
-    {templates.map((template) => <View key={template.id} style={styles.card}><View style={styles.taskLine}><Text style={styles.cardTitle}>{template.title}</Text><Text style={styles.badge}>{template.isActive ? 'نشط' : 'مؤرشف'}</Text></View><Text style={styles.meta}>{roleLabel(template.roleCode)} · {template.steps.length} خطوات · {template.reports.length} نماذج تقارير · إصدار القالب {template.version}</Text><View style={styles.actionsRow}><Pressable style={styles.secondary} onPress={() => { setSelected(template); setEditing(true); setSaveError(''); }}><Text style={styles.secondaryText}>تعديل القالب</Text></Pressable><Pressable style={styles.secondary} onPress={() => { setSelected({ ...template, id: undefined, title: `نسخة من ${template.title}`, isActive: false }); setEditing(true); setSaveError(''); }}><Text style={styles.secondaryText}>نسخ القالب</Text></Pressable><Pressable style={styles.secondary} onPress={async () => { try { await setTaskDesignerTemplateActive(template.id!, !template.isActive); await onReload(); } catch (cause) { setSaveError(friendlyDataError(cause, 'تعذر تغيير حالة القالب.')); } }}><Text style={styles.secondaryText}>{template.isActive ? 'أرشفة' : 'إعادة تفعيل'}</Text></Pressable></View></View>)}
+    {visibleTemplates.map((template) => <View key={template.id} style={styles.card}><View style={styles.taskLine}><Text style={styles.cardTitle}>{template.title}</Text><Text style={styles.badge}>{template.isActive ? 'نشط' : 'مؤرشف'}</Text></View><Text style={styles.meta}>{roleLabel(template.roleCode)} · {template.steps.length} خطوات · {template.reports.length} نماذج تقارير · إصدار القالب {template.version}</Text><View style={styles.actionsRow}><Pressable style={styles.secondary} onPress={() => { setSelected(template); setEditing(true); setSaveError(''); }}><Text style={styles.secondaryText}>تعديل القالب</Text></Pressable><Pressable style={styles.secondary} onPress={() => { setSelected({ ...template, id: undefined, title: `نسخة من ${template.title}`, isActive: false }); setEditing(true); setSaveError(''); }}><Text style={styles.secondaryText}>نسخ القالب</Text></Pressable><Pressable style={styles.secondary} onPress={async () => { try { await setTaskDesignerTemplateActive(template.id!, !template.isActive); await onReload(); } catch (cause) { setSaveError(friendlyDataError(cause, 'تعذر تغيير حالة القالب.')); } }}><Text style={styles.secondaryText}>{template.isActive ? 'أرشفة' : 'إعادة تفعيل'}</Text></Pressable></View></View>)}
     {!!saveError && <Text accessibilityRole="alert" style={styles.error}>{saveError}</Text>}
     {editing && <OrganizationalTaskDesigner key={selected?.id ?? 'new-organizational-schedule'} initialTemplate={selected ?? undefined} employees={employees} branches={branches} canManage={true} onSave={save} onSend={sendDirectly} onList={onReload} />}
-    {templates.length === 0 && <Text style={styles.muted}>لا توجد قوالب بعد؛ أنشئ قالبًا جديدًا للبدء.</Text>}
+    {visibleTemplates.length === 0 && <Text style={styles.muted}>لا توجد قوالب بعد؛ أنشئ قالبًا جديدًا للبدء.</Text>}
   </View>;
 }
 

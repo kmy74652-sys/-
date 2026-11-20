@@ -130,6 +130,13 @@ export default function OrganizationalTaskDesigner({ initialTemplate, employees 
     if (message.includes('no_employee_for_role_branch') || message.includes('employee_assignment_invalid')) return 'تعذر الإرسال: الموظف غير مرتبط بهذا الدور أو الفرع.';
     if (message.includes('employee_login_not_linked')) return 'تعذر الإرسال: الموظف لا يملك حساب دخول مرتبطًا.';
     if (message.includes('invalid_task_schedule')) return 'تعذر الإرسال: الموعد النهائي يجب أن يكون بعد وقت بدء المهمة.';
+    if (message.includes('invalid_task_branch')) return 'تعذر الإرسال: الفرع المحدد غير نشط أو لا ينتمي إلى المؤسسة.';
+    if (message.includes('invalid_task_priority')) return 'تعذر الإرسال: أولوية المهمة غير صالحة.';
+    if (message.includes('task_template_not_found')) return 'تعذر الإرسال: لم يتم العثور على القالب المحفوظ أو أنه مؤرشف. أعد فتح المصمم ثم احفظه مرة أخرى.';
+    if (message.includes('report_requires_owner_approval') || message.includes('report_form_version_requires_approval')) return 'تعذر الإرسال: نموذج التقرير المرتبط يحتاج اعتمادًا من صاحب المؤسسة قبل إرسال المهمة.';
+    if (message.includes('required_report_cannot_be_optional')) return 'تعذر الإرسال: لا يمكن جعل نموذج التقرير الإلزامي اختياريًا.';
+    if (message.includes('invalid_report_overrides')) return 'تعذر الإرسال: إعدادات التقرير المرتبط غير صالحة. افتح القالب واحفظه من جديد.';
+    if (message.includes('task_template_save_response_invalid')) return 'تعذر الإرسال: لم يرجع حفظ القالب معرفًا صحيحًا. أعد المحاولة بعد تحديث الشاشة.';
     if (message.includes('permission_denied')) return 'تعذر الإرسال: لا تملك صلاحية إدارة المهام.';
     return 'تعذر إرسال المهمة للموظف. تحقق من الاتصال والموظف المحدد ثم حاول مرة أخرى.';
   };
