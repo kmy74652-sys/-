@@ -124,6 +124,7 @@ export default function TasksScreen() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<Task['status'] | 'all'>('all');
   const [reportStatusFilter, setReportStatusFilter] = useState<'all' | 'ready' | 'uploaded' | 'approved'>('all');
+  const [reportSection, setReportSection] = useState<'tasks' | 'independent'>('tasks');
   const [branchFilter, setBranchFilter] = useState('');
   const [positionFilter, setPositionFilter] = useState<Task['position_code'] | 'all'>('all');
   const [error, setError] = useState('');
@@ -425,9 +426,9 @@ export default function TasksScreen() {
         {!!notice && <Text accessibilityLiveRegion="polite" style={styles.notice}>{notice}</Text>}
         {!loading && !reportsOnly && <View style={styles.employeeIntro}><Text style={styles.employeeIntroTitle}>مساحة تنفيذك اليومية</Text><Text style={styles.employeeIntroText}>اقرأ التكليف، ابدأ التنفيذ، ثم عبّئ التقرير المطلوب وأرسله للمسؤول للمراجعة.</Text></View>}
         {!loading && <View style={styles.workTabs}><Pressable accessibilityRole="tab" accessibilityState={{ selected: !reportsOnly }} style={[styles.workTab, !reportsOnly && styles.workTabSelected]} onPress={() => router.replace({ pathname: '/tasks', params: { mode: 'mine' } })}><Text style={[styles.workTabText, !reportsOnly && styles.workTabTextSelected]}>المهام</Text></Pressable><Pressable accessibilityRole="tab" accessibilityState={{ selected: reportsOnly }} style={[styles.workTab, reportsOnly && styles.workTabSelected]} onPress={() => router.replace({ pathname: '/tasks', params: { view: 'reports', mode: 'mine' } })}><Text style={[styles.workTabText, reportsOnly && styles.workTabTextSelected]}>إعداد التقارير</Text></Pressable></View>}
-        {!loading && reportsOnly && <><View style={styles.reportUploadHeader}><Text style={styles.reportUploadTitle}>رفع التقارير المرتبطة بالمهام</Text><Text style={styles.reportUploadSubtitle}>تعبئة التقارير المصممة من الإدارة وإرسالها للمراجعة دون خلطها بعداد المهام أو جدول الدوام.</Text></View><View style={styles.reportStatusTabs}>{([['all', 'الكل'], ['ready', 'جاهز للرفع'], ['uploaded', 'تم الرفع'], ['approved', 'معتمد']] as const).map(([value, label]) => <Pressable key={value} accessibilityRole="button" accessibilityState={{ selected: reportStatusFilter === value }} style={[styles.reportStatusTab, reportStatusFilter === value && styles.reportStatusTabSelected]} onPress={() => setReportStatusFilter(value)}><Text style={reportStatusFilter === value ? styles.reportStatusTabTextSelected : styles.reportStatusTabText}>{label}</Text></Pressable>)}</View></>}
+        {!loading && reportsOnly && <><View style={styles.reportSectionTabs}><Pressable accessibilityRole="tab" accessibilityState={{ selected: reportSection === 'tasks' }} style={[styles.reportSectionTab, reportSection === 'tasks' && styles.reportSectionTabSelected]} onPress={() => setReportSection('tasks')}><Text style={reportSection === 'tasks' ? styles.reportSectionTabTextSelected : styles.reportSectionTabText}>رفع التقارير المرتبطة بالمهام</Text></Pressable><Pressable accessibilityRole="tab" accessibilityState={{ selected: reportSection === 'independent' }} style={[styles.reportSectionTab, reportSection === 'independent' && styles.reportSectionTabSelected]} onPress={() => setReportSection('independent')}><Text style={reportSection === 'independent' ? styles.reportSectionTabTextSelected : styles.reportSectionTabText}>التقارير المصممة من الإدارة</Text></Pressable></View>{reportSection === 'tasks' ? <><View style={styles.reportUploadHeader}><Text style={styles.reportUploadTitle}>رفع التقارير المرتبطة بالمهام</Text><Text style={styles.reportUploadSubtitle}>تعبئة التقارير التي صممتها الإدارة وربطتها بالمهمة وإرسالها للمراجعة.</Text></View><View style={styles.reportStatusTabs}>{([['all', 'الكل'], ['ready', 'جاهز للرفع'], ['uploaded', 'تم الرفع'], ['approved', 'معتمد']] as const).map(([value, label]) => <Pressable key={value} accessibilityRole="button" accessibilityState={{ selected: reportStatusFilter === value }} style={[styles.reportStatusTab, reportStatusFilter === value && styles.reportStatusTabSelected]} onPress={() => setReportStatusFilter(value)}><Text style={reportStatusFilter === value ? styles.reportStatusTabTextSelected : styles.reportStatusTabText}>{label}</Text></Pressable>)}</View></> : <View style={styles.reportUploadHeader}><Text style={styles.reportUploadTitle}>التقارير المصممة من الإدارة</Text><Text style={styles.reportUploadSubtitle}>التقارير السابقة التي تصممها الإدارة وتصل للموظف حسب الدور والفرع، دون ربطها بمهمة.</Text></View>}</>}
         {!loading && !reportsOnly && <View style={styles.summaryRow}><View style={styles.summaryCard}><Text style={styles.summaryValue}>{employeeSummary.pending}</Text><Text style={styles.summaryLabel}>جديدة</Text></View><View style={styles.summaryCard}><Text style={styles.summaryValue}>{employeeSummary.active}</Text><Text style={styles.summaryLabel}>قيد التنفيذ</Text></View><View style={styles.summaryCard}><Text style={styles.summaryValue}>{employeeSummary.submitted}</Text><Text style={styles.summaryLabel}>بانتظار المراجعة</Text></View></View>}
-        {!loading && reportsOnly && <EmployeeRoleReportPanel roleCode={employeeRoleCode} branchId={employeeBranchId} employeeName={employeeName} />}
+        {!loading && reportsOnly && reportSection === 'independent' && <EmployeeRoleReportPanel roleCode={employeeRoleCode} branchId={employeeBranchId} employeeName={employeeName} />}
         {loading && <View style={styles.loading}><ActivityIndicator size="large" color="#17324d" /><Text style={styles.muted}>جارٍ تحميل المهام…</Text></View>}
         {!loading && !reportsOnly && (canReview || canManage) && <View style={styles.modeTabs}>
           {([
@@ -458,13 +459,13 @@ export default function TasksScreen() {
           </ScrollView>
         </>}
 
-        {!loading && !reportsOnly && filteredTasks.map((task) => (
+        {!loading && (!reportsOnly || reportSection === 'tasks') && filteredTasks.map((task) => (
           <View style={styles.taskCard} key={task.id}>
             {!reportsOnly && <View style={styles.taskHeading}>
               <Text style={styles.taskTitle}>{task.title}</Text>
               <Text style={[styles.badge, task.status === 'approved' ? styles.goodBadge : task.status === 'rejected' ? styles.warnBadge : styles.neutralBadge]}>{statusLabels[task.status]}</Text>
             </View>}
-            {reportsOnly && <View style={styles.reportWorkspace}>
+            {reportsOnly && reportSection === 'tasks' && <View style={styles.reportWorkspace}>
               {!!task.report_forms.length && task.report_forms.map((form) => {
                 const key = formDraftKey(task, form);
                 const locked = form.status === 'submitted' || form.status === 'approved';
@@ -598,6 +599,11 @@ const styles = StyleSheet.create({
   reportUploadHeader: { backgroundColor: '#fff', borderRadius: 14, borderWidth: 1, borderColor: '#e2e9eb', padding: 14, gap: 5 },
   reportUploadTitle: { color: '#17324d', fontSize: 17, fontWeight: '900', textAlign: 'right' },
   reportUploadSubtitle: { color: '#718394', fontSize: 12, lineHeight: 20, textAlign: 'right' },
+  reportSectionTabs: { flexDirection: 'row-reverse', gap: 8, paddingVertical: 2 },
+  reportSectionTab: { flex: 1, minHeight: 48, borderRadius: 12, borderWidth: 1, borderColor: '#d6e0e4', backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 8 },
+  reportSectionTabSelected: { backgroundColor: '#e5b336', borderColor: '#e5b336' },
+  reportSectionTabText: { color: '#39556a', fontSize: 12, fontWeight: '800', textAlign: 'center' },
+  reportSectionTabTextSelected: { color: '#17324d', fontSize: 12, fontWeight: '900', textAlign: 'center' },
   reportStatusTabs: { flexDirection: 'row-reverse', gap: 7, paddingVertical: 2 },
   reportStatusTab: { flex: 1, minHeight: 40, borderRadius: 10, borderWidth: 1, borderColor: '#ccd9df', backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 5 },
   reportStatusTabSelected: { backgroundColor: '#17324d', borderColor: '#17324d' },
