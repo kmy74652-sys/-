@@ -26,7 +26,24 @@ export type DashboardData = {
 
 function client() { if (!supabase) throw new Error('supabase_not_configured'); return supabase; }
 
-export async function loadDashboardData(): Promise<DashboardData> {
+let dashboardCache: { value: DashboardData; loadedAt: number } | null = null;
+let dashboardRequest: Promise<DashboardData> | null = null;
+
+export async function loadDashboardData(options: { force?: boolean; maxAgeMs?: number } = {}): Promise<DashboardData> {
+  const maxAgeMs = options.maxAgeMs ?? 30_000;
+  if (!options.force && dashboardCache && Date.now() - dashboardCache.loadedAt < maxAgeMs) return dashboardCache.value;
+  if (dashboardRequest) return dashboardRequest;
+  dashboardRequest = loadDashboardDataFresh();
+  try {
+    const value = await dashboardRequest;
+    dashboardCache = { value, loadedAt: Date.now() };
+    return value;
+  } finally {
+    dashboardRequest = null;
+  }
+}
+
+async function loadDashboardDataFresh(): Promise<DashboardData> {
   const db = client();
   const [tasksResult, branchesResult, employeesResult, reportsResult, roleReportsResult, activityResult] = await Promise.all([
     db.from('tasks').select('id,title,description,branch_id,assigned_to,due_at,priority,status').order('due_at', { ascending: true }).limit(200),

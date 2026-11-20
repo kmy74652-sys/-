@@ -75,10 +75,12 @@ export default function AdminScreen() {
       if (!currentPermissions.includes('tasks.manage')) throw new Error('permission_denied');
       const canManageLibrary = currentPermissions.includes('task_library.manage');
       const canManageReports = currentPermissions.includes('report_forms.manage');
-      const dashboard = await loadDashboardData();
-      const reportTemplates = canManageReports ? await listApprovedDesignerTemplates() : canManageLibrary ? await listApprovedTaskReportForms() : [];
-      const editableTaskTemplates = canManageLibrary ? await listTaskDesignerTemplates() : [];
-      const categories = canManageLibrary ? await listTaskDesignerCategories() : [];
+      const [dashboard, reportTemplates, editableTaskTemplates, categories] = await Promise.all([
+        loadDashboardData({ force, maxAgeMs: 30_000 }),
+        canManageReports ? listApprovedDesignerTemplates() : canManageLibrary ? listApprovedTaskReportForms() : Promise.resolve([]),
+        canManageLibrary ? listTaskDesignerTemplates() : Promise.resolve([]),
+        canManageLibrary ? listTaskDesignerCategories() : Promise.resolve([]),
+      ]);
       setPermissions(currentPermissions);
       setData(dashboard);
       setDesignerTemplates(reportTemplates);

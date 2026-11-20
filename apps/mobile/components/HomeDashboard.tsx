@@ -23,6 +23,12 @@ const services: Array<{ key: HomeDestination; title: string; subtitle: string; i
   { key: 'hr', title: 'الموارد البشرية', subtitle: 'العقود والدوام والرواتب', icon: 'agreement' },
   { key: 'permissions', title: 'الصلاحيات', subtitle: 'إدارة صلاحيات المستخدمين', icon: 'permissions' },
 ];
+const serviceGroups: Array<{ title: string; keys: HomeDestination[] }> = [
+  { title: 'العمل والمتابعة', keys: ['tasks', 'reports', 'performance'] },
+  { title: 'الموظفون والفروع', keys: ['employees', 'branches'] },
+  { title: 'أدوات الإعداد', keys: ['task-designer', 'report-designer'] },
+  { title: 'الموارد والإعدادات', keys: ['agreements', 'hr', 'permissions'] },
+];
 const metrics: Array<{ filter: TaskFilter; title: string; icon: HomeIconName; background: string; foreground: string }> = [
   { filter: 'all', title: 'إجمالي المهام', icon: 'tasks', background: '#e0ecff', foreground: '#164c80' },
   { filter: 'in_progress', title: 'قيد التنفيذ', icon: 'play', background: '#e2f3ee', foreground: '#146b50' },
@@ -187,15 +193,16 @@ export default function HomeDashboard({ profile: initialProfile, onNavigate, onS
             </Pressable>)}
           </View>
 
-          <View style={styles.moduleGrid}>
-            {services.map((item) => {
-              const enabled = access[item.key];
-              return <Pressable key={item.key} accessibilityRole="button" accessibilityState={{ disabled: false }} accessibilityLabel={`${item.title}، ${item.subtitle}`} style={({ pressed }) => [styles.moduleCard, largeText && styles.largeModuleCard, !enabled && styles.unavailableCard, pressed && styles.pressed]} onPress={() => navigate(item.key)}>
+          {serviceGroups.map((group) => {
+            const groupServices = group.keys.map((key) => services.find((item) => item.key === key)).filter((item): item is typeof services[number] => Boolean(item && access[item.key]));
+            if (!groupServices.length) return null;
+            return <View key={group.title} style={styles.serviceGroup}><View style={styles.serviceGroupHeading}><Text style={styles.serviceGroupTitle}>{group.title}</Text><Text style={styles.serviceGroupHint}>{groupServices.length} أقسام</Text></View><View style={styles.moduleGrid}>
+              {groupServices.map((item) => <Pressable key={item.key} accessibilityRole="button" accessibilityState={{ disabled: false }} accessibilityLabel={`${item.title}، ${item.subtitle}`} style={({ pressed }) => [styles.moduleCard, largeText && styles.largeModuleCard, pressed && styles.pressed]} onPress={() => navigate(item.key)}>
                 <HomeIcon name={item.icon} size={compact ? 31 : 37} />
-                <View style={styles.moduleCopy}><Text style={[styles.moduleTitle, compact && styles.compactModuleTitle]}>{item.title}</Text><Text style={[styles.moduleSubtitle, compact && styles.compactModuleSubtitle]}>{item.subtitle}</Text>{!enabled && <Text style={styles.unavailableText}>غير متاح لحسابك</Text>}</View>
-              </Pressable>;
-            })}
-          </View>
+                <View style={styles.moduleCopy}><Text style={[styles.moduleTitle, compact && styles.compactModuleTitle]}>{item.title}</Text><Text style={[styles.moduleSubtitle, compact && styles.compactModuleSubtitle]}>{item.subtitle}</Text></View>
+              </Pressable>)}
+            </View></View>;
+          })}
 
           <View style={[styles.branchFooter, largeText && styles.stackedFooter]}>
             <View style={styles.footerPart}><HomeIcon name="calendar" size={27} /><View style={styles.footerCopy}><Text style={styles.footerTitle}>آخر تحديث</Text><Text style={styles.footerValue}>{lastUpdated ? formatDate(lastUpdated) : 'لم يُحدّث بعد'}</Text></View></View>
@@ -266,6 +273,10 @@ const styles = StyleSheet.create({
   metricLabel: { fontSize: 13, fontWeight: '800', textAlign: 'center', lineHeight: 20, writingDirection: 'rtl' },
   compactMetricLabel: { fontSize: 11 },
   moduleGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 8, direction: 'rtl' },
+  serviceGroup: { gap: 7 },
+  serviceGroupHeading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 3, direction: 'rtl' },
+  serviceGroupTitle: { color: NAVY, fontSize: 15, fontWeight: '900', textAlign: 'right', writingDirection: 'rtl' },
+  serviceGroupHint: { color: '#718096', fontSize: 11, fontWeight: '700', writingDirection: 'rtl' },
   moduleCard: { width: '49%', minHeight: 82, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 10, paddingVertical: 9, borderRadius: 16, backgroundColor: '#fbfcff', borderWidth: 1, borderColor: '#d6dfed', shadowColor: '#244979', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.12, shadowRadius: 4, elevation: 2, direction: 'rtl' },
   largeModuleCard: { flexDirection: 'column', alignItems: 'center' },
   moduleCopy: { flex: 1, gap: 3, minWidth: 0 },
