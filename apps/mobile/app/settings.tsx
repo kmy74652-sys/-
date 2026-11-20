@@ -102,6 +102,10 @@ export default function EmployeeAccessSettings() {
   useEffect(() => {
     void loadSettings();
   }, []);
+  useEffect(() => {
+    const timer = setInterval(() => void loadSettings({ force: true }), 60_000);
+    return () => clearInterval(timer);
+  }, []);
 
   function applySnapshot(snapshot: SettingsSnapshot) {
     setEmployees(snapshot.employees);
@@ -465,11 +469,6 @@ export default function EmployeeAccessSettings() {
           );
         }) : null}
 
-        {!loading && isOwner && (
-          <Pressable accessibilityRole="button" disabled={busyEmployeeId !== null} style={styles.refresh} onPress={() => void loadSettings({ force: true })}>
-            <Text style={styles.refreshText}>تحديث قائمة الموظفين</Text>
-          </Pressable>
-        )}
         </>}
       </View>
     </AppShell>

@@ -221,6 +221,10 @@ export default function TasksScreen() {
     });
     return () => subscription.remove();
   }, [load]);
+  useEffect(() => {
+    const timer = setInterval(() => void load(), 60_000);
+    return () => clearInterval(timer);
+  }, [load]);
 
   async function mutate(task: Task, operation: () => Promise<void>, successMessage: string) {
     setBusyTask(task.id);
