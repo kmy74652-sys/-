@@ -35,7 +35,7 @@ export function SharedBrandHeader({ title, subtitle, profileName, organizationNa
     <View style={styles.headerIdentity}>
       <Image source={require('../assets/alshaeri-official-logo.png')} style={[styles.logo, compact && styles.compactLogo]} resizeMode="contain" accessibilityLabel="الشعار الرسمي لمؤسسة الشاعري" />
       <View style={styles.headerCopy}>
-        <Text style={[styles.brand, compact && styles.compactBrand]}>برنامج الشاعري</Text>
+        <Text style={[styles.brand, compact && styles.compactBrand]}>مانجمنت</Text>
         <Text style={styles.org}>{organizationName}</Text>
         <View style={styles.mottoRow}><View style={styles.mottoLine} /><Text style={styles.motto}>{tagline}</Text><View style={styles.mottoLine} /></View>
         {!!title && <Text style={styles.title}>{title}</Text>}

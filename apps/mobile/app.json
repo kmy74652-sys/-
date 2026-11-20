@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "برنامج الشاعري",
+    "name": "مانجمنت",
     "slug": "alshaeri-mobile",
     "version": "0.1.0",
     "orientation": "portrait",
@@ -32,11 +32,11 @@
       "versionCode": 4,
       "supportsRTL": true,
       "adaptiveIcon": {
-        "foregroundImage": "./assets/android-icon-foreground.png",
+        "foregroundImage": "./assets/management-adaptive-foreground.png",
         "backgroundColor": "#17324d"
       }
     },
-    "icon": "./assets/icon.png",
+    "icon": "./assets/management-icon.png",
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",

@@ -152,7 +152,7 @@ export default function Home() {
             <View style={styles.auth}>
               <Image source={require('../assets/alshaeri-official-logo.png')} style={styles.loginLogo} resizeMode="contain" accessibilityLabel="شعار الشاعري للتجارة العامة" />
               <Text style={styles.eyebrow}>بوابة العمل والتواصل الإداري</Text>
-              <Text style={styles.title}>برنامج الشاعري</Text>
+              <Text style={styles.title}>مانجمنت</Text>
               <Text style={styles.copy}>سجّل دخولك للوصول إلى مهامك، تقاريرك، وتنبيهات العمل في مكان واحد.</Text>
               {!!error && <Text accessibilityRole="alert" style={styles.error}>{error}</Text>}
               <TextInput

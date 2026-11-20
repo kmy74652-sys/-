@@ -19,7 +19,7 @@ export async function registerForPushNotifications(userId: string): Promise<stri
 
   if (Platform.OS === 'android') {
     await Notifications.setNotificationChannelAsync('default', {
-      name: 'إشعارات برنامج الشاعري',
+      name: 'إشعارات مانجمنت',
       importance: Notifications.AndroidImportance.MAX,
       vibrationPattern: [0, 250, 250, 250],
       lightColor: '#E5A93C',
