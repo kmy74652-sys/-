@@ -8,7 +8,7 @@ type EmployeeOption = { id: string; userId?: string | null; name: string; active
 type Props = { initialTemplate?: Partial<TaskTemplateDraft>; employees?: EmployeeOption[]; canManage?: boolean; onSave?: (draft: TaskTemplateDraft) => void | Promise<void>; onSend?: (draft: TaskTemplateDraft, employeeId: string, branchId: string | null, dueAt: string) => void | Promise<void>; onList?: () => void | Promise<void> };
 
 const roles: Array<[TaskRoleCode, string]> = [
-  ['accountant', 'محاسب'], ['warehouse_keeper', 'أمين مستودع'], ['warehouse_worker', 'عامل مستودع'], ['admin_followup', 'متابعة إدارية'], ['owner', 'المالك'],
+  ['owner', 'صاحب المؤسسة'], ['admin_followup', 'المدير التنفيذي'], ['accountant', 'المحاسب'], ['warehouse_keeper', 'أمين المخازن'], ['warehouse_worker', 'عمال التحميل'],
 ];
 const defaultKpis = ['طلبات العملاء', 'الرد على الجوال', 'فواتير المشتريات', 'مطابقة الموردين', 'الحسابات', 'تحصيل العملاء', 'الشكاوى', 'التقرير اليومي'];
 const key = () => `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
