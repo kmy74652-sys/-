@@ -33,6 +33,7 @@ const checks = [
   ['reports are designed independently and delivered automatically by role', designer.includes('التقارير مستقلة عن قالب المهمة') && admin.includes('حقول التقرير المعتمدة للدور المحدد تُرسل تلقائياً') && admin.includes('const selectedReport = designerTemplates.find((template) => template.role_code === draft.roleCode')],
   ['admin report review has search and status filters', admin.includes('ابحث باسم الموظف أو المهمة') && admin.includes("setStatus(value)") && adminData.includes('taskTitle') && adminData.includes('values')],
   ['report submission and review notifications are automatic', reportCycle.includes('task_reports_notify_cycle') && reportCycle.includes("new.status in ('approved', 'returned')")],
+  ['employee report upload tab has independent status filters', tasks.includes('رفع التقارير المرتبطة بالمهام') && tasks.includes('جاهز للرفع') && tasks.includes('تم الرفع') && tasks.includes('reportStatusFilter') && tasks.includes('reportStatusMatches')],
 ];
 const failed = checks.filter(([, ok]) => !ok);
 if (failed.length) { console.error(JSON.stringify({ ok: false, failed: failed.map(([name]) => name) })); process.exit(1); }

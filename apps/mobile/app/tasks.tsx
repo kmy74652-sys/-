@@ -119,6 +119,7 @@ export default function TasksScreen() {
   const [reviewNote, setReviewNote] = useState('');
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<Task['status'] | 'all'>('all');
+  const [reportStatusFilter, setReportStatusFilter] = useState<'all' | 'ready' | 'uploaded' | 'approved'>('all');
   const [branchFilter, setBranchFilter] = useState('');
   const [positionFilter, setPositionFilter] = useState<Task['position_code'] | 'all'>('all');
   const [error, setError] = useState('');
@@ -375,6 +376,10 @@ export default function TasksScreen() {
   const filteredTasks = tasks.filter((task) => {
     const hasPendingFormReview = task.report_forms.some((form) => form.status === 'submitted');
     const hasReport = task.report_forms.length > 0 || task.report_schema.length > 0;
+    const hasReadyReport = task.report_forms.some((form) => !['submitted', 'approved'].includes(form.status ?? '')) || (!task.report_forms.length && !['submitted', 'approved'].includes(task.status));
+    const hasUploadedReport = task.report_forms.some((form) => form.status === 'submitted') || (!task.report_forms.length && task.status === 'submitted');
+    const hasApprovedReport = task.report_forms.some((form) => form.status === 'approved') || (!task.report_forms.length && task.status === 'approved');
+    const reportStatusMatches = reportStatusFilter === 'all' || (reportStatusFilter === 'ready' && hasReadyReport) || (reportStatusFilter === 'uploaded' && hasUploadedReport) || (reportStatusFilter === 'approved' && hasApprovedReport);
     const modeMatches = screenMode === 'mine'
       ? task.assignee_employee_id === currentUserId
       : screenMode === 'review'
@@ -386,6 +391,7 @@ export default function TasksScreen() {
       (positionFilter === 'all' || task.position_code === positionFilter) &&
       (!reportsOnly || hasReport) &&
       (!reportsOnly || !isDynamicTestTitle(task.title)) &&
+      (!reportsOnly || reportStatusMatches) &&
       (!search.trim() || `${task.title} ${task.description ?? ''}`.toLocaleLowerCase('ar').includes(search.trim().toLocaleLowerCase('ar')));
   });
   const employeeSummary = {
@@ -410,6 +416,7 @@ export default function TasksScreen() {
         {!!notice && <Text accessibilityLiveRegion="polite" style={styles.notice}>{notice}</Text>}
         {!loading && !reportsOnly && <View style={styles.employeeIntro}><Text style={styles.employeeIntroTitle}>مساحة تنفيذك اليومية</Text><Text style={styles.employeeIntroText}>اقرأ التكليف، ابدأ التنفيذ، ثم عبّئ التقرير المطلوب وأرسله للمسؤول للمراجعة.</Text></View>}
         {!loading && <View style={styles.workTabs}><Pressable accessibilityRole="tab" accessibilityState={{ selected: !reportsOnly }} style={[styles.workTab, !reportsOnly && styles.workTabSelected]} onPress={() => router.replace({ pathname: '/tasks', params: { mode: 'mine' } })}><Text style={[styles.workTabText, !reportsOnly && styles.workTabTextSelected]}>المهام</Text></Pressable><Pressable accessibilityRole="tab" accessibilityState={{ selected: reportsOnly }} style={[styles.workTab, reportsOnly && styles.workTabSelected]} onPress={() => router.replace({ pathname: '/tasks', params: { view: 'reports', mode: 'mine' } })}><Text style={[styles.workTabText, reportsOnly && styles.workTabTextSelected]}>إعداد التقارير</Text></Pressable></View>}
+        {!loading && reportsOnly && <><View style={styles.reportUploadHeader}><Text style={styles.reportUploadTitle}>رفع التقارير المرتبطة بالمهام</Text><Text style={styles.reportUploadSubtitle}>تعبئة التقارير المصممة من الإدارة وإرسالها للمراجعة دون خلطها بعداد المهام أو جدول الدوام.</Text></View><View style={styles.reportStatusTabs}>{([['all', 'الكل'], ['ready', 'جاهز للرفع'], ['uploaded', 'تم الرفع'], ['approved', 'معتمد']] as const).map(([value, label]) => <Pressable key={value} accessibilityRole="button" accessibilityState={{ selected: reportStatusFilter === value }} style={[styles.reportStatusTab, reportStatusFilter === value && styles.reportStatusTabSelected]} onPress={() => setReportStatusFilter(value)}><Text style={reportStatusFilter === value ? styles.reportStatusTabTextSelected : styles.reportStatusTabText}>{label}</Text></Pressable>)}</View></>}
         {!loading && !reportsOnly && <View style={styles.summaryRow}><View style={styles.summaryCard}><Text style={styles.summaryValue}>{employeeSummary.pending}</Text><Text style={styles.summaryLabel}>جديدة</Text></View><View style={styles.summaryCard}><Text style={styles.summaryValue}>{employeeSummary.active}</Text><Text style={styles.summaryLabel}>قيد التنفيذ</Text></View><View style={styles.summaryCard}><Text style={styles.summaryValue}>{employeeSummary.submitted}</Text><Text style={styles.summaryLabel}>بانتظار المراجعة</Text></View></View>}
         {loading && <View style={styles.loading}><ActivityIndicator size="large" color="#17324d" /><Text style={styles.muted}>جارٍ تحميل المهام…</Text></View>}
         {!loading && !reportsOnly && (canReview || canManage) && <View style={styles.modeTabs}>
@@ -578,6 +585,14 @@ const styles = StyleSheet.create({
   workTabSelected: { backgroundColor: '#e5b336', borderColor: '#e5b336' },
   workTabText: { color: '#39556a', fontWeight: '800', fontSize: 13 },
   workTabTextSelected: { color: '#17324d', fontWeight: '900' },
+  reportUploadHeader: { backgroundColor: '#fff', borderRadius: 14, borderWidth: 1, borderColor: '#e2e9eb', padding: 14, gap: 5 },
+  reportUploadTitle: { color: '#17324d', fontSize: 17, fontWeight: '900', textAlign: 'right' },
+  reportUploadSubtitle: { color: '#718394', fontSize: 12, lineHeight: 20, textAlign: 'right' },
+  reportStatusTabs: { flexDirection: 'row-reverse', gap: 7, paddingVertical: 2 },
+  reportStatusTab: { flex: 1, minHeight: 40, borderRadius: 10, borderWidth: 1, borderColor: '#ccd9df', backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 5 },
+  reportStatusTabSelected: { backgroundColor: '#17324d', borderColor: '#17324d' },
+  reportStatusTabText: { color: '#39556a', fontSize: 11, fontWeight: '700' },
+  reportStatusTabTextSelected: { color: '#fff', fontSize: 11, fontWeight: '900' },
   filters: { flexDirection: 'row-reverse', gap: 8, paddingVertical: 4 },
   filterChip: { borderRadius: 18, borderWidth: 1, borderColor: '#ccd9df', paddingHorizontal: 12, paddingVertical: 8 },
   filterChipSelected: { backgroundColor: '#17324d', borderColor: '#17324d' },
