@@ -8,8 +8,15 @@ const admin = readFileSync('apps/mobile/app/admin.tsx', 'utf8');
 const adminData = readFileSync('apps/mobile/lib/adminData.ts', 'utf8');
 const mobileData = readFileSync('apps/mobile/lib/mobileData.ts', 'utf8');
 const tasks = readFileSync('apps/mobile/app/tasks.tsx', 'utf8');
+const dynamicReports = readFileSync('apps/mobile/components/EmployeeDynamicReportsPanel.tsx', 'utf8');
+const dynamicReportsClient = readFileSync('apps/mobile/lib/dynamicReports.ts', 'utf8');
+const dynamicReportsMigration = readFileSync('supabase/migrations/073_employee_dynamic_reports.sql', 'utf8');
 if (!tasks.includes('inAppNotification') || !tasks.includes('مهمة جديدة') || !tasks.includes("payload?.eventType === 'INSERT'") || !tasks.includes('notifiedTaskIds')) {
   console.error(JSON.stringify({ ok: false, failed: ['in-app new-task banner and deduplication'] }));
+  process.exit(1);
+}
+if (!tasks.includes('EmployeeDynamicReportsPanel') || !dynamicReports.includes('إرسال التقرير للإدارة') || !dynamicReportsClient.includes('list_my_dynamic_report_forms') || !dynamicReportsMigration.includes('submit_my_dynamic_report')) {
+  console.error(JSON.stringify({ ok: false, failed: ['independent dynamic report delivery to employee'] }));
   process.exit(1);
 }
 const roleReports = readFileSync('apps/mobile/lib/employeeRoleReports.ts', 'utf8');
