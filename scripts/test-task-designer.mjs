@@ -30,7 +30,7 @@ const checks = [
   ['drafts have RLS and RPC', sql.includes('task_report_drafts') && sql.includes('save_task_report_draft') && tasks.includes('saveTaskReportDraft')],
   ['preview can move and resize', designer.includes('PanResponder') && designer.includes('تغيير الحجم')],
   ['steps support touch reorder', designer.includes('StepDragHandle') && designer.includes('onDrop')],
-  ['copy/archive are guarded in admin', admin.includes('نسخ القالب') && admin.includes('setTaskDesignerTemplateActive') && admin.includes('canManageTaskLibrary')],
+  ['final template delete is guarded and copy/archive are hidden', admin.includes('حذف نهائي') && admin.includes('deleteTaskDesignerTemplate') && !admin.includes('نسخ القالب') && !admin.includes('setTaskDesignerTemplateActive') && admin.includes('canManageTaskLibrary') && library.includes("delete_task_designer_template")],
   ['direct send targets the selected employee through the saved template', organizational.includes('selectedEmployeeId') && organizational.includes('إرسال المهمة للموظف مباشرة') && admin.includes('createAdministrativeTask') && admin.includes('templateId: draft.id ?? null') && adminData.includes("'assign_task_from_template'")],
   ['direct send preserves role and branch validation', organizational.includes('employee.assignments') && adminData.includes('employee_assignment_invalid') && admin.includes('branchId, assignedEmployeeId: employeeId')],
   ['save dispatches the directed task immediately', organizational.includes('const saveResult = await onSave?.(draft)') && organizational.includes('saveResult?.templateId') && organizational.includes('await onSend?.({ ...draft') && admin.includes('تفاصيل التنفيذ المباشر:')],

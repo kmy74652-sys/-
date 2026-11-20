@@ -164,6 +164,15 @@ export async function setTaskDesignerTemplateActive(templateId: string, isActive
   if (error) throw error;
 }
 
+export async function deleteTaskDesignerTemplate(templateId: string) {
+  const { db, organizationId } = await managementOrganization('task_library.manage');
+  const { error } = await db.rpc('delete_task_designer_template', {
+    p_organization_id: organizationId,
+    p_template_id: templateId,
+  });
+  if (error) throw error;
+}
+
 export async function assignTaskFromTemplate(input: {
   templateId: string; assignedTo: string; branchId: string | null; startsAt: string; dueAt: string;
   priority?: TaskTemplateDraft['priority']; instructions?: string; reportOverrides?: Array<{ approvedVersionId: string; required: boolean }>;
