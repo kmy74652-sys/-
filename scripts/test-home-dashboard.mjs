@@ -106,6 +106,12 @@ assert.match(admin, /section === 'overview' && profile\) return <HomeDashboard/)
 assert.match(admin, /section === 'report-designer'.*canManageReports/);
 assert.match(admin, /Promise\.all\(\[/);
 assert.match(admin, /loadDashboardData\(\{ force, maxAgeMs: 30_000 \}\)/);
+assert.match(admin, /onTaskUpdated/);
+assert.match(admin, /onTaskDeleted/);
+assert.match(admin, /onReportUpdated/);
+assert.match(admin, /onReportDeleted/);
+assert.match(admin, /updateManagedTask\(institutionId, task\.id, title, description, task\.dueAt\); onTaskUpdated/);
+assert.match(admin, /deleteManagedTask\(institutionId, task\.id\); onTaskDeleted/);
 const adminData = read('apps/mobile/lib/adminData.ts');
 assert.match(adminData, /dashboardCache/);
 assert.match(adminData, /dashboardRequest/);
