@@ -47,7 +47,7 @@ const checks = [
   ['legacy submitted report values are shown to employees', mobileData.includes('legacy_report_values') && tasks.includes('task.legacy_report_values ?? {}')],
   ['role reports are isolated by branch and reload on branch changes', roleReports.includes('listMyRoleReports(roleCode: string, branchId: string | null') && roleReports.includes(".eq('branch_id', branchId)") && roleReportPanel.includes('useEffect(() => { void load(); }, [roleCode, branchId])')],
   ['specialized role report errors have Arabic messages', mobileData.includes('role_report_assignment_invalid:') && mobileData.includes('role_report_already_submitted:') && mobileData.includes('review_note_required:') && mobileData.includes('invalid_role_report_payload:')],
-  ['role task cards are added inside the existing designer', organizational.includes('warehouse_keeper') && organizational.includes('warehouse_worker') && organizational.includes('إضافة بطاقات') && organizational.includes('إضافة البطاقات المحاسبية الناقصة') && organizational.includes('accountantMissingRows')],
+  ['role task cards are added inside the existing designer', organizational.includes('warehouse_keeper') && organizational.includes('warehouse_worker') && organizational.includes('admin_followup') && organizational.includes('owner') && organizational.includes('إضافة بطاقات') && organizational.includes('إضافة البطاقات المحاسبية الناقصة') && organizational.includes('accountantMissingRows')],
 ];
 const failed = checks.filter(([, ok]) => !ok);
 if (failed.length) { console.error(JSON.stringify({ ok: false, failed: failed.map(([name]) => name) })); process.exit(1); }
