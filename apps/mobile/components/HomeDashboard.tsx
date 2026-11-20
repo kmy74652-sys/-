@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { ActivityIndicator, Image, Modal, Pressable, RefreshControl, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { ActivityIndicator, Modal, Pressable, RefreshControl, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { friendlyDataError, getMyEmployeeProfile, listMyNotifications, type MobileNotification, type MobileProfile } from '../lib/mobileData';
 import { countUnreadNotifications, loadHomeSummary } from '../lib/homeData';
@@ -8,6 +8,7 @@ import { homeAccess, type HomeDestination, type TaskFilter } from '../lib/homeMo
 import { loadOrganizationBranding, type OrganizationBranding } from '../lib/organizationBranding';
 import { supabase } from '../lib/supabase';
 import HomeIcon, { type HomeIconName } from './HomeIcon';
+import { SharedBrandHeader } from './AppShell';
 
 const NAVY = '#0b3458';
 const GOLD = '#dba62a';
@@ -167,22 +168,14 @@ export default function HomeDashboard({ profile: initialProfile, onNavigate, onS
   return <SafeAreaView edges={['top', 'left', 'right']} style={styles.safe}>
     <View style={styles.frame}>
       <ScrollView style={styles.scroll} contentContainerStyle={styles.content} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void load(true)} tintColor={NAVY} colors={[NAVY]} />}>
-        <View style={[styles.brandHeader, compact && styles.compactHeader]}>
-          <Image source={require('../assets/alshaeri-official-logo.png')} style={[styles.logo, compact && styles.compactLogo]} resizeMode="contain" accessibilityLabel="الشعار الرسمي لمؤسسة الشاعري" />
-          <Pressable accessibilityRole="button" accessibilityLabel="تبديل الحساب" accessibilityHint="تسجيل الخروج وفتح حساب آخر" disabled={signingOut} style={({ pressed }) => [styles.accountSwitchButton, pressed && styles.pressed]} onPress={() => void signOut()}>
-            <HomeIcon name="avatar" size={24} color={NAVY} />
-          </Pressable>
-          <View style={styles.brandCopy}>
-            <Text style={[styles.brandTitle, compact && styles.compactTitle]}>برنامج الشاعري</Text>
-            <Text style={[styles.brandSubtitle, compact && styles.compactSubtitle]}>{branding?.name || 'مؤسسة الشاعري للتجارة العامة'}</Text>
-            <View style={styles.mottoRow}><View style={styles.mottoLine} /><Text style={styles.motto}>{branding?.tagline || 'معاً .. نحو إدارة أفضل'}</Text><View style={styles.mottoLine} /></View>
-          </View>
-          <Pressable accessibilityRole="button" accessibilityLabel={`الإشعارات، ${unread === null ? 'العداد غير متاح' : `${unread} غير مقروءة`}`} style={({ pressed }) => [styles.notificationButton, pressed && styles.pressed]} onPress={() => void openNotifications()}>
-            <HomeIcon name="bell" size={28} color="#fff" />
-            {unread !== null && unread > 0 && <View style={styles.badge}><Text style={styles.badgeText}>{unread > 99 ? '99+' : unread}</Text></View>}
-          </Pressable>
-        </View>
-
+        <SharedBrandHeader
+          organizationName={branding?.name || 'مؤسسة الشاعري للتجارة العامة'}
+          tagline={branding?.tagline || 'معاً .. نحو إدارة أفضل'}
+          compact={compact}
+          unread={unread}
+          onSwitchAccount={() => void signOut()}
+          onNotifications={() => void openNotifications()}
+        />
         <View style={styles.main}>
           {!!error && <View style={styles.errorPanel}><Text accessibilityRole="alert" style={styles.error}>{error}{lastUpdated ? ' الأرقام المعروضة من آخر تحديث ناجح.' : ''}</Text><Pressable style={styles.retry} onPress={() => void load()} accessibilityRole="button"><Text style={styles.retryText}>إعادة المحاولة</Text></Pressable></View>}
           <View style={styles.metrics}>

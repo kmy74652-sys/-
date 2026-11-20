@@ -33,7 +33,8 @@ import { evaluateReportField, isReportFieldVisible, normalizeTableColumns, repor
 import ReportFieldInput from '../components/ReportFieldInput';
 import ReportReadOnly from '../components/ReportReadOnly';
 import EmployeeRoleReportPanel from '../components/EmployeeRoleReportPanel';
-import AppShell, { ScreenHeader } from '../components/AppShell';
+import AppShell from '../components/AppShell';
+import CompactExpandableCard from '../components/CompactExpandableCard';
 import { readSessionCache, writeSessionCache } from '../lib/mobileSessionCache';
 
 type Task = {
@@ -441,11 +442,6 @@ export default function TasksScreen() {
         contentContainerStyle={styles.content}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); void load({ force: true }); }} />}
       >
-        <ScreenHeader
-          title={reportsOnly ? 'إعداد التقارير' : 'المهام والمتابعة'}
-          subtitle={reportsOnly ? 'تعبئة التقارير المطلوبة من الإدارة وإرسالها للمراجعة' : 'تنفيذ التكليفات ومراجعة التقارير'}
-          onBack={() => { if (router.canGoBack()) router.back(); else router.replace('/'); }}
-        />
         {!!error && <View style={styles.errorBox}><Text accessibilityRole="alert" style={styles.error}>{error}</Text><Pressable style={styles.retryButton} onPress={() => { setRefreshing(true); void load({ force: true }); }}><Text style={styles.retryText}>إعادة المحاولة</Text></Pressable></View>}
         {!!notice && <Text accessibilityLiveRegion="polite" style={styles.notice}>{notice}</Text>}
         {!loading && !reportsOnly && <View style={styles.employeeIntro}><Text style={styles.employeeIntroTitle}>مساحة تنفيذك اليومية</Text><Text style={styles.employeeIntroText}>اقرأ التكليف، ابدأ التنفيذ، ثم عبّئ التقرير المطلوب وأرسله للمسؤول للمراجعة.</Text></View>}
@@ -484,11 +480,7 @@ export default function TasksScreen() {
         </>}
 
         {!loading && filteredTasks.map((task) => (
-          <View style={styles.taskCard} key={task.id}>
-            {!reportsOnly && <View style={styles.taskHeading}>
-              <Text style={styles.taskTitle}>{task.title}</Text>
-              <Text style={[styles.badge, task.status === 'approved' ? styles.goodBadge : task.status === 'rejected' ? styles.warnBadge : styles.neutralBadge]}>{statusLabels[task.status]}</Text>
-            </View>}
+          <CompactExpandableCard key={task.id} title={task.title} subtitle={`${task.branch_name || 'كل الفروع'} · ${priorityLabels[task.priority]}`} status={reportsOnly ? 'إعداد التقارير' : statusLabels[task.status]}>
             {reportsOnly && <View style={styles.reportWorkspace}>
               {!!task.report_forms.length && task.report_forms.map((form) => {
                 const key = formDraftKey(task, form);
@@ -584,7 +576,7 @@ export default function TasksScreen() {
                 </>
               )}
             </View>}
-          </View>
+          </CompactExpandableCard>
         ))}
         {!loading && reportsOnly && filteredTasks.length === 0 && <View style={styles.emptyReportBox}><Text style={styles.empty}>لا توجد تقارير مرتبطة بالمهام حاليًا.</Text></View>}
         {!loading && !reportsOnly && !error && filteredTasks.length === 0 && <Text style={styles.empty}>{tasks.length ? 'لا توجد مهام تطابق البحث أو الفلتر.' : 'لا توجد مهام ظاهرة لهذا الحساب.'}</Text>}

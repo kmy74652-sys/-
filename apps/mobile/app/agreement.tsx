@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, SafeAreaView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Stack } from 'expo-router';
-import AppShell, { ScreenHeader } from '../components/AppShell';
+import AppShell from '../components/AppShell';
 import { friendlyDataError, getMyEmployeeProfile, type MobileProfile } from '../lib/mobileData';
 import { approveEmployeeAgreement, createEmployeeAgreement, listAgreementMembers, listEmployeeAgreements, publishEmployeeAgreement, submitEmployeeAgreementForApproval, type AgreementMember, type EmployeeAgreement } from '../lib/agreementData';
 
@@ -53,7 +53,6 @@ export default function EmployeeAgreementScreen() {
 
   return <AppShell activeTab="settings" title="اتفاقية العمل" subtitle="اتفاقيات الموظفين" refreshing={loading} onRefresh={() => void load()}>
     <Stack.Screen options={{ headerShown: false }} />
-    <ScreenHeader title="اتفاقية العمل" subtitle="عرض واعتماد اتفاقيات الموظفين" />
     <View style={styles.content}>
       <View style={styles.intro}><Text style={styles.eyebrow}>مستندات العمل</Text><Text style={styles.title}>اتفاقيات الموظفين</Text><Text style={styles.copy}>تظهر للموظف النسخة المنشورة فقط. بعد النشر تصبح النسخة ثابتة، ويُسجّل القبول أو الرفض في قاعدة البيانات مع وقت العملية.</Text></View>
       {!!error && <Text accessibilityRole="alert" style={styles.error}>{error}</Text>}

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Stack } from 'expo-router';
-import AppShell, { ScreenHeader } from '../components/AppShell';
+import AppShell from '../components/AppShell';
 import { friendlyDataError, getMyEmployeeProfile, type MobileProfile } from '../lib/mobileData';
 import { createHRContract, createHRSchedule, createPayrollPeriod, listHRData, recordHRAttendance, upsertPayrollEntry, type HRMember } from '../lib/hrData';
 
@@ -74,7 +74,6 @@ export default function HRScreen() {
   };
   return <AppShell activeTab="settings" title="الموارد البشرية" subtitle="العقود والدوام والرواتب" refreshing={loading} onRefresh={() => void load()}>
     <Stack.Screen options={{ headerShown: false }} />
-    <ScreenHeader title="الموارد البشرية" subtitle="إدارة العقود والدوام والرواتب" />
     <View style={styles.content}>
       {!!error && <Text accessibilityRole="alert" style={styles.error}>{error}</Text>}
       {!!notice && <Text accessibilityLiveRegion="polite" style={styles.success}>{notice}</Text>}

@@ -4,7 +4,7 @@ import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import * as FileSystem from 'expo-file-system';
 import AdenDeadlinePicker, { adenDateTimeToIso, currentAdenDateTime } from '../components/AdenDeadlinePicker';
 import HomeDashboard from '../components/HomeDashboard';
-import AppShell, { ScreenHeader, type ShellTab } from '../components/AppShell';
+import AppShell, { type ShellTab } from '../components/AppShell';
 import { friendlyDataError, getMyEmployeeProfile, type MobileProfile } from '../lib/mobileData';
 import { createAdministrativeTask, loadDashboardData, roleLabel, statusLabel, type DashboardData } from '../lib/adminData';
 import { supabase } from '../lib/supabase';
@@ -241,7 +241,6 @@ export default function AdminScreen() {
   const sectionTitles: Record<Section, string> = { overview: 'الرئيسية', tasks: 'إدارة المهام', 'task-designer': 'مصمم المهام', 'report-designer': 'مصمم التقارير', reports: 'تقارير الموظفين', performance: 'إحصائيات ومقارنة الأداء', hr: 'الموارد البشرية', branches: 'إدارة الفروع', employees: 'الموظفون', activity: 'السجل والمرفقات' };
   return <AppShell activeTab={shellTab} title={sectionTitles[section]} subtitle="لوحة إدارة المؤسسة" profileName={currentName} onRefresh={() => { setRefreshing(true); void load(true); }}>
     <Stack.Screen options={{ headerShown: false }} />
-    <ScreenHeader title={sectionTitles[section]} subtitle={`${brandName} · ${brandTagline}`} profileName={currentName} onBack={section === 'overview' ? undefined : () => setSection('overview')} />
     {!!error && <Text accessibilityRole="alert" style={styles.error}>{error}</Text>}
     {!!notice && <Text style={styles.notice}>{notice}</Text>}
 

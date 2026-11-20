@@ -10,7 +10,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import AppShell, { ScreenHeader } from '../components/AppShell';
+import AppShell from '../components/AppShell';
 import { friendlyDataError, getMyEmployeeProfile } from '../lib/mobileData';
 import { supabase } from '../lib/supabase';
 import { loadOrganizationBranding, saveOrganizationBranding } from '../lib/organizationBranding';
@@ -334,14 +334,12 @@ export default function EmployeeAccessSettings() {
 
   if (!loading && !isOwner) {
     return <AppShell activeTab={activeTab} title={activeTab === 'employees' ? 'الموظفون' : 'الإعدادات'} subtitle="إدارة المؤسسة والموظفين">
-      <ScreenHeader title={activeTab === 'employees' ? 'الموظفون' : 'الإعدادات'} subtitle="إدارة المؤسسة والموظفين" onBack={() => { if (router.canGoBack()) router.back(); else router.replace('/'); }} />
       <View style={styles.unavailable}><Text style={styles.title}>هذه الصفحة غير متاحة</Text><Text style={styles.copy}>{error || 'تحتاج إلى صلاحية صاحب المؤسسة أو المدير التنفيذي المخوّل.'}</Text><Pressable style={styles.refresh} onPress={() => void loadSettings({ force: true })}><Text style={styles.refreshText}>إعادة المحاولة</Text></Pressable></View>
     </AppShell>;
   }
 
   return (
     <AppShell activeTab={activeTab} title={activeTab === 'employees' ? 'الموظفون' : 'الإعدادات'} subtitle="إدارة المؤسسة والموظفين">
-      <ScreenHeader title={activeTab === 'employees' ? 'الموظفون' : 'الإعدادات'} subtitle="إدارة المؤسسة والموظفين" onBack={() => { if (router.canGoBack()) router.back(); else router.replace('/'); }} />
       <View style={styles.content}>
         {activeTab === 'settings' && !loading && canEditBrand && <View style={styles.employeeCard}>
           <Text style={styles.employeeName}>هوية المؤسسة والواجهة الرئيسية</Text>
