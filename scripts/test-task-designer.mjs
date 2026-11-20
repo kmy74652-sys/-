@@ -24,6 +24,7 @@ const checks = [
   ['direct send preserves role and branch validation', organizational.includes('employee.assignments') && adminData.includes('employee_assignment_invalid') && admin.includes('branchId, assignedEmployeeId: employeeId')],
   ['save dispatches the directed task immediately', organizational.includes('await onSave?.(draft)') && organizational.includes('await onSend?.(draft') && admin.includes('تفاصيل التنفيذ المباشر:')],
   ['employee task tab shows new tasks only', tasks.includes('const employeeNewOnly') && tasks.includes("normalizeTaskStatus(task.status) === 'pending'") && tasks.includes('!employeeNewOnly ||')],
+  ['dynamic test cards stay hidden while designer tasks remain visible', tasks.includes('isDynamicTestTitle') && tasks.includes('!isDynamicTestTitle(task.title)') && tasks.includes('اختبار مهمة ديناميكية')],
   ['manual task assignment clears stale branch and matches role-specific assignments', admin.includes("roleCode: role, branchId: '', assignedEmployeeId: ''") && admin.includes('const employeesForDraft') && admin.includes('assignment.roleCode === draft.roleCode && (!draft.branchId || assignment.branchId === draft.branchId)')],
   ['manual task assignment requires a linked login and explains missing employees', admin.includes('Boolean(employee.userId)') && adminData.includes("employee_login_not_linked") && mobileData.includes('no_employee_for_role:')],
   ['assignment failures have clear Arabic causes', mobileData.includes('no_employee_for_role_branch:') && mobileData.includes('invalid_task_schedule:')],

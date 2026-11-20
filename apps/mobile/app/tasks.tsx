@@ -396,6 +396,7 @@ export default function TasksScreen() {
         : canManage || canReview;
     return modeMatches &&
       (!employeeNewOnly || normalizeTaskStatus(task.status) === 'pending') &&
+      !isDynamicTestTitle(task.title) &&
       taskMatchesFilter(task, statusFilter) &&
       (!branchFilter || task.branch_id === branchFilter) &&
       (positionFilter === 'all' || task.position_code === positionFilter) &&
