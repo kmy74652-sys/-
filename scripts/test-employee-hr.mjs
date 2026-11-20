@@ -12,4 +12,7 @@ for (const label of ['العقود', 'الدوام والحضور', 'الروا�
 for (const rpc of ['create_employee_contract', 'create_employee_work_schedule', 'record_employee_attendance', 'create_employee_payroll_period', 'upsert_employee_payroll_entry']) assert.match(data, new RegExp(rpc));
 assert.match(admin, /الموارد البشرية/);
 assert.match(admin, /\/hr/);
-console.log(JSON.stringify({ ok: true, checks: 18, sections: ['contracts', 'attendance', 'payroll'], protectedMutations: true, routeWired: true }));
+assert.match(page, /HRErrorBoundary/);
+assert.match(page, /permissions\?\.includes\('employee_hr\.manage'\)/);
+assert.match(page, /data\.contracts \?\? \[\]/);
+console.log(JSON.stringify({ ok: true, checks: 21, sections: ['contracts', 'attendance', 'payroll'], protectedMutations: true, routeWired: true, runtimeBoundary: true }));

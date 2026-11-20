@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { Component, ReactNode, useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Stack } from 'expo-router';
 import AppShell from '../components/AppShell';
@@ -10,9 +10,22 @@ const today = new Date().toISOString().slice(0, 10);
 const emptyForm = { memberId: '', contractNo: '', contractType: 'employment', startDate: today, endDate: '', salary: '', duties: '', scheduleName: 'الدوام الأساسي', startTime: '08:00', endTime: '17:00', breakMinutes: '60', workDate: today, attendanceStatus: 'present', checkIn: '08:00', checkOut: '17:00', note: '', periodStart: today.slice(0, 8) + '01', periodEnd: today, periodId: '', base: '', additions: '0', deductions: '0' };
 
 export default function HRScreen() {
+  return <HRErrorBoundary><HRScreenContent /></HRErrorBoundary>;
+}
+
+class HRErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
+  state: { error: Error | null } = { error: null };
+  static getDerivedStateFromError(error: Error) { return { error }; }
+  render() {
+    if (this.state.error) return <View style={{ flex: 1, backgroundColor: '#f5f7fd', alignItems: 'center', justifyContent: 'center', padding: 24, direction: 'rtl' }}><Text style={{ color: '#17324d', fontSize: 20, fontWeight: '900', textAlign: 'center' }}>تعذر فتح الموارد البشرية</Text><Text style={{ color: '#718394', fontSize: 14, lineHeight: 23, textAlign: 'center', marginTop: 10 }}>حدث خطأ غير متوقع أثناء تحميل الشاشة. أغلقها وافتحها مرة أخرى، وإذا استمر الخطأ راجع مسؤول النظام.</Text></View>;
+    return this.props.children;
+  }
+}
+
+function HRScreenContent() {
   const [profile, setProfile] = useState<MobileProfile | null>(null); const [tab, setTab] = useState<Tab>('contracts'); const [data, setData] = useState<Awaited<ReturnType<typeof listHRData>> | null>(null); const [form, setForm] = useState(emptyForm); const [loading, setLoading] = useState(true); const [busy, setBusy] = useState(false); const [error, setError] = useState(''); const [notice, setNotice] = useState('');
-  const canManage = Boolean(profile?.permissions.includes('employee_hr.manage'));
-  const memberName = (id: string) => data?.members.find((member) => member.id === id)?.displayName ?? 'موظف غير محدد';
+  const canManage = Boolean(profile?.permissions?.includes('employee_hr.manage'));
+  const memberName = (id: string) => data?.members?.find((member) => member.id === id)?.displayName ?? 'موظف غير محدد';
   const load = useCallback(async () => { setLoading(true); setError(''); try { const identity = await getMyEmployeeProfile(); if (!identity?.employee) throw new Error('employee_not_active'); setProfile(identity.employee); setData(await listHRData(identity.employee)); } catch (cause) { setError(friendlyDataError(cause, 'تعذر تحميل بيانات الموارد البشرية.')); } finally { setLoading(false); } }, []);
   useEffect(() => { void load(); }, [load]);
   function update(key: keyof typeof emptyForm, value: string) { setForm((current) => ({ ...current, [key]: value })); }
@@ -67,9 +80,9 @@ export default function HRScreen() {
   const renderList = () => {
     if (!data) return null;
     return <View style={styles.list}>
-      {tab === 'contracts' && data.contracts.map((item) => <View style={styles.item} key={item.id}><Text style={styles.itemTitle}>{item.contractNo} — {memberName(item.membershipId)}</Text><Text style={styles.meta}>من {item.startDate}{item.endDate ? ` إلى ${item.endDate}` : ' · مفتوح'} · {item.status}</Text><Text style={styles.meta}>{item.baseSalary ?? 'غير محدد'} {item.currency} · {item.duties.length} مسؤوليات</Text></View>)}
-      {tab === 'attendance' && <>{data.schedules.map((item) => <View style={styles.item} key={item.id}><Text style={styles.itemTitle}>جدول {item.name} — {memberName(item.membershipId)}</Text><Text style={styles.meta}>{item.startTime} إلى {item.endTime} · استراحة {item.breakMinutes} دقيقة</Text></View>)}{data.attendance.map((item) => <View style={styles.item} key={item.id}><Text style={styles.itemTitle}>{item.workDate} — {memberName(item.membershipId)}</Text><Text style={styles.meta}>{item.status} · دخول {item.checkInAt ? new Date(item.checkInAt).toLocaleTimeString('ar-SA') : '—'} · خروج {item.checkOutAt ? new Date(item.checkOutAt).toLocaleTimeString('ar-SA') : '—'}</Text></View>)}</>}
-      {tab === 'payroll' && data.periods.map((item) => <View style={styles.item} key={item.id}><Pressable onPress={() => update('periodId', item.id)}><Text style={styles.itemTitle}>{item.start} إلى {item.end} · {item.status}</Text><Text style={styles.meta}>اضغط لاختيار الفترة · {item.entries.length} قيود · {item.id}</Text></Pressable>{item.entries.map((entry) => <Text style={styles.meta} key={entry.membershipId}>{memberName(entry.membershipId)}: صافي {entry.net.toFixed(2)} {entry.currency}</Text>)}</View>)}
+      {tab === 'contracts' && (data.contracts ?? []).map((item) => <View style={styles.item} key={item.id}><Text style={styles.itemTitle}>{item.contractNo} — {memberName(item.membershipId)}</Text><Text style={styles.meta}>من {item.startDate}{item.endDate ? ` إلى ${item.endDate}` : ' · مفتوح'} · {item.status}</Text><Text style={styles.meta}>{item.baseSalary ?? 'غير محدد'} {item.currency} · {(item.duties ?? []).length} مسؤوليات</Text></View>)}
+      {tab === 'attendance' && <>{(data.schedules ?? []).map((item) => <View style={styles.item} key={item.id}><Text style={styles.itemTitle}>جدول {item.name} — {memberName(item.membershipId)}</Text><Text style={styles.meta}>{item.startTime} إلى {item.endTime} · استراحة {item.breakMinutes} دقيقة</Text></View>)}{(data.attendance ?? []).map((item) => <View style={styles.item} key={item.id}><Text style={styles.itemTitle}>{item.workDate} — {memberName(item.membershipId)}</Text><Text style={styles.meta}>{item.status} · دخول {item.checkInAt ? new Date(item.checkInAt).toLocaleTimeString('ar-SA') : '—'} · خروج {item.checkOutAt ? new Date(item.checkOutAt).toLocaleTimeString('ar-SA') : '—'}</Text></View>)}</>}
+      {tab === 'payroll' && (data.periods ?? []).map((item) => <View style={styles.item} key={item.id}><Pressable onPress={() => update('periodId', item.id)}><Text style={styles.itemTitle}>{item.start} إلى {item.end} · {item.status}</Text><Text style={styles.meta}>اضغط لاختيار الفترة · {(item.entries ?? []).length} قيود · {item.id}</Text></Pressable>{(item.entries ?? []).map((entry) => <Text style={styles.meta} key={entry.membershipId}>{memberName(entry.membershipId)}: صافي {Number(entry.net ?? 0).toFixed(2)} {entry.currency}</Text>)}</View>)}
     </View>;
   };
   return <AppShell activeTab="settings" title="الموارد البشرية" subtitle="العقود والدوام والرواتب" refreshing={loading} onRefresh={() => void load()}>
