@@ -422,12 +422,11 @@ function TaskTemplatesSection({ templates, categories, employees, branches, onRe
     try {
       setSaveError('');
       const saved = await saveTaskDesignerTemplate(draft, categories);
-      setSelected(null);
-      setEditing(false);
       await onReload();
       return saved;
     } catch (cause) {
       setSaveError(friendlyDataError(cause, 'تعذر حفظ قالب المهمة. تحقق من الصلاحيات ونماذج التقارير المعتمدة.'));
+      throw cause;
     }
   }
   async function sendDirectly(draft: TaskTemplateDraft, employeeId: string, branchId: string | null, dueAt: string) {
@@ -437,6 +436,8 @@ function TaskTemplatesSection({ templates, categories, employees, branches, onRe
     const executionDetails = draft.steps.map((step, index) => `${index + 1}. ${step.title}\nالفترة: ${step.instructions}\nالإثبات: ${step.evidenceInstructions || 'تأكيد الإنجاز'}`).join('\n');
     await createAdministrativeTask({ title: draft.title, description: [draft.description, 'تفاصيل التنفيذ المباشر:', executionDetails].filter(Boolean).join('\n\n'), dueAt, priority: draft.priority, roleCode: draft.roleCode, branchId, assignedEmployeeId: employeeId, templateId: draft.id ?? null, reportTemplateId, reportVersionId, reportRequired: Boolean(reportVersionId), reportOverrides: draft.reports });
     await onReload();
+    setSelected(null);
+    setEditing(false);
   }
   return <View style={{ gap: 12 }}>
     <View style={styles.card}><Text style={styles.sectionTitle}>مصمم الجدول التنظيمي للمهام</Text><Text style={styles.copy}>أنشئ جدول الدوام، المهام اليومية، المسؤوليات، مؤشرات الأداء، متطلبات الإثبات وبنود التقرير اليومي. أما حقول التقرير نفسها فتُصمم من «مصمم التقارير» وتصل تلقائياً إلى الموظف.</Text><Pressable style={styles.primary} onPress={() => { setSelected(null); setEditing(true); setSaveError(''); }}><Text style={styles.primaryText}>جدول تنظيمي جديد</Text></Pressable></View>

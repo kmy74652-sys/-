@@ -125,6 +125,14 @@ export default function OrganizationalTaskDesigner({ initialTemplate, employees 
   const addSubItem = (rowId: string) => { const value = (subItemDrafts[rowId] ?? '').trim(); if (!value) return; setRows((current) => current.map((row) => row.id === rowId ? { ...row, subItems: [...row.subItems, value] } : row)); setSubItemDrafts((current) => ({ ...current, [rowId]: '' })); };
   const removeSubItem = (rowId: string, index: number) => Alert.alert('تأكيد حذف البند', 'هل تريد حذف هذا البند من المهمة؟', [{ text: 'إلغاء', style: 'cancel' }, { text: 'حذف', style: 'destructive', onPress: () => setRows((current) => current.map((row) => row.id === rowId ? { ...row, subItems: row.subItems.filter((_, itemIndex) => itemIndex !== index) } : row)) }]);
   const updateList = (setter: (items: string[]) => void, items: string[], index: number, value: string) => setter(items.map((item, itemIndex) => itemIndex === index ? value : item));
+  const dispatchError = (cause: unknown) => {
+    const message = cause instanceof Error ? cause.message : String(cause ?? '');
+    if (message.includes('no_employee_for_role_branch') || message.includes('employee_assignment_invalid')) return 'تعذر الإرسال: الموظف غير مرتبط بهذا الدور أو الفرع.';
+    if (message.includes('employee_login_not_linked')) return 'تعذر الإرسال: الموظف لا يملك حساب دخول مرتبطًا.';
+    if (message.includes('invalid_task_schedule')) return 'تعذر الإرسال: الموعد النهائي يجب أن يكون بعد وقت بدء المهمة.';
+    if (message.includes('permission_denied')) return 'تعذر الإرسال: لا تملك صلاحية إدارة المهام.';
+    return 'تعذر إرسال المهمة للموظف. تحقق من الاتصال والموظف المحدد ثم حاول مرة أخرى.';
+  };
   const addListItem = (setter: (items: string[]) => void, items: string[]) => setter([...items, '']);
   const applyRolePreset = (role: TaskRoleCode) => {
     const preset = rolePresets[role];
@@ -165,17 +173,16 @@ export default function OrganizationalTaskDesigner({ initialTemplate, employees 
     setBusy(true); setNotice('');
     try {
       const draft = buildDraft();
-      const saveResult = await onSave?.(draft);
-      const dispatchedDraft = { ...draft, id: saveResult?.templateId ?? draft.id, reports: saveResult?.reports ?? draft.reports };
       const employee = employeeOptions.find((item) => item.id === selectedEmployeeId);
       const dueAt = adenDateTimeToIso(dueDate, dueTime);
-      if (employee && dueAt) {
-        await onSend?.(dispatchedDraft, employee.id, selectedBranchId || null, dueAt);
-        setNotice(`تم حفظ المهمة وإرسالها مباشرة إلى ${employee.name} ضمن تبويب المهام.`);
-      } else {
-        setNotice('تم حفظ الجدول التنظيمي. اختر موظفًا وموعدًا صالحًا لإرساله مباشرة.');
-      }
-    } finally { setBusy(false); }
+      if (!employee) { setNotice('اختر الموظف المستلم أولاً؛ لا يتم حفظ المهمة دون إسناد مباشر.'); return; }
+      if (!dueAt) { setNotice('أدخل موعدًا نهائيًا صالحًا قبل حفظ المهمة.'); return; }
+      const saveResult = await onSave?.(draft);
+      if (!saveResult?.templateId && !draft.id) throw new Error('task_template_save_response_invalid');
+      const dispatchedDraft = { ...draft, id: saveResult?.templateId ?? draft.id, reports: saveResult?.reports ?? draft.reports };
+      await onSend?.(dispatchedDraft, employee.id, selectedBranchId || null, dueAt);
+      setNotice(`تم حفظ المهمة وإرسالها مباشرة إلى ${employee.name} ضمن تبويب المهام.`);
+    } catch (cause) { setNotice(dispatchError(cause)); } finally { setBusy(false); }
   }
   async function sendDirectly() {
     const employee = employeeOptions.find((item) => item.id === selectedEmployeeId);
@@ -183,7 +190,7 @@ export default function OrganizationalTaskDesigner({ initialTemplate, employees 
     if (!employee) { setNotice('اختر الموظف المستلم للمهمة أولاً.'); return; }
     if (!dueAt) { setNotice('أدخل موعداً نهائياً صالحاً للمهمة.'); return; }
     setBusy(true); setNotice('');
-    try { const draft = buildDraft(); const saveResult = await onSave?.(draft); await onSend?.({ ...draft, id: saveResult?.templateId ?? draft.id, reports: saveResult?.reports ?? draft.reports }, employee.id, selectedBranchId || null, dueAt); setNotice(`تم إرسال المهمة مباشرة إلى ${employee.name}.`); } finally { setBusy(false); }
+    try { const draft = buildDraft(); const saveResult = await onSave?.(draft); if (!saveResult?.templateId && !draft.id) throw new Error('task_template_save_response_invalid'); await onSend?.({ ...draft, id: saveResult?.templateId ?? draft.id, reports: saveResult?.reports ?? draft.reports }, employee.id, selectedBranchId || null, dueAt); setNotice(`تم حفظ وإرسال المهمة مباشرة إلى ${employee.name}.`); } catch (cause) { setNotice(dispatchError(cause)); } finally { setBusy(false); }
   }
 
   return <View style={styles.shell}>
