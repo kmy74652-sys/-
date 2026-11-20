@@ -8,6 +8,9 @@ const admin = readFileSync('apps/mobile/app/admin.tsx', 'utf8');
 const adminData = readFileSync('apps/mobile/lib/adminData.ts', 'utf8');
 const mobileData = readFileSync('apps/mobile/lib/mobileData.ts', 'utf8');
 const tasks = readFileSync('apps/mobile/app/tasks.tsx', 'utf8');
+const roleReports = readFileSync('apps/mobile/lib/employeeRoleReports.ts', 'utf8');
+const roleReportPanel = readFileSync('apps/mobile/components/EmployeeRoleReportPanel.tsx', 'utf8');
+const roleReportsMigration = readFileSync('supabase/migrations/068_employee_role_reports.sql', 'utf8');
 const reportCycle = readFileSync('supabase/migrations/054_report_cycle_notifications.sql', 'utf8');
 const checks = [
   ['permission RPC is separate from report designer', sql.includes('task_library_allowed_for_org') && library.includes('task_library_allowed_for_org')],
@@ -31,9 +34,12 @@ const checks = [
   ['report designer remains independent', admin.includes("import ReportDesigner") && admin.includes('section === \'report-designer\'') && admin.includes('<ReportDesigner')],
   ['legacy starter catalog is hidden from designer', library.includes('retiredStarterTemplateCodes') && !admin.includes('قالب التقرير القديم')],
   ['reports are designed independently and delivered automatically by role', designer.includes('التقارير مستقلة عن قالب المهمة') && admin.includes('حقول التقرير المعتمدة للدور المحدد تُرسل تلقائياً') && admin.includes('const selectedReport = designerTemplates.find((template) => template.role_code === draft.roleCode')],
-  ['admin report review has search and status filters', admin.includes('ابحث باسم الموظف أو المهمة') && admin.includes("setStatus(value)") && adminData.includes('taskTitle') && adminData.includes('values')],
+  ['admin report review has search and status filters', (admin.includes('ابحث باسم الموظف أو المهمة') || admin.includes('ابحث باسم الموظف أو التقرير')) && admin.includes("setStatus(value)") && adminData.includes('taskTitle') && adminData.includes('values')],
   ['report submission and review notifications are automatic', reportCycle.includes('task_reports_notify_cycle') && reportCycle.includes("new.status in ('approved', 'returned')")],
   ['employee report upload tab has independent status filters', tasks.includes('رفع التقارير المرتبطة بالمهام') && tasks.includes('جاهز للرفع') && tasks.includes('تم الرفع') && tasks.includes('reportStatusFilter') && tasks.includes('reportStatusMatches')],
+  ['employee third tab uses independent role reports instead of dynamic reports', tasks.includes('EmployeeRoleReportPanel') && tasks.includes('!reportsOnly && filteredTasks.map') && roleReportPanel.includes('إرسال التقرير للإدارة') && roleReports.includes('mobile_submit_employee_role_report')],
+  ['role reports have independent secure storage and review workflow', roleReportsMigration.includes('employee_role_reports') && roleReportsMigration.includes('mobile_submit_employee_role_report') && roleReportsMigration.includes('review_employee_role_report') && roleReportsMigration.includes("status in ('submitted','approved','returned')")],
+  ['admin report list includes role reports', adminData.includes('employee_role_reports') && adminData.includes("source: 'role'") && admin.includes('اعتماد تقرير الدور')],
 ];
 const failed = checks.filter(([, ok]) => !ok);
 if (failed.length) { console.error(JSON.stringify({ ok: false, failed: failed.map(([name]) => name) })); process.exit(1); }

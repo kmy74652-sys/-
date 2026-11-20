@@ -32,6 +32,7 @@ import { pickTaskAttachment, uploadTaskAttachment, type PickedAttachment } from 
 import { evaluateReportField, isReportFieldVisible, normalizeTableColumns, reportDefaultDraft, validateReportFieldValue, type ReportField, type ReportTableColumn } from '../lib/reportSchema';
 import ReportFieldInput from '../components/ReportFieldInput';
 import ReportReadOnly from '../components/ReportReadOnly';
+import EmployeeRoleReportPanel from '../components/EmployeeRoleReportPanel';
 import AppShell, { ScreenHeader } from '../components/AppShell';
 
 type Task = {
@@ -109,6 +110,9 @@ export default function TasksScreen() {
   const [canReview, setCanReview] = useState(false);
   const [canManage, setCanManage] = useState(false);
   const [currentUserId, setCurrentUserId] = useState('');
+  const [employeeRoleCode, setEmployeeRoleCode] = useState('accountant');
+  const [employeeName, setEmployeeName] = useState('');
+  const [employeeBranchId, setEmployeeBranchId] = useState<string | null>(null);
   const [screenMode, setScreenMode] = useState<'mine' | 'all' | 'review'>('mine');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -141,6 +145,9 @@ export default function TasksScreen() {
       if (!identity) throw new Error('not_authenticated');
       if (!identity.employee) throw new Error('employee_not_active');
       setCurrentUserId(identity.userId);
+      setEmployeeName(identity.employee.fullName);
+      setEmployeeRoleCode(identity.employee.roles[0]?.code ?? 'accountant');
+      setEmployeeBranchId(identity.employee.branches.find((branch) => branch.isDefault)?.id ?? identity.employee.branches[0]?.id ?? null);
       const permissions = new Set(identity.employee.permissions);
       if (!permissions.has('tasks.execute') && !permissions.has('tasks.manage')) throw new Error('permission_denied');
       const [taskRows, notificationRows] = await Promise.all([listMyTasks(identity.employee.institutionId), listMyNotifications()]);
@@ -418,6 +425,7 @@ export default function TasksScreen() {
         {!loading && <View style={styles.workTabs}><Pressable accessibilityRole="tab" accessibilityState={{ selected: !reportsOnly }} style={[styles.workTab, !reportsOnly && styles.workTabSelected]} onPress={() => router.replace({ pathname: '/tasks', params: { mode: 'mine' } })}><Text style={[styles.workTabText, !reportsOnly && styles.workTabTextSelected]}>المهام</Text></Pressable><Pressable accessibilityRole="tab" accessibilityState={{ selected: reportsOnly }} style={[styles.workTab, reportsOnly && styles.workTabSelected]} onPress={() => router.replace({ pathname: '/tasks', params: { view: 'reports', mode: 'mine' } })}><Text style={[styles.workTabText, reportsOnly && styles.workTabTextSelected]}>إعداد التقارير</Text></Pressable></View>}
         {!loading && reportsOnly && <><View style={styles.reportUploadHeader}><Text style={styles.reportUploadTitle}>رفع التقارير المرتبطة بالمهام</Text><Text style={styles.reportUploadSubtitle}>تعبئة التقارير المصممة من الإدارة وإرسالها للمراجعة دون خلطها بعداد المهام أو جدول الدوام.</Text></View><View style={styles.reportStatusTabs}>{([['all', 'الكل'], ['ready', 'جاهز للرفع'], ['uploaded', 'تم الرفع'], ['approved', 'معتمد']] as const).map(([value, label]) => <Pressable key={value} accessibilityRole="button" accessibilityState={{ selected: reportStatusFilter === value }} style={[styles.reportStatusTab, reportStatusFilter === value && styles.reportStatusTabSelected]} onPress={() => setReportStatusFilter(value)}><Text style={reportStatusFilter === value ? styles.reportStatusTabTextSelected : styles.reportStatusTabText}>{label}</Text></Pressable>)}</View></>}
         {!loading && !reportsOnly && <View style={styles.summaryRow}><View style={styles.summaryCard}><Text style={styles.summaryValue}>{employeeSummary.pending}</Text><Text style={styles.summaryLabel}>جديدة</Text></View><View style={styles.summaryCard}><Text style={styles.summaryValue}>{employeeSummary.active}</Text><Text style={styles.summaryLabel}>قيد التنفيذ</Text></View><View style={styles.summaryCard}><Text style={styles.summaryValue}>{employeeSummary.submitted}</Text><Text style={styles.summaryLabel}>بانتظار المراجعة</Text></View></View>}
+        {!loading && reportsOnly && <EmployeeRoleReportPanel roleCode={employeeRoleCode} branchId={employeeBranchId} employeeName={employeeName} />}
         {loading && <View style={styles.loading}><ActivityIndicator size="large" color="#17324d" /><Text style={styles.muted}>جارٍ تحميل المهام…</Text></View>}
         {!loading && !reportsOnly && (canReview || canManage) && <View style={styles.modeTabs}>
           {([
@@ -448,7 +456,7 @@ export default function TasksScreen() {
           </ScrollView>
         </>}
 
-        {!loading && filteredTasks.map((task) => (
+        {!loading && !reportsOnly && filteredTasks.map((task) => (
           <View style={styles.taskCard} key={task.id}>
             {!reportsOnly && <View style={styles.taskHeading}>
               <Text style={styles.taskTitle}>{task.title}</Text>
@@ -551,7 +559,7 @@ export default function TasksScreen() {
             </View>}
           </View>
         ))}
-        {!loading && !error && filteredTasks.length === 0 && <Text style={styles.empty}>{reportsOnly ? 'لا توجد تقارير مطلوبة حالياً.' : tasks.length ? 'لا توجد مهام تطابق البحث أو الفلتر.' : 'لا توجد مهام ظاهرة لهذا الحساب.'}</Text>}
+        {!loading && !reportsOnly && !error && filteredTasks.length === 0 && <Text style={styles.empty}>{tasks.length ? 'لا توجد مهام تطابق البحث أو الفلتر.' : 'لا توجد مهام ظاهرة لهذا الحساب.'}</Text>}
 
         {!reportsOnly && <View style={styles.notifications}>
           <Text style={styles.sectionTitle}>التنبيهات</Text>
