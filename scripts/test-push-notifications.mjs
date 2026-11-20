@@ -11,6 +11,7 @@ assert(pkg.includes('expo-notifications') && pkg.includes('expo-device'), 'Expo 
 assert(app.includes('"expo-notifications"') && app.includes('"versionCode": 4'), 'native notification plugin and version bump are configured');
 assert(pushClient.includes('requestPermissionsAsync') && pushClient.includes('getExpoPushTokenAsync'), 'device permission and token registration are implemented');
 assert(pushClient.includes("rpc('register_push_device'") && pushClient.includes("rpc('disable_push_device'"), 'token writes use protected RPCs');
+assert(pushClient.includes('notifyInAppTaskReceived') && pushClient.includes("sound: 'default'") && pushClient.includes('trigger: null'), 'local task notification plays the default sound');
 assert(layout.includes('addNotificationResponseReceivedListener') && layout.includes("router.push('/tasks'"), 'notification presses open the employee workspace');
 assert(migration.includes('notification_devices') && migration.includes('register_push_device') && migration.includes('disable_push_device'), 'device table and protected lifecycle RPCs exist');
 assert(migration.includes('notifications_dispatch_push') && migration.includes('net.http_post'), 'new in-app notifications dispatch to Expo Push Service');

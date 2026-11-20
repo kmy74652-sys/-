@@ -28,6 +28,7 @@ import {
   updateTaskStatus,
   type MobileTaskReportForm,
 } from '../lib/mobileData';
+import { notifyInAppTaskReceived } from '../lib/pushNotifications';
 import { pickTaskAttachment, uploadTaskAttachment, type PickedAttachment } from '../lib/taskAttachments';
 import { evaluateReportField, isReportFieldVisible, normalizeTableColumns, reportDefaultDraft, validateReportFieldValue, type ReportField, type ReportTableColumn } from '../lib/reportSchema';
 import ReportFieldInput from '../components/ReportFieldInput';
@@ -131,11 +132,13 @@ export default function TasksScreen() {
   const [positionFilter, setPositionFilter] = useState<Task['position_code'] | 'all'>('all');
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  const [inAppNotification, setInAppNotification] = useState<{ taskId: string; title: string } | null>(null);
   const [attachments, setAttachments] = useState<Record<string, Record<string, Array<PickedAttachment & { path?: string }>>>>({});
   const [stepAttachments, setStepAttachments] = useState<Record<string, Record<string, { id: string; name: string }>>>({});
   const [timeline, setTimeline] = useState<Record<string, Awaited<ReturnType<typeof listTaskTimeline>>>>({});
   const lastLoadAt = useRef(0);
   const loadInFlight = useRef(false);
+  const notifiedTaskIds = useRef(new Set<string>());
 
   const applyTaskRows = useCallback((taskRows: Task[]) => {
     setTasks(taskRows);
@@ -229,7 +232,16 @@ export default function TasksScreen() {
     if (!supabase || !currentUserId) return;
     const client = supabase;
     let refreshTimer: ReturnType<typeof setTimeout> | null = null;
-    const scheduleRefresh = () => {
+    const scheduleRefresh = (payload?: { eventType?: string; new?: Record<string, unknown> }) => {
+      if (payload?.eventType === 'INSERT') {
+        const taskId = typeof payload.new?.id === 'string' ? payload.new.id : '';
+        if (taskId && !notifiedTaskIds.current.has(taskId)) {
+          notifiedTaskIds.current.add(taskId);
+          const title = typeof payload.new?.title === 'string' ? payload.new.title : 'مهمة جديدة';
+          setInAppNotification({ taskId, title });
+          void notifyInAppTaskReceived(title);
+        }
+      }
       if (refreshTimer) clearTimeout(refreshTimer);
       refreshTimer = setTimeout(() => {
         refreshTimer = null;
@@ -245,6 +257,11 @@ export default function TasksScreen() {
       void client.removeChannel(channel);
     };
   }, [currentUserId, load]);
+  useEffect(() => {
+    if (!inAppNotification) return;
+    const timer = setTimeout(() => setInAppNotification(null), 10_000);
+    return () => clearTimeout(timer);
+  }, [inAppNotification]);
   useEffect(() => {
     const timer = setInterval(() => void load(), 60_000);
     return () => clearInterval(timer);
@@ -467,6 +484,10 @@ export default function TasksScreen() {
       >
         {!!error && <View style={styles.errorBox}><Text accessibilityRole="alert" style={styles.error}>{error}</Text><Pressable style={styles.retryButton} onPress={() => { setRefreshing(true); void load({ force: true }); }}><Text style={styles.retryText}>إعادة المحاولة</Text></Pressable></View>}
         {!!notice && <Text accessibilityLiveRegion="polite" style={styles.notice}>{notice}</Text>}
+        {!!inAppNotification && <View accessibilityLiveRegion="polite" style={styles.newTaskNotice}>
+          <View style={styles.newTaskNoticeCopy}><Text style={styles.newTaskNoticeTitle}>مهمة جديدة</Text><Text style={styles.newTaskNoticeText}>{inAppNotification.title}</Text><Text style={styles.newTaskNoticeHint}>تم إسنادها إليك ويمكنك البدء بها الآن.</Text></View>
+          <View style={styles.newTaskNoticeActions}><Pressable style={styles.newTaskOpenButton} onPress={() => { setInAppNotification(null); setStatusFilter('all'); }}><Text style={styles.newTaskOpenText}>فتح المهمة</Text></Pressable><Pressable accessibilityLabel="إخفاء تنبيه المهمة الجديدة" style={styles.newTaskDismissButton} onPress={() => setInAppNotification(null)}><Text style={styles.newTaskDismissText}>إخفاء</Text></Pressable></View>
+        </View>}
         {!loading && !reportsOnly && <View style={styles.employeeIntro}><Text style={styles.employeeIntroTitle}>مساحة تنفيذك اليومية</Text><Text style={styles.employeeIntroText}>اقرأ التكليف، ابدأ التنفيذ، ثم عبّئ التقرير المطلوب وأرسله للمسؤول للمراجعة.</Text></View>}
         {!loading && <View style={styles.workTabs}><Pressable accessibilityRole="tab" accessibilityState={{ selected: !reportsOnly }} style={[styles.workTab, !reportsOnly && styles.workTabSelected]} onPress={() => router.replace({ pathname: '/tasks', params: { mode: 'mine' } })}><Text style={[styles.workTabText, !reportsOnly && styles.workTabTextSelected]}>المهام</Text></Pressable><Pressable accessibilityRole="tab" accessibilityState={{ selected: reportsOnly }} style={[styles.workTab, reportsOnly && styles.workTabSelected]} onPress={() => router.replace({ pathname: '/tasks', params: { view: 'reports', mode: 'mine' } })}><Text style={[styles.workTabText, reportsOnly && styles.workTabTextSelected]}>إعداد التقارير</Text></Pressable></View>}
         {!loading && reportsOnly && <><View style={styles.reportUploadHeader}><Text style={styles.reportUploadTitle}>تقارير المهام</Text><Text style={styles.reportUploadSubtitle}>التقارير التي صممتها الإدارة وربطتها بالمهام. افتح الحقول، عبئها، ثم أرسل التقرير للمراجعة.</Text></View><View style={styles.reportStatusTabs}>{([['all', 'الكل'], ['ready', 'جاهز للرفع'], ['uploaded', 'تم الرفع'], ['approved', 'معتمد']] as const).map(([value, label]) => <Pressable key={value} accessibilityRole="button" accessibilityState={{ selected: reportStatusFilter === value }} style={[styles.reportStatusTab, reportStatusFilter === value && styles.reportStatusTabSelected]} onPress={() => setReportStatusFilter(value)}><Text style={reportStatusFilter === value ? styles.reportStatusTabTextSelected : styles.reportStatusTabText}>{label}</Text></Pressable>)}</View></>}
@@ -682,6 +703,16 @@ const styles = StyleSheet.create({
   secondaryText: { color: '#17324d', fontWeight: '800' },
   errorBox: { backgroundColor: '#fff0ef', borderRadius: 10, padding: 10, gap: 8 }, error: { color: '#a8443d', padding: 2, textAlign: 'right', lineHeight: 22 }, retryButton: { minHeight: 38, borderRadius: 8, backgroundColor: '#fff', borderWidth: 1, borderColor: '#b55248', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 12 }, retryText: { color: '#a8443d', fontWeight: '800' },
   notice: { color: '#23633c', backgroundColor: '#e8f5eb', borderRadius: 10, padding: 12, textAlign: 'right', lineHeight: 22 },
+  newTaskNotice: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', gap: 10, backgroundColor: '#fff4d7', borderWidth: 2, borderColor: '#dba62a', borderRadius: 15, padding: 13 },
+  newTaskNoticeCopy: { flex: 1, gap: 2 },
+  newTaskNoticeTitle: { color: '#17324d', fontSize: 17, fontWeight: '900', textAlign: 'right' },
+  newTaskNoticeText: { color: '#263f52', fontWeight: '800', textAlign: 'right' },
+  newTaskNoticeHint: { color: '#718394', fontSize: 12, textAlign: 'right' },
+  newTaskNoticeActions: { gap: 6, minWidth: 78 },
+  newTaskOpenButton: { backgroundColor: '#17324d', borderRadius: 9, paddingHorizontal: 10, paddingVertical: 9, alignItems: 'center' },
+  newTaskOpenText: { color: '#fff', fontSize: 12, fontWeight: '800' },
+  newTaskDismissButton: { paddingVertical: 5, alignItems: 'center' },
+  newTaskDismissText: { color: '#8c4f13', fontSize: 12, fontWeight: '700' },
   employeeIntro: { backgroundColor: '#17324d', borderRadius: 16, padding: 16, gap: 6 },
   employeeIntroTitle: { color: '#fff', fontSize: 18, fontWeight: '900', textAlign: 'right' },
   employeeIntroText: { color: '#dceaf0', lineHeight: 22, textAlign: 'right' },

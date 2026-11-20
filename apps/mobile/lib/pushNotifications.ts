@@ -58,3 +58,21 @@ export async function disablePushNotifications(): Promise<void> {
 export function resetPushRegistration(): void {
   registeredUserId = null;
 }
+
+export async function notifyInAppTaskReceived(title: string): Promise<void> {
+  try {
+    const permission = await Notifications.getPermissionsAsync();
+    if (permission.status !== 'granted') return;
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title: 'مهمة جديدة وصلت',
+        body: title.trim() || 'تم إسناد مهمة جديدة إليك. افتح تبويب المهام للاطلاع عليها.',
+        sound: 'default',
+        data: { type: 'task_assigned' },
+      },
+      trigger: null,
+    });
+  } catch {
+    // Local sound is optional; the in-app banner remains visible if unavailable.
+  }
+}
