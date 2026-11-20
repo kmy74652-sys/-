@@ -34,6 +34,7 @@ import ReportFieldInput from '../components/ReportFieldInput';
 import ReportReadOnly from '../components/ReportReadOnly';
 import EmployeeRoleReportPanel from '../components/EmployeeRoleReportPanel';
 import AppShell, { ScreenHeader } from '../components/AppShell';
+import { readSessionCache, writeSessionCache } from '../lib/mobileSessionCache';
 
 type Task = {
   id: string;
@@ -135,6 +136,31 @@ export default function TasksScreen() {
   const lastLoadAt = useRef(0);
   const loadInFlight = useRef(false);
 
+  const applyTaskRows = useCallback((taskRows: Task[]) => {
+    setTasks(taskRows);
+    setDrafts((current) => {
+      const next = { ...current };
+      for (const task of taskRows) {
+        const taskDraft = { ...(next[task.id] ?? {}) };
+        for (const field of task.report_schema ?? []) {
+          if (taskDraft[field.key] === undefined) taskDraft[field.key] = reportDefaultDraft(field);
+        }
+        for (const form of task.report_forms ?? []) {
+          const formKey = formDraftKey(task, form);
+          const formDraft = { ...(next[formKey] ?? {}) };
+          for (const field of form.schema) {
+            const persisted = form.draft_values?.[field.key];
+            if (persisted !== undefined && formDraft[field.key] === undefined) formDraft[field.key] = typeof persisted === 'string' ? persisted : JSON.stringify(persisted);
+            if (formDraft[field.key] === undefined) formDraft[field.key] = reportDefaultDraft(field);
+          }
+          next[formKey] = formDraft;
+        }
+        next[task.id] = taskDraft;
+      }
+      return next;
+    });
+  }, []);
+
   const load = useCallback(async ({ force = false }: { force?: boolean } = {}) => {
     if (loadInFlight.current) return;
     if (!force && Date.now() - lastLoadAt.current < 15_000) return;
@@ -151,32 +177,27 @@ export default function TasksScreen() {
       setEmployeeBranchId(identity.employee.branches.find((branch) => branch.isDefault)?.id ?? identity.employee.branches[0]?.id ?? null);
       const permissions = new Set(identity.employee.permissions);
       if (!permissions.has('tasks.execute') && !permissions.has('tasks.manage')) throw new Error('permission_denied');
-      const [taskRows, notificationRows] = await Promise.all([listMyTasks(identity.employee.institutionId), listMyNotifications()]);
+      const cacheKey = `${identity.userId}:${identity.employee.institutionId}`;
+      const cachedTasks = readSessionCache<Task[]>('employee-tasks', cacheKey);
+      const cachedNotifications = readSessionCache<Notification[]>('employee-notifications', cacheKey);
       setCanReview(identity.employee.permissions.includes('tasks.review'));
       setCanManage(permissions.has('tasks.manage'));
-      setTasks(taskRows);
-      setDrafts((current) => {
-        const next = { ...current };
-        for (const task of taskRows) {
-          const taskDraft = { ...(next[task.id] ?? {}) };
-          for (const field of task.report_schema ?? []) {
-            if (taskDraft[field.key] === undefined) taskDraft[field.key] = reportDefaultDraft(field);
-          }
-          for (const form of task.report_forms ?? []) {
-            const formKey = formDraftKey(task, form);
-            const formDraft = { ...(next[formKey] ?? {}) };
-            for (const field of form.schema) {
-              const persisted = form.draft_values?.[field.key];
-              if (persisted !== undefined && formDraft[field.key] === undefined) formDraft[field.key] = typeof persisted === 'string' ? persisted : JSON.stringify(persisted);
-              if (formDraft[field.key] === undefined) formDraft[field.key] = reportDefaultDraft(field);
-            }
-            next[formKey] = formDraft;
-          }
-          next[task.id] = taskDraft;
-        }
-        return next;
-      });
+      if (cachedTasks) {
+        applyTaskRows(cachedTasks);
+        setLoading(false);
+        setNotice('تُعرض آخر بيانات ناجحة، جارٍ التحديث في الخلفية…');
+      }
+      if (cachedNotifications) setNotifications(cachedNotifications);
+      const [taskResult, notificationResult] = await Promise.allSettled([listMyTasks(identity.employee.institutionId), listMyNotifications()]);
+      if (taskResult.status === 'rejected') throw taskResult.reason;
+      const taskRows = taskResult.value;
+      const notificationRows = notificationResult.status === 'fulfilled' ? notificationResult.value : cachedNotifications ?? [];
+      applyTaskRows(taskRows);
+      writeSessionCache('employee-tasks', cacheKey, taskRows);
       setNotifications(notificationRows);
+      if (notificationResult.status === 'fulfilled') writeSessionCache('employee-notifications', cacheKey, notificationRows);
+      if (notificationResult.status === 'rejected' && !cachedNotifications) setNotice('تم تحميل المهام، وتعذر تحديث التنبيهات مؤقتًا.');
+      if (cachedTasks) setNotice('تم تحديث البيانات المعروضة في الخلفية.');
     } catch (cause) {
       setError(friendlyDataError(cause, 'تعذر تحميل البيانات مباشرة من Supabase. تحقق من الاتصال والصلاحيات.'));
     } finally {
@@ -185,7 +206,7 @@ export default function TasksScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [applyTaskRows]);
 
   useEffect(() => { void load(); }, [load]);
   useEffect(() => {

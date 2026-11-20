@@ -12,5 +12,15 @@ assert.equal(source.includes('>تقارير المهام</Text>'), true, 'قسم
 assert.equal(source.includes('>التقارير اليومية من الإدارة</Text>'), true, 'قسم التقارير المستقلة مطلوب داخل صفحة التقارير');
 assert.equal(source.includes('<EmployeeRoleReportPanel'), true, 'يجب أن يبقى مسار التقارير المستقلة مرتبطًا بمكونه');
 assert.equal(source.includes("!loading && filteredTasks.map((task)"), true, 'يجب عرض تقارير المهام مباشرة دون شرط تبويب داخلي');
+assert.equal(source.includes("readSessionCache<Task[]>('employee-tasks'"), true, 'يجب قراءة آخر مهام ناجحة من cache الجلسة');
+assert.equal(source.includes("writeSessionCache('employee-tasks'"), true, 'يجب تحديث cache المهام بعد نجاح الجلب');
+assert.equal(source.includes('applyTaskRows(cachedTasks)'), true, 'يجب عرض cache قبل اكتمال التحديث الشبكي');
+assert.equal(source.includes('setLoading(false);'), true, 'يجب إنهاء حالة الانتظار عند توفر cache');
+assert.equal(source.includes('Promise.allSettled([listMyTasks'), true, 'يجب فصل فشل التنبيهات عن تحميل المهام');
+assert.equal(source.includes("if (taskResult.status === 'rejected') throw taskResult.reason"), true, 'يجب اعتبار فشل المهام فقط فشلًا رئيسيًا');
 
-console.log(JSON.stringify({ ok: true, checks: 9, scope: 'employee-screen-simplification' }));
+const cache = fs.readFileSync(new URL('../apps/mobile/lib/mobileSessionCache.ts', import.meta.url), 'utf8');
+assert.equal(cache.includes('DEFAULT_MAX_AGE_MS = 120_000'), true, 'يجب أن يكون cache قصير العمر');
+assert.equal(cache.includes('cache.clear()'), true, 'يجب توفير إفراغ كامل للcache');
+
+console.log(JSON.stringify({ ok: true, checks: 18, scope: 'employee-screen-simplification' }));
