@@ -132,15 +132,30 @@ export default function AdminScreen() {
     try {
       setError(''); setNotice('');
       const selectedReport = designerTemplates.find((template) => template.role_code === draft.roleCode && template.approved_version_id && template.is_active !== false);
-      await createAdministrativeTask({
+      const createdTask = await createAdministrativeTask({
         title: draft.title, description: draft.description, dueAt, priority: draft.priority,
         roleCode: draft.roleCode, branchId: draft.branchId || null, assignedEmployeeId: draft.assignedEmployeeId, templateId: draft.templateId || null,
         reportTemplateId: selectedReport?.id ?? null, reportVersionId: selectedReport?.approved_version_id ?? null,
         reportRequired: Boolean(selectedReport?.approved_version_id),
       });
+      const branchName = data?.branches.find((branch) => branch.id === (draft.branchId || null))?.name ?? null;
+      setData((current) => current ? {
+        ...current,
+        tasks: [...current.tasks, {
+          id: createdTask.id,
+          title: draft.title.trim(),
+          description: draft.description.trim() || null,
+          branchId: draft.branchId || null,
+          branchName,
+          assignedTo: createdTask.assigned_to,
+          dueAt,
+          priority: draft.priority,
+          status: 'new',
+        }].sort((left, right) => (left.dueAt ?? '').localeCompare(right.dueAt ?? '')),
+      } : current);
       const nextDeadline = currentAdenDateTime();
       setDraft({ title: '', description: '', dueDate: nextDeadline.date, dueTime: nextDeadline.time, priority: 'normal', roleCode: 'admin_followup', branchId: '', assignedEmployeeId: '', templateId: '', reportTemplateId: '', reportRequired: true });
-      setShowCreate(false); setNotice('تم إنشاء المهمة وإسنادها للموظف المحدد.'); await load(true);
+      setShowCreate(false); setNotice('تم إنشاء المهمة وإسنادها للموظف المحدد. ظهرت مباشرة في القائمة.');
     } catch (cause) { setError(friendlyDataError(cause, 'تعذر إنشاء المهمة. تأكد من وجود موظف نشط ضمن التصنيف والفرع المحددين.')); }
   }
   const canManageTaskLibrary = permissions.includes('task_library.manage');
