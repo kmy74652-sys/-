@@ -22,7 +22,8 @@
     "test:task-designer": "node scripts/test-task-designer.mjs",
     "test:admin-management": "node scripts/test-admin-management.mjs",
     "test:management-mutations": "node scripts/test-management-mutations.mjs",
-    "test:home-dashboard": "node scripts/test-home-dashboard.mjs"
+    "test:home-dashboard": "node scripts/test-home-dashboard.mjs",
+    "test:push-notifications": "node scripts/test-push-notifications.mjs"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",
