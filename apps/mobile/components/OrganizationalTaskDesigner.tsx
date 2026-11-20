@@ -1,0 +1,77 @@
+import { useMemo, useState } from 'react';
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import type { TaskRoleCode, TaskTemplateDraft } from './TaskDesigner';
+
+type ScheduleRow = { id: string; timeSlot: string; responsibility: string; kpiIndicator: string; proofRequirement: string; requiresProof: boolean };
+type Props = { initialTemplate?: Partial<TaskTemplateDraft>; onSave?: (draft: TaskTemplateDraft) => void | Promise<void>; onList?: () => void | Promise<void> };
+
+const roles: Array<[TaskRoleCode, string]> = [
+  ['accountant', 'محاسب'], ['warehouse_keeper', 'أمين مستودع'], ['warehouse_worker', 'عامل مستودع'], ['admin_followup', 'متابعة إدارية'], ['owner', 'المالك'],
+];
+const kpis = ['طلبات العملاء', 'الرد على الجوال', 'فواتير المشتريات', 'مطابقة الموردين', 'الحسابات', 'تحصيل العملاء', 'الشكاوى', 'التقرير اليومي'];
+const key = () => `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+const defaults: ScheduleRow[] = [
+  { id: key(), timeSlot: '08:00 - 08:30 ص', responsibility: 'مراجعة رسائل الجوال والطلبات الجديدة ومتابعة الأعمال المتبقية', kpiIndicator: 'الرد على الجوال', proofRequirement: 'تأكيد الإنجاز', requiresProof: false },
+  { id: key(), timeSlot: '02:00 - 03:00 م', responsibility: 'مطابقة حساب مورد واحد أو موردين على الأقل يومياً وتسجيل الفروقات', kpiIndicator: 'مطابقة الموردين', proofRequirement: 'إرفاق كشف / ملاحظة', requiresProof: true },
+  { id: key(), timeSlot: '04:00 - 04:30 م', responsibility: 'تسليم الحسابات الجاهزة للمتابعة والسيطرة عليها', kpiIndicator: 'الحسابات', proofRequirement: 'إدخال العدد', requiresProof: true },
+  { id: key(), timeSlot: '09:45 - 10:30 م', responsibility: 'مراجعة الأعمال اليومية وإعداد تقرير الإنجاز وإقفال المهام', kpiIndicator: 'التقرير اليومي', proofRequirement: 'إرسال التقرير اليومي', requiresProof: true },
+];
+const continuousDefaults = ['الرد على اتصالات ورسائل زبائن الجملة دون تأخير.', 'استقبال طلبات العملاء وتسجيلها ومتابعتها حتى التنفيذ.', 'عدم ترك أي فاتورة مشتريات دون تسجيل أو متابعة.'];
+const reportDefaults = ['عدد فواتير مبيعات الجملة وطلبات العملاء المستلمة والمنفذة', 'إجمالي المبالغ المحصلة', 'عدد فواتير المشتريات المسجلة', 'أسماء الموردين الذين تمت مطابقة حساباتهم', 'عدد الحسابات المسلمة للمتابعة', 'الشكاوى التي تمت معالجتها', 'الأعمال التي لم تنجز وأسباب التأخير'];
+const recommendationDefaults = ['خدمة العملاء ومبيعات الجملة لها الأولوية عند وجود زبائن أو طلبات عاجلة.', 'عدم تأجيل تسجيل فواتير المشتريات إلى اليوم التالي وتوثيق الفروقات.', 'إبلاغ الإدارة فوراً عن أي اختلاف في الأسعار أو الكميات أو الحسابات.'];
+
+function listFromTemplate(value: unknown, fallback: string[]) {
+  return Array.isArray(value) && value.length ? value.map(String) : fallback;
+}
+function roleCode(value: string | undefined): TaskRoleCode { return roles.some(([code]) => code === value) ? value as TaskRoleCode : 'accountant'; }
+
+export default function OrganizationalTaskDesigner({ initialTemplate, onSave, onList }: Props) {
+  const [title, setTitle] = useState(initialTemplate?.title ?? 'الجدول التنظيمي للدوام والمهام اليومية');
+  const [selectedRole, setSelectedRole] = useState<TaskRoleCode>(roleCode(initialTemplate?.roleCode));
+  const [days, setDays] = useState('السبت إلى الخميس (الجمعة إجازة)');
+  const [morning, setMorning] = useState('08:00 ص - 12:00 م');
+  const [breakTime, setBreakTime] = useState('12:00 م - 01:00 م');
+  const [evening, setEvening] = useState('01:00 م - 10:30 م');
+  const [rows, setRows] = useState<ScheduleRow[]>(() => initialTemplate?.steps?.length ? initialTemplate.steps.map((step, index) => ({ id: step.id || key(), timeSlot: `الفترة ${index + 1}`, responsibility: step.title, kpiIndicator: 'التقرير اليومي', proofRequirement: step.evidenceInstructions || 'تأكيد الإنجاز', requiresProof: step.evidenceRequired })) : defaults);
+  const [continuous, setContinuous] = useState(continuousDefaults);
+  const [reportFields, setReportFields] = useState(reportDefaults);
+  const [recommendations, setRecommendations] = useState(recommendationDefaults);
+  const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState('');
+
+  const updateRow = (id: string, patch: Partial<ScheduleRow>) => setRows((current) => current.map((row) => row.id === id ? { ...row, ...patch } : row));
+  const addRow = () => setRows((current) => [...current, { id: key(), timeSlot: '05:00 - 05:30 م', responsibility: '', kpiIndicator: kpis[0], proofRequirement: 'تأكيد الإنجاز', requiresProof: false }]);
+  const removeRow = (id: string) => setRows((current) => current.length > 1 ? current.filter((row) => row.id !== id) : current);
+  const updateList = (setter: (items: string[]) => void, items: string[], index: number, value: string) => setter(items.map((item, itemIndex) => itemIndex === index ? value : item));
+  const addListItem = (setter: (items: string[]) => void, items: string[]) => setter([...items, '']);
+
+  const summary = useMemo(() => `${days} · صباحية ${morning} · استراحة ${breakTime} · مسائية ${evening}`, [breakTime, days, evening, morning]);
+  async function save() {
+    setBusy(true); setNotice('');
+    const description = [summary, 'المهام المستمرة:', ...continuous.filter(Boolean).map((item) => `- ${item}`), 'بنود التقرير اليومي:', ...reportFields.filter(Boolean).map((item) => `- ${item}`), 'التوصيات والضوابط:', ...recommendations.filter(Boolean).map((item) => `- ${item}`)].join('\n');
+    const steps = rows.map((row, index) => ({ id: row.id, title: row.responsibility.trim() || `مهمة تنظيمية ${index + 1}`, instructions: `الفترة: ${row.timeSlot}\nمؤشر الأداء: ${row.kpiIndicator}\nالإثبات: ${row.proofRequirement}`, required: true, evidenceRequired: row.requiresProof, evidenceInstructions: row.proofRequirement }));
+    const draft: TaskTemplateDraft = { id: initialTemplate?.id, category: 'admin', subcategory: 'الدوام والمهام اليومية', customSubcategory: '', title: title.trim() || 'الجدول التنظيمي للدوام والمهام اليومية', description, instructions: summary, roleCode: selectedRole, priority: initialTemplate?.priority ?? 'normal', expectedDurationMinutes: initialTemplate?.expectedDurationMinutes ?? null, steps, reports: [], reportFields: [], reportRequired: false, isActive: initialTemplate?.isActive ?? true };
+    try { await onSave?.(draft); setNotice('تم حفظ الجدول التنظيمي ضمن قالب المهام.'); } finally { setBusy(false); }
+  }
+
+  return <View style={styles.shell}>
+    <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+      <View style={styles.header}><View style={styles.headerCopy}><Text style={styles.eyebrow}>إدارة الدوام والمسؤوليات</Text><Text style={styles.title}>مصمم الجدول التنظيمي للمهام</Text></View><Pressable disabled={busy} style={styles.saveTop} onPress={() => void save()}><Text style={styles.saveText}>{busy ? 'جارٍ الحفظ…' : 'حفظ الجدول'}</Text></Pressable></View>
+      {!!notice && <Text style={styles.notice}>{notice}</Text>}
+      <View style={styles.card}><Text style={styles.sectionTitle}>إعدادات الدوام</Text><TextInput style={styles.input} value={title} onChangeText={setTitle} placeholder="عنوان الجدول التنظيمي" /><Text style={styles.label}>الدور الوظيفي</Text><View style={styles.chips}>{roles.map(([code, label]) => <Pressable key={code} style={[styles.chip, selectedRole === code && styles.chipSelected]} onPress={() => setSelectedRole(code)}><Text style={selectedRole === code ? styles.chipTextSelected : styles.chipText}>{label}</Text></Pressable>)}</View><TextInput style={styles.input} value={days} onChangeText={setDays} placeholder="أيام العمل" /><View style={styles.threeColumns}><TextInput style={styles.input} value={morning} onChangeText={setMorning} placeholder="الفترة الصباحية" /><TextInput style={styles.input} value={breakTime} onChangeText={setBreakTime} placeholder="فترة الاستراحة" /><TextInput style={styles.input} value={evening} onChangeText={setEvening} placeholder="الفترة المسائية" /></View></View>
+      <View style={styles.card}><View style={styles.sectionHeader}><Text style={styles.sectionTitle}>توزيع المهام حسب ساعات الدوام</Text><Pressable style={styles.addButton} onPress={addRow}><Text style={styles.addText}>+ إضافة صف</Text></Pressable></View>{rows.map((row, index) => <View style={styles.rowCard} key={row.id}><View style={styles.rowHeader}><Text style={styles.rowTitle}>المهمة {index + 1}</Text><Pressable onPress={() => removeRow(row.id)}><Text style={styles.deleteText}>حذف</Text></Pressable></View><TextInput style={styles.input} value={row.timeSlot} onChangeText={(value) => updateRow(row.id, { timeSlot: value })} placeholder="الفترة الزمنية" /><TextInput style={[styles.input, styles.multiline]} value={row.responsibility} onChangeText={(value) => updateRow(row.id, { responsibility: value })} placeholder="اكتب المهمة والمسؤولية" multiline /><Text style={styles.label}>مؤشر الأداء</Text><View style={styles.chips}>{kpis.map((kpi) => <Pressable key={kpi} style={[styles.chip, row.kpiIndicator === kpi && styles.chipSelected]} onPress={() => updateRow(row.id, { kpiIndicator: kpi })}><Text style={row.kpiIndicator === kpi ? styles.chipTextSelected : styles.chipText}>{kpi}</Text></Pressable>)}</View><TextInput style={styles.input} value={row.proofRequirement} onChangeText={(value) => updateRow(row.id, { proofRequirement: value })} placeholder="الإثبات أو الشرط" /><Pressable style={[styles.proofToggle, row.requiresProof && styles.proofToggleActive]} onPress={() => updateRow(row.id, { requiresProof: !row.requiresProof })}><Text style={row.requiresProof ? styles.proofTextActive : styles.proofText}>{row.requiresProof ? 'الإثبات مطلوب ✓' : 'الإثبات اختياري'}</Text></Pressable></View>)}</View>
+      <EditableList title="المهام المستمرة طوال الدوام" items={continuous} icon="↻" onChange={(index, value) => updateList(setContinuous, continuous, index, value)} onAdd={() => addListItem(setContinuous, continuous)} />
+      <EditableList title="بنود التقرير اليومي للموظف" items={reportFields} icon="✓" onChange={(index, value) => updateList(setReportFields, reportFields, index, value)} onAdd={() => addListItem(setReportFields, reportFields)} />
+      <EditableList title="التوصيات والضوابط الإدارية" items={recommendations} icon="◆" onChange={(index, value) => updateList(setRecommendations, recommendations, index, value)} onAdd={() => addListItem(setRecommendations, recommendations)} />
+      <View style={styles.actions}><Pressable disabled={busy} style={styles.primary} onPress={() => void save()}><Text style={styles.primaryText}>{busy ? 'جارٍ الحفظ…' : 'حفظ الجدول التنظيمي'}</Text></Pressable><Pressable style={styles.secondary} onPress={() => void onList?.()}><Text style={styles.secondaryText}>عرض الجداول المحفوظة</Text></Pressable></View>
+    </ScrollView>
+  </View>;
+}
+
+function EditableList({ title, items, icon, onChange, onAdd }: { title: string; items: string[]; icon: string; onChange: (index: number, value: string) => void; onAdd: () => void }) {
+  return <View style={styles.card}><View style={styles.sectionHeader}><Text style={styles.sectionTitle}>{title}</Text><Text style={styles.icon}>{icon}</Text></View>{items.map((item, index) => <View style={styles.listRow} key={`${title}-${index}`}><Text style={styles.bullet}>•</Text><TextInput style={[styles.input, styles.listInput]} value={item} onChangeText={(value) => onChange(index, value)} placeholder="أدخل البند" /></View>)}<Pressable style={styles.addButton} onPress={onAdd}><Text style={styles.addText}>+ إضافة بند</Text></Pressable></View>;
+}
+
+const styles = StyleSheet.create({
+  shell: { flex: 1, backgroundColor: '#f5f8f9' }, content: { gap: 12, padding: 12, paddingBottom: 28 }, header: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', gap: 10 }, headerCopy: { flex: 1 }, eyebrow: { color: '#718394', textAlign: 'right', fontSize: 12, fontWeight: '800' }, title: { color: '#17324d', textAlign: 'right', fontSize: 21, fontWeight: '900', marginTop: 3 }, saveTop: { minHeight: 42, borderRadius: 10, backgroundColor: '#17324d', paddingHorizontal: 13, alignItems: 'center', justifyContent: 'center' }, saveText: { color: '#fff', fontWeight: '900' }, notice: { color: '#23633c', backgroundColor: '#e8f5eb', borderRadius: 10, padding: 11, textAlign: 'right' }, card: { backgroundColor: '#fff', borderRadius: 14, borderWidth: 1, borderColor: '#dce6e9', padding: 13, gap: 10 }, sectionHeader: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', gap: 8 }, sectionTitle: { color: '#17324d', fontSize: 16, fontWeight: '900', textAlign: 'right' }, label: { color: '#29475a', fontWeight: '800', textAlign: 'right' }, input: { minHeight: 44, flex: 1, borderWidth: 1, borderColor: '#d6e0e4', borderRadius: 9, paddingHorizontal: 10, paddingVertical: 8, textAlign: 'right', color: '#17324d', backgroundColor: '#fbfcfc' }, multiline: { minHeight: 70, textAlignVertical: 'top' }, threeColumns: { flexDirection: 'row-reverse', gap: 7 }, chips: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 6 }, chip: { borderWidth: 1, borderColor: '#cbd8de', borderRadius: 18, paddingHorizontal: 10, paddingVertical: 8, backgroundColor: '#fff' }, chipSelected: { backgroundColor: '#17324d', borderColor: '#17324d' }, chipText: { color: '#39556a', fontSize: 12 }, chipTextSelected: { color: '#fff', fontWeight: '800', fontSize: 12 }, addButton: { minHeight: 40, borderRadius: 9, borderWidth: 1, borderColor: '#cbd8de', paddingHorizontal: 11, alignItems: 'center', justifyContent: 'center', alignSelf: 'flex-start' }, addText: { color: '#17324d', fontWeight: '900' }, rowCard: { gap: 8, backgroundColor: '#f8fafb', borderRadius: 11, borderWidth: 1, borderColor: '#e2eaed', padding: 10 }, rowHeader: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between' }, rowTitle: { color: '#17324d', fontWeight: '900' }, deleteText: { color: '#a8443d', fontWeight: '800' }, proofToggle: { minHeight: 40, borderRadius: 9, borderWidth: 1, borderColor: '#cbd8de', alignItems: 'center', justifyContent: 'center' }, proofToggleActive: { backgroundColor: '#eff8f2', borderColor: '#8bb5a0' }, proofText: { color: '#39556a', fontWeight: '800' }, proofTextActive: { color: '#285844', fontWeight: '900' }, listRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 7 }, listInput: { flex: 1 }, bullet: { color: '#b17c12', fontSize: 22, fontWeight: '900' }, icon: { color: '#b17c12', fontSize: 20, fontWeight: '900' }, actions: { flexDirection: 'row-reverse', gap: 8 }, primary: { flex: 1, minHeight: 48, borderRadius: 10, backgroundColor: '#17324d', alignItems: 'center', justifyContent: 'center', padding: 11 }, primaryText: { color: '#fff', fontWeight: '900' }, secondary: { minHeight: 48, borderRadius: 10, backgroundColor: '#e9f0f4', alignItems: 'center', justifyContent: 'center', padding: 11 }, secondaryText: { color: '#17324d', fontWeight: '900' },
+});

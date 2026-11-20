@@ -11,12 +11,13 @@ import { supabase } from '../lib/supabase';
 import { loadOrganizationBranding } from '../lib/organizationBranding';
 import { listApprovedDesignerTemplates, type ReportTemplate } from '../lib/reportDesigner';
 import ReportDesigner from '../components/ReportDesigner';
-import TaskDesigner, { type TaskTemplateDraft, type TaskReportTemplateOption } from '../components/TaskDesigner';
+import { type TaskTemplateDraft } from '../components/TaskDesigner';
+import OrganizationalTaskDesigner from '../components/OrganizationalTaskDesigner';
 import { assignTaskFromTemplate, listApprovedTaskReportForms, listTaskDesignerCategories, listTaskDesignerTemplates, saveTaskDesignerTemplate, setTaskDesignerTemplateActive, type StoredTaskTemplate, type TaskCategoryRow } from '../lib/taskDesigner';
 import { deleteManagedBranch, deleteManagedReport, deleteManagedTask, updateManagedTask } from '../lib/managementData';
 
 type Section = 'overview' | 'tasks' | 'task-designer' | 'report-designer' | 'reports' | 'hr' | 'branches' | 'employees' | 'activity';
-const sections: Array<[Section, string]> = [['overview', 'الرئيسية'], ['tasks', 'إدارة المهام'], ['task-designer', 'مصمم المهام'], ['report-designer', 'مصمم التقارير'], ['reports', 'تقارير الموظفين'], ['branches', 'الفروع'], ['employees', 'الموظفون'], ['activity', 'السجل والمرفقات']];
+const sections: Array<[Section, string]> = [['overview', 'الرئيسية'], ['tasks', 'إدارة المهام'], ['task-designer', 'الجدول التنظيمي'], ['report-designer', 'مصمم التقارير'], ['reports', 'تقارير الموظفين'], ['branches', 'الفروع'], ['employees', 'الموظفون'], ['activity', 'السجل والمرفقات']];
 const allowedSections: readonly Section[] = sections.map(([value]) => value);
 function isSection(value: string | undefined): value is Section { return Boolean(value && allowedSections.includes(value as Section)); }
 type HomeDestination = 'tasks' | 'reports' | 'employees' | 'branches' | 'task-designer' | 'report-designer' | 'agreements' | 'hr' | 'permissions' | 'settings';
@@ -160,7 +161,7 @@ export default function AdminScreen() {
 
       {section === 'overview' && !profile && <Overview counts={counts} data={data} fmt={fmt} onSection={setSection} onSettings={() => router.push('/settings')} onHR={() => router.push('/hr' as never)} canDesign={canManageTaskLibrary} canDesignReports={canManageReports} />}
       {section === 'tasks' && <><TasksSection data={data} designerTemplates={designerTemplates} showCreate={showCreate} setShowCreate={setShowCreate} draft={draft} setDraft={setDraft} createTask={createTask} fmt={fmt} onOpenTasks={() => router.push('/tasks')} canManage={canManageEmployees} institutionId={profile?.institutionId ?? ''} onReload={load} />{canManageTaskLibrary && <TaskAssignmentSection templates={taskDesignerTemplates} data={data} onReload={load} onEditTemplates={() => setSection('task-designer')} />}</>}
-      {section === 'task-designer' && (canManageTaskLibrary ? <TaskTemplatesSection templates={taskDesignerTemplates} categories={taskCategories} reportTemplates={designerTemplates.flatMap((report): TaskReportTemplateOption[] => report.approved_version_id ? [{ id: report.id, title: report.title, role_code: report.role_code as TaskTemplateDraft['roleCode'], approved_version_id: report.approved_version_id, approved_version_no: report.approved_version_no, is_active: report.is_active }] : [])} onReload={load} canManageReports={canManageReports} /> : <Unavailable title="مصمم المهام" text="لا تملك صلاحية إدارة مكتبة المهام." />)}
+      {section === 'task-designer' && (canManageTaskLibrary ? <TaskTemplatesSection templates={taskDesignerTemplates} categories={taskCategories} onReload={load} /> : <Unavailable title="الجدول التنظيمي" text="لا تملك صلاحية إدارة الجداول التنظيمية." />)}
       {section === 'report-designer' && (canManageReports && canManageEmployees ? <ReportDesigner organizationId={profile?.institutionId ?? ''} /> : <Unavailable title="مصمم التقارير" text="لا تملك صلاحية إدارة نماذج التقارير." />)}
       {section === 'reports' && (canViewReports ? <ReportsSection data={data} fmt={fmt} onOpenTasks={() => router.push('/tasks')} canManage={canManageEmployees} institutionId={profile?.institutionId ?? ''} onReload={load} /> : <Unavailable title="تقارير الموظفين" text="لا تملك صلاحية قراءة تقارير المؤسسة أو مراجعتها." />)}
       {section === 'branches' && (canViewBranches ? <BranchesSection data={data} institutionId={profile?.institutionId ?? ''} canManage={canManageEmployees} onReload={load} /> : <Unavailable title="إدارة الفروع" text="لا تملك صلاحية عرض الفروع." />)}
@@ -326,12 +327,10 @@ function EmployeesSection({ data }: any) { return <><Text style={styles.sectionT
 function ActivitySection({ data, fmt }: any) { return <><Text style={styles.sectionTitle}>سجل النشاط والمرفقات</Text><Text style={styles.copy}>السجل يعرض الأحداث المسموح بها حسب RLS. إدارة المرفقات تتم من داخل تقرير المهمة.</Text>{(data?.activity ?? []).map((item: any) => <View style={styles.row} key={item.id}><Text style={styles.cardTitle}>{item.action}</Text><Text style={styles.meta}>المهمة {item.taskId.slice(0, 8)} · {fmt(item.createdAt)}</Text></View>)}</>; }
 function Unavailable({ title, text }: { title: string; text: string }) { return <View style={styles.unavailable}><Text style={styles.sectionTitle}>{title}</Text><Text style={styles.copy}>{text}</Text></View>; }
 
-function TaskTemplatesSection({ templates, categories, reportTemplates, onReload, canManageReports }: { templates: StoredTaskTemplate[]; categories: TaskCategoryRow[]; reportTemplates: TaskReportTemplateOption[]; onReload: () => Promise<void>; canManageReports: boolean }) {
+function TaskTemplatesSection({ templates, categories, onReload }: { templates: StoredTaskTemplate[]; categories: TaskCategoryRow[]; onReload: () => Promise<void> }) {
   const [selected, setSelected] = useState<StoredTaskTemplate | null>(null);
   const [editing, setEditing] = useState(false);
-  const [mode, setMode] = useState<'tasks' | 'reports'>('tasks');
   const [saveError, setSaveError] = useState('');
-  const subcategoryOptions = Object.fromEntries(categories.filter((category) => category.parent_id).map((category) => [categories.find((parent) => parent.id === category.parent_id)?.code, [...(categories.filter((item) => item.parent_id === category.parent_id).map((item) => item.title))]])) as Partial<Record<'finance' | 'sales' | 'purchases' | 'warehouse' | 'items' | 'admin' | 'other', string[]>>;
   async function save(draft: TaskTemplateDraft) {
     try {
       setSaveError('');
@@ -344,14 +343,11 @@ function TaskTemplatesSection({ templates, categories, reportTemplates, onReload
     }
   }
   return <View style={{ gap: 12 }}>
-    <View style={styles.choices}><Pressable style={[styles.choice, mode === 'tasks' && styles.choiceSelected]} onPress={() => setMode('tasks')}><Text style={mode === 'tasks' ? styles.choiceSelectedText : styles.choiceText}>مصمم المهام</Text></Pressable>{canManageReports && <Pressable style={[styles.choice, mode === 'reports' && styles.choiceSelected]} onPress={() => setMode('reports')}><Text style={mode === 'reports' ? styles.choiceSelectedText : styles.choiceText}>مصمم التقارير الديناميكي</Text></Pressable>}</View>
-    {mode === 'reports' && canManageReports ? <ReportDesigner /> : <>
-    <View style={styles.card}><Text style={styles.sectionTitle}>مصمم المهمة والتقرير</Text><Text style={styles.copy}>أنشئ المهمة وخطواتها وحقول تقرير الموظف من شاشة واحدة. حفظ القالب يحفظ التصميم فقط ولا يرسل تكليفًا؛ لإرسال مهمة فعلية اختر «إسناد من قالب مهام» وحدد الموظفين والفرع. تحفظ نسخة ثابتة من التقرير لكل تكليف جديد.</Text><Pressable style={styles.primary} onPress={() => { setSelected(null); setEditing(true); setSaveError(''); }}><Text style={styles.primaryText}>قالب جديد</Text></Pressable></View>
+    <View style={styles.card}><Text style={styles.sectionTitle}>مصمم الجدول التنظيمي للمهام</Text><Text style={styles.copy}>أنشئ جدول الدوام، المهام اليومية، المسؤوليات، مؤشرات الأداء، متطلبات الإثبات وبنود التقرير اليومي. أما حقول التقرير نفسها فتُصمم من «مصمم التقارير» وتصل تلقائياً إلى الموظف.</Text><Pressable style={styles.primary} onPress={() => { setSelected(null); setEditing(true); setSaveError(''); }}><Text style={styles.primaryText}>جدول تنظيمي جديد</Text></Pressable></View>
     {templates.map((template) => <View key={template.id} style={styles.card}><View style={styles.taskLine}><Text style={styles.cardTitle}>{template.title}</Text><Text style={styles.badge}>{template.isActive ? 'نشط' : 'مؤرشف'}</Text></View><Text style={styles.meta}>{roleLabel(template.roleCode)} · {template.steps.length} خطوات · {template.reports.length} نماذج تقارير · إصدار القالب {template.version}</Text><View style={styles.actionsRow}><Pressable style={styles.secondary} onPress={() => { setSelected(template); setEditing(true); setSaveError(''); }}><Text style={styles.secondaryText}>تعديل القالب</Text></Pressable><Pressable style={styles.secondary} onPress={() => { setSelected({ ...template, id: undefined, title: `نسخة من ${template.title}`, isActive: false }); setEditing(true); setSaveError(''); }}><Text style={styles.secondaryText}>نسخ القالب</Text></Pressable><Pressable style={styles.secondary} onPress={async () => { try { await setTaskDesignerTemplateActive(template.id!, !template.isActive); await onReload(); } catch (cause) { setSaveError(friendlyDataError(cause, 'تعذر تغيير حالة القالب.')); } }}><Text style={styles.secondaryText}>{template.isActive ? 'أرشفة' : 'إعادة تفعيل'}</Text></Pressable></View></View>)}
     {!!saveError && <Text accessibilityRole="alert" style={styles.error}>{saveError}</Text>}
-    {editing && <TaskDesigner key={selected?.id ?? 'new-task-template'} initialTemplate={selected ?? undefined} reportTemplates={reportTemplates} subcategoryOptions={subcategoryOptions} onSave={save} onList={onReload} />}
+    {editing && <OrganizationalTaskDesigner key={selected?.id ?? 'new-organizational-schedule'} initialTemplate={selected ?? undefined} onSave={save} onList={onReload} />}
     {templates.length === 0 && <Text style={styles.muted}>لا توجد قوالب بعد؛ أنشئ قالبًا جديدًا للبدء.</Text>}
-    </>}
   </View>;
 }
 

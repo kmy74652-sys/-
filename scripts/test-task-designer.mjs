@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 
 const sql = readFileSync('supabase/migrations/035_task_designer_multi_reports.sql', 'utf8');
 const designer = readFileSync('apps/mobile/components/TaskDesigner.tsx', 'utf8');
+const organizational = readFileSync('apps/mobile/components/OrganizationalTaskDesigner.tsx', 'utf8');
 const library = readFileSync('apps/mobile/lib/taskDesigner.ts', 'utf8');
 const admin = readFileSync('apps/mobile/app/admin.tsx', 'utf8');
 const adminData = readFileSync('apps/mobile/lib/adminData.ts', 'utf8');
@@ -22,8 +23,10 @@ const checks = [
   ['manual task assignment clears stale branch and matches role-specific assignments', admin.includes("roleCode: role, branchId: '', assignedEmployeeId: ''") && admin.includes('const employeesForDraft') && admin.includes('assignment.roleCode === draft.roleCode && (!draft.branchId || assignment.branchId === draft.branchId)')],
   ['manual task assignment requires a linked login and explains missing employees', admin.includes('Boolean(employee.userId)') && adminData.includes("employee_login_not_linked") && mobileData.includes('no_employee_for_role:')],
   ['assignment failures have clear Arabic causes', mobileData.includes('no_employee_for_role_branch:') && mobileData.includes('invalid_task_schedule:')],
-  ['save template is explicitly distinguished from sending a task', admin.includes('حفظ القالب يحفظ التصميم فقط ولا يرسل تكليفًا')],
-  ['dynamic report designer is mounted beside task designer', admin.includes("import ReportDesigner") && admin.includes('<ReportDesigner />')],
+  ['organizational designer replaces legacy task designer', admin.includes('OrganizationalTaskDesigner') && admin.includes('الجدول التنظيمي') && organizational.includes('حفظ الجدول التنظيمي')],
+  ['organizational schedule has role, work periods, rows and performance proof', organizational.includes('الدور الوظيفي') && organizational.includes('الفترة الصباحية') && organizational.includes('فترة الاستراحة') && organizational.includes('الفترة المسائية') && organizational.includes('مؤشر الأداء') && organizational.includes('الإثبات أو الشرط') && organizational.includes('إضافة صف')],
+  ['organizational schedule has continuous work, daily report and controls', organizational.includes('المهام المستمرة طوال الدوام') && organizational.includes('بنود التقرير اليومي للموظف') && organizational.includes('التوصيات والضوابط الإدارية')],
+  ['report designer remains independent', admin.includes("import ReportDesigner") && admin.includes('section === \'report-designer\'') && admin.includes('<ReportDesigner')],
   ['legacy starter catalog is hidden from designer', library.includes('retiredStarterTemplateCodes') && !admin.includes('قالب التقرير القديم')],
   ['reports are designed independently and delivered automatically by role', designer.includes('التقارير مستقلة عن قالب المهمة') && admin.includes('حقول التقرير المعتمدة للدور المحدد تُرسل تلقائياً') && admin.includes('const selectedReport = designerTemplates.find((template) => template.role_code === draft.roleCode')],
   ['admin report review has search and status filters', admin.includes('ابحث باسم الموظف أو المهمة') && admin.includes("setStatus(value)") && adminData.includes('taskTitle') && adminData.includes('values')],
