@@ -49,7 +49,7 @@ const db = {
     const builder = {
       select(columns, options = {}) { query.columns = columns; query.options = options; return this; },
       eq(key, value) { query.filters.push((row) => row[key] === value); return this; },
-      is(key, value) { return this.eq(key, value); },
+      is(key, value) { query.filters.push((row) => value === null ? row[key] == null : row[key] === value); return this; },
       in(key, values) { query.filters.push((row) => values.includes(row[key])); return this; },
       order() { return this; },
       limit(count) { query.end = count - 1; return this; },

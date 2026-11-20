@@ -10,6 +10,7 @@ const auth = read('supabase/functions/employee-code-auth/index.ts');
 const settings = read('apps/mobile/app/settings.tsx');
 const admin = read('apps/mobile/app/admin.tsx');
 const data = read('apps/mobile/lib/adminData.ts');
+const homeDashboard = read('apps/mobile/components/HomeDashboard.tsx');
 
 assert.match(migration, /admin_update_employee/);
 assert.match(migration, /admin_manage_branch/);
@@ -77,7 +78,8 @@ assert.match(admin, /metrics: \{[^}]*flexDirection: 'row-reverse'[^}]*justifyCon
 assert.match(admin, /metric: \{[^}]*width: '48%'[^}]*minHeight: 112/);
 assert.match(admin, /content: \{[^}]*paddingBottom: 124/);
 assert.match(admin, /moduleGrid: \{[^}]*flexDirection:'row-reverse'/);
-assert.match(admin, /bottomBar: \{[^}]*flexDirection:'row-reverse'/);
+assert.doesNotMatch(admin, /bottomBar: \{/);
+assert.match(homeDashboard, /bottomBar: \{[^}]*flexDirection: 'row'/);
 const layout = read('apps/mobile/app/_layout.tsx');
 assert.match(layout, /I18nManager\.allowRTL\(true\)/);
 assert.match(layout, /I18nManager\.forceRTL\(true\)/);
