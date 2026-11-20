@@ -98,6 +98,7 @@ export default function TasksScreen() {
   const requestedStatus = parseTaskFilter(firstSearchParam(routeParams.status));
   const requestedBranchId = parseBranchId(firstSearchParam(routeParams.branchId));
   const requestedMode = parseTaskMode(firstSearchParam(routeParams.mode));
+  const reportsOnly = firstSearchParam(routeParams.view) === 'reports';
   const [tasks, setTasks] = useState<Task[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [canReview, setCanReview] = useState(false);
@@ -368,6 +369,7 @@ export default function TasksScreen() {
   };
   const filteredTasks = tasks.filter((task) => {
     const hasPendingFormReview = task.report_forms.some((form) => form.status === 'submitted');
+    const hasReport = task.report_forms.length > 0 || task.report_schema.length > 0;
     const modeMatches = screenMode === 'mine'
       ? task.assignee_employee_id === currentUserId
       : screenMode === 'review'
@@ -377,6 +379,7 @@ export default function TasksScreen() {
       taskMatchesFilter(task, statusFilter) &&
       (!branchFilter || task.branch_id === branchFilter) &&
       (positionFilter === 'all' || task.position_code === positionFilter) &&
+      (!reportsOnly || hasReport) &&
       (!search.trim() || `${task.title} ${task.description ?? ''}`.toLocaleLowerCase('ar').includes(search.trim().toLocaleLowerCase('ar')));
   });
   const employeeSummary = {
@@ -386,20 +389,21 @@ export default function TasksScreen() {
   };
 
   return (
-    <AppShell activeTab="tasks" title="المهام والمتابعة" scroll={false}>
+    <AppShell activeTab="tasks" title={reportsOnly ? 'إعداد التقارير' : 'المهام والمتابعة'} scroll={false}>
       <Stack.Screen options={{ title: 'المهام', headerShown: false }} />
       <ScrollView
         contentContainerStyle={styles.content}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); void load({ force: true }); }} />}
       >
         <ScreenHeader
-          title="المهام والمتابعة"
-          subtitle="تنفيذ التكليفات ومراجعة التقارير"
+          title={reportsOnly ? 'إعداد التقارير' : 'المهام والمتابعة'}
+          subtitle={reportsOnly ? 'تعبئة التقارير المطلوبة من الإدارة وإرسالها للمراجعة' : 'تنفيذ التكليفات ومراجعة التقارير'}
           onBack={() => { if (router.canGoBack()) router.back(); else router.replace('/'); }}
         />
         {!!error && <View style={styles.errorBox}><Text accessibilityRole="alert" style={styles.error}>{error}</Text><Pressable style={styles.retryButton} onPress={() => { setRefreshing(true); void load({ force: true }); }}><Text style={styles.retryText}>إعادة المحاولة</Text></Pressable></View>}
         {!!notice && <Text accessibilityLiveRegion="polite" style={styles.notice}>{notice}</Text>}
-        {!loading && <View style={styles.employeeIntro}><Text style={styles.employeeIntroTitle}>مساحة تنفيذك اليومية</Text><Text style={styles.employeeIntroText}>اقرأ التكليف، ابدأ التنفيذ، ثم عبّئ التقرير المطلوب وأرسله للمسؤول للمراجعة.</Text></View>}
+        {!loading && <View style={styles.employeeIntro}><Text style={styles.employeeIntroTitle}>{reportsOnly ? 'تقاريرك المطلوبة' : 'مساحة تنفيذك اليومية'}</Text><Text style={styles.employeeIntroText}>{reportsOnly ? 'ستجد هنا نماذج التقارير التي صممتها الإدارة وربطتها بالمهام المسندة إليك.' : 'اقرأ التكليف، ابدأ التنفيذ، ثم عبّئ التقرير المطلوب وأرسله للمسؤول للمراجعة.'}</Text></View>}
+        {!loading && <View style={styles.workTabs}><Pressable accessibilityRole="tab" accessibilityState={{ selected: !reportsOnly }} style={[styles.workTab, !reportsOnly && styles.workTabSelected]} onPress={() => router.replace({ pathname: '/tasks', params: { mode: 'mine' } })}><Text style={[styles.workTabText, !reportsOnly && styles.workTabTextSelected]}>المهام</Text></Pressable><Pressable accessibilityRole="tab" accessibilityState={{ selected: reportsOnly }} style={[styles.workTab, reportsOnly && styles.workTabSelected]} onPress={() => router.replace({ pathname: '/tasks', params: { view: 'reports', mode: 'mine' } })}><Text style={[styles.workTabText, reportsOnly && styles.workTabTextSelected]}>إعداد التقارير</Text></Pressable></View>}
         {!loading && <View style={styles.summaryRow}><View style={styles.summaryCard}><Text style={styles.summaryValue}>{employeeSummary.pending}</Text><Text style={styles.summaryLabel}>جديدة</Text></View><View style={styles.summaryCard}><Text style={styles.summaryValue}>{employeeSummary.active}</Text><Text style={styles.summaryLabel}>قيد التنفيذ</Text></View><View style={styles.summaryCard}><Text style={styles.summaryValue}>{employeeSummary.submitted}</Text><Text style={styles.summaryLabel}>بانتظار المراجعة</Text></View></View>}
         {loading && <View style={styles.loading}><ActivityIndicator size="large" color="#17324d" /><Text style={styles.muted}>جارٍ تحميل المهام…</Text></View>}
         {!loading && (canReview || canManage) && <View style={styles.modeTabs}>
@@ -437,6 +441,7 @@ export default function TasksScreen() {
               <Text style={styles.taskTitle}>{task.title}</Text>
               <Text style={[styles.badge, task.status === 'approved' ? styles.goodBadge : task.status === 'rejected' ? styles.warnBadge : styles.neutralBadge]}>{statusLabels[task.status]}</Text>
             </View>
+            {!reportsOnly && <>
             <Text style={styles.cardSectionLabel}>1 · اقرأ التكليف</Text>
             {!!task.description && <Text style={styles.body}>{task.description}</Text>}
             <Text style={styles.meta}>المنصب: {task.position_code ? positionLabels[task.position_code] : 'بحاجة إلى تصنيف'}{task.branch_name ? ` · الفرع: ${task.branch_name}${task.branch_level ? ` (المستوى ${task.branch_level})` : ''}` : task.branch_id ? ' · فرع محدد' : ''}</Text>
@@ -453,6 +458,7 @@ export default function TasksScreen() {
             </View>)}</View>}
             <Pressable style={styles.secondaryButton} onPress={() => void showTimeline(task)}><Text style={styles.secondaryText}>عرض السجل الزمني</Text></Pressable>
             {!!timeline[task.id]?.length && <View style={styles.timeline}>{timeline[task.id].map((entry) => <Text key={entry.id} style={styles.meta}>{formatDate(entry.created_at)} · {entry.status} · {entry.actor_name}{entry.note ? ` — ${entry.note}` : ''}</Text>)}</View>}
+            </>}
 
             {reportTask === task.id && (task.report_schema ?? []).filter((field) => isReportFieldVisible(field, draftValuesForTask(task))).map((field) => <ReportFieldInput
               key={field.key} field={field} raw={drafts[task.id]?.[field.key] ?? ''}
@@ -486,7 +492,7 @@ export default function TasksScreen() {
               </Pressable>
             )}
 
-            <View style={styles.actions}><Text style={styles.cardSectionLabel}>الإجراء التالي</Text>
+            {!reportsOnly && <View style={styles.actions}><Text style={styles.cardSectionLabel}>الإجراء التالي</Text>
               {['pending', 'rejected'].includes(task.status) && (
                 <Pressable disabled={busyTask === task.id} style={styles.primaryButton} onPress={() => void mutate(task, () => updateTaskStatus(task.id, 'in_progress'), 'تم تسجيل بدء تنفيذ المهمة.')}>
                   <Text style={styles.primaryText}>بدء التنفيذ</Text>
@@ -512,7 +518,7 @@ export default function TasksScreen() {
                   <Pressable disabled={busyTask === task.id || !reviewNote.trim()} style={styles.secondaryButton} onPress={() => void mutate(task, () => reviewTask(task.id, 'rejected', reviewNote), 'أعيدت المهمة مع ملاحظات.')}><Text style={styles.secondaryText}>إرجاع مع سبب</Text></Pressable>
                 </>
               )}
-            </View>
+            </View>}
           </View>
         ))}
         {!loading && !error && filteredTasks.length === 0 && <Text style={styles.empty}>{tasks.length ? 'لا توجد مهام تطابق البحث أو الفلتر.' : 'لا توجد مهام ظاهرة لهذا الحساب.'}</Text>}
@@ -544,6 +550,11 @@ const styles = StyleSheet.create({
   modeTabSelected: { backgroundColor: '#17324d', borderColor: '#17324d' },
   modeTabText: { color: '#39556a', fontSize: 12, fontWeight: '700', textAlign: 'center' },
   modeTabTextSelected: { color: '#fff' },
+  workTabs: { flexDirection: 'row-reverse', gap: 8, paddingVertical: 2 },
+  workTab: { flex: 1, minHeight: 45, borderRadius: 12, borderWidth: 1, borderColor: '#d6e0e4', backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' },
+  workTabSelected: { backgroundColor: '#e5b336', borderColor: '#e5b336' },
+  workTabText: { color: '#39556a', fontWeight: '800', fontSize: 13 },
+  workTabTextSelected: { color: '#17324d', fontWeight: '900' },
   filters: { flexDirection: 'row-reverse', gap: 8, paddingVertical: 4 },
   filterChip: { borderRadius: 18, borderWidth: 1, borderColor: '#ccd9df', paddingHorizontal: 12, paddingVertical: 8 },
   filterChipSelected: { backgroundColor: '#17324d', borderColor: '#17324d' },

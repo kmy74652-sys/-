@@ -16,6 +16,9 @@ assert(mobileData.includes("callrpc('mobile_record_task_update', { p_task_id: it
 assert(mobileData.includes("callrpc('mobile_record_task_update', { p_task_id: taskid, p_status: status, p_note: note })"), 'online task status updates must match the deployed three-argument RPC');
 assert(mobile.includes("canreview && (task.status === 'submitted' || haspendingformreview)"), 'manager review queue must include legacy and dynamic submitted reports');
 assert(mobile.includes("['mine', 'مهامي']") && mobile.includes("['review', 'مراجعة التقارير']"), 'role-based task/review tabs missing');
+assert(mobile.includes("firstsearchparam(routeparams.view) === 'reports'") && mobile.includes('إعداد التقارير'), 'employee report workspace tab missing');
+assert(mobile.includes('(!reportsonly || hasreport)'), 'report workspace must show only tasks with assigned report forms');
+assert(read('apps/mobile/components/HomeDashboard.tsx').includes("view: 'reports'"), 'employee dashboard reports card must open the report workspace');
 const queue = new Map();
 const add = (id) => queue.has(id) || queue.set(id, true);
 add('report:task-1:key-1'); add('report:task-1:key-1');

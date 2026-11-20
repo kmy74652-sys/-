@@ -124,7 +124,7 @@ export default function HomeDashboard({ profile: initialProfile, onNavigate, onS
       if (access.manageTasks) router.push({ pathname: '/admin', params: { section: 'tasks' } });
       else openTasks();
     } else if (destination === 'reports' && !access.manageTasks) {
-      router.push({ pathname: '/tasks', params: { mode: 'mine', status: 'submitted', ...(branchId ? { branchId } : {}) } });
+      router.push({ pathname: '/tasks', params: { view: 'reports', mode: 'mine', ...(branchId ? { branchId } : {}) } });
     } else if (destination === 'employees' && access.settings) router.push('/settings');
     else router.push({ pathname: '/admin', params: { section: destination } });
   }
