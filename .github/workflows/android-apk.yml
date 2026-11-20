@@ -21,9 +21,6 @@ jobs:
       EXPO_PUBLIC_SUPABASE_ANON_KEY: sb_publishable_vRWbeJO5I_KJwJjqVDSZLA_pEHABsPk
       EXPO_USE_COMMUNITY_AUTOLINKING: '0'
       NODE_ENV: production
-      ALSHAERI_RELEASE_KEYSTORE_BASE64: ${{ secrets.ALSHAERI_RELEASE_KEYSTORE_BASE64 }}
-      ALSHAERI_RELEASE_STORE_PASSWORD: ${{ secrets.ALSHAERI_RELEASE_STORE_PASSWORD }}
-      ALSHAERI_RELEASE_KEY_PASSWORD: ${{ secrets.ALSHAERI_RELEASE_KEY_PASSWORD }}
     defaults:
       run:
         working-directory: apps/mobile
@@ -103,34 +100,8 @@ jobs:
       - name: Prepare and build release APK
         run: |
           set -euo pipefail
-          : "${ALSHAERI_RELEASE_KEYSTORE_BASE64:?Missing ALSHAERI_RELEASE_KEYSTORE_BASE64 repository secret}"
-          : "${ALSHAERI_RELEASE_STORE_PASSWORD:?Missing ALSHAERI_RELEASE_STORE_PASSWORD repository secret}"
-          : "${ALSHAERI_RELEASE_KEY_PASSWORD:?Missing ALSHAERI_RELEASE_KEY_PASSWORD repository secret}"
           # Keep all Android ABIs in the official APK for broad device compatibility.
           export ORG_GRADLE_PROJECT_reactNativeArchitectures=arm64-v8a
-          printf '%s' "$ALSHAERI_RELEASE_KEYSTORE_BASE64" | base64 --decode > android/app/alshaeri-release.keystore
-          python3 - <<'PY'
-          from pathlib import Path
-          path = Path('android/app/build.gradle')
-          text = path.read_text()
-          marker = "    signingConfigs {\n"
-          addition = """    signingConfigs {
-        release {
-            storeFile file('alshaeri-release.keystore')
-            storePassword System.getenv('ALSHAERI_RELEASE_STORE_PASSWORD')
-            keyAlias 'alshaeri-release'
-            keyPassword System.getenv('ALSHAERI_RELEASE_KEY_PASSWORD')
-        }
-"""
-          if "storeFile file('alshaeri-release.keystore')" not in text:
-              if marker not in text:
-                  raise SystemExit('Could not find Android signingConfigs block')
-              text = text.replace(marker, addition, 1)
-          text = text.replace('signingConfig signingConfigs.debug\n            shrinkResources',
-                              'signingConfig signingConfigs.release\n            shrinkResources', 1)
-          path.write_text(text)
-          PY
-          grep -q "signingConfig signingConfigs.release" android/app/build.gradle
           autolinking="$(pnpm exec expo-modules-autolinking resolve --platform android --json)"
           printf '%s' "$autolinking" | node -e 'let text="";process.stdin.on("data",chunk=>text+=chunk);process.stdin.on("end",()=>{const result=JSON.parse(text);const linking=result.modules?.find(item=>item.packageName==="expo-linking");if(!linking||!linking.modules?.includes("expo.modules.linking.ExpoLinkingModule")){console.error("Expo Linking is not registered for Android autolinking.");process.exit(1)}console.log("Expo Linking module detected.")})'
           cd android

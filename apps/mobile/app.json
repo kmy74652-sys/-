@@ -29,7 +29,7 @@
     ],
     "android": {
       "package": "com.alshaeri.mobile",
-      "versionCode": 5,
+      "versionCode": 4,
       "supportsRTL": true,
       "adaptiveIcon": {
         "foregroundImage": "./assets/android-icon-foreground.png",
