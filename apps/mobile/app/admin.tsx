@@ -106,6 +106,12 @@ export default function AdminScreen() {
   const removeTaskLocally = useCallback((taskId: string) => {
     setData((current) => current ? { ...current, tasks: current.tasks.filter((task) => task.id !== taskId) } : current);
   }, []);
+  const restoreTaskLocally = useCallback((task: DashboardData['tasks'][number]) => {
+    setData((current) => {
+      if (!current || current.tasks.some((item) => item.id === task.id)) return current;
+      return { ...current, tasks: [...current.tasks, task].sort((left, right) => (left.dueAt ?? '').localeCompare(right.dueAt ?? '')) };
+    });
+  }, []);
   const updateReportLocally = useCallback((reportId: string, patch: Partial<DashboardData['reports'][number]>) => {
     setData((current) => current ? { ...current, reports: current.reports.map((report) => report.id === reportId ? { ...report, ...patch } : report) } : current);
   }, []);
@@ -192,7 +198,7 @@ export default function AdminScreen() {
     {!!notice && <Text style={styles.notice}>{notice}</Text>}
 
       {section === 'overview' && !profile && <Overview counts={counts} data={data} fmt={fmt} onSection={setSection} onSettings={() => router.push('/settings')} onHR={() => router.push('/hr' as never)} canDesign={canManageTaskLibrary} canDesignReports={canManageReports} />}
-      {section === 'tasks' && <TasksSection data={data} designerTemplates={designerTemplates} showCreate={showCreate} setShowCreate={setShowCreate} draft={draft} setDraft={setDraft} createTask={createTask} fmt={fmt} onOpenTasks={() => router.push('/tasks')} canManage={canManageEmployees} institutionId={profile?.institutionId ?? ''} onReload={load} onTaskUpdated={updateTaskLocally} onTaskDeleted={removeTaskLocally} />}
+      {section === 'tasks' && <TasksSection data={data} designerTemplates={designerTemplates} showCreate={showCreate} setShowCreate={setShowCreate} draft={draft} setDraft={setDraft} createTask={createTask} fmt={fmt} onOpenTasks={() => router.push('/tasks')} canManage={canManageEmployees} institutionId={profile?.institutionId ?? ''} onReload={load} onTaskUpdated={updateTaskLocally} onTaskDeleted={removeTaskLocally} onTaskRestored={restoreTaskLocally} />}
       {section === 'task-designer' && (canManageTaskLibrary ? <TaskTemplatesSection templates={taskDesignerTemplates} categories={taskCategories} employees={data?.employees ?? []} onReload={load} /> : <Unavailable title="الجدول التنظيمي" text="لا تملك صلاحية إدارة الجداول التنظيمية." />)}
       {section === 'report-designer' && (canManageReports && canManageEmployees ? <ReportDesigner organizationId={profile?.institutionId ?? ''} /> : <Unavailable title="مصمم التقارير" text="لا تملك صلاحية إدارة نماذج التقارير." />)}
       {section === 'reports' && (canViewReports ? <ReportsSection data={data} fmt={fmt} onOpenTasks={() => router.push('/tasks')} canManage={canManageEmployees} institutionId={profile?.institutionId ?? ''} onReportUpdated={updateReportLocally} onReportDeleted={removeReportLocally} /> : <Unavailable title="تقارير الموظفين" text="لا تملك صلاحية قراءة تقارير المؤسسة أو مراجعتها." />)}
@@ -215,7 +221,7 @@ function Overview({ counts, data, fmt, onSection, onSettings, onHR, canDesign, c
   <View style={styles.activityPreview}><Text style={styles.sectionTitle}>آخر النشاط</Text>{(data?.activity ?? []).slice(0,3).map((item)=><View style={styles.activityPreviewRow} key={item.id}><Text style={styles.cardTitle}>{item.action}</Text><Text style={styles.meta}>{fmt(item.createdAt)}</Text></View>)}{!(data?.activity ?? []).length&&<Text style={styles.muted}>لا توجد أنشطة حديثة.</Text>}</View>
 </>; }
 
-function TasksSection({ data, designerTemplates, showCreate, setShowCreate, draft, setDraft, createTask, fmt, onOpenTasks, canManage, institutionId, onReload, onTaskUpdated, onTaskDeleted }: any) {
+function TasksSection({ data, designerTemplates, showCreate, setShowCreate, draft, setDraft, createTask, fmt, onOpenTasks, canManage, institutionId, onReload, onTaskUpdated, onTaskDeleted, onTaskRestored }: any) {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [edits, setEdits] = useState<Record<string, { title: string; description: string }>>({});
@@ -284,7 +290,7 @@ function TasksSection({ data, designerTemplates, showCreate, setShowCreate, draf
           <TextInput style={styles.input} placeholder="تعديل عنوان المهمة" value={edits[task.id]?.title ?? task.title} onChangeText={(value) => setEdits((current) => ({ ...current, [task.id]: { title: value, description: current[task.id]?.description ?? task.description ?? '' } }))} />
           <TextInput style={styles.input} placeholder="تعديل وصف المهمة" value={edits[task.id]?.description ?? task.description ?? ''} onChangeText={(value) => setEdits((current) => ({ ...current, [task.id]: { title: current[task.id]?.title ?? task.title, description: value } }))} multiline />
           <Pressable disabled={busyMutation === task.id} style={styles.secondary} onPress={() => void (async () => { setBusyMutation(task.id); try { const title = edits[task.id]?.title ?? task.title; const description = edits[task.id]?.description ?? task.description ?? ''; await updateManagedTask(institutionId, task.id, title, description, task.dueAt); onTaskUpdated(task.id, { title, description }); } catch (error) { Alert.alert('تعذر التعديل', (error as Error)?.message ?? 'تحقق من الصلاحية والاتصال.'); } finally { setBusyMutation(null); } })()}><Text style={styles.secondaryText}>{busyMutation === task.id ? 'جارٍ الحفظ…' : 'حفظ تعديل المهمة'}</Text></Pressable>
-          <Pressable disabled={busyMutation === task.id} style={styles.dangerButton} onPress={() => Alert.alert('إزالة المهمة', 'ستتم إزالة المهمة من القوائم النشطة مع الاحتفاظ بسجل النشاط الإداري لأغراض التدقيق. هل تريد المتابعة؟', [{ text: 'إلغاء', style: 'cancel' }, { text: 'إزالة', style: 'destructive', onPress: () => void (async () => { setBusyMutation(task.id); try { await deleteManagedTask(institutionId, task.id); onTaskDeleted(task.id); } catch (error) { Alert.alert('تعذر إزالة المهمة', (error as Error)?.message ?? 'تعذر تنفيذ العملية.'); } finally { setBusyMutation(null); } })() }])}><Text style={styles.dangerText}>إزالة المهمة</Text></Pressable>
+          <Pressable disabled={busyMutation === task.id} style={styles.dangerButton} onPress={() => Alert.alert('إزالة المهمة', 'ستتم إزالة المهمة من القوائم النشطة مع الاحتفاظ بسجل النشاط الإداري لأغراض التدقيق. هل تريد المتابعة؟', [{ text: 'إلغاء', style: 'cancel' }, { text: 'إزالة', style: 'destructive', onPress: () => void (async () => { setBusyMutation(task.id); onTaskDeleted(task.id); try { await deleteManagedTask(institutionId, task.id); } catch (error) { onTaskRestored(task); Alert.alert('تعذر إزالة المهمة', (error as Error)?.message ?? 'تعذر تنفيذ العملية. أُعيدت المهمة إلى القائمة.'); } finally { setBusyMutation(null); } })() }])}><Text style={styles.dangerText}>إزالة المهمة</Text></Pressable>
         </>}
       </View>;
     }) : <View style={styles.taskEmpty}><Text style={styles.taskEmptyGlyph}>▤</Text><Text style={styles.taskEmptyTitle}>لا توجد مهام مطابقة</Text><Text style={styles.taskEmptyText}>{tasks.length?'جرّب تغيير البحث أو حالة المهمة.':'ابدأ بإنشاء أول تكليف للمؤسسة.'}</Text></View>}
