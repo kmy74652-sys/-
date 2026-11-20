@@ -40,7 +40,7 @@ export default function Layout() {
   if (!fontsLoaded) return <View style={{ flex: 1, backgroundColor: '#f5f7fd' }} />;
   const TextDefaults = Text as typeof Text & { defaultProps?: { style?: unknown } };
   const TextInputDefaults = TextInput as typeof TextInput & { defaultProps?: { style?: unknown } };
-  TextDefaults.defaultProps = { ...TextDefaults.defaultProps, style: [{ fontFamily: 'AlshaeriArabic' }, TextDefaults.defaultProps?.style] };
-  TextInputDefaults.defaultProps = { ...TextInputDefaults.defaultProps, style: [{ fontFamily: 'AlshaeriArabic', writingDirection: 'rtl' }, TextInputDefaults.defaultProps?.style] };
+  TextDefaults.defaultProps = { ...TextDefaults.defaultProps, style: [{ fontFamily: 'AlshaeriArabic', writingDirection: 'rtl', textAlign: 'right' }, TextDefaults.defaultProps?.style] };
+  TextInputDefaults.defaultProps = { ...TextInputDefaults.defaultProps, style: [{ fontFamily: 'AlshaeriArabic', writingDirection: 'rtl', textAlign: 'right' }, TextInputDefaults.defaultProps?.style] };
   return <View style={{ flex: 1, direction: 'rtl', backgroundColor: '#f5f7fd' }}><StatusBar barStyle="dark-content" backgroundColor="#f5f7fd" /><Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: '#f5f7fd' } }} /></View>;
 }
