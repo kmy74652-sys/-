@@ -18,7 +18,7 @@ assert(mobile.includes("canreview && (task.status === 'submitted' || haspendingf
 assert(mobile.includes("['mine', 'مهامي']") && mobile.includes("['review', 'مراجعة التقارير']"), 'role-based task/review tabs missing');
 assert(mobile.includes("firstsearchparam(routeparams.view) === 'reports'") && mobile.includes('إعداد التقارير'), 'employee report workspace tab missing');
 assert(mobile.includes('(!reportsonly || hasreport)'), 'report workspace must show only tasks with assigned report forms');
-assert(mobile.includes('إرسال التقرير مرة واحدة') && mobile.includes('تم ترحيل هذا التقرير ولا يمكن تعديله'), 'report workspace must expose one submission and lock submitted reports');
+assert(mobile.includes('إرسال التقرير مرة واحدة') && !mobile.includes('تم ترحيل هذا التقرير ولا يمكن تعديله'), 'report workspace must expose one submission without showing the internal lock message');
 assert(mobile.includes("!reportsonly && <view style={styles.notifications}") && mobile.includes("!loading && !reportsonly && tasks.length > 0"), 'report workspace must hide task filters and notifications');
 assert(read('supabase/migrations/066_lock_submitted_task_report_drafts.sql').includes('report_draft_locked_after_submission'), 'submitted report draft lock migration missing');
 assert(read('apps/mobile/components/HomeDashboard.tsx').includes("view: 'reports'"), 'employee dashboard reports card must open the report workspace');

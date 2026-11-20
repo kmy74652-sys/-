@@ -25,7 +25,7 @@ const checks = [
   ['save template is explicitly distinguished from sending a task', admin.includes('حفظ القالب يحفظ التصميم فقط ولا يرسل تكليفًا')],
   ['dynamic report designer is mounted beside task designer', admin.includes("import ReportDesigner") && admin.includes('<ReportDesigner />')],
   ['legacy starter catalog is hidden from designer', library.includes('retiredStarterTemplateCodes') && !admin.includes('قالب التقرير القديم')],
-  ['approved report templates can be linked to task templates', designer.includes('reportTemplates') && designer.includes('نموذج التقرير الذي سيعبئه الموظف') && admin.includes('reportTemplates={designerTemplates.flatMap')],
+  ['reports are designed independently and delivered automatically by role', designer.includes('التقارير مستقلة عن قالب المهمة') && admin.includes('حقول التقرير المعتمدة للدور المحدد تُرسل تلقائياً') && admin.includes('const selectedReport = designerTemplates.find((template) => template.role_code === draft.roleCode')],
   ['admin report review has search and status filters', admin.includes('ابحث باسم الموظف أو المهمة') && admin.includes("setStatus(value)") && adminData.includes('taskTitle') && adminData.includes('values')],
   ['report submission and review notifications are automatic', reportCycle.includes('task_reports_notify_cycle') && reportCycle.includes("new.status in ('approved', 'returned')")],
 ];

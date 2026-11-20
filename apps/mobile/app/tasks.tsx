@@ -68,6 +68,11 @@ function firstSearchParam(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] : value;
 }
 
+function isDynamicTestTitle(value: string) {
+  const title = value.trim().toLocaleLowerCase('ar');
+  return title.includes('اختبار مهمة ديناميكية') || title.includes('اختبار تقرير ديناميكي');
+}
+
 function parseTaskFilter(value: string | undefined): TaskFilter {
   return value === 'pending' || value === 'in_progress' || value === 'submitted' || value === 'rejected' || value === 'approved' || value === 'late' ? value : 'all';
 }
@@ -380,6 +385,7 @@ export default function TasksScreen() {
       (!branchFilter || task.branch_id === branchFilter) &&
       (positionFilter === 'all' || task.position_code === positionFilter) &&
       (!reportsOnly || hasReport) &&
+      (!reportsOnly || !isDynamicTestTitle(task.title)) &&
       (!search.trim() || `${task.title} ${task.description ?? ''}`.toLocaleLowerCase('ar').includes(search.trim().toLocaleLowerCase('ar')));
   });
   const employeeSummary = {
@@ -437,10 +443,10 @@ export default function TasksScreen() {
 
         {!loading && filteredTasks.map((task) => (
           <View style={styles.taskCard} key={task.id}>
-            <View style={styles.taskHeading}>
+            {!reportsOnly && <View style={styles.taskHeading}>
               <Text style={styles.taskTitle}>{task.title}</Text>
               <Text style={[styles.badge, task.status === 'approved' ? styles.goodBadge : task.status === 'rejected' ? styles.warnBadge : styles.neutralBadge]}>{statusLabels[task.status]}</Text>
-            </View>
+            </View>}
             {reportsOnly && <View style={styles.reportWorkspace}>
               {!!task.report_forms.length && task.report_forms.map((form) => {
                 const key = formDraftKey(task, form);
@@ -452,11 +458,10 @@ export default function TasksScreen() {
                   {form.status === 'returned' && !!form.review_note && <Text style={styles.proof}>ملاحظة الإدارة: {form.review_note}</Text>}
                   {locked ? <ReportReadOnly fields={form.schema} values={form.values} /> : form.schema.filter((field) => isReportFieldVisible(field, formValues)).map((field) => <ReportFieldInput key={field.key} field={field} raw={drafts[key]?.[field.key] ?? ''} attachments={attachments[key]?.[field.key] ?? []} calculated={evaluateReportField(field, form.schema, formValues).value} calculationError={evaluateReportField(field, form.schema, formValues).error} rows={field.type === 'table' ? tableRows(key, field) : []} onDraftChange={(value) => setDrafts((current) => ({ ...current, [key]: { ...current[key], [field.key]: value } }))} onTableChange={(rows) => updateTable(key, field, rows)} onChooseAttachment={() => void chooseFormAttachment(task, form, field.key)} />)}
                   {!locked && <><Pressable style={styles.secondaryButton} onPress={() => void saveSeparateDraft(task, form)}><Text style={styles.secondaryText}>حفظ المسودة</Text></Pressable><Pressable disabled={busyTask === task.id} style={styles.primaryButton} onPress={() => submitSeparateReport(task, form)}><Text style={styles.primaryText}>{busyTask === task.id ? 'جارٍ الإرسال…' : 'إرسال التقرير مرة واحدة'}</Text></Pressable></>}
-                  {locked && <Text style={styles.lockedReportText}>تم ترحيل هذا التقرير ولا يمكن تعديله أو إرساله مرة أخرى. يمكن للإدارة إعادته للتعديل عند الحاجة.</Text>}
                 </View>;
               })}
               {!task.report_forms.length && !!task.report_schema.length && <View style={styles.directReportForm}>
-                {task.status === 'submitted' || task.status === 'approved' ? <><ReportReadOnly fields={task.report_schema} values={{}} /><Text style={styles.lockedReportText}>تم ترحيل هذا التقرير ولا يمكن تعديله أو إرساله مرة أخرى. يمكن للإدارة إعادته للتعديل عند الحاجة.</Text></> : <>{task.report_schema.filter((field) => isReportFieldVisible(field, draftValuesForTask(task))).map((field) => <ReportFieldInput key={field.key} field={field} raw={drafts[task.id]?.[field.key] ?? ''} attachments={attachments[task.id]?.[field.key] ?? []} calculated={calculatedValue(task.id, field)} calculationError={calculationError(task.id, field)} rows={field.type === 'table' ? tableRows(task.id, field) : []} onDraftChange={(value) => setDrafts((current) => ({ ...current, [task.id]: { ...current[task.id], [field.key]: value } }))} onTableChange={(rows) => updateTable(task.id, field, rows)} onChooseAttachment={() => void chooseAttachment(task, field.key)} />)}<Pressable disabled={busyTask === task.id} style={styles.primaryButton} onPress={() => submitReport(task)}><Text style={styles.primaryText}>{busyTask === task.id ? 'جارٍ الإرسال…' : 'إرسال التقرير مرة واحدة'}</Text></Pressable></>}
+                {task.status === 'submitted' || task.status === 'approved' ? <ReportReadOnly fields={task.report_schema} values={{}} /> : <>{task.report_schema.filter((field) => isReportFieldVisible(field, draftValuesForTask(task))).map((field) => <ReportFieldInput key={field.key} field={field} raw={drafts[task.id]?.[field.key] ?? ''} attachments={attachments[task.id]?.[field.key] ?? []} calculated={calculatedValue(task.id, field)} calculationError={calculationError(task.id, field)} rows={field.type === 'table' ? tableRows(task.id, field) : []} onDraftChange={(value) => setDrafts((current) => ({ ...current, [task.id]: { ...current[task.id], [field.key]: value } }))} onTableChange={(rows) => updateTable(task.id, field, rows)} onChooseAttachment={() => void chooseAttachment(task, field.key)} />)}<Pressable disabled={busyTask === task.id} style={styles.primaryButton} onPress={() => submitReport(task)}><Text style={styles.primaryText}>{busyTask === task.id ? 'جارٍ الإرسال…' : 'إرسال التقرير مرة واحدة'}</Text></Pressable></>}
               </View>}
             </View>}
             {!reportsOnly && <>

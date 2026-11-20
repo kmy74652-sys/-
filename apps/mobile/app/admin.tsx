@@ -114,13 +114,12 @@ export default function AdminScreen() {
     if (new Date(dueAt).getTime() < startAt.getTime()) { setError('لا يمكن أن يسبق الموعد النهائي بداية المهمة. اختر موعدًا الآن أو لاحقًا بتوقيت عدن.'); return; }
     try {
       setError(''); setNotice('');
-      const selectedReport = designerTemplates.find((template) => template.id === draft.reportTemplateId && template.role_code === draft.roleCode);
-      if (draft.reportTemplateId && !selectedReport?.approved_version_id) throw new Error('report_form_version_requires_approval');
+      const selectedReport = designerTemplates.find((template) => template.role_code === draft.roleCode && template.approved_version_id && template.is_active !== false);
       await createAdministrativeTask({
         title: draft.title, description: draft.description, dueAt, priority: draft.priority,
         roleCode: draft.roleCode, branchId: draft.branchId || null, assignedEmployeeId: draft.assignedEmployeeId, templateId: draft.templateId || null,
         reportTemplateId: selectedReport?.id ?? null, reportVersionId: selectedReport?.approved_version_id ?? null,
-        reportRequired: draft.reportRequired,
+        reportRequired: Boolean(selectedReport?.approved_version_id),
       });
       const nextDeadline = currentAdenDateTime();
       setDraft({ title: '', description: '', dueDate: nextDeadline.date, dueTime: nextDeadline.time, priority: 'normal', roleCode: 'admin_followup', branchId: '', assignedEmployeeId: '', templateId: '', reportTemplateId: '', reportRequired: true });
@@ -234,9 +233,7 @@ function TasksSection({ data, designerTemplates, showCreate, setShowCreate, draf
       <Text style={styles.fieldLabel}>الموظف المستلم</Text>
       <View style={styles.choices}>{employeesForDraft.map((employee: any) => <Pressable key={employee.id} style={[styles.choice, draft.assignedEmployeeId === employee.id && styles.choiceSelected]} onPress={() => setDraft({ ...draft, assignedEmployeeId: employee.id })}><Text style={draft.assignedEmployeeId === employee.id ? styles.choiceSelectedText : styles.choiceText}>{employee.name} · رقم {employee.employeeNo ?? 'غير مسجل'}</Text></Pressable>)}</View>
       {!employeesForDraft.length && <Text style={styles.error}>لا يوجد موظف نشط مرتبط بحساب دخول بهذا التصنيف والفرع. اختر «كل الفروع» أو راجع تعيين الدور والفرع.</Text>}
-      <Text style={styles.fieldLabel}>نموذج التقرير المرتبط بالتكليف</Text>
-      <View style={styles.choices}><Pressable style={[styles.choice, !draft.reportTemplateId && styles.choiceSelected]} onPress={() => setDraft({ ...draft, reportTemplateId: '' })}><Text style={!draft.reportTemplateId ? styles.choiceSelectedText : styles.choiceText}>بدون نموذج تقرير</Text></Pressable>{designerTemplates.filter((template: ReportTemplate) => template.role_code === draft.roleCode).map((template: ReportTemplate) => <Pressable key={template.id} style={[styles.choice, draft.reportTemplateId === template.id && styles.choiceSelected]} onPress={() => setDraft({ ...draft, reportTemplateId: template.id })}><Text style={draft.reportTemplateId === template.id ? styles.choiceSelectedText : styles.choiceText}>{template.title} · إصدار {template.approved_version_no}</Text></Pressable>)}</View>
-      <Pressable style={styles.secondary} onPress={() => setDraft({ ...draft, reportRequired: !draft.reportRequired })}><Text style={styles.secondaryText}>{draft.reportRequired ? 'التقرير مطلوب ✓' : 'التقرير اختياري'}</Text></Pressable>
+      <Text style={{ color: '#52687a', backgroundColor: '#eef5f7', borderRadius: 10, padding: 10, textAlign: 'right', lineHeight: 21 }}>حقول التقرير المعتمدة للدور المحدد تُرسل تلقائياً إلى تبويب «إعداد التقارير» لدى الموظف، ولا تحتاج إلى ربط يدوي داخل المهمة.</Text>
       <Pressable style={styles.primary} onPress={() => void createTask()}><Text style={styles.primaryText}>حفظ ونشر التكليف</Text></Pressable>
     </View>}
     <View style={styles.taskSearchBox}><Text style={styles.taskSearchGlyph}>⌕</Text><TextInput style={styles.taskSearchInput} value={search} onChangeText={setSearch} placeholder="ابحث بعنوان المهمة أو الفرع..." placeholderTextColor="#8493a4" /></View>
