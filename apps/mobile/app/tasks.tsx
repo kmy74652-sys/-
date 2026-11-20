@@ -402,11 +402,11 @@ export default function TasksScreen() {
         />
         {!!error && <View style={styles.errorBox}><Text accessibilityRole="alert" style={styles.error}>{error}</Text><Pressable style={styles.retryButton} onPress={() => { setRefreshing(true); void load({ force: true }); }}><Text style={styles.retryText}>إعادة المحاولة</Text></Pressable></View>}
         {!!notice && <Text accessibilityLiveRegion="polite" style={styles.notice}>{notice}</Text>}
-        {!loading && <View style={styles.employeeIntro}><Text style={styles.employeeIntroTitle}>{reportsOnly ? 'تقاريرك المطلوبة' : 'مساحة تنفيذك اليومية'}</Text><Text style={styles.employeeIntroText}>{reportsOnly ? 'ستجد هنا نماذج التقارير التي صممتها الإدارة وربطتها بالمهام المسندة إليك.' : 'اقرأ التكليف، ابدأ التنفيذ، ثم عبّئ التقرير المطلوب وأرسله للمسؤول للمراجعة.'}</Text></View>}
+        {!loading && !reportsOnly && <View style={styles.employeeIntro}><Text style={styles.employeeIntroTitle}>مساحة تنفيذك اليومية</Text><Text style={styles.employeeIntroText}>اقرأ التكليف، ابدأ التنفيذ، ثم عبّئ التقرير المطلوب وأرسله للمسؤول للمراجعة.</Text></View>}
         {!loading && <View style={styles.workTabs}><Pressable accessibilityRole="tab" accessibilityState={{ selected: !reportsOnly }} style={[styles.workTab, !reportsOnly && styles.workTabSelected]} onPress={() => router.replace({ pathname: '/tasks', params: { mode: 'mine' } })}><Text style={[styles.workTabText, !reportsOnly && styles.workTabTextSelected]}>المهام</Text></Pressable><Pressable accessibilityRole="tab" accessibilityState={{ selected: reportsOnly }} style={[styles.workTab, reportsOnly && styles.workTabSelected]} onPress={() => router.replace({ pathname: '/tasks', params: { view: 'reports', mode: 'mine' } })}><Text style={[styles.workTabText, reportsOnly && styles.workTabTextSelected]}>إعداد التقارير</Text></Pressable></View>}
-        {!loading && <View style={styles.summaryRow}><View style={styles.summaryCard}><Text style={styles.summaryValue}>{employeeSummary.pending}</Text><Text style={styles.summaryLabel}>جديدة</Text></View><View style={styles.summaryCard}><Text style={styles.summaryValue}>{employeeSummary.active}</Text><Text style={styles.summaryLabel}>قيد التنفيذ</Text></View><View style={styles.summaryCard}><Text style={styles.summaryValue}>{employeeSummary.submitted}</Text><Text style={styles.summaryLabel}>بانتظار المراجعة</Text></View></View>}
+        {!loading && !reportsOnly && <View style={styles.summaryRow}><View style={styles.summaryCard}><Text style={styles.summaryValue}>{employeeSummary.pending}</Text><Text style={styles.summaryLabel}>جديدة</Text></View><View style={styles.summaryCard}><Text style={styles.summaryValue}>{employeeSummary.active}</Text><Text style={styles.summaryLabel}>قيد التنفيذ</Text></View><View style={styles.summaryCard}><Text style={styles.summaryValue}>{employeeSummary.submitted}</Text><Text style={styles.summaryLabel}>بانتظار المراجعة</Text></View></View>}
         {loading && <View style={styles.loading}><ActivityIndicator size="large" color="#17324d" /><Text style={styles.muted}>جارٍ تحميل المهام…</Text></View>}
-        {!loading && (canReview || canManage) && <View style={styles.modeTabs}>
+        {!loading && !reportsOnly && (canReview || canManage) && <View style={styles.modeTabs}>
           {([
             ['mine', 'مهامي'],
             ['review', 'مراجعة التقارير'],
@@ -414,8 +414,8 @@ export default function TasksScreen() {
           ] as const).filter(([mode]) => mode === 'mine' || (mode === 'review' ? canReview : canManage || canReview)).map(([mode, label]) => <Pressable key={mode} accessibilityRole="button" accessibilityState={{ selected: screenMode === mode }} style={[styles.modeTab, screenMode === mode && styles.modeTabSelected]} onPress={() => { setScreenMode(mode); setStatusFilter('all'); setPositionFilter('all'); }}><Text style={[styles.modeTabText, screenMode === mode && styles.modeTabTextSelected]}>{label}</Text></Pressable>)}
         </View>}
 
-        {!loading && !!branchFilter && <View style={styles.activeFilter}><Text style={styles.meta}>الفرع المحدد: {tasks.find((task) => task.branch_id === branchFilter)?.branch_name ?? branchFilter}</Text><Pressable accessibilityRole="button" onPress={() => setBranchFilter('')} style={styles.clearFilterButton}><Text style={styles.clearFilterText}>مسح الفرع</Text></Pressable></View>}
-        {!loading && tasks.length > 0 && <>
+        {!loading && !reportsOnly && !!branchFilter && <View style={styles.activeFilter}><Text style={styles.meta}>الفرع المحدد: {tasks.find((task) => task.branch_id === branchFilter)?.branch_name ?? branchFilter}</Text><Pressable accessibilityRole="button" onPress={() => setBranchFilter('')} style={styles.clearFilterButton}><Text style={styles.clearFilterText}>مسح الفرع</Text></Pressable></View>}
+        {!loading && !reportsOnly && tasks.length > 0 && <>
           <TextInput style={styles.input} value={search} onChangeText={setSearch} placeholder="ابحث عن مهمة…" accessibilityLabel="البحث في المهام" />
           {canReview && screenMode !== 'mine' && <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filters}>
             {([['all', 'كل المناصب'], ['owner', 'صاحب المؤسسة'], ['admin_followup', 'المدير التنفيذي'], ['accountant', 'المحاسب'], ['warehouse_keeper', 'أمين المخازن'], ['warehouse_worker', 'عمال التحميل']] as const).map(([code, label]) => {
@@ -441,6 +441,24 @@ export default function TasksScreen() {
               <Text style={styles.taskTitle}>{task.title}</Text>
               <Text style={[styles.badge, task.status === 'approved' ? styles.goodBadge : task.status === 'rejected' ? styles.warnBadge : styles.neutralBadge]}>{statusLabels[task.status]}</Text>
             </View>
+            {reportsOnly && <View style={styles.reportWorkspace}>
+              {!!task.report_forms.length && task.report_forms.map((form) => {
+                const key = formDraftKey(task, form);
+                const locked = form.status === 'submitted' || form.status === 'approved';
+                const formValues = valuesForReportForm(task, form);
+                const formStatus = form.status === 'approved' ? 'تم اعتماد التقرير' : form.status === 'submitted' ? 'تم إرسال التقرير — بانتظار مراجعة الإدارة' : form.status === 'returned' ? 'أعيد للتعديل من الإدارة' : 'جاهز للتعبئة';
+                return <View key={form.snapshot_id} style={styles.directReportForm}>
+                  <View style={styles.taskHeading}><Text style={styles.reportFormTitle}>{form.title}</Text><Text style={[styles.badge, form.status === 'approved' ? styles.goodBadge : form.status === 'returned' ? styles.warnBadge : styles.neutralBadge]}>{formStatus}</Text></View>
+                  {form.status === 'returned' && !!form.review_note && <Text style={styles.proof}>ملاحظة الإدارة: {form.review_note}</Text>}
+                  {locked ? <ReportReadOnly fields={form.schema} values={form.values} /> : form.schema.filter((field) => isReportFieldVisible(field, formValues)).map((field) => <ReportFieldInput key={field.key} field={field} raw={drafts[key]?.[field.key] ?? ''} attachments={attachments[key]?.[field.key] ?? []} calculated={evaluateReportField(field, form.schema, formValues).value} calculationError={evaluateReportField(field, form.schema, formValues).error} rows={field.type === 'table' ? tableRows(key, field) : []} onDraftChange={(value) => setDrafts((current) => ({ ...current, [key]: { ...current[key], [field.key]: value } }))} onTableChange={(rows) => updateTable(key, field, rows)} onChooseAttachment={() => void chooseFormAttachment(task, form, field.key)} />)}
+                  {!locked && <><Pressable style={styles.secondaryButton} onPress={() => void saveSeparateDraft(task, form)}><Text style={styles.secondaryText}>حفظ المسودة</Text></Pressable><Pressable disabled={busyTask === task.id} style={styles.primaryButton} onPress={() => submitSeparateReport(task, form)}><Text style={styles.primaryText}>{busyTask === task.id ? 'جارٍ الإرسال…' : 'إرسال التقرير مرة واحدة'}</Text></Pressable></>}
+                  {locked && <Text style={styles.lockedReportText}>تم ترحيل هذا التقرير ولا يمكن تعديله أو إرساله مرة أخرى. يمكن للإدارة إعادته للتعديل عند الحاجة.</Text>}
+                </View>;
+              })}
+              {!task.report_forms.length && !!task.report_schema.length && <View style={styles.directReportForm}>
+                {task.status === 'submitted' || task.status === 'approved' ? <><ReportReadOnly fields={task.report_schema} values={{}} /><Text style={styles.lockedReportText}>تم ترحيل هذا التقرير ولا يمكن تعديله أو إرساله مرة أخرى. يمكن للإدارة إعادته للتعديل عند الحاجة.</Text></> : <>{task.report_schema.filter((field) => isReportFieldVisible(field, draftValuesForTask(task))).map((field) => <ReportFieldInput key={field.key} field={field} raw={drafts[task.id]?.[field.key] ?? ''} attachments={attachments[task.id]?.[field.key] ?? []} calculated={calculatedValue(task.id, field)} calculationError={calculationError(task.id, field)} rows={field.type === 'table' ? tableRows(task.id, field) : []} onDraftChange={(value) => setDrafts((current) => ({ ...current, [task.id]: { ...current[task.id], [field.key]: value } }))} onTableChange={(rows) => updateTable(task.id, field, rows)} onChooseAttachment={() => void chooseAttachment(task, field.key)} />)}<Pressable disabled={busyTask === task.id} style={styles.primaryButton} onPress={() => submitReport(task)}><Text style={styles.primaryText}>{busyTask === task.id ? 'جارٍ الإرسال…' : 'إرسال التقرير مرة واحدة'}</Text></Pressable></>}
+              </View>}
+            </View>}
             {!reportsOnly && <>
             <Text style={styles.cardSectionLabel}>1 · اقرأ التكليف</Text>
             {!!task.description && <Text style={styles.body}>{task.description}</Text>}
@@ -460,7 +478,7 @@ export default function TasksScreen() {
             {!!timeline[task.id]?.length && <View style={styles.timeline}>{timeline[task.id].map((entry) => <Text key={entry.id} style={styles.meta}>{formatDate(entry.created_at)} · {entry.status} · {entry.actor_name}{entry.note ? ` — ${entry.note}` : ''}</Text>)}</View>}
             </>}
 
-            {reportTask === task.id && (task.report_schema ?? []).filter((field) => isReportFieldVisible(field, draftValuesForTask(task))).map((field) => <ReportFieldInput
+            {!reportsOnly && reportTask === task.id && (task.report_schema ?? []).filter((field) => isReportFieldVisible(field, draftValuesForTask(task))).map((field) => <ReportFieldInput
               key={field.key} field={field} raw={drafts[task.id]?.[field.key] ?? ''}
               attachments={attachments[task.id]?.[field.key] ?? []} calculated={calculatedValue(task.id, field)} calculationError={calculationError(task.id, field)}
               rows={field.type === 'table' ? tableRows(task.id, field) : []}
@@ -469,9 +487,9 @@ export default function TasksScreen() {
               onChooseAttachment={() => void chooseAttachment(task, field.key)}
             />)}
 
-            {(!!task.report_forms.length || (!!task.report_schema?.length && ['in_progress', 'rejected'].includes(task.status))) && <Text style={styles.cardSectionLabel}>3 · عبّئ التقرير وأرسله</Text>}
-            {!!task.report_forms.length && ['in_progress', 'rejected'].includes(task.status) && (() => { const firstForm = task.report_forms.find((form) => Boolean(form.snapshot_id) && !['submitted', 'approved'].includes(form.status ?? '')); const snapshotId = firstForm?.snapshot_id; return firstForm && snapshotId ? <Pressable accessibilityRole="button" style={styles.reportQuickButton} onPress={() => { setError(''); setActiveReportForm({ taskId: task.id, snapshotId }); }}><Text style={styles.reportQuickTitle}>التقرير المطلوب من الإدارة</Text><Text style={styles.reportQuickText}>اضغط هنا لفتح النموذج وتعبئته ثم إرساله للمراجعة</Text><Text style={styles.reportQuickAction}>فتح التقرير الآن ←</Text></Pressable> : null; })()}
-            {!!task.report_forms.length && <View style={styles.timeline}><Text style={styles.fieldLabel}>نماذج التقارير المرتبطة</Text>{task.report_forms.map((form)=>{
+            {!reportsOnly && (!!task.report_forms.length || (!!task.report_schema?.length && ['in_progress', 'rejected'].includes(task.status))) && <Text style={styles.cardSectionLabel}>3 · عبّئ التقرير وأرسله</Text>}
+            {!reportsOnly && !!task.report_forms.length && ['in_progress', 'rejected'].includes(task.status) && (() => { const firstForm = task.report_forms.find((form) => Boolean(form.snapshot_id) && !['submitted', 'approved'].includes(form.status ?? '')); const snapshotId = firstForm?.snapshot_id; return firstForm && snapshotId ? <Pressable accessibilityRole="button" style={styles.reportQuickButton} onPress={() => { setError(''); setActiveReportForm({ taskId: task.id, snapshotId }); }}><Text style={styles.reportQuickTitle}>التقرير المطلوب من الإدارة</Text><Text style={styles.reportQuickText}>اضغط هنا لفتح النموذج وتعبئته ثم إرساله للمراجعة</Text><Text style={styles.reportQuickAction}>فتح التقرير الآن ←</Text></Pressable> : null; })()}
+            {!reportsOnly && !!task.report_forms.length && <View style={styles.timeline}><Text style={styles.fieldLabel}>نماذج التقارير المرتبطة</Text>{task.report_forms.map((form)=>{
               const key=formDraftKey(task,form); const opened=activeReportForm?.taskId===task.id&&activeReportForm.snapshotId===form.snapshot_id;
               const statusLabel=form.status==='submitted'?'بانتظار مراجعة هذا النموذج':form.status==='approved'?'تم اعتماد هذا النموذج':form.status==='returned'?'أُعيد هذا النموذج للتعديل':form.required?'مطلوب الإرسال':'اختياري';
               const canEdit=['in_progress','rejected','submitted'].includes(task.status)&&form.status!=='submitted'&&form.status!=='approved';
@@ -486,7 +504,7 @@ export default function TasksScreen() {
               </View>;
             })}</View>}
 
-            {task.report_flow !== 'multi_form' && !!task.report_schema?.length && ['in_progress', 'rejected'].includes(task.status) && reportTask !== task.id && (
+            {!reportsOnly && task.report_flow !== 'multi_form' && !!task.report_schema?.length && ['in_progress', 'rejected'].includes(task.status) && reportTask !== task.id && (
               <Pressable accessibilityRole="button" style={styles.secondaryButton} onPress={() => { setError(''); setReportTask(task.id); }}>
                 <Text style={styles.secondaryText}>كتابة التقرير</Text>
               </Pressable>
@@ -521,9 +539,9 @@ export default function TasksScreen() {
             </View>}
           </View>
         ))}
-        {!loading && !error && filteredTasks.length === 0 && <Text style={styles.empty}>{tasks.length ? 'لا توجد مهام تطابق البحث أو الفلتر.' : 'لا توجد مهام ظاهرة لهذا الحساب.'}</Text>}
+        {!loading && !error && filteredTasks.length === 0 && <Text style={styles.empty}>{reportsOnly ? 'لا توجد تقارير مطلوبة حالياً.' : tasks.length ? 'لا توجد مهام تطابق البحث أو الفلتر.' : 'لا توجد مهام ظاهرة لهذا الحساب.'}</Text>}
 
-        <View style={styles.notifications}>
+        {!reportsOnly && <View style={styles.notifications}>
           <Text style={styles.sectionTitle}>التنبيهات</Text>
           {!notifications.length && <Text style={styles.muted}>لا توجد تنبيهات جديدة.</Text>}
           {notifications.slice(0, 5).map((item) => (
@@ -533,7 +551,7 @@ export default function TasksScreen() {
               <Text style={styles.meta}>{formatDate(item.created_at)}{item.read_at ? ' · مقروء' : ' · جديد'}</Text>
             </View>
           ))}
-        </View>
+        </View>}
       </ScrollView>
     </AppShell>
   );
@@ -603,6 +621,10 @@ const styles = StyleSheet.create({
   timeline: { borderTopWidth: 1, borderTopColor: '#edf1f3', paddingTop: 8, gap: 4 },
   stepCard: { backgroundColor: '#f8fafb', borderWidth: 1, borderColor: '#e2eaed', borderRadius: 11, padding: 11, gap: 8 },
   reportCard: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#e2eaed', borderRadius: 12, padding: 12, gap: 8 },
+  reportWorkspace: { gap: 12, marginTop: 2 },
+  directReportForm: { gap: 10, borderTopWidth: 1, borderTopColor: '#edf1f3', paddingTop: 12 },
+  reportFormTitle: { flex: 1, color: '#17324d', fontSize: 17, fontWeight: '900', textAlign: 'right', lineHeight: 25 },
+  lockedReportText: { color: '#52687a', backgroundColor: '#eef5f7', borderRadius: 10, padding: 11, textAlign: 'right', lineHeight: 21 },
   reportQuickButton: { backgroundColor: '#fff4d7', borderWidth: 2, borderColor: '#dba62a', borderRadius: 14, padding: 14, gap: 4, alignItems: 'flex-end' },
   reportQuickTitle: { color: '#17324d', fontSize: 16, fontWeight: '900', textAlign: 'right' },
   reportQuickText: { color: '#52687a', fontSize: 13, textAlign: 'right', lineHeight: 20 },

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 const read = (name) => fs.readFileSync(new URL(`../${name}`, import.meta.url), 'utf8').toLowerCase();
-const workflow = read('supabase/migrations/001_extensions.sql') + read('supabase/migrations/003_tasks.sql') + read('supabase/migrations/008_task_workflow.sql') + read('supabase/migrations/022_mobile_modern_task_workflows.sql') + read('supabase/migrations/023_task_workflow_schema_hardening.sql');
+const workflow = read('supabase/migrations/001_extensions.sql') + read('supabase/migrations/003_tasks.sql') + read('supabase/migrations/008_task_workflow.sql') + read('supabase/migrations/022_mobile_modern_task_workflows.sql') + read('supabase/migrations/023_task_workflow_schema_hardening.sql') + read('supabase/migrations/066_lock_submitted_task_report_drafts.sql');
 const access = read('supabase/migrations/005_security.sql') + read('supabase/seed/001_roles_permissions.sql') + read('supabase/migrations/007_task_authorization.sql') + read('supabase/migrations/025_production_task_attachments_timeline.sql');
 const mobile = read('apps/mobile/app/tasks.tsx');
 const mobileData = read('apps/mobile/lib/mobileData.ts');
@@ -18,6 +18,9 @@ assert(mobile.includes("canreview && (task.status === 'submitted' || haspendingf
 assert(mobile.includes("['mine', 'مهامي']") && mobile.includes("['review', 'مراجعة التقارير']"), 'role-based task/review tabs missing');
 assert(mobile.includes("firstsearchparam(routeparams.view) === 'reports'") && mobile.includes('إعداد التقارير'), 'employee report workspace tab missing');
 assert(mobile.includes('(!reportsonly || hasreport)'), 'report workspace must show only tasks with assigned report forms');
+assert(mobile.includes('إرسال التقرير مرة واحدة') && mobile.includes('تم ترحيل هذا التقرير ولا يمكن تعديله'), 'report workspace must expose one submission and lock submitted reports');
+assert(mobile.includes("!reportsonly && <view style={styles.notifications}") && mobile.includes("!loading && !reportsonly && tasks.length > 0"), 'report workspace must hide task filters and notifications');
+assert(read('supabase/migrations/066_lock_submitted_task_report_drafts.sql').includes('report_draft_locked_after_submission'), 'submitted report draft lock migration missing');
 assert(read('apps/mobile/components/HomeDashboard.tsx').includes("view: 'reports'"), 'employee dashboard reports card must open the report workspace');
 const queue = new Map();
 const add = (id) => queue.has(id) || queue.set(id, true);
