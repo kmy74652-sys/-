@@ -96,7 +96,7 @@ export async function listTaskTemplates() {
   return data ?? [];
 }
 
-export async function createAdministrativeTask(input: { title: string; description: string; dueAt: string; priority: string; branchId: string | null; roleCode: string; assignedEmployeeId: string; templateId: string | null; reportTemplateId?: string | null; reportVersionId?: string | null; reportRequired?: boolean }) {
+export async function createAdministrativeTask(input: { title: string; description: string; dueAt: string; priority: string; branchId: string | null; roleCode: string; assignedEmployeeId: string; templateId: string | null; reportTemplateId?: string | null; reportVersionId?: string | null; reportRequired?: boolean; reportOverrides?: unknown[] }) {
   const db = client();
   const { data: authData, error: authError } = await db.auth.getUser();
   if (authError || !authData.user) throw authError ?? new Error('not_authenticated');
@@ -120,24 +120,36 @@ export async function createAdministrativeTask(input: { title: string; descripti
   if (!assignee?.user_id) throw new Error('employee_login_not_linked');
   const assignment = assignments.find((row) => row.membership_id === assignee?.id);
   if (!assignee || !assignment) throw new Error('employee_not_active');
-  const { data: task, error } = await db.rpc('create_task_with_report_form', {
-    p_organization_id: organizationId,
-    p_title: input.title.trim(),
-    p_description: input.description.trim() || null,
-    p_due_at: input.dueAt,
-    p_priority: input.priority,
-    p_branch_id: input.branchId,
-    p_role_code: input.roleCode,
-    p_template_id: input.templateId,
-    p_assigned_to: assignee.user_id,
-    p_report_template_id: reportTemplateId,
-    p_report_version_id: reportVersionId,
-    p_report_required: Boolean(input.reportRequired),
-  });
+  const { data: task, error } = input.templateId
+    ? await db.rpc('assign_task_from_template', {
+        p_organization_id: organizationId,
+        p_template_id: input.templateId,
+        p_assigned_to: assignee.user_id,
+        p_branch_id: input.branchId,
+        p_starts_at: new Date().toISOString(),
+        p_due_at: input.dueAt,
+        p_priority: input.priority,
+        p_instructions: input.description.trim() || null,
+        p_report_overrides: input.reportOverrides ?? [],
+      })
+    : await db.rpc('create_task_with_report_form', {
+        p_organization_id: organizationId,
+        p_title: input.title.trim(),
+        p_description: input.description.trim() || null,
+        p_due_at: input.dueAt,
+        p_priority: input.priority,
+        p_branch_id: input.branchId,
+        p_role_code: input.roleCode,
+        p_template_id: null,
+        p_assigned_to: assignee.user_id,
+        p_report_template_id: reportTemplateId,
+        p_report_version_id: reportVersionId,
+        p_report_required: Boolean(input.reportRequired),
+      });
   if (error) throw error;
-  const result = task as { id?: string; assigned_to?: string } | null;
-  if (!result?.id) throw new Error('task_create_response_invalid');
-  return { id: result.id, assigned_to: result.assigned_to ?? assignee.user_id };
+  const taskId = typeof task === 'string' ? task : (task as { id?: string } | null)?.id;
+  if (!taskId) throw new Error('task_create_response_invalid');
+  return { id: taskId, assigned_to: assignee.user_id };
 }
 
 export const statusLabel = (status: string) => ({ new: 'جديدة', received: 'مستلمة', in_progress: 'قيد التنفيذ', on_hold: 'معلّقة', report_submitted: 'بانتظار المراجعة', needs_revision: 'تحتاج تصحيحًا', completed_approved: 'منجزة ومعتمدة', late: 'متأخرة' }[status] ?? status);

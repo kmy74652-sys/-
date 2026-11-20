@@ -11,16 +11,16 @@ export default function EmployeeRoleReportPanel({ roleCode, branchId, employeeNa
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
-  const today = new Date().toISOString().slice(0, 10);
+  const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Aden', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
   const todayReport = reports.find((item) => item.report_date === today);
   const locked = todayReport?.status === 'submitted' || todayReport?.status === 'approved';
 
   async function load() {
-    try { setLoading(true); setError(''); const rows = await listMyRoleReports(roleCode); setReports(rows); const current = rows.find((item) => item.report_date === today && item.status === 'returned'); if (current) setValues(current.values ?? {}); }
+    try { setLoading(true); setError(''); const rows = await listMyRoleReports(roleCode, branchId); setReports(rows); const current = rows.find((item) => item.report_date === today && item.status === 'returned'); if (current) setValues(current.values ?? {}); }
     catch (cause) { setError(friendlyDataError(cause, 'تعذر تحميل تقرير الدور.')); }
     finally { setLoading(false); }
   }
-  useEffect(() => { void load(); }, [roleCode]);
+  useEffect(() => { void load(); }, [roleCode, branchId]);
   async function submit() {
     if (locked) return;
     setBusy(true); setError(''); setNotice('');

@@ -53,6 +53,7 @@ type Task = {
   report_schema: ReportField[];
   task_instructions: string | null;
   report_flow: 'legacy' | 'multi_form';
+  legacy_report_values: Record<string, unknown> | null;
   execution_steps: Array<{ id: string; title: string; instructions: string | null; sort_order: number; required: boolean; evidence_required: boolean; evidence_instructions: string | null; completed: boolean }>;
   report_forms: MobileTaskReportForm[];
 };
@@ -480,7 +481,7 @@ export default function TasksScreen() {
                 </View>;
               })}
               {!task.report_forms.length && !!task.report_schema.length && <View style={styles.directReportForm}>
-                {task.status === 'submitted' || task.status === 'approved' ? <ReportReadOnly fields={task.report_schema} values={{}} /> : <>{task.report_schema.filter((field) => isReportFieldVisible(field, draftValuesForTask(task))).map((field) => <ReportFieldInput key={field.key} field={field} raw={drafts[task.id]?.[field.key] ?? ''} attachments={attachments[task.id]?.[field.key] ?? []} calculated={calculatedValue(task.id, field)} calculationError={calculationError(task.id, field)} rows={field.type === 'table' ? tableRows(task.id, field) : []} onDraftChange={(value) => setDrafts((current) => ({ ...current, [task.id]: { ...current[task.id], [field.key]: value } }))} onTableChange={(rows) => updateTable(task.id, field, rows)} onChooseAttachment={() => void chooseAttachment(task, field.key)} />)}<Pressable disabled={busyTask === task.id} style={styles.primaryButton} onPress={() => submitReport(task)}><Text style={styles.primaryText}>{busyTask === task.id ? 'جارٍ الإرسال…' : 'إرسال التقرير مرة واحدة'}</Text></Pressable></>}
+                {task.status === 'submitted' || task.status === 'approved' ? <ReportReadOnly fields={task.report_schema} values={task.legacy_report_values ?? {}} /> : <>{task.report_schema.filter((field) => isReportFieldVisible(field, draftValuesForTask(task))).map((field) => <ReportFieldInput key={field.key} field={field} raw={drafts[task.id]?.[field.key] ?? ''} attachments={attachments[task.id]?.[field.key] ?? []} calculated={calculatedValue(task.id, field)} calculationError={calculationError(task.id, field)} rows={field.type === 'table' ? tableRows(task.id, field) : []} onDraftChange={(value) => setDrafts((current) => ({ ...current, [task.id]: { ...current[task.id], [field.key]: value } }))} onTableChange={(rows) => updateTable(task.id, field, rows)} onChooseAttachment={() => void chooseAttachment(task, field.key)} />)}<Pressable disabled={busyTask === task.id} style={styles.primaryButton} onPress={() => submitReport(task)}><Text style={styles.primaryText}>{busyTask === task.id ? 'جارٍ الإرسال…' : 'إرسال التقرير مرة واحدة'}</Text></Pressable></>}
               </View>}
             </View>}
             {!reportsOnly && <>

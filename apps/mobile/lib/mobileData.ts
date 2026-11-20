@@ -36,6 +36,7 @@ export type MobileTask = {
   report_schema: ReportField[];
   task_instructions: string | null;
   report_flow: 'legacy' | 'multi_form';
+  legacy_report_values: Record<string, unknown> | null;
   execution_steps: MobileTaskStep[];
   report_forms: MobileTaskReportForm[];
 };
@@ -159,7 +160,8 @@ export async function listMyTasks(institutionId?: string): Promise<MobileTask[]>
       const rawSchema = Array.isArray(snapshot.schema) ? snapshot.schema as Array<Record<string, unknown>> : [];
       return { snapshot_id: snapshot.id, title: snapshot.title ?? 'نموذج تقرير', sort_order: snapshot.sort_order ?? 0, required: Boolean(snapshot.is_required), schema: rawSchema.map((field) => ({ key: String(field.key ?? ''), label: String(field.label ?? ''), description: (field.description as string | null) ?? null, type: String(field.type ?? 'short_text') as ReportField['type'], options: Array.isArray(field.options) ? field.options.map(String) : [], required: Boolean(field.required), repeatable: Boolean(field.repeatable), validation: (field.validation as Record<string, unknown>) ?? {}, config: (field.config as Record<string, unknown>) ?? {} })), report_id: latest?.id ?? null, draft_values: (latestDraft?.values as Record<string, unknown> | null) ?? null, status: latest?.status === 'returned' ? 'returned' : latest?.status === 'approved' ? 'approved' : latest?.status === 'submitted' ? 'submitted' : null, values: (latest?.values as Record<string, unknown> | null) ?? null, review_note: latest?.review_note ?? null, submitted_at: latest?.submitted_at ?? null };
     }) : [];
-    return { ...task, assignee_employee_id: task.assigned_to, position_code: (task.position_code as MobileTask['position_code'] | null) ?? role ?? null, starts_at: task.starts_at ?? task.assigned_at ?? task.created_at ?? task.due_at, status, proof_required: Boolean(task.proof_required), proof_instructions: task.proof_instructions, task_instructions: task.task_instructions, report_flow: task.report_flow === 'multi_form' ? 'multi_form' : 'legacy', execution_steps: executionSteps, report_forms: reportForms, report_schema: fieldsByTask.get(task.id) ?? [], branch_name: branchById.get(task.branch_id)?.name ?? null, branch_level: branchById.get(task.branch_id)?.branch_level ?? null };
+    const latestLegacyReport = (reportsResult.data ?? []).find((report) => report.task_id === task.id && !report.report_form_snapshot_id);
+    return { ...task, assignee_employee_id: task.assigned_to, position_code: (task.position_code as MobileTask['position_code'] | null) ?? role ?? null, starts_at: task.starts_at ?? task.assigned_at ?? task.created_at ?? task.due_at, status, proof_required: Boolean(task.proof_required), proof_instructions: task.proof_instructions, task_instructions: task.task_instructions, report_flow: task.report_flow === 'multi_form' ? 'multi_form' : 'legacy', legacy_report_values: (latestLegacyReport?.values as Record<string, unknown> | null) ?? null, execution_steps: executionSteps, report_forms: reportForms, report_schema: fieldsByTask.get(task.id) ?? [], branch_name: branchById.get(task.branch_id)?.name ?? null, branch_level: branchById.get(task.branch_id)?.branch_level ?? null };
   }) as MobileTask[];
 }
 
@@ -303,6 +305,10 @@ export function friendlyDataError(error: unknown, fallback: string): string {
     report_signature_required: 'ارسم التوقيع قبل إرسال التقرير.',
     report_signature_immutable: 'حُفظ التوقيع مع التقرير ولا يمكن تعديله بعد الإرسال.',
     invalid_task_report_payload: 'بيانات التقرير غير صالحة.',
+    role_report_assignment_invalid: 'لا يطابق التقرير الدور أو الفرع المحدد لهذا الموظف.',
+    role_report_already_submitted: 'تم إرسال تقرير هذا اليوم مسبقًا ولا يمكن إرساله مرة أخرى.',
+    review_note_required: 'اكتب ملاحظة المراجعة قبل إعادة التقرير للتعديل.',
+    invalid_role_report_payload: 'بيانات تقرير الدور غير صالحة.',
     not_authenticated: 'انتهت الجلسة. سجّل الدخول مجددًا.',
   };
   for (const [key, value] of Object.entries(known)) {

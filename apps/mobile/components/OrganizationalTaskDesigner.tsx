@@ -1,11 +1,13 @@
 import { useMemo, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import AdenDeadlinePicker, { adenDateTimeToIso, currentAdenDateTime } from './AdenDeadlinePicker';
-import type { TaskRoleCode, TaskTemplateDraft } from './TaskDesigner';
+import type { TaskReportSelection, TaskRoleCode, TaskTemplateDraft } from './TaskDesigner';
+import type { DesignerField } from '../lib/reportSchema';
 
 type ScheduleRow = { id: string; timeSlot: string; responsibility: string; kpiIndicator: string; proofRequirement: string; requiresProof: boolean; subItems: string[] };
 type EmployeeOption = { id: string; userId?: string | null; name: string; active: boolean; roles?: string[]; assignments?: Array<{ roleCode: string; branchId: string | null }> };
-type Props = { initialTemplate?: Partial<TaskTemplateDraft>; employees?: EmployeeOption[]; canManage?: boolean; onSave?: (draft: TaskTemplateDraft) => void | Promise<void>; onSend?: (draft: TaskTemplateDraft, employeeId: string, branchId: string | null, dueAt: string) => void | Promise<void>; onList?: () => void | Promise<void> };
+type SaveResult = { templateId?: string; reports?: TaskReportSelection[] };
+type Props = { initialTemplate?: Partial<TaskTemplateDraft>; employees?: EmployeeOption[]; canManage?: boolean; onSave?: (draft: TaskTemplateDraft) => void | Promise<SaveResult | void>; onSend?: (draft: TaskTemplateDraft, employeeId: string, branchId: string | null, dueAt: string) => void | Promise<void>; onList?: () => void | Promise<void> };
 
 const roles: Array<[TaskRoleCode, string]> = [
   ['owner', 'صاحب المؤسسة'], ['admin_followup', 'المدير التنفيذي'], ['accountant', 'المحاسب'], ['warehouse_keeper', 'أمين المخازن'], ['warehouse_worker', 'عمال التحميل'],
@@ -58,20 +60,36 @@ export default function OrganizationalTaskDesigner({ initialTemplate, employees 
   const addListItem = (setter: (items: string[]) => void, items: string[]) => setter([...items, '']);
 
   const summary = useMemo(() => `${days} · صباحية ${morning} · استراحة ${breakTime} · مسائية ${evening}`, [breakTime, days, evening, morning]);
+  function reportFieldsToDesignerFields(): DesignerField[] {
+    return reportFields.map((label, index) => ({
+      field_key: `daily_report_${index + 1}`,
+      label: label.trim() || `بند التقرير ${index + 1}`,
+      description: 'يُعبّأ ضمن التقرير المرتبط بالمهمة.',
+      field_type: 'short_text',
+      is_required: true,
+      repeatable: false,
+      sort_order: index,
+      options: [],
+      validation: {},
+      config: {},
+    }));
+  }
   function buildDraft(): TaskTemplateDraft {
     const description = [summary, 'المهام المستمرة:', ...continuous.filter(Boolean).map((item) => `- ${item}`), 'بنود التقرير اليومي:', ...reportFields.filter(Boolean).map((item) => `- ${item}`), 'التوصيات والضوابط:', ...recommendations.filter(Boolean).map((item) => `- ${item}`)].join('\n');
     const steps = rows.map((row, index) => ({ id: row.id, title: row.responsibility.trim() || `مهمة تنظيمية ${index + 1}`, instructions: [`الفترة: ${row.timeSlot}`, `مؤشر الأداء: ${row.kpiIndicator}`, `الإثبات: ${row.proofRequirement}`, row.subItems.length ? `البنود الفرعية:\n${row.subItems.map((item) => `- ${item}`).join('\n')}` : ''].filter(Boolean).join('\n'), required: true, evidenceRequired: row.requiresProof, evidenceInstructions: row.proofRequirement }));
-    return { id: initialTemplate?.id, category: 'admin', subcategory: 'الدوام والمهام اليومية', customSubcategory: '', title: title.trim() || 'الجدول التنظيمي للدوام والمهام اليومية', description, instructions: summary, roleCode: selectedRole, priority: initialTemplate?.priority ?? 'normal', expectedDurationMinutes: initialTemplate?.expectedDurationMinutes ?? null, steps, reports: [], reportFields: [], reportRequired: false, isActive: initialTemplate?.isActive ?? true };
+    const fields = reportFieldsToDesignerFields();
+    return { id: initialTemplate?.id, category: 'admin', subcategory: 'الدوام والمهام اليومية', customSubcategory: '', title: title.trim() || 'الجدول التنظيمي للدوام والمهام اليومية', description, instructions: summary, roleCode: selectedRole, priority: initialTemplate?.priority ?? 'normal', expectedDurationMinutes: initialTemplate?.expectedDurationMinutes ?? null, steps, reports: initialTemplate?.reports ?? [], reportFields: fields, reportRequired: fields.length > 0, isActive: initialTemplate?.isActive ?? true };
   }
   async function save() {
     setBusy(true); setNotice('');
     try {
       const draft = buildDraft();
-      await onSave?.(draft);
+      const saveResult = await onSave?.(draft);
+      const dispatchedDraft = { ...draft, id: saveResult?.templateId ?? draft.id, reports: saveResult?.reports ?? draft.reports };
       const employee = employeeOptions.find((item) => item.id === selectedEmployeeId);
       const dueAt = adenDateTimeToIso(dueDate, dueTime);
       if (employee && dueAt) {
-        await onSend?.(draft, employee.id, employee.assignments?.find((item) => item.roleCode === selectedRole)?.branchId ?? null, dueAt);
+        await onSend?.(dispatchedDraft, employee.id, employee.assignments?.find((item) => item.roleCode === selectedRole)?.branchId ?? null, dueAt);
         setNotice(`تم حفظ المهمة وإرسالها مباشرة إلى ${employee.name} ضمن تبويب المهام.`);
       } else {
         setNotice('تم حفظ الجدول التنظيمي. اختر موظفًا وموعدًا صالحًا لإرساله مباشرة.');
@@ -84,7 +102,7 @@ export default function OrganizationalTaskDesigner({ initialTemplate, employees 
     if (!employee) { setNotice('اختر الموظف المستلم للمهمة أولاً.'); return; }
     if (!dueAt) { setNotice('أدخل موعداً نهائياً صالحاً للمهمة.'); return; }
     setBusy(true); setNotice('');
-    try { await onSend?.(buildDraft(), employee.id, employee.assignments?.find((item) => item.roleCode === selectedRole)?.branchId ?? null, dueAt); setNotice(`تم إرسال المهمة مباشرة إلى ${employee.name}.`); } finally { setBusy(false); }
+    try { const draft = buildDraft(); const saveResult = await onSave?.(draft); await onSend?.({ ...draft, id: saveResult?.templateId ?? draft.id, reports: saveResult?.reports ?? draft.reports }, employee.id, employee.assignments?.find((item) => item.roleCode === selectedRole)?.branchId ?? null, dueAt); setNotice(`تم إرسال المهمة مباشرة إلى ${employee.name}.`); } finally { setBusy(false); }
   }
 
   return <View style={styles.shell}>

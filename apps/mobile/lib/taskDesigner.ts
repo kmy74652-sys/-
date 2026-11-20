@@ -155,7 +155,7 @@ export async function saveTaskDesignerTemplate(draft: TaskTemplateDraft, categor
   };
   const { data, error } = await db.rpc('save_task_designer_template', { p_organization_id: organizationId, p_template_id: draft.id ?? null, p_payload: payload });
   if (error) throw error;
-  return data as string;
+  return { templateId: data as string, reports: reportForms };
 }
 
 export async function setTaskDesignerTemplateActive(templateId: string, isActive: boolean) {

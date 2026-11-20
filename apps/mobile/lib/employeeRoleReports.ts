@@ -52,8 +52,10 @@ export function roleReportConfig(roleCode: string) {
 }
 function db() { if (!supabase) throw new Error('supabase_not_configured'); return supabase; }
 
-export async function listMyRoleReports(roleCode: string): Promise<RoleReport[]> {
-  const { data, error } = await db().from('employee_role_reports').select('id,organization_id,employee_user_id,role_code,branch_id,report_date,report_title,values,status,submitted_at,review_note').eq('role_code', roleCode).order('report_date', { ascending: false }).limit(30);
+export async function listMyRoleReports(roleCode: string, branchId: string | null = null): Promise<RoleReport[]> {
+  let query = db().from('employee_role_reports').select('id,organization_id,employee_user_id,role_code,branch_id,report_date,report_title,values,status,submitted_at,review_note').eq('role_code', roleCode).order('report_date', { ascending: false }).limit(30);
+  query = branchId ? query.eq('branch_id', branchId) : query.is('branch_id', null);
+  const { data, error } = await query;
   if (error) throw error;
   return (data ?? []) as RoleReport[];
 }

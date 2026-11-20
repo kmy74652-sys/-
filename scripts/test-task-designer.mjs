@@ -20,9 +20,9 @@ const checks = [
   ['preview can move and resize', designer.includes('PanResponder') && designer.includes('تغيير الحجم')],
   ['steps support touch reorder', designer.includes('StepDragHandle') && designer.includes('onDrop')],
   ['copy/archive are guarded in admin', admin.includes('نسخ القالب') && admin.includes('setTaskDesignerTemplateActive') && admin.includes('canManageTaskLibrary')],
-  ['direct send targets the selected employee without legacy template assignment', organizational.includes('selectedEmployeeId') && organizational.includes('إرسال المهمة للموظف مباشرة') && admin.includes('createAdministrativeTask') && admin.includes('templateId: null') && !admin.includes('assignTaskFromTemplate') && !admin.includes('إسناد من قالب')],
+  ['direct send targets the selected employee through the saved template', organizational.includes('selectedEmployeeId') && organizational.includes('إرسال المهمة للموظف مباشرة') && admin.includes('createAdministrativeTask') && admin.includes('templateId: draft.id ?? null') && adminData.includes("'assign_task_from_template'")],
   ['direct send preserves role and branch validation', organizational.includes('employee.assignments') && adminData.includes('employee_assignment_invalid') && admin.includes('branchId, assignedEmployeeId: employeeId')],
-  ['save dispatches the directed task immediately', organizational.includes('await onSave?.(draft)') && organizational.includes('await onSend?.(draft') && admin.includes('تفاصيل التنفيذ المباشر:')],
+  ['save dispatches the directed task immediately', organizational.includes('const saveResult = await onSave?.(draft)') && organizational.includes('saveResult?.templateId') && organizational.includes('await onSend?.({ ...draft') && admin.includes('تفاصيل التنفيذ المباشر:')],
   ['employee task tab shows new tasks only', tasks.includes('const employeeNewOnly') && tasks.includes("normalizeTaskStatus(task.status) === 'pending'") && tasks.includes('!employeeNewOnly ||')],
   ['dynamic test cards stay hidden while designer tasks remain visible', tasks.includes('isDynamicTestTitle') && tasks.includes('!isDynamicTestTitle(task.title)') && tasks.includes('اختبار مهمة ديناميكية')],
   ['manual task assignment clears stale branch and matches role-specific assignments', admin.includes("roleCode: role, branchId: '', assignedEmployeeId: ''") && admin.includes('const employeesForDraft') && admin.includes('assignment.roleCode === draft.roleCode && (!draft.branchId || assignment.branchId === draft.branchId)')],
@@ -36,7 +36,7 @@ const checks = [
   ['task and sub-item deletion require confirmation', organizational.includes('تأكيد حذف المهمة') && organizational.includes('تأكيد حذف البند') && organizational.includes("style: 'destructive'")],
   ['report designer remains independent', admin.includes("import ReportDesigner") && admin.includes('section === \'report-designer\'') && admin.includes('<ReportDesigner')],
   ['legacy starter catalog is hidden from designer', library.includes('retiredStarterTemplateCodes') && !admin.includes('قالب التقرير القديم')],
-  ['reports are designed independently and delivered automatically by role', designer.includes('التقارير مستقلة عن قالب المهمة') && admin.includes('حقول التقرير المعتمدة للدور المحدد تُرسل تلقائياً') && admin.includes('const selectedReport = designerTemplates.find((template) => template.role_code === draft.roleCode')],
+  ['reports are designed independently and delivered automatically by role', designer.includes('التقارير مستقلة عن قالب المهمة') && admin.includes('حقول التقرير المعتمدة للدور المحدد تُرسل تلقائياً') && admin.includes('const linkedReport = draft.reports[0]')],
   ['admin report review has search and status filters', (admin.includes('ابحث باسم الموظف أو المهمة') || admin.includes('ابحث باسم الموظف أو التقرير')) && admin.includes("setStatus(value)") && adminData.includes('taskTitle') && adminData.includes('values')],
   ['report submission and review notifications are automatic', reportCycle.includes('task_reports_notify_cycle') && reportCycle.includes("new.status in ('approved', 'returned')")],
   ['employee report upload tab has independent status filters', tasks.includes('رفع التقارير المرتبطة بالمهام') && tasks.includes('جاهز للرفع') && tasks.includes('تم الرفع') && tasks.includes('reportStatusFilter') && tasks.includes('reportStatusMatches')],
@@ -44,6 +44,9 @@ const checks = [
   ['employee reports are split into linked-task and administration-designed sections', tasks.includes('reportSection') && tasks.includes('رفع التقارير المرتبطة بالمهام') && tasks.includes('التقارير المصممة من الإدارة') && tasks.includes("reportSection === 'independent'")],
   ['role reports have independent secure storage and review workflow', roleReportsMigration.includes('employee_role_reports') && roleReportsMigration.includes('mobile_submit_employee_role_report') && roleReportsMigration.includes('review_employee_role_report') && roleReportsMigration.includes("status in ('submitted','approved','returned')")],
   ['admin report list includes role reports', adminData.includes('employee_role_reports') && adminData.includes("source: 'role'") && admin.includes('اعتماد تقرير الدور')],
+  ['legacy submitted report values are shown to employees', mobileData.includes('legacy_report_values') && tasks.includes('task.legacy_report_values ?? {}')],
+  ['role reports are isolated by branch and reload on branch changes', roleReports.includes('listMyRoleReports(roleCode: string, branchId: string | null') && roleReports.includes(".eq('branch_id', branchId)") && roleReportPanel.includes('useEffect(() => { void load(); }, [roleCode, branchId])')],
+  ['specialized role report errors have Arabic messages', mobileData.includes('role_report_assignment_invalid:') && mobileData.includes('role_report_already_submitted:') && mobileData.includes('review_note_required:') && mobileData.includes('invalid_role_report_payload:')],
 ];
 const failed = checks.filter(([, ok]) => !ok);
 if (failed.length) { console.error(JSON.stringify({ ok: false, failed: failed.map(([name]) => name) })); process.exit(1); }

@@ -164,7 +164,7 @@ export default function AdminScreen() {
 
       {section === 'overview' && !profile && <Overview counts={counts} data={data} fmt={fmt} onSection={setSection} onSettings={() => router.push('/settings')} onHR={() => router.push('/hr' as never)} canDesign={canManageTaskLibrary} canDesignReports={canManageReports} />}
       {section === 'tasks' && <TasksSection data={data} designerTemplates={designerTemplates} showCreate={showCreate} setShowCreate={setShowCreate} draft={draft} setDraft={setDraft} createTask={createTask} fmt={fmt} onOpenTasks={() => router.push('/tasks')} canManage={canManageEmployees} institutionId={profile?.institutionId ?? ''} onReload={load} />}
-      {section === 'task-designer' && (canManageTaskLibrary ? <TaskTemplatesSection templates={taskDesignerTemplates} categories={taskCategories} employees={data?.employees ?? []} reportTemplates={designerTemplates} onReload={load} /> : <Unavailable title="الجدول التنظيمي" text="لا تملك صلاحية إدارة الجداول التنظيمية." />)}
+      {section === 'task-designer' && (canManageTaskLibrary ? <TaskTemplatesSection templates={taskDesignerTemplates} categories={taskCategories} employees={data?.employees ?? []} onReload={load} /> : <Unavailable title="الجدول التنظيمي" text="لا تملك صلاحية إدارة الجداول التنظيمية." />)}
       {section === 'report-designer' && (canManageReports && canManageEmployees ? <ReportDesigner organizationId={profile?.institutionId ?? ''} /> : <Unavailable title="مصمم التقارير" text="لا تملك صلاحية إدارة نماذج التقارير." />)}
       {section === 'reports' && (canViewReports ? <ReportsSection data={data} fmt={fmt} onOpenTasks={() => router.push('/tasks')} canManage={canManageEmployees} institutionId={profile?.institutionId ?? ''} onReload={load} /> : <Unavailable title="تقارير الموظفين" text="لا تملك صلاحية قراءة تقارير المؤسسة أو مراجعتها." />)}
       {section === 'performance' && (canViewReports ? <PerformanceAnalytics /> : <Unavailable title="إحصائيات ومقارنة الأداء" text="لا تملك صلاحية عرض إحصائيات الأداء." />)}
@@ -332,25 +332,28 @@ function EmployeesSection({ data }: any) { return <><Text style={styles.sectionT
 function ActivitySection({ data, fmt }: any) { return <><Text style={styles.sectionTitle}>سجل النشاط والمرفقات</Text><Text style={styles.copy}>السجل يعرض الأحداث المسموح بها حسب RLS. إدارة المرفقات تتم من داخل تقرير المهمة.</Text>{(data?.activity ?? []).map((item: any) => <View style={styles.row} key={item.id}><Text style={styles.cardTitle}>{item.action}</Text><Text style={styles.meta}>المهمة {item.taskId.slice(0, 8)} · {fmt(item.createdAt)}</Text></View>)}</>; }
 function Unavailable({ title, text }: { title: string; text: string }) { return <View style={styles.unavailable}><Text style={styles.sectionTitle}>{title}</Text><Text style={styles.copy}>{text}</Text></View>; }
 
-function TaskTemplatesSection({ templates, categories, employees, reportTemplates, onReload }: { templates: StoredTaskTemplate[]; categories: TaskCategoryRow[]; employees: NonNullable<DashboardData>['employees']; reportTemplates: ReportTemplate[]; onReload: () => Promise<void> }) {
+function TaskTemplatesSection({ templates, categories, employees, onReload }: { templates: StoredTaskTemplate[]; categories: TaskCategoryRow[]; employees: NonNullable<DashboardData>['employees']; onReload: () => Promise<void> }) {
   const [selected, setSelected] = useState<StoredTaskTemplate | null>(null);
   const [editing, setEditing] = useState(false);
   const [saveError, setSaveError] = useState('');
   async function save(draft: TaskTemplateDraft) {
     try {
       setSaveError('');
-      await saveTaskDesignerTemplate(draft, categories);
+      const saved = await saveTaskDesignerTemplate(draft, categories);
       setSelected(null);
       setEditing(false);
       await onReload();
+      return saved;
     } catch (cause) {
       setSaveError(friendlyDataError(cause, 'تعذر حفظ قالب المهمة. تحقق من الصلاحيات ونماذج التقارير المعتمدة.'));
     }
   }
   async function sendDirectly(draft: TaskTemplateDraft, employeeId: string, branchId: string | null, dueAt: string) {
-    const selectedReport = reportTemplates.find((template) => template.role_code === draft.roleCode && template.approved_version_id && template.is_active !== false);
+    const linkedReport = draft.reports[0];
+    const reportTemplateId = linkedReport?.reportTemplateId ?? null;
+    const reportVersionId = linkedReport?.approvedVersionId ?? null;
     const executionDetails = draft.steps.map((step, index) => `${index + 1}. ${step.title}\nالفترة: ${step.instructions}\nالإثبات: ${step.evidenceInstructions || 'تأكيد الإنجاز'}`).join('\n');
-    await createAdministrativeTask({ title: draft.title, description: [draft.description, 'تفاصيل التنفيذ المباشر:', executionDetails].filter(Boolean).join('\n\n'), dueAt, priority: draft.priority, roleCode: draft.roleCode, branchId, assignedEmployeeId: employeeId, templateId: null, reportTemplateId: selectedReport?.id ?? null, reportVersionId: selectedReport?.approved_version_id ?? null, reportRequired: Boolean(selectedReport?.approved_version_id) });
+    await createAdministrativeTask({ title: draft.title, description: [draft.description, 'تفاصيل التنفيذ المباشر:', executionDetails].filter(Boolean).join('\n\n'), dueAt, priority: draft.priority, roleCode: draft.roleCode, branchId, assignedEmployeeId: employeeId, templateId: draft.id ?? null, reportTemplateId, reportVersionId, reportRequired: Boolean(reportVersionId), reportOverrides: draft.reports });
     await onReload();
   }
   return <View style={{ gap: 12 }}>
