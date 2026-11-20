@@ -169,7 +169,7 @@ export default function HomeDashboard({ profile: initialProfile, onNavigate, onS
       <ScrollView style={styles.scroll} contentContainerStyle={styles.content} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void load(true)} tintColor={NAVY} colors={[NAVY]} />}>
         <View style={[styles.brandHeader, compact && styles.compactHeader]}>
           <Image source={require('../assets/alshaeri-official-logo.png')} style={[styles.logo, compact && styles.compactLogo]} resizeMode="contain" accessibilityLabel="الشعار الرسمي لمؤسسة الشاعري" />
-          <Pressable accessibilityRole="button" accessibilityLabel="تبديل الحساب" accessibilityHint="تسجيل الخروج وفتح حساب آخر" disabled={signingOut} style={({ pressed }) => [styles.accountSwitchButton, compact && styles.compactAccountSwitch, pressed && styles.pressed]} onPress={() => void signOut()}>
+          <Pressable accessibilityRole="button" accessibilityLabel="تبديل الحساب" accessibilityHint="تسجيل الخروج وفتح حساب آخر" disabled={signingOut} style={({ pressed }) => [styles.accountSwitchButton, pressed && styles.pressed]} onPress={() => void signOut()}>
             <HomeIcon name="avatar" size={24} color={NAVY} />
           </Pressable>
           <View style={styles.brandCopy}>
@@ -249,21 +249,20 @@ const styles = StyleSheet.create({
   frame: { flex: 1, width: '100%', maxWidth: 840, alignSelf: 'center', direction: 'rtl' },
   scroll: { flex: 1 },
   content: { flexGrow: 1, paddingBottom: 16 },
-  brandHeader: { position: 'relative', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 92, paddingTop: 12, paddingBottom: 9, minHeight: 145, direction: 'rtl' },
-  compactHeader: { paddingHorizontal: 72, minHeight: 126 },
-  logo: { position: 'absolute', left: 12, top: 13, width: 92, height: 104 },
-  compactLogo: { left: 8, top: 10, width: 68, height: 82 },
-  accountSwitchButton: { position: 'absolute', left: 116, top: 49, width: 42, height: 42, borderRadius: 22, borderWidth: 1, borderColor: '#c6d3e3', backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' },
-  compactAccountSwitch: { left: 82, top: 42, width: 36, height: 36, borderRadius: 19 },
-  brandCopy: { width: '100%', gap: 4, alignItems: 'center' },
-  brandTitle: { color: NAVY, fontSize: 26, fontWeight: '900', textAlign: 'center', writingDirection: 'rtl' },
-  compactTitle: { fontSize: 21 },
-  brandSubtitle: { color: NAVY, fontSize: 14, fontWeight: '800', textAlign: 'center', writingDirection: 'rtl' },
-  compactSubtitle: { fontSize: 12 },
+  brandHeader: { flexDirection: 'row-reverse', alignItems: 'center', paddingHorizontal: 10, paddingTop: 10, paddingBottom: 8, minHeight: 122, gap: 8, direction: 'rtl' },
+  compactHeader: { paddingHorizontal: 8, minHeight: 104, gap: 5 },
+  logo: { width: 74, height: 86, flexShrink: 0 },
+  compactLogo: { width: 58, height: 70 },
+  accountSwitchButton: { width: 44, height: 44, borderRadius: 22, borderWidth: 1, borderColor: '#c6d3e3', backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  brandCopy: { flex: 1, minWidth: 0, gap: 4, alignItems: 'center' },
+  brandTitle: { color: NAVY, fontSize: 24, fontWeight: '900', textAlign: 'center', writingDirection: 'rtl', flexShrink: 1 },
+  compactTitle: { fontSize: 19 },
+  brandSubtitle: { color: NAVY, fontSize: 13, fontWeight: '800', textAlign: 'center', writingDirection: 'rtl', flexShrink: 1 },
+  compactSubtitle: { fontSize: 11 },
   mottoRow: { flexDirection: 'row', gap: 5, alignItems: 'center', justifyContent: 'center' },
   mottoLine: { width: 15, height: 1.5, backgroundColor: '#bf9229' },
   motto: { color: NAVY, fontSize: 11, fontWeight: '700', textAlign: 'center', writingDirection: 'rtl', flexShrink: 1 },
-  notificationButton: { position: 'absolute', right: 14, top: 31, width: 52, height: 52, borderRadius: 27, backgroundColor: NAVY, alignItems: 'center', justifyContent: 'center' },
+  notificationButton: { width: 48, height: 48, borderRadius: 24, backgroundColor: NAVY, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   badge: { position: 'absolute', right: -3, top: -5, borderRadius: 13, backgroundColor: '#c32f32', minWidth: 24, minHeight: 24, paddingHorizontal: 4, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#f5f7fd' },
   badgeText: { color: '#fff', fontSize: 12, fontWeight: '800' },
   main: { paddingHorizontal: 10, gap: 11, paddingTop: 8 },

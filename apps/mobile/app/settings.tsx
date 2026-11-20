@@ -352,6 +352,7 @@ export default function EmployeeAccessSettings() {
           <Text style={styles.employeeMeta}>اترك رابط الشعار فارغًا لاستخدام شعار التطبيق الافتراضي.</Text>
           <Pressable accessibilityRole="button" disabled={brandBusy || !brandSettingsReady} style={styles.primaryButton} onPress={() => void saveBrandSettings()}>{brandBusy ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>حفظ هوية المؤسسة</Text>}</Pressable>
         </View>}
+        {activeTab === 'employees' && <>
         <Text style={styles.eyebrow}>إدارة آمنة للدخول</Text>
         <Text style={styles.title}>رموز دخول الموظفين</Text>
         <Text style={styles.copy}>
@@ -469,6 +470,7 @@ export default function EmployeeAccessSettings() {
             <Text style={styles.refreshText}>تحديث قائمة الموظفين</Text>
           </Pressable>
         )}
+        </>}
       </View>
     </AppShell>
   );
