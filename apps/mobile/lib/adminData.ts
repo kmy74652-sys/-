@@ -46,7 +46,7 @@ export async function loadDashboardData(options: { force?: boolean; maxAgeMs?: n
 async function loadDashboardDataFresh(): Promise<DashboardData> {
   const db = client();
   const [tasksResult, branchesResult, employeesResult, reportsResult, roleReportsResult, activityResult] = await Promise.all([
-    db.from('tasks').select('id,title,description,branch_id,assigned_to,due_at,priority,status').order('due_at', { ascending: true }).limit(200),
+    db.from('tasks').select('id,title,description,branch_id,assigned_to,due_at,priority,status').is('deleted_at', null).order('due_at', { ascending: true }).limit(200),
     db.from('branches').select('id,code,name,is_active,branch_level').order('code', { ascending: true }).limit(100),
     db.from('organization_memberships').select('id,user_id,display_name,employee_no,is_active').order('display_name', { ascending: true }).limit(200),
     db.from('task_reports').select('id,task_id,status,submitted_at,review_note,values,report_form_snapshot_id').order('submitted_at', { ascending: false }).limit(100),
