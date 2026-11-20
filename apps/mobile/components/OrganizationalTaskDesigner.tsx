@@ -93,21 +93,22 @@ const accountantMissingRows: Array<Omit<ScheduleRow, 'id'>> = [
 function roleCode(value: string | undefined): TaskRoleCode { return roles.some(([code]) => code === value) ? value as TaskRoleCode : 'accountant'; }
 
 export default function OrganizationalTaskDesigner({ initialTemplate, employees = [], branches = [], canManage = true, onSave, onSend, onList }: Props) {
-  const [title, setTitle] = useState(initialTemplate?.title ?? 'الجدول التنظيمي للدوام والمهام اليومية');
+  const isNewTemplate = !initialTemplate?.id;
+  const [title, setTitle] = useState(initialTemplate?.title ?? '');
   const [selectedRole, setSelectedRole] = useState<TaskRoleCode>(roleCode(initialTemplate?.roleCode));
   const [kpis, setKpis] = useState(defaultKpis);
   const [newKpi, setNewKpi] = useState('');
   const [showKpiInput, setShowKpiInput] = useState(false);
   const [kpiTargetRowId, setKpiTargetRowId] = useState('');
   const [subItemDrafts, setSubItemDrafts] = useState<Record<string, string>>({});
-  const [days, setDays] = useState('السبت إلى الخميس (الجمعة إجازة)');
-  const [morning, setMorning] = useState('08:00 ص - 12:00 م');
-  const [breakTime, setBreakTime] = useState('12:00 م - 01:00 م');
-  const [evening, setEvening] = useState('01:00 م - 10:30 م');
-  const [rows, setRows] = useState<ScheduleRow[]>(() => initialTemplate?.steps?.length ? initialTemplate.steps.map((step, index) => ({ id: step.id || key(), timeSlot: `الفترة ${index + 1}`, responsibility: step.title, kpiIndicator: 'التقرير اليومي', proofRequirement: step.evidenceInstructions || 'تأكيد الإنجاز', requiresProof: step.evidenceRequired, subItems: [] })) : defaults);
-  const [continuous, setContinuous] = useState(continuousDefaults);
-  const [reportFields, setReportFields] = useState(reportDefaults);
-  const [recommendations, setRecommendations] = useState(recommendationDefaults);
+  const [days, setDays] = useState(isNewTemplate ? '' : 'السبت إلى الخميس (الجمعة إجازة)');
+  const [morning, setMorning] = useState(isNewTemplate ? '' : '08:00 ص - 12:00 م');
+  const [breakTime, setBreakTime] = useState(isNewTemplate ? '' : '12:00 م - 01:00 م');
+  const [evening, setEvening] = useState(isNewTemplate ? '' : '01:00 م - 10:30 م');
+  const [rows, setRows] = useState<ScheduleRow[]>(() => initialTemplate?.steps?.length ? initialTemplate.steps.map((step, index) => ({ id: step.id || key(), timeSlot: `الفترة ${index + 1}`, responsibility: step.title, kpiIndicator: 'التقرير اليومي', proofRequirement: step.evidenceInstructions || 'تأكيد الإنجاز', requiresProof: step.evidenceRequired, subItems: [] })) : []);
+  const [continuous, setContinuous] = useState(() => isNewTemplate ? [] : continuousDefaults);
+  const [reportFields, setReportFields] = useState(() => initialTemplate?.reportFields?.length ? initialTemplate.reportFields.map((field) => field.label) : []);
+  const [recommendations, setRecommendations] = useState(() => isNewTemplate ? [] : recommendationDefaults);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState('');
   const initialDeadline = currentAdenDateTime();
@@ -179,6 +180,9 @@ export default function OrganizationalTaskDesigner({ initialTemplate, employees 
   async function save() {
     setBusy(true); setNotice('');
     try {
+      if (!title.trim()) { setNotice('اكتب عنوان الجدول قبل الحفظ.'); return; }
+      if (!rows.length) { setNotice('أضف مهمة واحدة على الأقل قبل الحفظ.'); return; }
+      if (rows.some((row) => !row.responsibility.trim())) { setNotice('اكتب وصف كل مهمة أو احذف البطاقة الفارغة.'); return; }
       const draft = buildDraft();
       const employee = employeeOptions.find((item) => item.id === selectedEmployeeId);
       const dueAt = adenDateTimeToIso(dueDate, dueTime);
@@ -192,6 +196,9 @@ export default function OrganizationalTaskDesigner({ initialTemplate, employees 
     } catch (cause) { setNotice(dispatchError(cause)); } finally { setBusy(false); }
   }
   async function sendDirectly() {
+    if (!title.trim()) { setNotice('اكتب عنوان الجدول قبل الإرسال.'); return; }
+    if (!rows.length) { setNotice('أضف مهمة واحدة على الأقل قبل الإرسال.'); return; }
+    if (rows.some((row) => !row.responsibility.trim())) { setNotice('اكتب وصف كل مهمة أو احذف البطاقة الفارغة.'); return; }
     const employee = employeeOptions.find((item) => item.id === selectedEmployeeId);
     const dueAt = adenDateTimeToIso(dueDate, dueTime);
     if (!employee) { setNotice('اختر الموظف المستلم للمهمة أولاً.'); return; }
