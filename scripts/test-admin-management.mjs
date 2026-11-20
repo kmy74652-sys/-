@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 const read = (path) => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
 const migration = read('supabase/migrations/036_admin_management_atomicity.sql');
 const brandingMigration = read('supabase/migrations/043_institution_branding_owner_permission.sql');
+const brandingRpcMigration = read('supabase/migrations/077_save_organization_branding_rpc.sql');
 const archiveMigration = read('supabase/migrations/044_allow_employee_archive_audit.sql');
 const branding = read('apps/mobile/lib/organizationBranding.ts');
 const auth = read('supabase/functions/employee-code-auth/index.ts');
@@ -63,6 +64,10 @@ assert.doesNotMatch(admin, /from\('institutions'\)/);
 assert.match(settings, /loadOrganizationBranding/);
 assert.match(settings, /saveOrganizationBranding/);
 assert.doesNotMatch(settings, /from\('institutions'\)/);
+assert.match(brandingRpcMigration, /create or replace function public\.save_organization_branding/i);
+assert.match(brandingRpcMigration, /organizations\.update/i);
+assert.match(branding, /rpc\('save_organization_branding'/i);
+assert.match(admin, /setSelected\(null\); setEditing\(false\); await onReload\(\)/);
 
 
 assert.match(migration, /case when p_is_active then 'updated' else 'archived' end/);

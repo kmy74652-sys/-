@@ -67,27 +67,12 @@ export async function saveOrganizationBranding(
   logoUrl: string | null,
 ) {
   if (!supabase) throw new Error('supabase_not_configured');
-
-  const { data, error: readError } = await supabase
-    .from('organizations')
-    .select('settings')
-    .eq('id', organizationId)
-    .single();
-
-  if (readError) {
-    if (isMissingSettingsColumn(readError)) throw new Error('organization_branding_migration_required');
-    throw readError;
-  }
-
-  const settings = (data?.settings ?? {}) as Record<string, unknown>;
-  const { error } = await supabase
-    .from('organizations')
-    .update({
-      name,
-      settings: { ...settings, branding: { tagline, logo_url: logoUrl } },
-    })
-    .eq('id', organizationId);
-
+  const { error } = await supabase.rpc('save_organization_branding', {
+    p_organization_id: organizationId,
+    p_name: name,
+    p_tagline: tagline,
+    p_logo_url: logoUrl,
+  });
   if (error) throw error;
 }
 
