@@ -100,7 +100,8 @@ jobs:
       - name: Prepare and build release APK
         run: |
           set -euo pipefail
-          # Keep all Android ABIs in the official APK for broad device compatibility.
+          # Direct-install APK: modern Android devices use arm64-v8a.
+          # Excluding duplicate x86/32-bit native libraries reduces APK size substantially.
           export ORG_GRADLE_PROJECT_reactNativeArchitectures=arm64-v8a
           autolinking="$(pnpm exec expo-modules-autolinking resolve --platform android --json)"
           printf '%s' "$autolinking" | node -e 'let text="";process.stdin.on("data",chunk=>text+=chunk);process.stdin.on("end",()=>{const result=JSON.parse(text);const linking=result.modules?.find(item=>item.packageName==="expo-linking");if(!linking||!linking.modules?.includes("expo.modules.linking.ExpoLinkingModule")){console.error("Expo Linking is not registered for Android autolinking.");process.exit(1)}console.log("Expo Linking module detected.")})'
