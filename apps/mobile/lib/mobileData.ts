@@ -85,14 +85,15 @@ async function readRelatedRows<T>(ids: string[], query: (chunk: string[], start:
   return rows;
 }
 
-export async function listMyTasks(institutionId?: string): Promise<MobileTask[]> {
+export async function listMyTasks(institutionId?: string, assignedTo?: string): Promise<MobileTask[]> {
   const client = getClient();
   const taskQuery = () => {
     const query = client.from('tasks')
       .select('id,title,description,assigned_to,branch_id,position_code,due_at,priority,status,assigned_at,created_at,starts_at,report_form_snapshot_id,report_flow,task_instructions,proof_required,proof_instructions')
       .is('deleted_at', null)
       .order('due_at', { ascending: true }).order('id', { ascending: true });
-    return institutionId ? query.eq('organization_id', institutionId) : query;
+    const scoped = institutionId ? query.eq('organization_id', institutionId) : query;
+    return assignedTo ? scoped.eq('assigned_to', assignedTo) : scoped;
   };
   const rows: NonNullable<Awaited<ReturnType<typeof taskQuery>>['data']> = [];
   for (let offset = 0; ; offset += 500) {

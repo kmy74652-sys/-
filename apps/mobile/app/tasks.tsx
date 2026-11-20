@@ -189,7 +189,10 @@ export default function TasksScreen() {
         setNotice('تُعرض آخر بيانات ناجحة، جارٍ التحديث في الخلفية…');
       }
       if (cachedNotifications) setNotifications(cachedNotifications);
-      const [taskResult, notificationResult] = await Promise.allSettled([listMyTasks(identity.employee.institutionId), listMyNotifications()]);
+      const [taskResult, notificationResult] = await Promise.allSettled([
+        listMyTasks(identity.employee.institutionId, canManage || canReview ? undefined : identity.userId),
+        listMyNotifications(),
+      ]);
       if (taskResult.status === 'rejected') throw taskResult.reason;
       const taskRows = taskResult.value;
       const notificationRows = notificationResult.status === 'fulfilled' ? notificationResult.value : cachedNotifications ?? [];
@@ -222,6 +225,26 @@ export default function TasksScreen() {
     });
     return () => subscription.remove();
   }, [load]);
+  useEffect(() => {
+    if (!supabase || !currentUserId) return;
+    const client = supabase;
+    let refreshTimer: ReturnType<typeof setTimeout> | null = null;
+    const scheduleRefresh = () => {
+      if (refreshTimer) clearTimeout(refreshTimer);
+      refreshTimer = setTimeout(() => {
+        refreshTimer = null;
+        void load({ force: true });
+      }, 450);
+    };
+    const channel = client
+      .channel(`employee-task-feed:${currentUserId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks', filter: `assigned_to=eq.${currentUserId}` }, scheduleRefresh)
+      .subscribe();
+    return () => {
+      if (refreshTimer) clearTimeout(refreshTimer);
+      void client.removeChannel(channel);
+    };
+  }, [currentUserId, load]);
   useEffect(() => {
     const timer = setInterval(() => void load(), 60_000);
     return () => clearInterval(timer);
