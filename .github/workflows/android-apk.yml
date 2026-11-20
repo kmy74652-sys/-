@@ -108,6 +108,22 @@ jobs:
           # the React Native 0.76 native packaging tasks.
           sed -i 's/^reactNativeArchitectures=.*/reactNativeArchitectures=arm64-v8a/' android/gradle.properties
           grep -q '^reactNativeArchitectures=arm64-v8a$' android/gradle.properties
+          # The generated Expo 52 template does not add abiFilters to
+          # defaultConfig, so dependency .so files would still be packaged for
+          # every ABI. Add an explicit filter before Gradle evaluates the app.
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('android/app/build.gradle')
+          text = path.read_text()
+          marker = '        versionName "0.1.0"\n'
+          addition = marker + '        ndk { abiFilters "arm64-v8a" }\n'
+          if 'abiFilters "arm64-v8a"' not in text:
+              if marker not in text:
+                  raise SystemExit('Could not find Android defaultConfig marker')
+              text = text.replace(marker, addition, 1)
+              path.write_text(text)
+          PY
+          grep -q 'abiFilters "arm64-v8a"' android/app/build.gradle
           autolinking="$(pnpm exec expo-modules-autolinking resolve --platform android --json)"
           printf '%s' "$autolinking" | node -e 'let text="";process.stdin.on("data",chunk=>text+=chunk);process.stdin.on("end",()=>{const result=JSON.parse(text);const linking=result.modules?.find(item=>item.packageName==="expo-linking");if(!linking||!linking.modules?.includes("expo.modules.linking.ExpoLinkingModule")){console.error("Expo Linking is not registered for Android autolinking.");process.exit(1)}console.log("Expo Linking module detected.")})'
           cd android
