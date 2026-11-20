@@ -10,6 +10,11 @@ export type OrganizationBranding = {
   settingsAvailable: boolean;
 };
 
+export type OrganizationLogoAsset = {
+  uri: string;
+  mimeType?: string | null;
+};
+
 function isMissingSettingsColumn(error: unknown) {
   const value = error as { code?: string; message?: string } | null;
   const message = value?.message ?? '';
@@ -84,4 +89,22 @@ export async function saveOrganizationBranding(
     .eq('id', organizationId);
 
   if (error) throw error;
+}
+
+export async function uploadOrganizationLogo(organizationId: string, asset: OrganizationLogoAsset) {
+  if (!supabase) throw new Error('supabase_not_configured');
+  if (!asset.uri || !/^image\/(jpeg|png|webp)$/i.test(asset.mimeType ?? '')) throw new Error('organization_logo_type_invalid');
+  const response = await fetch(asset.uri);
+  if (!response.ok) throw new Error('organization_logo_read_failed');
+  const blob = await response.blob();
+  if (blob.size > 5 * 1024 * 1024) throw new Error('organization_logo_too_large');
+  const path = `${organizationId}/logo`;
+  const { error } = await supabase.storage.from('organization-branding').upload(path, blob, {
+    contentType: asset.mimeType ?? 'image/png',
+    upsert: true,
+    cacheControl: '3600',
+  });
+  if (error) throw error;
+  const { data } = supabase.storage.from('organization-branding').getPublicUrl(path);
+  return `${data.publicUrl}?v=${Date.now()}`;
 }

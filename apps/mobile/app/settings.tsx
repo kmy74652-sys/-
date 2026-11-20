@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
 import { useLocalSearchParams, useRouter, type ErrorBoundaryProps } from 'expo-router';
+import * as DocumentPicker from 'expo-document-picker';
 import {
   ActivityIndicator,
   Alert,
+  Image,
   Pressable,
   SafeAreaView,
   StyleSheet,
@@ -13,7 +15,7 @@ import {
 import AppShell from '../components/AppShell';
 import { friendlyDataError, getMyEmployeeProfile } from '../lib/mobileData';
 import { supabase } from '../lib/supabase';
-import { loadOrganizationBranding, saveOrganizationBranding } from '../lib/organizationBranding';
+import { loadOrganizationBranding, saveOrganizationBranding, uploadOrganizationLogo, type OrganizationLogoAsset } from '../lib/organizationBranding';
 
 type EmployeeAccess = {
   id: string;
@@ -90,6 +92,8 @@ export default function EmployeeAccessSettings() {
   const [brandName, setBrandName] = useState('مؤسسة الشاعري للتجارة العامة');
   const [brandTagline, setBrandTagline] = useState('معًا... نحو إدارة أفضل');
   const [brandLogoUrl, setBrandLogoUrl] = useState('');
+  const [brandLogoAsset, setBrandLogoAsset] = useState<OrganizationLogoAsset | null>(null);
+  const [brandLogoName, setBrandLogoName] = useState('لم يتم اختيار صورة');
   const [brandBusy, setBrandBusy] = useState(false);
   const [canAssignOwner, setCanAssignOwner] = useState(false);
   const [branches, setBranches] = useState<Branch[]>([]);
@@ -148,6 +152,7 @@ export default function EmployeeAccessSettings() {
       setBrandName(branding.name);
       setBrandTagline(branding.tagline);
       setBrandLogoUrl(branding.logoUrl ?? '');
+      setBrandLogoName(branding.logoUrl ? 'الشعار الحالي محفوظ' : 'لم يتم اختيار صورة');
       setBrandSettingsReady(branding.settingsAvailable);
       const owner = employeeRoles.some((role) => role?.code === 'owner' || role?.code === 'admin_followup')
         && employeePermissions.includes('employees.manage');
@@ -187,14 +192,15 @@ export default function EmployeeAccessSettings() {
     if (!supabase || !institutionId || !canEditBrand) return;
     const cleanName = brandName.trim();
     const cleanTagline = brandTagline.trim();
-    const cleanLogoUrl = brandLogoUrl.trim();
     if (cleanName.length < 2 || cleanName.length > 90) { setError('اسم المؤسسة يجب أن يكون بين حرفين و90 حرفًا.'); return; }
     if (cleanTagline.length > 100) { setError('العبارة التعريفية يجب ألا تتجاوز 100 حرف.'); return; }
-    if (cleanLogoUrl && !/^https:\/\//i.test(cleanLogoUrl)) { setError('رابط الشعار يجب أن يبدأ بـ https://'); return; }
     setBrandBusy(true); setError(''); setMessage('');
     try {
       if (!brandSettingsReady) throw new Error('organization_branding_migration_required');
-      await saveOrganizationBranding(institutionId, cleanName, cleanTagline, cleanLogoUrl || null);
+      const logoUrl = brandLogoAsset ? await uploadOrganizationLogo(institutionId, brandLogoAsset) : (brandLogoUrl || null);
+      await saveOrganizationBranding(institutionId, cleanName, cleanTagline, logoUrl);
+      setBrandLogoAsset(null);
+      setBrandLogoName('تم حفظ الشعار الحالي');
       setMessage('تم حفظ هوية المؤسسة. ستظهر التغييرات في لوحة الإدارة على أجهزة الموظفين بعد تحديث التطبيق.');
     } catch (cause) {
       if (cause instanceof Error && cause.message === 'organization_branding_migration_required') {
@@ -203,6 +209,16 @@ export default function EmployeeAccessSettings() {
         setError(friendlyDataError(cause, 'تعذر حفظ الهوية. تحقق من صلاحية تعديل بيانات المؤسسة وتحديث قاعدة البيانات.'));
       }
     } finally { setBrandBusy(false); }
+  }
+
+  async function chooseBrandLogo() {
+    const result = await DocumentPicker.getDocumentAsync({ type: ['image/jpeg', 'image/png', 'image/webp'], copyToCacheDirectory: true, multiple: false });
+    if (result.canceled || !result.assets?.[0]) return;
+    const asset = result.assets[0];
+    if ((asset.size ?? 0) > 5 * 1024 * 1024) { setError('حجم الشعار يجب ألا يتجاوز 5 ميجابايت.'); return; }
+    setBrandLogoAsset({ uri: asset.uri, mimeType: asset.mimeType });
+    setBrandLogoName(asset.name || 'صورة الشعار المحددة');
+    setError('');
   }
 
   async function createEmployee() {
@@ -341,17 +357,17 @@ export default function EmployeeAccessSettings() {
   return (
     <AppShell activeTab={activeTab} title={activeTab === 'employees' ? 'الموظفون' : 'الإعدادات'} subtitle="إدارة المؤسسة والموظفين">
       <View style={styles.content}>
-        {activeTab === 'settings' && !loading && canEditBrand && <View style={styles.employeeCard}>
-          <Text style={styles.employeeName}>هوية المؤسسة والواجهة الرئيسية</Text>
-          <Text style={styles.copy}>يمكن لصاحب المؤسسة تغيير الاسم والعبارة التعريفية ورابط الشعار. تُحفظ الإعدادات مركزياً لتظهر في أجهزة المستخدمين.</Text>
+        {activeTab === 'settings' && !loading && canEditBrand && <View style={styles.brandCard}>
+          <View style={styles.brandCardHeader}><View style={styles.brandCardHeaderCopy}><Text style={styles.employeeName}>هوية المؤسسة</Text><Text style={styles.brandCardHint}>الاسم والشعار اللذان يظهران للموظفين</Text></View>{brandLogoAsset?.uri || brandLogoUrl ? <Image source={{ uri: brandLogoAsset?.uri || brandLogoUrl }} style={styles.brandPreview} /> : <View style={styles.brandPreviewFallback}><Text style={styles.brandPreviewGlyph}>ش</Text></View>}</View>
+          <Text style={styles.copy}>حدّث بيانات الهوية من بطاقة واحدة واضحة. يتم رفع الشعار كصورة وحفظه مركزياً ليظهر في التطبيق.</Text>
           {!brandSettingsReady && <Text style={styles.warning}>تحديث قاعدة البيانات الخاص بهوية المؤسسة لم يُطبّق بعد؛ ستعمل بقية إعدادات الموظفين بصورة طبيعية.</Text>}
           <Text style={styles.employeeMeta}>اسم المؤسسة</Text>
           <TextInput style={styles.input} value={brandName} onChangeText={setBrandName} maxLength={90} placeholder="اسم المؤسسة" />
           <Text style={styles.employeeMeta}>العبارة التعريفية</Text>
           <TextInput style={styles.input} value={brandTagline} onChangeText={setBrandTagline} maxLength={100} placeholder="عبارة تظهر أسفل اسم المؤسسة" />
-          <Text style={styles.employeeMeta}>رابط الشعار (HTTPS)</Text>
-          <TextInput style={styles.input} value={brandLogoUrl} onChangeText={setBrandLogoUrl} autoCapitalize="none" autoCorrect={false} keyboardType="url" placeholder="https://example.com/logo.png" />
-          <Text style={styles.employeeMeta}>اترك رابط الشعار فارغًا لاستخدام شعار التطبيق الافتراضي.</Text>
+          <Text style={styles.employeeMeta}>شعار المؤسسة</Text>
+          <Pressable accessibilityRole="button" disabled={brandBusy || !brandSettingsReady} style={styles.logoPickerButton} onPress={() => void chooseBrandLogo()}><Text style={styles.logoPickerText}>اختيار صورة من الجهاز</Text></Pressable>
+          <Text style={styles.logoFileName}>{brandLogoName}</Text>
           <Pressable accessibilityRole="button" disabled={brandBusy || !brandSettingsReady} style={styles.primaryButton} onPress={() => void saveBrandSettings()}>{brandBusy ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>حفظ هوية المؤسسة</Text>}</Pressable>
         </View>}
         {activeTab === 'employees' && <>
@@ -502,6 +518,16 @@ const styles = StyleSheet.create({
   success: { color: '#23633c', textAlign: 'right', lineHeight: 22, marginBottom: 10 },
   loading: { alignItems: 'center', paddingVertical: 28 }, unavailable: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#e2e9eb', borderRadius: 16, padding: 18, gap: 10, marginTop: 12 },
   employeeCard: { backgroundColor: '#fff', borderRadius: 16, padding: 16, marginTop: 12, borderWidth: 1, borderColor: '#e2e9eb' },
+  brandCard: { backgroundColor: '#fff', borderRadius: 20, padding: 18, marginTop: 12, borderWidth: 1, borderColor: '#dfe7eb', shadowColor: '#17324d', shadowOpacity: 0.06, shadowRadius: 10, shadowOffset: { width: 0, height: 4 }, elevation: 2 },
+  brandCardHeader: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 10 },
+  brandCardHeaderCopy: { flex: 1, alignItems: 'flex-end' },
+  brandCardHint: { color: '#718394', fontSize: 12, textAlign: 'right', marginTop: 3 },
+  brandPreview: { width: 64, height: 64, borderRadius: 16, borderWidth: 1, borderColor: '#d6e0e4', backgroundColor: '#fff' },
+  brandPreviewFallback: { width: 64, height: 64, borderRadius: 16, backgroundColor: '#eaf1f5', alignItems: 'center', justifyContent: 'center' },
+  brandPreviewGlyph: { color: '#17324d', fontSize: 30, fontWeight: '800' },
+  logoPickerButton: { minHeight: 46, borderRadius: 11, borderWidth: 1, borderColor: '#17324d', backgroundColor: '#edf4f7', alignItems: 'center', justifyContent: 'center', marginTop: 9 },
+  logoPickerText: { color: '#17324d', fontWeight: '800' },
+  logoFileName: { color: '#718394', fontSize: 12, textAlign: 'right', marginTop: 7, marginBottom: 4 },
   employeeName: { color: '#17324d', fontSize: 17, fontWeight: '800', textAlign: 'right', lineHeight: 25 },
   employeeMeta: { color: '#718394', fontSize: 13, textAlign: 'right', marginTop: 5, lineHeight: 20 },
   warning: { color: '#8b3a2e', textAlign: 'right', lineHeight: 21, marginTop: 10 },
