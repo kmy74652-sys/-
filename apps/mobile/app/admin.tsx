@@ -444,7 +444,17 @@ function TaskTemplatesSection({ templates, categories, employees, branches, onRe
   }
   return <View style={{ gap: 12 }}>
     <View style={styles.card}><Text style={styles.sectionTitle}>مصمم الجدول التنظيمي للمهام</Text><Text style={styles.copy}>أنشئ جدول الدوام، المهام اليومية، المسؤوليات، مؤشرات الأداء، متطلبات الإثبات وبنود التقرير اليومي. أما حقول التقرير نفسها فتُصمم من «مصمم التقارير» وتصل تلقائياً إلى الموظف.</Text><Pressable style={styles.primary} onPress={() => { setSelected(null); setEditing(true); setSaveError(''); }}><Text style={styles.primaryText}>جدول تنظيمي جديد</Text></Pressable></View>
-    {visibleTemplates.map((template) => <View key={template.id} style={styles.card}><View style={styles.taskLine}><Text style={styles.cardTitle}>{template.title}</Text><Text style={styles.badge}>{template.isActive ? 'نشط' : 'غير نشط'}</Text></View><Text style={styles.meta}>{roleLabel(template.roleCode)} · {template.steps.length} خطوات · {template.reports.length} نماذج تقارير · إصدار القالب {template.version}</Text><View style={styles.actionsRow}><Pressable style={styles.secondary} onPress={() => { setSelected(template); setEditing(true); setSaveError(''); }}><Text style={styles.secondaryText}>تعديل القالب</Text></Pressable><Pressable style={styles.dangerButton} onPress={() => Alert.alert('حذف القالب نهائياً', 'سيُحذف قالب الجدول وبياناته من مكتبة القوالب نهائياً. ستبقى المهام السابقة وتقاريرها محفوظة دون ارتباط بالقالب. لا يمكن التراجع عن هذا الإجراء.', [{ text: 'إلغاء', style: 'cancel' }, { text: 'حذف نهائي', style: 'destructive', onPress: () => void (async () => { try { setSaveError(''); await deleteTaskDesignerTemplate(template.id!); await onReload(); } catch (cause) { setSaveError(friendlyDataError(cause, 'تعذر حذف القالب نهائياً.')); } })() }])}><Text style={styles.dangerText}>حذف نهائي</Text></Pressable></View></View>)}
+    {visibleTemplates.map((template) => <View key={template.id} style={styles.templateCard}>
+      <View style={styles.templateHeader}>
+        <View style={styles.templateHeaderCopy}><Text style={styles.templateTitle}>{template.title}</Text><Text style={styles.templateRole}>{roleLabel(template.roleCode)}</Text></View>
+        <Text style={[styles.templateStatus, template.isActive ? styles.templateStatusActive : styles.templateStatusInactive]}>{template.isActive ? 'نشط' : 'غير نشط'}</Text>
+      </View>
+      <View style={styles.templateMetaRow}><View style={styles.templateMetaChip}><Text style={styles.templateMetaValue}>{template.steps.length}</Text><Text style={styles.templateMetaLabel}>خطوات</Text></View><View style={styles.templateMetaChip}><Text style={styles.templateMetaValue}>{template.reports.length}</Text><Text style={styles.templateMetaLabel}>تقارير</Text></View><View style={styles.templateMetaChip}><Text style={styles.templateMetaValue}>{template.version}</Text><Text style={styles.templateMetaLabel}>الإصدار</Text></View></View>
+      <View style={styles.templateActions}>
+        <Pressable style={styles.templateEditButton} onPress={() => { setSelected(template); setEditing(true); setSaveError(''); }}><Text style={styles.templateEditText}>تعديل القالب</Text></Pressable>
+        <Pressable style={styles.templateDeleteButton} onPress={() => Alert.alert('حذف القالب نهائياً', 'سيُحذف قالب الجدول وبياناته من مكتبة القوالب نهائياً. ستبقى المهام السابقة وتقاريرها محفوظة دون ارتباط بالقالب. لا يمكن التراجع عن هذا الإجراء.', [{ text: 'إلغاء', style: 'cancel' }, { text: 'حذف نهائي', style: 'destructive', onPress: () => void (async () => { try { setSaveError(''); await deleteTaskDesignerTemplate(template.id!); await onReload(); } catch (cause) { setSaveError(friendlyDataError(cause, 'تعذر حذف القالب نهائياً.')); } })() }])}><Text style={styles.templateDeleteText}>حذف نهائي</Text></Pressable>
+      </View>
+    </View>)}
     {!!saveError && <Text accessibilityRole="alert" style={styles.error}>{saveError}</Text>}
     {editing && <OrganizationalTaskDesigner key={selected?.id ?? 'new-organizational-schedule'} initialTemplate={selected ?? undefined} employees={employees} branches={branches} canManage={true} onSave={save} onSend={sendDirectly} onList={onReload} />}
     {visibleTemplates.length === 0 && <Text style={styles.muted}>لا توجد قوالب بعد؛ أنشئ قالبًا جديدًا للبدء.</Text>}
@@ -530,6 +540,23 @@ const styles = StyleSheet.create({
   taskEmptyText:{color:'#8190a1',fontSize:12,textAlign:'center'},
   taskOpenExecution:{backgroundColor:'#e8eef7',borderRadius:13,padding:13,alignItems:'center'},
   taskOpenExecutionText:{color:'#173e6d',fontSize:12,fontWeight:'900'},
+  templateCard:{backgroundColor:'#fff',borderRadius:18,borderWidth:1,borderColor:'#dce5ef',padding:15,gap:12,shadowColor:'#17324d',shadowOpacity:0.06,shadowRadius:7,shadowOffset:{width:0,height:3},elevation:2},
+  templateHeader:{flexDirection:'row-reverse',alignItems:'flex-start',justifyContent:'space-between',gap:10},
+  templateHeaderCopy:{flex:1,alignItems:'flex-end',gap:4},
+  templateTitle:{color:'#17324d',fontSize:17,fontWeight:'900',textAlign:'right',lineHeight:25},
+  templateRole:{color:'#718394',fontSize:12,fontWeight:'700',textAlign:'right'},
+  templateStatus:{borderRadius:16,paddingHorizontal:10,paddingVertical:6,fontSize:12,fontWeight:'900'},
+  templateStatusActive:{color:'#23633c',backgroundColor:'#e8f5eb'},
+  templateStatusInactive:{color:'#73521f',backgroundColor:'#fff3d8'},
+  templateMetaRow:{flexDirection:'row-reverse',gap:8,borderTopWidth:1,borderTopColor:'#edf1f5',paddingTop:10},
+  templateMetaChip:{flex:1,backgroundColor:'#f5f8fa',borderRadius:11,paddingVertical:8,alignItems:'center',gap:2},
+  templateMetaValue:{color:'#17324d',fontSize:16,fontWeight:'900'},
+  templateMetaLabel:{color:'#718394',fontSize:10,fontWeight:'700'},
+  templateActions:{flexDirection:'row-reverse',gap:8},
+  templateEditButton:{flex:1,minHeight:45,borderRadius:11,backgroundColor:'#e8f0f3',alignItems:'center',justifyContent:'center',paddingHorizontal:8},
+  templateEditText:{color:'#17324d',fontWeight:'900',fontSize:13},
+  templateDeleteButton:{flex:1,minHeight:45,borderRadius:11,backgroundColor:'#fff0ef',borderWidth:1,borderColor:'#e1a7a2',alignItems:'center',justifyContent:'center',paddingHorizontal:8},
+  templateDeleteText:{color:'#a8443d',fontWeight:'900',fontSize:13},
   moduleCard: { width:'48%', minHeight:102, backgroundColor:'#fff', borderRadius:17, borderWidth:1, borderColor:'#d5e0ef', padding:11, flexDirection:'row-reverse', alignItems:'center', gap:7, shadowColor:'#163b65', shadowOpacity:0.07, shadowRadius:7, shadowOffset:{width:0,height:3}, elevation:2 },
   moduleIcon: { width:42, height:42, borderRadius:13, backgroundColor:'#e7effb', alignItems:'center', justifyContent:'center' },
   moduleIconGold: { backgroundColor:'#fff1d6' },
