@@ -17,6 +17,7 @@ import { listApprovedTaskReportForms, listTaskDesignerCategories, listTaskDesign
 import { deleteManagedBranch, deleteManagedReport, deleteManagedTask, updateManagedTask } from '../lib/managementData';
 import { reviewEmployeeRoleReport } from '../lib/employeeRoleReports';
 import PerformanceAnalytics from '../components/PerformanceAnalytics';
+import { readSessionCache, writeSessionCache } from '../lib/mobileSessionCache';
 
 type Section = 'overview' | 'tasks' | 'task-designer' | 'report-designer' | 'reports' | 'performance' | 'hr' | 'branches' | 'employees' | 'activity';
 const sections: Array<[Section, string]> = [['overview', 'الرئيسية'], ['tasks', 'إدارة المهام'], ['task-designer', 'الجدول التنظيمي'], ['report-designer', 'مصمم التقارير'], ['reports', 'تقارير الموظفين'], ['performance', 'إحصائيات الأداء'], ['branches', 'الفروع'], ['employees', 'الموظفون'], ['activity', 'السجل والمرفقات']];
@@ -47,6 +48,7 @@ export default function AdminScreen() {
   const [notice, setNotice] = useState('');
   const lastLoadedAt = useRef(0);
   const loadInFlight = useRef<Promise<void> | null>(null);
+  const adminCacheKey = useRef('');
   const [showCreate, setShowCreate] = useState(false);
   const [initialDeadline] = useState(currentAdenDateTime);
   const [draft, setDraft] = useState({ title: '', description: '', dueDate: initialDeadline.date, dueTime: initialDeadline.time, priority: 'normal', roleCode: 'admin_followup', branchId: '', assignedEmployeeId: '', templateId: '', reportTemplateId: '', reportRequired: true });
@@ -66,26 +68,45 @@ export default function AdminScreen() {
       if (!identity?.employee) throw new Error('employee_not_active');
       setProfile(identity.employee);
       setCurrentName(identity.employee.fullName || 'المستخدم');
-      const branding = await loadOrganizationBranding(identity.employee.institutionId);
-      setBrandName(branding.name);
-      setBrandTagline(branding.tagline);
-      setBrandLogoUrl(branding.logoUrl);
-      setNotice(branding.settingsAvailable ? '' : 'تعديل هوية المؤسسة سيتاح بعد تحديث قاعدة البيانات؛ لوحة الإدارة تعمل بالبيانات الحالية.');
+      const brandingRequest = loadOrganizationBranding(identity.employee.institutionId);
       const currentPermissions = identity.employee.permissions;
       if (!currentPermissions.includes('tasks.manage')) throw new Error('permission_denied');
       const canManageLibrary = currentPermissions.includes('task_library.manage');
       const canManageReports = currentPermissions.includes('report_forms.manage');
-      const [dashboard, reportTemplates, editableTaskTemplates, categories] = await Promise.all([
+      const cacheKey = `${identity.userId}:${identity.employee.institutionId}`;
+      adminCacheKey.current = cacheKey;
+      const cachedDashboard = readSessionCache<DashboardData>('admin-dashboard', cacheKey);
+      const cachedReportTemplates = readSessionCache<ReportTemplate[]>('admin-report-templates', cacheKey);
+      const cachedTaskTemplates = readSessionCache<StoredTaskTemplate[]>('admin-task-templates', cacheKey);
+      const cachedCategories = readSessionCache<TaskCategoryRow[]>('admin-task-categories', cacheKey);
+      setPermissions(currentPermissions);
+      if (cachedDashboard) setData(cachedDashboard);
+      if (cachedReportTemplates) setDesignerTemplates(cachedReportTemplates);
+      if (cachedTaskTemplates) setTaskDesignerTemplates(cachedTaskTemplates);
+      if (cachedCategories) setTaskCategories(cachedCategories);
+      if (cachedDashboard || cachedReportTemplates || cachedTaskTemplates || cachedCategories) {
+        setLoading(false);
+        setNotice('تُعرض آخر بيانات ناجحة، جارٍ تحديث لوحة المشرف في الخلفية…');
+      }
+      const [branding, dashboard, reportTemplates, editableTaskTemplates, categories] = await Promise.all([
+        brandingRequest,
         loadDashboardData({ force, maxAgeMs: 30_000 }),
         canManageReports ? listApprovedDesignerTemplates() : canManageLibrary ? listApprovedTaskReportForms() : Promise.resolve([]),
         canManageLibrary ? listTaskDesignerTemplates() : Promise.resolve([]),
         canManageLibrary ? listTaskDesignerCategories() : Promise.resolve([]),
       ]);
-      setPermissions(currentPermissions);
+      setBrandName(branding.name);
+      setBrandTagline(branding.tagline);
+      setBrandLogoUrl(branding.logoUrl);
+      setNotice(branding.settingsAvailable ? (cachedDashboard ? 'تم تحديث لوحة المشرف في الخلفية.' : '') : 'تعديل هوية المؤسسة سيتاح بعد تحديث قاعدة البيانات؛ لوحة الإدارة تعمل بالبيانات الحالية.');
       setData(dashboard);
       setDesignerTemplates(reportTemplates);
       setTaskDesignerTemplates(editableTaskTemplates);
       setTaskCategories(categories);
+      writeSessionCache('admin-dashboard', cacheKey, dashboard);
+      writeSessionCache('admin-report-templates', cacheKey, reportTemplates);
+      writeSessionCache('admin-task-templates', cacheKey, editableTaskTemplates);
+      writeSessionCache('admin-task-categories', cacheKey, categories);
         lastLoadedAt.current = Date.now();
       } catch (cause) { setError(friendlyDataError(cause, 'تعذر تحميل لوحة الإدارة من Supabase.')); }
       finally { setLoading(false); setRefreshing(false); }
@@ -101,22 +122,44 @@ export default function AdminScreen() {
     return { all: tasks.length, new: tasks.filter((task) => ['new', 'received'].includes(task.status)).length, active: tasks.filter((task) => ['in_progress', 'on_hold'].includes(task.status)).length, review: tasks.filter((task) => task.status === 'report_submitted').length, late: tasks.filter((task) => task.status === 'late' || (!!task.dueAt && new Date(task.dueAt) < new Date() && !['completed_approved', 'cancelled'].includes(task.status))).length, done: tasks.filter((task) => task.status === 'completed_approved').length };
   }, [data]);
   const updateTaskLocally = useCallback((taskId: string, patch: Partial<DashboardData['tasks'][number]>) => {
-    setData((current) => current ? { ...current, tasks: current.tasks.map((task) => task.id === taskId ? { ...task, ...patch } : task) } : current);
+    setData((current) => {
+      if (!current) return current;
+      const next = { ...current, tasks: current.tasks.map((task) => task.id === taskId ? { ...task, ...patch } : task) };
+      if (adminCacheKey.current) writeSessionCache('admin-dashboard', adminCacheKey.current, next);
+      return next;
+    });
   }, []);
   const removeTaskLocally = useCallback((taskId: string) => {
-    setData((current) => current ? { ...current, tasks: current.tasks.filter((task) => task.id !== taskId) } : current);
+    setData((current) => {
+      if (!current) return current;
+      const next = { ...current, tasks: current.tasks.filter((task) => task.id !== taskId) };
+      if (adminCacheKey.current) writeSessionCache('admin-dashboard', adminCacheKey.current, next);
+      return next;
+    });
   }, []);
   const restoreTaskLocally = useCallback((task: DashboardData['tasks'][number]) => {
     setData((current) => {
       if (!current || current.tasks.some((item) => item.id === task.id)) return current;
-      return { ...current, tasks: [...current.tasks, task].sort((left, right) => (left.dueAt ?? '').localeCompare(right.dueAt ?? '')) };
+      const next = { ...current, tasks: [...current.tasks, task].sort((left, right) => (left.dueAt ?? '').localeCompare(right.dueAt ?? '')) };
+      if (adminCacheKey.current) writeSessionCache('admin-dashboard', adminCacheKey.current, next);
+      return next;
     });
   }, []);
   const updateReportLocally = useCallback((reportId: string, patch: Partial<DashboardData['reports'][number]>) => {
-    setData((current) => current ? { ...current, reports: current.reports.map((report) => report.id === reportId ? { ...report, ...patch } : report) } : current);
+    setData((current) => {
+      if (!current) return current;
+      const next = { ...current, reports: current.reports.map((report) => report.id === reportId ? { ...report, ...patch } : report) };
+      if (adminCacheKey.current) writeSessionCache('admin-dashboard', adminCacheKey.current, next);
+      return next;
+    });
   }, []);
   const removeReportLocally = useCallback((reportId: string) => {
-    setData((current) => current ? { ...current, reports: current.reports.filter((report) => report.id !== reportId) } : current);
+    setData((current) => {
+      if (!current) return current;
+      const next = { ...current, reports: current.reports.filter((report) => report.id !== reportId) };
+      if (adminCacheKey.current) writeSessionCache('admin-dashboard', adminCacheKey.current, next);
+      return next;
+    });
   }, []);
 
   async function signOut() {
@@ -145,20 +188,25 @@ export default function AdminScreen() {
         reportRequired: Boolean(selectedReport?.approved_version_id),
       });
       const branchName = data?.branches.find((branch) => branch.id === (draft.branchId || null))?.name ?? null;
-      setData((current) => current ? {
-        ...current,
-        tasks: [...current.tasks, {
-          id: createdTask.id,
-          title: draft.title.trim(),
-          description: draft.description.trim() || null,
-          branchId: draft.branchId || null,
-          branchName,
-          assignedTo: createdTask.assigned_to,
-          dueAt,
-          priority: draft.priority,
-          status: 'new',
-        }].sort((left, right) => (left.dueAt ?? '').localeCompare(right.dueAt ?? '')),
-      } : current);
+      setData((current) => {
+        if (!current) return current;
+        const next = {
+          ...current,
+          tasks: [...current.tasks, {
+            id: createdTask.id,
+            title: draft.title.trim(),
+            description: draft.description.trim() || null,
+            branchId: draft.branchId || null,
+            branchName,
+            assignedTo: createdTask.assigned_to,
+            dueAt,
+            priority: draft.priority,
+            status: 'new' as const,
+          }].sort((left, right) => (left.dueAt ?? '').localeCompare(right.dueAt ?? '')),
+        };
+        if (adminCacheKey.current) writeSessionCache('admin-dashboard', adminCacheKey.current, next);
+        return next;
+      });
       const nextDeadline = currentAdenDateTime();
       setDraft({ title: '', description: '', dueDate: nextDeadline.date, dueTime: nextDeadline.time, priority: 'normal', roleCode: 'admin_followup', branchId: '', assignedEmployeeId: '', templateId: '', reportTemplateId: '', reportRequired: true });
       setShowCreate(false); setNotice('تم إنشاء المهمة وإسنادها للموظف المحدد. ظهرت مباشرة في القائمة.');

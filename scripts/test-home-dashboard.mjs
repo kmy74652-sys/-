@@ -106,6 +106,10 @@ assert.match(admin, /section === 'overview' && profile\) return <HomeDashboard/)
 assert.match(admin, /section === 'report-designer'.*canManageReports/);
 assert.match(admin, /Promise\.all\(\[/);
 assert.match(admin, /loadDashboardData\(\{ force, maxAgeMs: 30_000 \}\)/);
+assert.match(admin, /readSessionCache<DashboardData>\('admin-dashboard'/);
+assert.match(admin, /writeSessionCache\('admin-dashboard'/);
+assert.match(admin, /setLoading\(false\);/);
+assert.match(admin, /تُعرض آخر بيانات ناجحة، جارٍ تحديث لوحة المشرف/);
 assert.match(admin, /onTaskUpdated/);
 assert.match(admin, /onTaskDeleted/);
 assert.match(admin, /onTaskRestored/);
