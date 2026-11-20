@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { ActivityIndicator, Alert, Image, Modal, Pressable, RefreshControl, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { ActivityIndicator, Image, Modal, Pressable, RefreshControl, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { friendlyDataError, getMyEmployeeProfile, listMyNotifications, type MobileNotification, type MobileProfile } from '../lib/mobileData';
 import { countUnreadNotifications, loadHomeSummary } from '../lib/homeData';
@@ -11,12 +11,12 @@ import HomeIcon, { type HomeIconName } from './HomeIcon';
 
 const NAVY = '#0b3458';
 const GOLD = '#dba62a';
-const services: Array<{ key: HomeDestination | 'inventory'; title: string; subtitle: string; icon: HomeIconName }> = [
+const services: Array<{ key: HomeDestination; title: string; subtitle: string; icon: HomeIconName }> = [
   { key: 'tasks', title: 'إدارة المهام', subtitle: 'إنشاء ومتابعة المهام', icon: 'tasks' },
   { key: 'reports', title: 'التقارير', subtitle: 'تقارير شاملة ومفصلة', icon: 'reports' },
   { key: 'employees', title: 'إدارة الموظفين', subtitle: 'بيانات الموظفين والحسابات', icon: 'employees' },
   { key: 'branches', title: 'إدارة الفروع', subtitle: 'إضافة وتعديل الفروع', icon: 'branches' },
-  { key: 'inventory', title: 'المخزون', subtitle: 'إدارة المخزون والجرد', icon: 'inventory' },
+  { key: 'performance', title: 'إحصائيات ومقارنة الأداء', subtitle: 'ترتيب الموظفين ومقارنة الفروع', icon: 'reports' },
   { key: 'task-designer', title: 'مصمم المهام', subtitle: 'تصميم مهام دورية ومخصصة', icon: 'task-designer' },
   { key: 'report-designer', title: 'مصمم التقارير', subtitle: 'إنشاء تقارير ديناميكية', icon: 'report-designer' },
   { key: 'agreements', title: 'اتفاقية العمل', subtitle: 'عرض وقبول اتفاقية الموظف', icon: 'agreement' },
@@ -189,11 +189,10 @@ export default function HomeDashboard({ profile: initialProfile, onNavigate, onS
 
           <View style={styles.moduleGrid}>
             {services.map((item) => {
-              const enabled = item.key === 'inventory' ? true : access[item.key];
-              const unavailable = item.key === 'inventory';
-              return <Pressable key={item.key} accessibilityRole="button" accessibilityState={{ disabled: false }} accessibilityLabel={`${item.title}، ${item.subtitle}`} style={({ pressed }) => [styles.moduleCard, largeText && styles.largeModuleCard, !enabled && styles.unavailableCard, pressed && styles.pressed]} onPress={() => unavailable ? Alert.alert('المخزون', 'وحدة المخزون مرتبطة بإدارة المؤسسة وسيتم فتحها عند توفر صلاحية المخزون.') : navigate(item.key as HomeDestination)}>
+              const enabled = access[item.key];
+              return <Pressable key={item.key} accessibilityRole="button" accessibilityState={{ disabled: false }} accessibilityLabel={`${item.title}، ${item.subtitle}`} style={({ pressed }) => [styles.moduleCard, largeText && styles.largeModuleCard, !enabled && styles.unavailableCard, pressed && styles.pressed]} onPress={() => navigate(item.key)}>
                 <HomeIcon name={item.icon} size={compact ? 31 : 37} />
-                <View style={styles.moduleCopy}><Text style={[styles.moduleTitle, compact && styles.compactModuleTitle]}>{item.title}</Text><Text style={[styles.moduleSubtitle, compact && styles.compactModuleSubtitle]}>{item.subtitle}</Text>{!enabled && !unavailable && <Text style={styles.unavailableText}>غير متاح لحسابك</Text>}</View>
+                <View style={styles.moduleCopy}><Text style={[styles.moduleTitle, compact && styles.compactModuleTitle]}>{item.title}</Text><Text style={[styles.moduleSubtitle, compact && styles.compactModuleSubtitle]}>{item.subtitle}</Text>{!enabled && <Text style={styles.unavailableText}>غير متاح لحسابك</Text>}</View>
               </Pressable>;
             })}
           </View>

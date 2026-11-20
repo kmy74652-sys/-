@@ -14,7 +14,7 @@ function compile(path, dependencies = {}) {
 const model = compile('apps/mobile/lib/homeModel.ts');
 const now = Date.parse('2026-11-19T14:00:00Z');
 const old = '2026-11-18T14:00:00Z';
-const future = '2026-11-20T14:00:00Z';
+const future = '2099-11-20T14:00:00Z';
 const rows = [
   { status: 'new', due_at: future }, { status: 'received', due_at: old },
   { status: 'in_progress', due_at: future }, { status: 'on_hold', due_at: old },
@@ -101,7 +101,8 @@ assert.match(tasks, /task\.branch_id === branchFilter/);
 assert.match(tasks, /\['all', 'pending', 'in_progress', 'submitted', 'rejected', 'approved', 'late'\]/);
 assert.match(admin, /section === 'overview' && profile\) return <HomeDashboard/);
 assert.match(admin, /section === 'report-designer'.*canManageReports/);
-const titles = ['إدارة المهام', 'التقارير', 'إدارة الموظفين', 'إدارة الفروع', 'المخزون', 'مصمم المهام', 'مصمم التقارير', 'الصلاحيات'];
+const titles = ['إدارة المهام', 'التقارير', 'إدارة الموظفين', 'إدارة الفروع', 'إحصائيات ومقارنة الأداء', 'مصمم المهام', 'مصمم التقارير', 'الصلاحيات'];
+assert.doesNotMatch(home, /المخزون/);
 let last = -1;
 for (const title of titles) { const offset = home.indexOf(`title: '${title}'`); assert(offset > last, `Tile order: ${title}`); last = offset; }
 console.log('Home dashboard executable checks passed: status/overdue/multi-form counts, 1201-row pagination, employee/organization/branch scope, notification failures, permissions and route/layout wiring.');

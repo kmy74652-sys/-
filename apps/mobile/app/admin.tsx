@@ -16,12 +16,13 @@ import OrganizationalTaskDesigner from '../components/OrganizationalTaskDesigner
 import { listApprovedTaskReportForms, listTaskDesignerCategories, listTaskDesignerTemplates, saveTaskDesignerTemplate, setTaskDesignerTemplateActive, type StoredTaskTemplate, type TaskCategoryRow } from '../lib/taskDesigner';
 import { deleteManagedBranch, deleteManagedReport, deleteManagedTask, updateManagedTask } from '../lib/managementData';
 import { reviewEmployeeRoleReport } from '../lib/employeeRoleReports';
+import PerformanceAnalytics from '../components/PerformanceAnalytics';
 
-type Section = 'overview' | 'tasks' | 'task-designer' | 'report-designer' | 'reports' | 'hr' | 'branches' | 'employees' | 'activity';
-const sections: Array<[Section, string]> = [['overview', 'الرئيسية'], ['tasks', 'إدارة المهام'], ['task-designer', 'الجدول التنظيمي'], ['report-designer', 'مصمم التقارير'], ['reports', 'تقارير الموظفين'], ['branches', 'الفروع'], ['employees', 'الموظفون'], ['activity', 'السجل والمرفقات']];
+type Section = 'overview' | 'tasks' | 'task-designer' | 'report-designer' | 'reports' | 'performance' | 'hr' | 'branches' | 'employees' | 'activity';
+const sections: Array<[Section, string]> = [['overview', 'الرئيسية'], ['tasks', 'إدارة المهام'], ['task-designer', 'الجدول التنظيمي'], ['report-designer', 'مصمم التقارير'], ['reports', 'تقارير الموظفين'], ['performance', 'إحصائيات الأداء'], ['branches', 'الفروع'], ['employees', 'الموظفون'], ['activity', 'السجل والمرفقات']];
 const allowedSections: readonly Section[] = sections.map(([value]) => value);
 function isSection(value: string | undefined): value is Section { return Boolean(value && allowedSections.includes(value as Section)); }
-type HomeDestination = 'tasks' | 'reports' | 'employees' | 'branches' | 'task-designer' | 'report-designer' | 'agreements' | 'hr' | 'permissions' | 'settings';
+type HomeDestination = 'tasks' | 'reports' | 'employees' | 'branches' | 'performance' | 'task-designer' | 'report-designer' | 'agreements' | 'hr' | 'permissions' | 'settings';
 const roleCodes = ['owner', 'admin_followup', 'accountant', 'warehouse_keeper', 'warehouse_worker'];
 const priorityLabels: Record<string, string> = { normal: 'عادية', important: 'مهمة', urgent: 'عاجلة', critical: 'حرجة' };
 
@@ -145,6 +146,7 @@ export default function AdminScreen() {
     if (destination === 'tasks') { setSection('tasks'); return; }
     if (destination === 'reports') { if (canViewReports) setSection('reports'); return; }
     if (destination === 'branches') { if (canViewBranches) setSection('branches'); return; }
+    if (destination === 'performance') { if (canViewReports) setSection('performance'); return; }
     if (destination === 'task-designer') { if (canManageTaskLibrary) setSection('task-designer'); return; }
     if (destination === 'report-designer') { if (canManageReports) setSection('report-designer'); }
   }
@@ -152,7 +154,7 @@ export default function AdminScreen() {
   if (loading) return <SafeAreaView style={styles.safe}><View style={styles.center}><ActivityIndicator size="large" color="#17324d" /><Text style={styles.muted}>جارٍ تحميل لوحة الإدارة…</Text></View></SafeAreaView>;
   if (section === 'overview' && profile) return <HomeDashboard profile={profile} onNavigate={navigateFromHome} />;
   const shellTab: ShellTab = section === 'tasks' ? 'tasks' : section === 'employees' ? 'employees' : section === 'overview' ? 'home' : 'settings';
-  const sectionTitles: Record<Section, string> = { overview: 'الرئيسية', tasks: 'إدارة المهام', 'task-designer': 'مصمم المهام', 'report-designer': 'مصمم التقارير', reports: 'تقارير الموظفين', hr: 'الموارد البشرية', branches: 'إدارة الفروع', employees: 'الموظفون', activity: 'السجل والمرفقات' };
+  const sectionTitles: Record<Section, string> = { overview: 'الرئيسية', tasks: 'إدارة المهام', 'task-designer': 'مصمم المهام', 'report-designer': 'مصمم التقارير', reports: 'تقارير الموظفين', performance: 'إحصائيات ومقارنة الأداء', hr: 'الموارد البشرية', branches: 'إدارة الفروع', employees: 'الموظفون', activity: 'السجل والمرفقات' };
   return <AppShell activeTab={shellTab} title={sectionTitles[section]} subtitle="لوحة إدارة المؤسسة" profileName={currentName} onRefresh={() => { setRefreshing(true); void load(true); }}>
     <Stack.Screen options={{ headerShown: false }} />
     <ScreenHeader title={sectionTitles[section]} subtitle={`${brandName} · ${brandTagline}`} profileName={currentName} onBack={section === 'overview' ? undefined : () => setSection('overview')} />
@@ -165,6 +167,7 @@ export default function AdminScreen() {
       {section === 'task-designer' && (canManageTaskLibrary ? <TaskTemplatesSection templates={taskDesignerTemplates} categories={taskCategories} employees={data?.employees ?? []} reportTemplates={designerTemplates} onReload={load} /> : <Unavailable title="الجدول التنظيمي" text="لا تملك صلاحية إدارة الجداول التنظيمية." />)}
       {section === 'report-designer' && (canManageReports && canManageEmployees ? <ReportDesigner organizationId={profile?.institutionId ?? ''} /> : <Unavailable title="مصمم التقارير" text="لا تملك صلاحية إدارة نماذج التقارير." />)}
       {section === 'reports' && (canViewReports ? <ReportsSection data={data} fmt={fmt} onOpenTasks={() => router.push('/tasks')} canManage={canManageEmployees} institutionId={profile?.institutionId ?? ''} onReload={load} /> : <Unavailable title="تقارير الموظفين" text="لا تملك صلاحية قراءة تقارير المؤسسة أو مراجعتها." />)}
+      {section === 'performance' && (canViewReports ? <PerformanceAnalytics /> : <Unavailable title="إحصائيات ومقارنة الأداء" text="لا تملك صلاحية عرض إحصائيات الأداء." />)}
       {section === 'branches' && (canViewBranches ? <BranchesSection data={data} institutionId={profile?.institutionId ?? ''} canManage={canManageEmployees} onReload={load} /> : <Unavailable title="إدارة الفروع" text="لا تملك صلاحية عرض الفروع." />)}
       {section === 'employees' && (canViewEmployees ? <EmployeesSection data={data} /> : <Unavailable title="الموظفون" text="لا تملك صلاحية عرض الموظفين." />)}
       {section === 'activity' && (canViewActivity ? <ActivitySection data={data} fmt={fmt} /> : <Unavailable title="سجل النشاط" text="لا تملك صلاحية قراءة سجل النشاط." />)}
