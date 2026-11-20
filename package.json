@@ -9,6 +9,7 @@
     "typecheck": "pnpm -r typecheck",
     "schema:verify": "node scripts/verify-schema.mjs",
     "test:task-workflow": "node scripts/test-task-workflow.mjs",
+    "test:employee-screen": "node scripts/test-employee-screen.mjs",
     "test:report-designer": "node scripts/test-report-designer.mjs",
     "test:report-security": "node scripts/test-report-security.mjs",
     "test:employee-agreements": "node scripts/test-employee-agreements.mjs",
