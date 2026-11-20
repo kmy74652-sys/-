@@ -380,6 +380,7 @@ export default function TasksScreen() {
     const date = new Date(value);
     return Number.isNaN(date.getTime()) ? 'غير محدد' : new Intl.DateTimeFormat('ar-SA', { dateStyle: 'medium', timeStyle: 'short' }).format(date);
   };
+  const employeeNewOnly = !reportsOnly && screenMode === 'mine' && !canManage && !canReview;
   const filteredTasks = tasks.filter((task) => {
     const hasPendingFormReview = task.report_forms.some((form) => form.status === 'submitted');
     const hasReport = task.report_forms.length > 0 || task.report_schema.length > 0;
@@ -393,6 +394,7 @@ export default function TasksScreen() {
         ? canReview && (task.status === 'submitted' || hasPendingFormReview)
         : canManage || canReview;
     return modeMatches &&
+      (!employeeNewOnly || normalizeTaskStatus(task.status) === 'pending') &&
       taskMatchesFilter(task, statusFilter) &&
       (!branchFilter || task.branch_id === branchFilter) &&
       (positionFilter === 'all' || task.position_code === positionFilter) &&

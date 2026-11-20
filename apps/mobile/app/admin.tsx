@@ -349,7 +349,8 @@ function TaskTemplatesSection({ templates, categories, employees, reportTemplate
   }
   async function sendDirectly(draft: TaskTemplateDraft, employeeId: string, branchId: string | null, dueAt: string) {
     const selectedReport = reportTemplates.find((template) => template.role_code === draft.roleCode && template.approved_version_id && template.is_active !== false);
-    await createAdministrativeTask({ title: draft.title, description: draft.description, dueAt, priority: draft.priority, roleCode: draft.roleCode, branchId, assignedEmployeeId: employeeId, templateId: null, reportTemplateId: selectedReport?.id ?? null, reportVersionId: selectedReport?.approved_version_id ?? null, reportRequired: Boolean(selectedReport?.approved_version_id) });
+    const executionDetails = draft.steps.map((step, index) => `${index + 1}. ${step.title}\nالفترة: ${step.instructions}\nالإثبات: ${step.evidenceInstructions || 'تأكيد الإنجاز'}`).join('\n');
+    await createAdministrativeTask({ title: draft.title, description: [draft.description, 'تفاصيل التنفيذ المباشر:', executionDetails].filter(Boolean).join('\n\n'), dueAt, priority: draft.priority, roleCode: draft.roleCode, branchId, assignedEmployeeId: employeeId, templateId: null, reportTemplateId: selectedReport?.id ?? null, reportVersionId: selectedReport?.approved_version_id ?? null, reportRequired: Boolean(selectedReport?.approved_version_id) });
     await onReload();
   }
   return <View style={{ gap: 12 }}>

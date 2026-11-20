@@ -65,7 +65,18 @@ export default function OrganizationalTaskDesigner({ initialTemplate, employees 
   }
   async function save() {
     setBusy(true); setNotice('');
-    try { await onSave?.(buildDraft()); setNotice('تم حفظ الجدول التنظيمي.'); } finally { setBusy(false); }
+    try {
+      const draft = buildDraft();
+      await onSave?.(draft);
+      const employee = employeeOptions.find((item) => item.id === selectedEmployeeId);
+      const dueAt = adenDateTimeToIso(dueDate, dueTime);
+      if (employee && dueAt) {
+        await onSend?.(draft, employee.id, employee.assignments?.find((item) => item.roleCode === selectedRole)?.branchId ?? null, dueAt);
+        setNotice(`تم حفظ المهمة وإرسالها مباشرة إلى ${employee.name} ضمن تبويب المهام.`);
+      } else {
+        setNotice('تم حفظ الجدول التنظيمي. اختر موظفًا وموعدًا صالحًا لإرساله مباشرة.');
+      }
+    } finally { setBusy(false); }
   }
   async function sendDirectly() {
     const employee = employeeOptions.find((item) => item.id === selectedEmployeeId);
