@@ -136,9 +136,9 @@ export default function ReportDesigner({ organizationId = '' }: { organizationId
     finally { setBusy(false); }
   }
   function confirmDelete(template: ReportTemplate) {
-    Alert.alert('حذف قالب التقرير نهائيًا', 'سيُحذف قالب التقرير نهائيًا. إذا كان مرتبطًا بمهمة أو إصدار معتمد سيرفض النظام العملية. هل تريد المتابعة؟', [
+    Alert.alert('حذف قالب التقرير نهائيًا', 'سيُحذف القالب من مكتبة التقارير نهائيًا، وتُفصل ارتباطاته الحالية بالمهام. ستبقى المهام والتقارير السابقة ولقطاتها وإصداراتها محفوظة وقابلة للقراءة. هل تريد المتابعة؟', [
       { text: 'إلغاء', style: 'cancel' },
-      { text: 'حذف نهائي', style: 'destructive', onPress: () => void (async () => { setBusy(true); setError(''); try { await deleteManagedReportTemplate(organizationId, template.id); setNotice('تم حذف قالب التقرير نهائيًا.'); await refreshTemplates(); } catch (cause) { setError(String((cause as { message?: string })?.message ?? 'تعذر حذف القالب؛ قد يكون مرتبطًا بمهام سابقة.')); } finally { setBusy(false); } })() },
+      { text: 'حذف نهائي', style: 'destructive', onPress: () => void (async () => { setBusy(true); setError(''); try { await deleteManagedReportTemplate(organizationId, template.id); setNotice('تم حذف القالب وفصل ارتباطاته. بقيت المهام والتقارير السابقة محفوظة.'); await refreshTemplates(); } catch (cause) { setError(String((cause as { message?: string })?.message ?? 'تعذر حذف قالب التقرير. لم تُحذف أي مهام أو تقارير تاريخية.')); } finally { setBusy(false); } })() },
     ]);
   }
   const visibleTemplates = useMemo(() => templates.filter((template) =>

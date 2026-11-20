@@ -6,6 +6,7 @@ const read = (path) => fs.readFileSync(new URL(path, import.meta.url), 'utf8');
 const migration = ['026_dynamic_report_designer.sql', '027_report_form_approval.sql', '028_snapshot_report_validation.sql', '029_snapshot_field_validation.sql', '030_calculated_report_validation.sql', '031_signature_report_validation.sql', '034_report_builder_integrity.sql']
   .map((file) => read(`../supabase/migrations/${file}`)).join('\n');
 const currentMigration = read('../supabase/migrations/034_report_builder_integrity.sql');
+const deleteMigration = read('../supabase/migrations/076_delete_report_template_preserve_history.sql');
 const mobileDesigner = read('../apps/mobile/components/ReportDesigner.tsx');
 const reportInput = read('../apps/mobile/components/ReportFieldInput.tsx');
 const livePreview = read('../apps/mobile/components/ReportLivePreview.tsx');
@@ -103,6 +104,15 @@ assert(reportInput.includes("field.type === 'money' && previewMode") && reportIn
 assert(reportInput.includes('إضافة صف') && reportInput.includes('SignaturePad') && reportInput.includes('react-native-svg'));
 assert(tasks.includes('validateReportFieldValue') && tasks.includes('evaluateReportField') && tasks.includes('reportDefaultDraft'));
 assert(designerApi.includes("rpc('save_report_form_draft'") && designerApi.includes("rpc('approve_report_form_version'"));
+
+// Permanent library deletion detaches current associations while preserving
+// historical versions, snapshots, tasks, and submitted report data.
+assert(deleteMigration.includes('delete from public.task_template_report_forms'));
+assert(deleteMigration.includes('update public.task_report_form_snapshots') && deleteMigration.includes('set template_id = null'));
+assert(deleteMigration.includes('update public.report_form_versions') && deleteMigration.includes('set template_id = null'));
+assert(deleteMigration.includes('on delete set null'));
+assert(!deleteMigration.includes('report_template_in_use'));
+assert(mobileDesigner.includes('ستبقى المهام والتقارير السابقة') && mobileDesigner.includes('فصل ارتباطاته'));
 
 // DB invariants: org-scoped access, approved versions, immutable snapshots/signatures and server validation.
 for (const token of [
