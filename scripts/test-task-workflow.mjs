@@ -21,6 +21,7 @@ assert(mobile.includes("['mine', 'مهامي']") && mobile.includes("['review', 
 assert(mobile.includes("firstsearchparam(routeparams.view) === 'reports'") && mobile.includes('إعداد التقارير'), 'employee report workspace tab missing');
 assert(mobile.includes("setcanmanagereports(permissions.has('report_forms.manage'))") && mobile.includes('canmanagereports={canmanagereports && canmanage}'), 'report designer access must be permission-gated in employee workspace');
 assert(dynamicReportsPanel.includes("router.push('/admin?section=report-designer'") && dynamicReportsPanel.includes('فتح مصمم التقارير وإنشاء نموذج'), 'authorized managers must have a direct designer shortcut from the empty reports state');
+assert(mobile.includes('<employeedynamicreportspanel') && !mobile.includes('<reportsubmissionemployeepanel'), 'employee report workspace must render the dynamic designer form panel');
 assert(admin.includes("section === 'report-designer' && (canmanagereports ? <reportdesigner") && !admin.includes('canmanagereports && canmanageemployees ? <reportdesigner'), 'designer route must not require unrelated employee-management permission');
 assert(mobile.includes('(!reportsonly || hasreport)'), 'report workspace must show only tasks with assigned report forms');
 assert(mobile.includes('إرسال التقرير مرة واحدة') && !mobile.includes('تم ترحيل هذا التقرير ولا يمكن تعديله'), 'report workspace must expose one submission without showing the internal lock message');
