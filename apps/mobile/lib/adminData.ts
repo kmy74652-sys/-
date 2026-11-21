@@ -128,7 +128,9 @@ export async function createAdministrativeTask(input: { title: string; descripti
   if (authError || !authData.user) throw authError ?? new Error('not_authenticated');
   const { data: profileData, error: profileError } = await db.rpc('mobile_my_profile');
   if (profileError) throw profileError;
-  const organizationId = (profileData as { employee?: { institutionId?: string } } | null)?.employee?.institutionId;
+  const employeeProfile = (profileData as { employee?: { institutionId?: string; permissions?: string[] } } | null)?.employee;
+  const organizationId = employeeProfile?.institutionId;
+  const currentPermissions = new Set(employeeProfile?.permissions ?? []);
   if (!organizationId) throw new Error('employee_not_active');
   const reportTemplateId = input.reportTemplateId ?? null;
   const reportVersionId = input.reportVersionId ?? null;
@@ -176,9 +178,15 @@ export async function createAdministrativeTask(input: { title: string; descripti
   if (error) throw error;
   const taskId = typeof task === 'string' ? task : (task as { id?: string } | null)?.id;
   if (!taskId) throw new Error('task_create_response_invalid');
-  if (input.budgetAmount !== undefined || input.estimatedAmount !== undefined || input.spentAmount !== undefined || input.costNotes) {
-    const { error: costError } = await db.from('task_costs').upsert({ organization_id: organizationId, task_id: taskId, budget_amount: Math.max(0, input.budgetAmount ?? 0), estimated_amount: Math.max(0, input.estimatedAmount ?? 0), spent_amount: Math.max(0, input.spentAmount ?? 0), notes: input.costNotes?.trim() || null }, { onConflict: 'task_id' });
+  const hasCostInput = (input.budgetAmount ?? 0) > 0 || (input.estimatedAmount ?? 0) > 0 || (input.spentAmount ?? 0) > 0 || Boolean(input.costNotes?.trim());
+  if (hasCostInput && currentPermissions.has('task_costs.approve')) {
+    const { error: costError } = await db.from('task_costs').upsert({ organization_id: organizationId, task_id: taskId, budget_amount: Math.max(0, input.budgetAmount ?? 0), estimated_amount: Math.max(0, input.estimatedAmount ?? 0), spent_amount: Math.max(0, input.spentAmount ?? 0), notes: input.costNotes?.trim() || null, approved_by: authData.user.id, approved_at: new Date().toISOString() }, { onConflict: 'task_id' });
     if (costError) throw costError;
+  } else if (hasCostInput && currentPermissions.has('task_costs.propose')) {
+    const { error: costError } = await db.rpc('propose_task_cost', { p_organization_id: organizationId, p_task_id: taskId, p_estimated_amount: Math.max(0, input.estimatedAmount ?? 0), p_notes: input.costNotes?.trim() || null });
+    if (costError) throw costError;
+  } else if (hasCostInput) {
+    throw new Error('task_cost_permission_denied');
   }
   return { id: taskId, assigned_to: assignee.user_id };
 }
