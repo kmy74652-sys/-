@@ -479,7 +479,7 @@ export default function TasksScreen() {
     return modeMatches &&
       !isDynamicTestTitle(task.title) &&
       (reportsOnly || taskMatchesFilter(task, statusFilter)) &&
-      (reportsOnly || !branchFilter || task.branch_id === branchFilter) &&
+      (reportsOnly || screenMode === 'mine' || !branchFilter || task.branch_id === branchFilter) &&
       (reportsOnly || positionFilter === 'all' || task.position_code === positionFilter) &&
       (!reportsOnly || hasReport) &&
       (!reportsOnly || !isDynamicTestTitle(task.title)) &&
@@ -519,7 +519,7 @@ export default function TasksScreen() {
           ] as const).filter(([mode]) => mode === 'mine' || (mode === 'review' ? canReview : canManage || canReview)).map(([mode, label]) => <Pressable key={mode} accessibilityRole="button" accessibilityState={{ selected: screenMode === mode }} style={[styles.modeTab, screenMode === mode && styles.modeTabSelected]} onPress={() => { setScreenMode(mode); setStatusFilter('all'); setPositionFilter('all'); }}><Text style={[styles.modeTabText, screenMode === mode && styles.modeTabTextSelected]}>{label}</Text></Pressable>)}
         </View>}
 
-        {!loading && !reportsOnly && !!branchFilter && <View style={styles.activeFilter}><Text style={styles.meta}>الفرع المحدد: {tasks.find((task) => task.branch_id === branchFilter)?.branch_name ?? branchFilter}</Text><Pressable accessibilityRole="button" onPress={() => setBranchFilter('')} style={styles.clearFilterButton}><Text style={styles.clearFilterText}>مسح الفرع</Text></Pressable></View>}
+        {!loading && !reportsOnly && screenMode !== 'mine' && !!branchFilter && <View style={styles.activeFilter}><Text style={styles.meta}>الفرع المحدد: {tasks.find((task) => task.branch_id === branchFilter)?.branch_name ?? 'الفرع المحدد'}</Text><Pressable accessibilityRole="button" onPress={() => setBranchFilter('')} style={styles.clearFilterButton}><Text style={styles.clearFilterText}>مسح الفرع</Text></Pressable></View>}
         {!loading && !reportsOnly && tasks.length > 0 && <>
           <TextInput style={styles.input} value={search} onChangeText={setSearch} placeholder="ابحث عن مهمة…" accessibilityLabel="البحث في المهام" />
           {canReview && screenMode !== 'mine' && <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filters}>
