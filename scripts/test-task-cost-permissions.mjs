@@ -6,6 +6,7 @@ const migration = read('supabase/migrations/081_task_cost_permissions.sql');
 const taskCostsMigration = read('supabase/migrations/080_task_costs.sql');
 const admin = read('apps/mobile/app/admin.tsx');
 const adminData = read('apps/mobile/lib/adminData.ts');
+const dashboardData = adminData;
 const designer = read('apps/mobile/components/OrganizationalTaskDesigner.tsx');
 
 for (const permission of ['task_costs.read', 'task_costs.propose', 'task_costs.approve']) {
@@ -40,6 +41,11 @@ assert.match(adminData, /approved_by: authData\.user\.id/);
 assert.match(adminData, /rpc\('propose_task_cost'/);
 assert.match(adminData, /task_costs\.propose/);
 assert.match(adminData, /task_cost_permission_denied/);
+assert.match(dashboardData, /const dashboardCache = new Map<string, \{ value: DashboardData; loadedAt: number \}>\(\)/);
+assert.match(dashboardData, /const dashboardRequests = new Map<string, Promise<DashboardData>>\(\)/);
+assert.match(dashboardData, /const cacheKey = `\\$\\{authData\.user\.id\\}:\\$\\{organizationId\\}`/);
+assert.match(dashboardData, /dashboardCache\.get\(cacheKey\)/);
+assert.match(dashboardData, /dashboardRequests\.get\(cacheKey\)/);
 
 assert.match(designer, /canProposeCosts\?: boolean; canApproveCosts\?: boolean/);
 assert.match(designer, /canApproveCosts \? <View style=\{styles\.threeColumns\}/);
