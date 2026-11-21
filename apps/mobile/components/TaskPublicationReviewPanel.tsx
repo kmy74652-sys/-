@@ -92,6 +92,7 @@ export default function TaskPublicationReviewPanel({ branches, onPublished }: Pr
                 <Text style={styles.cell}>{row.timeSlot ?? '—'}</Text>
                 <Text style={styles.cell}>{row.responsibility ?? '—'}{Array.isArray(row.subItems) && row.subItems.length ? '\n' + row.subItems.map((v: string) => '• ' + v).join('\n') : ''}</Text>
                 <Text style={styles.cell}>{row.kpiIndicator ?? '—'}</Text>
+                <Text style={styles.cell}>{row.proofRequirement ?? (row.requiresProof ? 'مطلوب إثبات' : 'غير مطلوب')}{row.requiresProof ? '\n(إلزامي)' : ''}</Text>
               </View>)}
             </View> : <View style={styles.table}>{steps.map((step: any, index: number) => <Text key={index} style={styles.meta}>{index + 1}. {step.title} — {step.instructions ?? ''}</Text>)}</View>}
             {reportFields.length > 0 && <View style={styles.fieldList}><Text style={styles.fieldTitle}>حقول التقرير التي صممتها الإدارة</Text>{reportFields.map((field: any, index: number) => <Text key={field.key ?? index} style={styles.meta}>{index + 1}. {field.label ?? field.key} · {field.type ?? 'حقل نصي'} · {field.required ? 'إلزامي' : 'اختياري'}</Text>)}</View>}
