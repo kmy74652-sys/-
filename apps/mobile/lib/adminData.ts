@@ -11,12 +11,6 @@ export type AdminTask = {
   dueAt: string | null;
   priority: string;
   status: string;
-  budgetAmount: number;
-  estimatedAmount: number;
-  spentAmount: number;
-  costNotes: string | null;
-  costProposedAt?: string | null;
-  costApprovedAt?: string | null;
 };
 export type AdminBranch = { id: string; code: string; name: string; isActive: boolean; level: string | null };
 export type AdminEmployee = { id: string; userId: string | null; name: string; employeeNo: string | null; active: boolean; roles: string[]; branchId: string | null; branchName: string | null; assignments: Array<{ roleCode: string; branchId: string | null }> };
@@ -67,16 +61,15 @@ export async function loadDashboardData(options: { force?: boolean; maxAgeMs?: n
 
 async function loadDashboardDataFresh(): Promise<DashboardData> {
   const db = client();
-  const [tasksResult, branchesResult, employeesResult, reportsResult, roleReportsResult, activityResult, costsResult] = await Promise.all([
+  const [tasksResult, branchesResult, employeesResult, reportsResult, roleReportsResult, activityResult] = await Promise.all([
     db.from('tasks').select('id,title,description,branch_id,assigned_to,due_at,priority,status').is('deleted_at', null).order('due_at', { ascending: true }).limit(200),
     db.from('branches').select('id,code,name,is_active,branch_level').order('code', { ascending: true }).limit(100),
     db.from('organization_memberships').select('id,user_id,display_name,employee_no,is_active').order('display_name', { ascending: true }).limit(200),
     db.from('task_reports').select('id,task_id,status,submitted_at,review_note,values,report_form_snapshot_id').order('submitted_at', { ascending: false }).limit(100),
     db.from('employee_role_reports').select('id,employee_user_id,role_code,branch_id,report_date,report_title,status,submitted_at,review_note,values').order('submitted_at', { ascending: false }).limit(100),
     db.from('task_activity_log').select('id,task_id,action,created_at').order('created_at', { ascending: false }).limit(100),
-    db.from('task_costs').select('task_id,budget_amount,estimated_amount,spent_amount,notes,proposed_at,approved_at').limit(200),
   ]);
-  for (const result of [tasksResult, branchesResult, employeesResult, reportsResult, roleReportsResult, activityResult, costsResult]) if (result.error) throw result.error;
+  for (const result of [tasksResult, branchesResult, employeesResult, reportsResult, roleReportsResult, activityResult]) if (result.error) throw result.error;
   const branches = (branchesResult.data ?? []).map((row) => ({ id: row.id, code: row.code, name: row.name, isActive: row.is_active, level: row.branch_level }));
   const branchNames = new Map(branches.map((branch) => [branch.id, branch.name]));
   const membershipIds = (employeesResult.data ?? []).map((row) => row.id);
@@ -104,10 +97,8 @@ async function loadDashboardDataFresh(): Promise<DashboardData> {
       assignments: assignmentsByMembership.get(row.id) ?? [],
     };
   });
-  const costsByTaskId = new Map((costsResult.data ?? []).map((row) => [row.task_id, row]));
   const tasks = (tasksResult.data ?? []).map((row) => {
-    const cost = costsByTaskId.get(row.id);
-    return { id: row.id, title: row.title, description: row.description, branchId: row.branch_id, branchName: row.branch_id ? branchNames.get(row.branch_id) ?? null : null, assignedTo: row.assigned_to, dueAt: row.due_at, priority: row.priority, status: row.status, budgetAmount: Number(cost?.budget_amount ?? 0), estimatedAmount: Number(cost?.estimated_amount ?? 0), spentAmount: Number(cost?.spent_amount ?? 0), costNotes: cost?.notes ?? null, costProposedAt: cost?.proposed_at ?? null, costApprovedAt: cost?.approved_at ?? null };
+    return { id: row.id, title: row.title, description: row.description, branchId: row.branch_id, branchName: row.branch_id ? branchNames.get(row.branch_id) ?? null : null, assignedTo: row.assigned_to, dueAt: row.due_at, priority: row.priority, status: row.status };
   });
   const snapshotIds = (reportsResult.data ?? []).map((row) => row.report_form_snapshot_id).filter((id): id is string => Boolean(id));
   const snapshotsResult = snapshotIds.length ? await db.from('task_report_form_snapshots').select('id,title,schema').in('id', snapshotIds).limit(500) : { data: [], error: null };
@@ -140,7 +131,7 @@ export async function listTaskTemplates() {
   return data ?? [];
 }
 
-export async function createAdministrativeTask(input: { title: string; description: string; dueAt: string; priority: string; branchId: string | null; roleCode: string; assignedEmployeeId: string; templateId: string | null; reportTemplateId?: string | null; reportVersionId?: string | null; reportRequired?: boolean; reportOverrides?: unknown[]; idempotencyKey?: string; budgetAmount?: number; estimatedAmount?: number; spentAmount?: number; costNotes?: string | null }) {
+export async function createAdministrativeTask(input: { title: string; description: string; dueAt: string; priority: string; branchId: string | null; roleCode: string; assignedEmployeeId: string; templateId: string | null; reportTemplateId?: string | null; reportVersionId?: string | null; reportRequired?: boolean; reportOverrides?: unknown[]; idempotencyKey?: string }) {
   const db = client();
   const { data: authData, error: authError } = await db.auth.getUser();
   if (authError || !authData.user) throw authError ?? new Error('not_authenticated');
@@ -196,48 +187,7 @@ export async function createAdministrativeTask(input: { title: string; descripti
   if (error) throw error;
   const taskId = typeof task === 'string' ? task : (task as { id?: string } | null)?.id;
   if (!taskId) throw new Error('task_create_response_invalid');
-  const hasCostInput = (input.budgetAmount ?? 0) > 0 || (input.estimatedAmount ?? 0) > 0 || (input.spentAmount ?? 0) > 0 || Boolean(input.costNotes?.trim());
-  if (hasCostInput && currentPermissions.has('task_costs.approve')) {
-    const { error: costError } = await db.from('task_costs').upsert({ organization_id: organizationId, task_id: taskId, budget_amount: Math.max(0, input.budgetAmount ?? 0), estimated_amount: Math.max(0, input.estimatedAmount ?? 0), spent_amount: Math.max(0, input.spentAmount ?? 0), notes: input.costNotes?.trim() || null, approved_by: authData.user.id, approved_at: new Date().toISOString() }, { onConflict: 'task_id' });
-    if (costError) throw costError;
-  } else if (hasCostInput && currentPermissions.has('task_costs.propose')) {
-    const { error: costError } = await db.rpc('propose_task_cost', { p_organization_id: organizationId, p_task_id: taskId, p_estimated_amount: Math.max(0, input.estimatedAmount ?? 0), p_notes: input.costNotes?.trim() || null });
-    if (costError) throw costError;
-  } else if (hasCostInput) {
-    throw new Error('task_cost_permission_denied');
-  }
   return { id: taskId, assigned_to: assignee.user_id };
-}
-
-export async function approveAdministrativeTaskCost(input: { taskId: string; budgetAmount: number; estimatedAmount: number; spentAmount: number; notes?: string | null }) {
-  const db = client();
-  const [{ data: authData, error: authError }, { data: profileData, error: profileError }] = await Promise.all([
-    db.auth.getUser(),
-    db.rpc('mobile_my_profile'),
-  ]);
-  if (authError || !authData.user) throw authError ?? new Error('not_authenticated');
-  if (profileError) throw profileError;
-  const employee = (profileData as { employee?: { institutionId?: string; permissions?: string[] } } | null)?.employee;
-  const organizationId = employee?.institutionId;
-  if (!organizationId) throw new Error('employee_not_active');
-  if (!employee?.permissions?.includes('task_costs.approve')) throw new Error('task_cost_approval_permission_denied');
-
-  const amounts = [input.budgetAmount, input.estimatedAmount, input.spentAmount];
-  if (amounts.some((value) => !Number.isFinite(value) || value < 0)) throw new Error('invalid_task_cost_amount');
-
-  const approvedAt = new Date().toISOString();
-  const { error } = await db.from('task_costs').upsert({
-    organization_id: organizationId,
-    task_id: input.taskId,
-    budget_amount: input.budgetAmount,
-    estimated_amount: input.estimatedAmount,
-    spent_amount: input.spentAmount,
-    notes: input.notes?.trim() || null,
-    approved_by: authData.user.id,
-    approved_at: approvedAt,
-  }, { onConflict: 'task_id' });
-  if (error) throw error;
-  return { approvedAt };
 }
 
 export const statusLabel = (status: string) => ({ new: 'جديدة', received: 'مستلمة', in_progress: 'قيد التنفيذ', on_hold: 'معلّقة', report_submitted: 'بانتظار المراجعة', needs_revision: 'تحتاج تصحيحًا', completed_approved: 'منجزة ومعتمدة', late: 'متأخرة' }[status] ?? status);
