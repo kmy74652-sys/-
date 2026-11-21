@@ -221,9 +221,9 @@ export default function AdminScreen() {
     await load(true);
     return saved;
   }
-  async function sendDesignerTask(draft: TaskTemplateDraft, branchId: string | null, dueAt: string) {
+  async function sendDesignerTask(draft: TaskTemplateDraft, branchId: string | null, dueAt: string, idempotencyKey: string) {
     if (!draft.id) throw new Error('task_template_save_response_invalid');
-    await submitTaskPublicationRequest(draft.id, branchId, dueAt);
+    await submitTaskPublicationRequest(draft.id, branchId, dueAt, idempotencyKey);
     await load(true);
   }
   const canManageTasks = permissions.includes('tasks.manage');
@@ -448,9 +448,9 @@ function TaskTemplatesSection({ templates, categories, employees, branches, onRe
       throw cause;
     }
   }
-  async function sendDirectly(draft: TaskTemplateDraft, branchId: string | null, dueAt: string) {
+  async function sendDirectly(draft: TaskTemplateDraft, branchId: string | null, dueAt: string, idempotencyKey: string) {
     if (!draft.id) throw new Error('task_template_save_response_invalid');
-    await submitTaskPublicationRequest(draft.id, branchId, dueAt);
+    await submitTaskPublicationRequest(draft.id, branchId, dueAt, idempotencyKey);
     await onReload();
     setSelected(null);
     setEditing(false);
