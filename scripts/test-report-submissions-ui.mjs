@@ -7,7 +7,7 @@ const tasks = readFileSync('apps/mobile/app/tasks.tsx', 'utf8');
 const migration = readFileSync('supabase/migrations/083_report_submissions_workflow.sql', 'utf8');
 const validationMigration = readFileSync('supabase/migrations/084_validate_report_submission_answers.sql', 'utf8');
 assert(panel.includes("from('report_submissions')"), 'new workflow must use report_submissions');
-assert(panel.includes("status:'reviewed'") && panel.includes("status:'approved'"), 'review and final approval states must be supported');
+assert(panel.includes("act(row,'reviewed')") && panel.includes("act(row,'approved')"), 'review and final approval actions must be supported');
 assert(panel.includes("canReview") && panel.includes("canApprove"), 'actions must be permission gated');
 assert(panel.includes("status==='submitted'&&canReview") && panel.includes("status==='reviewed'&&canApprove"), 'Muhammad review must precede Abdulrahman approval');
 assert(panel.includes("status==='returned'&&!note"), 'return must require a reason');
