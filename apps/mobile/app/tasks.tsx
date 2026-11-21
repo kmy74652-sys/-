@@ -134,6 +134,7 @@ export default function TasksScreen() {
   const [reportStatusFilter, setReportStatusFilter] = useState<'all' | 'ready' | 'uploaded' | 'approved'>('all');
   const [branchFilter, setBranchFilter] = useState('');
   const [positionFilter, setPositionFilter] = useState<Task['position_code'] | 'all'>('all');
+  const [previewTaskId, setPreviewTaskId] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [inAppNotification, setInAppNotification] = useState<{ taskId: string; title: string } | null>(null);
@@ -558,6 +559,8 @@ export default function TasksScreen() {
               </View>}
             </View>}
             {!reportsOnly && <>
+            <Pressable accessibilityRole="button" accessibilityState={{ expanded: previewTaskId === task.id }} style={styles.previewButton} onPress={() => setPreviewTaskId((current) => current === task.id ? null : task.id)}><Text style={styles.previewButtonText}>{previewTaskId === task.id ? 'إخفاء المعاينة المنظمة' : 'معاينة المهمة في حقول منظمة'}</Text><Text style={styles.previewButtonHint}>عرض سريع وواضح قبل بدء التنفيذ</Text></Pressable>
+            {previewTaskId === task.id && <TaskStructuredPreview task={task} formatDate={formatDate} />}
             <Text style={styles.cardSectionLabel}>1 · اقرأ التكليف</Text>
             {!!task.description && <Text style={styles.body}>{task.description}</Text>}
             <Text style={styles.meta}>المنصب: {task.position_code ? positionLabels[task.position_code] : 'بحاجة إلى تصنيف'}{task.branch_name ? ` · الفرع: ${task.branch_name}${task.branch_level ? ` (المستوى ${task.branch_level})` : ''}` : task.branch_id ? ' · فرع محدد' : ''}</Text>
@@ -657,6 +660,32 @@ export default function TasksScreen() {
   );
 }
 
+function TaskStructuredPreview({ task, formatDate }: { task: Task; formatDate: (value: string) => string }) {
+  const reportNames = task.report_forms.map((form) => form.title).filter(Boolean);
+  return <View style={styles.taskPreview}>
+    <Text style={styles.taskPreviewTitle}>ملخص المهمة</Text>
+    <View style={styles.previewFields}>
+      <PreviewField label="اسم المهمة" value={task.title} />
+      <PreviewField label="الحالة" value={statusLabels[task.status]} />
+      <PreviewField label="الأولوية" value={priorityLabels[task.priority]} />
+      <PreviewField label="حالة الوصول" value={deliveryLabels[task.delivery_status]} />
+      <PreviewField label="المنصب" value={task.position_code ? positionLabels[task.position_code] : 'غير محدد'} />
+      <PreviewField label="الفرع" value={task.branch_name || 'كل الفروع'} />
+      <PreviewField label="بداية التنفيذ" value={formatDate(task.starts_at)} />
+      <PreviewField label="الموعد النهائي" value={formatDate(task.due_at)} />
+      <PreviewField label="عدد خطوات التنفيذ" value={`${task.execution_steps.length} خطوات`} />
+      <PreviewField label="التقرير المرتبط" value={reportNames.length ? reportNames.join('، ') : task.report_schema.length ? `${task.report_schema.length} حقول تقرير` : 'لا يوجد تقرير مرتبط'} />
+    </View>
+    {!!task.description && <PreviewTextField label="وصف المهمة" value={task.description} />}
+    {!!task.task_instructions && <PreviewTextField label="تعليمات التنفيذ" value={task.task_instructions} />}
+    {task.proof_required && <PreviewTextField label="متطلبات الإثبات" value={task.proof_instructions || 'إرفاق دليل إنجاز مطلوب'} tone="warning" />}
+    {!!task.execution_steps.length && <View style={styles.previewSteps}><Text style={styles.previewFieldLabel}>خطوات التنفيذ</Text>{task.execution_steps.map((step, index) => <View key={step.id} style={styles.previewStepRow}><Text style={styles.previewStepNumber}>{index + 1}</Text><View style={styles.previewStepCopy}><Text style={styles.previewStepTitle}>{step.title}</Text><Text style={styles.previewStepMeta}>{step.required ? 'إلزامية' : 'اختيارية'}{step.completed ? ' · مكتملة' : ''}{step.evidence_required ? ' · تحتاج إثباتاً' : ''}</Text></View></View>)}</View>}
+  </View>;
+}
+
+function PreviewField({ label, value }: { label: string; value: string }) { return <View style={styles.previewField}><Text style={styles.previewFieldLabel}>{label}</Text><Text style={styles.previewFieldValue}>{value}</Text></View>; }
+function PreviewTextField({ label, value, tone }: { label: string; value: string; tone?: 'warning' }) { return <View style={[styles.previewTextField, tone === 'warning' && styles.previewWarning]}><Text style={styles.previewFieldLabel}>{label}</Text><Text style={styles.previewTextValue}>{value}</Text></View>; }
+
 const styles = StyleSheet.create({
   content: { padding: 12, paddingBottom: 32, gap: 12 },
   headerActions: { flexDirection: 'row-reverse', alignItems: 'center', marginBottom: 2 },
@@ -695,6 +724,24 @@ const styles = StyleSheet.create({
   taskCard: { backgroundColor: '#fff', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#e2e9eb', gap: 10 },
   taskHeading: { flexDirection: 'row-reverse', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 },
   taskTitle: { flex: 1, color: '#17324d', fontSize: 18, fontWeight: '800', textAlign: 'right', lineHeight: 27 },
+  previewButton: { backgroundColor: '#eef5f7', borderWidth: 1, borderColor: '#c8dce2', borderRadius: 11, padding: 11, gap: 3, alignItems: 'flex-end' },
+  previewButtonText: { color: '#17324d', fontWeight: '900', textAlign: 'right' },
+  previewButtonHint: { color: '#718394', fontSize: 11, textAlign: 'right' },
+  taskPreview: { backgroundColor: '#f8fafb', borderWidth: 1, borderColor: '#dce8eb', borderRadius: 12, padding: 11, gap: 9 },
+  taskPreviewTitle: { color: '#17324d', fontSize: 16, fontWeight: '900', textAlign: 'right' },
+  previewFields: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 7 },
+  previewField: { width: '48%', minHeight: 58, backgroundColor: '#fff', borderWidth: 1, borderColor: '#e2eaed', borderRadius: 9, padding: 8, gap: 4 },
+  previewFieldLabel: { color: '#718394', fontSize: 11, fontWeight: '800', textAlign: 'right' },
+  previewFieldValue: { color: '#17324d', fontSize: 13, fontWeight: '900', textAlign: 'right', lineHeight: 19 },
+  previewTextField: { backgroundColor: '#fff', borderRadius: 9, borderWidth: 1, borderColor: '#e2eaed', padding: 9, gap: 4 },
+  previewTextValue: { color: '#39556a', textAlign: 'right', lineHeight: 20 },
+  previewWarning: { backgroundColor: '#fff7e8', borderColor: '#ecd49e' },
+  previewSteps: { gap: 6 },
+  previewStepRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 8, backgroundColor: '#fff', borderRadius: 8, padding: 8 },
+  previewStepNumber: { width: 25, height: 25, borderRadius: 13, backgroundColor: '#e5b336', color: '#17324d', textAlign: 'center', textAlignVertical: 'center', fontWeight: '900', paddingTop: 3 },
+  previewStepCopy: { flex: 1, gap: 2 },
+  previewStepTitle: { color: '#29475a', fontWeight: '900', textAlign: 'right' },
+  previewStepMeta: { color: '#718394', fontSize: 11, textAlign: 'right' },
   cardSectionLabel: { color: '#17324d', fontSize: 15, fontWeight: '900', textAlign: 'right', marginTop: 3 },
   badge: { overflow: 'hidden', borderRadius: 20, paddingHorizontal: 10, paddingVertical: 5, fontSize: 12, fontWeight: '700' },
   goodBadge: { color: '#23633c', backgroundColor: '#e5f4e9' },
