@@ -187,18 +187,20 @@ export default function TasksScreen() {
       setEmployeeBranchId(identity.employee.branches.find((branch) => branch.isDefault)?.id ?? identity.employee.branches[0]?.id ?? null);
       const permissions = new Set(identity.employee.permissions);
       if (!permissions.has('tasks.execute') && !permissions.has('tasks.manage')) throw new Error('permission_denied');
+      const canReviewNow = permissions.has('tasks.review');
+      const canManageNow = permissions.has('tasks.manage');
       const cacheKey = `${identity.userId}:${identity.employee.institutionId}`;
       const cachedTasks = readSessionCache<Task[]>('employee-tasks', cacheKey);
       const cachedNotifications = readSessionCache<Notification[]>('employee-notifications', cacheKey);
-      setCanReview(identity.employee.permissions.includes('tasks.review'));
-      setCanManage(permissions.has('tasks.manage'));
+      setCanReview(canReviewNow);
+      setCanManage(canManageNow);
       if (cachedTasks) {
         applyTaskRows(cachedTasks);
         setLoading(false);
         setNotice('تُعرض آخر بيانات ناجحة، جارٍ التحديث في الخلفية…');
       }
       if (cachedNotifications) setNotifications(cachedNotifications);
-      const [taskResult, notificationResult] = await Promise.allSettled([listMyTasks(identity.employee.institutionId, canManage || canReview ? undefined : identity.userId), listMyNotifications()]);
+      const [taskResult, notificationResult] = await Promise.allSettled([listMyTasks(identity.employee.institutionId, canManageNow || canReviewNow ? undefined : identity.userId), listMyNotifications()]);
       if (taskResult.status === 'rejected') throw taskResult.reason;
       const taskRows = taskResult.value;
       const notificationRows = notificationResult.status === 'fulfilled' ? notificationResult.value : cachedNotifications ?? [];
