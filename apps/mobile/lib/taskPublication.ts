@@ -31,13 +31,14 @@ async function publicationContext() {
   throw new Error('permission_denied');
 }
 
-export async function submitTaskPublicationRequest(templateId: string, branchId: string | null, dueAt: string) {
+export async function submitTaskPublicationRequest(templateId: string, branchId: string | null, dueAt: string, idempotencyKey: string) {
   const organizationId = await publicationContext();
   const { data, error } = await supabase!.rpc('submit_task_publication_request', {
     p_organization_id: organizationId,
     p_template_id: templateId,
     p_branch_id: branchId,
     p_due_at: dueAt,
+    p_idempotency_key: idempotencyKey,
   });
   if (error) throw error;
   if (typeof data !== 'string') throw new Error('task_publication_request_response_invalid');
