@@ -173,7 +173,14 @@ export default function OrganizationalTaskDesigner({ initialTemplate, employees 
     }));
   }
   function buildDraft(): TaskTemplateDraft {
-    const description = [summary, 'المهام المستمرة:', ...continuous.filter(Boolean).map((item) => `- ${item}`), 'بنود التقرير اليومي:', ...reportFields.filter(Boolean).map((item) => `- ${item}`), 'التوصيات والضوابط:', ...recommendations.filter(Boolean).map((item) => `- ${item}`)].join('\n');
+    const description = JSON.stringify({
+      __alshaairy_task_designer_v1: true,
+      schedule: { days, morning, breakTime, evening, summary },
+      rows: rows.map((row) => ({ timeSlot: row.timeSlot, responsibility: row.responsibility.trim(), kpiIndicator: row.kpiIndicator, proofRequirement: row.proofRequirement, requiresProof: row.requiresProof, subItems: row.subItems.filter(Boolean) })),
+      continuous: continuous.filter(Boolean),
+      reportFields: reportFields.filter(Boolean),
+      recommendations: recommendations.filter(Boolean),
+    });
     const steps = rows.map((row, index) => ({ id: row.id, title: row.responsibility.trim() || `مهمة تنظيمية ${index + 1}`, instructions: [`الفترة: ${row.timeSlot}`, `مؤشر الأداء: ${row.kpiIndicator}`, `الإثبات: ${row.proofRequirement}`, row.subItems.length ? `البنود الفرعية:\n${row.subItems.map((item) => `- ${item}`).join('\n')}` : ''].filter(Boolean).join('\n'), required: true, evidenceRequired: row.requiresProof, evidenceInstructions: row.proofRequirement }));
     const fields = reportFieldsToDesignerFields();
     return { id: initialTemplate?.id, category: 'admin', subcategory: 'الدوام والمهام اليومية', customSubcategory: '', title: title.trim() || 'الجدول التنظيمي للدوام والمهام اليومية', description, instructions: summary, roleCode: selectedRole, priority: initialTemplate?.priority ?? 'normal', expectedDurationMinutes: initialTemplate?.expectedDurationMinutes ?? null, steps, reports: initialTemplate?.reports ?? [], reportFields: fields, reportRequired: fields.length > 0, isActive: initialTemplate?.isActive ?? true };
