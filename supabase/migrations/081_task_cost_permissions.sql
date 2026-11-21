@@ -30,6 +30,7 @@ alter table public.task_costs
 -- full write access to the financial cost row.
 drop policy if exists task_costs_manage_scoped on public.task_costs;
 drop policy if exists task_costs_read_scoped on public.task_costs;
+drop policy if exists task_costs_approve_scoped on public.task_costs;
 
 create policy task_costs_read_scoped
 on public.task_costs
