@@ -28,7 +28,8 @@
     "test:overdue-reminders": "node scripts/test-overdue-reminders.mjs",
     "test:performance-analytics": "node scripts/test-performance-analytics.mjs",
     "test:task-evaluation-fields": "node scripts/test-task-evaluation-fields.mjs",
-    "diagnose:mobile-complete-step": "node scripts/diagnose-mobile-complete-task-step.mjs"
+    "diagnose:mobile-complete-step": "node scripts/diagnose-mobile-complete-task-step.mjs",
+    "test:report-submissions-ui": "node scripts/test-report-submissions-ui.mjs"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",
