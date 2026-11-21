@@ -1,0 +1,13 @@
+import { readFileSync } from 'node:fs';
+import assert from 'node:assert/strict';
+const panel = readFileSync('apps/mobile/components/ReportSubmissionReviewPanel.tsx', 'utf8');
+const admin = readFileSync('apps/mobile/app/admin.tsx', 'utf8');
+const migration = readFileSync('supabase/migrations/083_report_submissions_workflow.sql', 'utf8');
+assert(panel.includes("from('report_submissions')"), 'new workflow must use report_submissions');
+assert(panel.includes("status:'reviewed'") && panel.includes("status:'approved'"), 'review and final approval states must be supported');
+assert(panel.includes("canReview") && panel.includes("canApprove"), 'actions must be permission gated');
+assert(panel.includes("status==='submitted'&&canReview") && panel.includes("status==='reviewed'&&canApprove"), 'Muhammad review must precede Abdulrahman approval');
+assert(panel.includes("status==='returned'&&!note"), 'return must require a reason');
+assert(admin.includes('ReportSubmissionReviewPanel') && admin.includes("permissions.includes('report_submissions.review')") && admin.includes("permissions.includes('report_submissions.approve')"), 'admin reports section must mount the new panel with role permissions');
+assert(!migration.match(/(?:drop|truncate)\s+(?:table\s+)?public\.(?:employee_dynamic_reports|employee_role_reports)/i), 'legacy report tables must not be dropped or truncated');
+console.log('Report submissions UI checks passed.');
