@@ -8,7 +8,7 @@ type ScheduleRow = { id: string; timeSlot: string; responsibility: string; kpiIn
 type EmployeeOption = { id: string; userId?: string | null; name: string; active: boolean; roles?: string[]; assignments?: Array<{ roleCode: string; branchId: string | null }> };
 type BranchOption = { id: string; name: string; isActive?: boolean };
 type SaveResult = { templateId?: string; reports?: TaskReportSelection[] };
-type Props = { initialTemplate?: Partial<TaskTemplateDraft>; employees?: EmployeeOption[]; branches?: BranchOption[]; canManage?: boolean; onSave?: (draft: TaskTemplateDraft) => void | Promise<SaveResult | void>; onSend?: (draft: TaskTemplateDraft, employeeId: string, branchId: string | null, dueAt: string, idempotencyKey: string) => void | Promise<void>; onList?: () => void | Promise<void> };
+type Props = { initialTemplate?: Partial<TaskTemplateDraft>; employees?: EmployeeOption[]; branches?: BranchOption[]; canManage?: boolean; onSave?: (draft: TaskTemplateDraft) => void | Promise<SaveResult | void>; onSend?: (draft: TaskTemplateDraft, branchId: string | null, dueAt: string, idempotencyKey: string) => void | Promise<void>; onList?: () => void | Promise<void> };
 
 const roles: Array<[TaskRoleCode, string]> = [
   ['owner', 'صاحب المؤسسة'], ['admin_followup', 'المدير التنفيذي'], ['accountant', 'المحاسب'], ['warehouse_keeper', 'أمين المخازن'], ['warehouse_worker', 'عمال التحميل'],
@@ -110,15 +110,16 @@ export default function OrganizationalTaskDesigner({ initialTemplate, employees 
   const [reportFields, setReportFields] = useState(() => initialTemplate?.reportFields?.length ? initialTemplate.reportFields.map((field) => field.label) : []);
   const [recommendations, setRecommendations] = useState(() => isNewTemplate ? [] : recommendationDefaults);
   const [busy, setBusy] = useState(false);
+  const [submittedForReview, setSubmittedForReview] = useState(false);
   const [notice, setNotice] = useState('');
   const initialDeadline = currentAdenDateTime();
-  const [selectedEmployeeId, setSelectedEmployeeId] = useState('');
   const [selectedBranchId, setSelectedBranchId] = useState('');
   const [dueDate, setDueDate] = useState(initialDeadline.date);
   const [dueTime, setDueTime] = useState(initialDeadline.time);
-  const [dispatchKey] = useState(() => `task-dispatch:${Date.now()}:${Math.random().toString(36).slice(2, 10)}`);
+  const [dispatchKey] = useState(() => `task-publication:${key()}`);
   const activeBranches = branches.filter((branch) => branch.isActive !== false);
-  const employeeOptions = employees.filter((employee) => employee.active && Boolean(employee.userId) && (employee.roles ?? []).includes(selectedRole) && (selectedBranchId === '' || (employee.assignments ?? []).some((assignment) => assignment.roleCode === selectedRole && assignment.branchId === selectedBranchId)));
+  const eligibleEmployees = employees.filter((employee) => employee.active && Boolean(employee.userId) && (employee.assignments ?? []).some((assignment) => assignment.roleCode === selectedRole && (selectedBranchId === '' || assignment.branchId === selectedBranchId)));
+  const eligibleCount = new Set(eligibleEmployees.map((employee) => employee.userId)).size;
 
   const updateRow = (id: string, patch: Partial<ScheduleRow>) => setRows((current) => current.map((row) => row.id === id ? { ...row, ...patch } : row));
   const addRow = () => setRows((current) => [...current, { id: key(), timeSlot: '05:00 - 05:30 م', responsibility: '', kpiIndicator: kpis[0], proofRequirement: 'تأكيد الإنجاز', requiresProof: false, subItems: [] }]);
@@ -129,7 +130,8 @@ export default function OrganizationalTaskDesigner({ initialTemplate, employees 
   const updateList = (setter: (items: string[]) => void, items: string[], index: number, value: string) => setter(items.map((item, itemIndex) => itemIndex === index ? value : item));
   const dispatchError = (cause: unknown) => {
     const message = cause instanceof Error ? cause.message : String(cause ?? '');
-    if (message.includes('no_employee_for_role_branch') || message.includes('employee_assignment_invalid')) return 'تعذر الإرسال: الموظف غير مرتبط بهذا الدور أو الفرع.';
+    if (message.includes('no_employee_for_role_branch')) return 'تعذر الإرسال للمراجعة: لا يوجد موظف نشط مرتبط بهذا التصنيف والفرع.';
+    if (message.includes('employee_assignment_invalid')) return 'تعذر الإرسال: تعيين الدور الوظيفي غير صالح.';
     if (message.includes('employee_login_not_linked')) return 'تعذر الإرسال: الموظف لا يملك حساب دخول مرتبطًا.';
     if (message.includes('invalid_task_schedule')) return 'تعذر الإرسال: الموعد النهائي يجب أن يكون بعد وقت بدء المهمة.';
     if (message.includes('invalid_task_branch')) return 'تعذر الإرسال: الفرع المحدد غير نشط أو لا ينتمي إلى المؤسسة.';
@@ -173,35 +175,44 @@ export default function OrganizationalTaskDesigner({ initialTemplate, employees 
     }));
   }
   function buildDraft(): TaskTemplateDraft {
-    const description = [summary, 'المهام المستمرة:', ...continuous.filter(Boolean).map((item) => `- ${item}`), 'بنود التقرير اليومي:', ...reportFields.filter(Boolean).map((item) => `- ${item}`), 'التوصيات والضوابط:', ...recommendations.filter(Boolean).map((item) => `- ${item}`)].join('\n');
+    const description = JSON.stringify({
+      __alshaairy_task_designer_v1: true,
+      schedule: { days, morning, breakTime, evening, summary },
+      rows: rows.map((row) => ({ timeSlot: row.timeSlot, responsibility: row.responsibility.trim(), kpiIndicator: row.kpiIndicator, proofRequirement: row.proofRequirement, requiresProof: row.requiresProof, subItems: row.subItems.filter(Boolean) })),
+      continuous: continuous.filter(Boolean),
+      reportFields: reportFields.filter(Boolean),
+      recommendations: recommendations.filter(Boolean),
+    });
     const steps = rows.map((row, index) => ({ id: row.id, title: row.responsibility.trim() || `مهمة تنظيمية ${index + 1}`, instructions: [`الفترة: ${row.timeSlot}`, `مؤشر الأداء: ${row.kpiIndicator}`, `الإثبات: ${row.proofRequirement}`, row.subItems.length ? `البنود الفرعية:\n${row.subItems.map((item) => `- ${item}`).join('\n')}` : ''].filter(Boolean).join('\n'), required: true, evidenceRequired: row.requiresProof, evidenceInstructions: row.proofRequirement }));
     const fields = reportFieldsToDesignerFields();
     return { id: initialTemplate?.id, category: 'admin', subcategory: 'الدوام والمهام اليومية', customSubcategory: '', title: title.trim() || 'الجدول التنظيمي للدوام والمهام اليومية', description, instructions: summary, roleCode: selectedRole, priority: initialTemplate?.priority ?? 'normal', expectedDurationMinutes: initialTemplate?.expectedDurationMinutes ?? null, steps, reports: initialTemplate?.reports ?? [], reportFields: fields, reportRequired: fields.length > 0, isActive: initialTemplate?.isActive ?? true };
   }
-  async function dispatchNow(draft: TaskTemplateDraft, employee: EmployeeOption, dueAt: string) {
+  async function dispatchNow(draft: TaskTemplateDraft, dueAt: string) {
     setBusy(true); setNotice('');
     try {
       const saveResult = await onSave?.(draft);
-      if (!saveResult?.templateId && !draft.id) throw new Error('task_template_save_response_invalid');
-      await onSend?.({ ...draft, id: saveResult?.templateId ?? draft.id, reports: saveResult?.reports ?? draft.reports }, employee.id, selectedBranchId || null, dueAt, dispatchKey);
-      setNotice(`تم حفظ المهمة وإرسالها إلى ${employee.name}. مفتاح الإرسال محفوظ لمنع التكرار عند ضعف الاتصال.`);
+      const templateId = saveResult?.templateId ?? draft.id;
+      if (!templateId) throw new Error('task_template_save_response_invalid');
+      await onSend?.({ ...draft, id: templateId, reports: saveResult?.reports ?? draft.reports }, selectedBranchId || null, dueAt, dispatchKey);
+      setSubmittedForReview(true);
+      setNotice('تم حفظ تصميم المهمة وإرساله إلى الإدارة للمراجعة والاعتماد. لن يصل إلى الموظفين قبل الاعتماد. لإرسال تصميم جديد أغلق المصمم ثم افتحه من جديد.');
     } catch (cause) { setNotice(dispatchError(cause)); } finally { setBusy(false); }
   }
   function confirmAndDispatch() {
-    if (busy) return;
-    if (!title.trim()) { setNotice('اكتب عنوان الجدول قبل الإرسال.'); return; }
-    if (!rows.length) { setNotice('أضف مهمة واحدة على الأقل قبل الإرسال.'); return; }
+    if (busy || submittedForReview) return;
+    if (!title.trim()) { setNotice('اكتب عنوان الجدول قبل الحفظ.'); return; }
+    if (!rows.length) { setNotice('أضف مهمة واحدة على الأقل قبل الحفظ.'); return; }
     if (rows.some((row) => !row.responsibility.trim())) { setNotice('اكتب وصف كل مهمة أو احذف البطاقة الفارغة.'); return; }
-    const employee = employeeOptions.find((item) => item.id === selectedEmployeeId);
     const dueAt = adenDateTimeToIso(dueDate, dueTime);
-    if (!employee) { setNotice('اختر الموظف المستلم للمهمة أولاً.'); return; }
     if (!dueAt) { setNotice('أدخل موعداً نهائياً صالحاً للمهمة.'); return; }
     if (new Date(dueAt).getTime() <= Date.now()) { setNotice('اختر موعداً نهائياً مستقبلياً، ثم أعد الإرسال.'); return; }
-    const branchName = activeBranches.find((branch) => branch.id === selectedBranchId)?.name ?? 'كل الفروع';
-    const reportText = reportFields.length ? `نموذج تقرير مرتبط (${reportFields.length} حقول)` : 'بدون نموذج تقرير مرتبط';
-    Alert.alert('مراجعة وتأكيد الإرسال', `المهمة: ${title.trim()}\nالموظف: ${employee.name}\nالفرع: ${branchName}\nالموعد: ${dueDate} ${dueTime}\nالخطوات: ${rows.length}\n${reportText}`, [
+    if (eligibleCount === 0) { setNotice('لا يوجد موظفون نشطون مرتبطون بهذا التصنيف والفرع.'); return; }
+    const branchName = activeBranches.find((branch) => branch.id === selectedBranchId)?.name ?? 'جميع الفروع';
+    const roleName = roles.find(([code]) => code === selectedRole)?.[1] ?? selectedRole;
+    const reportText = reportFields.length ? `نموذج المهمة يحتوي على ${reportFields.length} حقول تقرير` : 'بدون حقول تقرير إضافية';
+    Alert.alert('إرسال التصميم للمراجعة', `المهمة: ${title.trim()}\\nالتصنيف: ${roleName}\\nالفرع: ${branchName}\\nالموظفون المطابقون: ${eligibleCount}\\nالموعد: ${dueDate} ${dueTime}\\nالصفوف: ${rows.length}\\n${reportText}\\n\\nلن تصل المهمة للموظفين إلا بعد اعتماد صاحب المؤسسة.`, [
       { text: 'إلغاء', style: 'cancel' },
-      { text: 'تأكيد الإرسال', onPress: () => void dispatchNow(buildDraft(), employee, dueAt) },
+      { text: 'إرسال للمراجعة', onPress: () => void dispatchNow(buildDraft(), dueAt) },
     ]);
   }
   const save = confirmAndDispatch;
@@ -209,15 +220,15 @@ export default function OrganizationalTaskDesigner({ initialTemplate, employees 
 
   return <View style={styles.shell}>
     <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-      <View style={styles.header}><View style={styles.headerCopy}><Text style={styles.eyebrow}>إدارة الدوام والمسؤوليات</Text><Text style={styles.title}>مصمم الجدول التنظيمي للمهام</Text></View><Pressable disabled={busy} style={styles.saveTop} onPress={() => void save()}><Text style={styles.saveText}>{busy ? 'جارٍ الحفظ…' : 'حفظ الجدول'}</Text></Pressable></View>
+      <View style={styles.header}><View style={styles.headerCopy}><Text style={styles.eyebrow}>إدارة الدوام والمسؤوليات</Text><Text style={styles.title}>مصمم الجدول التنظيمي للمهام</Text></View><Pressable disabled={busy || submittedForReview} style={styles.saveTop} onPress={() => void save()}><Text style={styles.saveText}>{busy ? 'جارٍ الحفظ والإرسال…' : submittedForReview ? 'تم الإرسال للمراجعة' : 'حفظ وإرسال للمراجعة'}</Text></Pressable></View>
       {!!notice && <Text style={styles.notice}>{notice}</Text>}
-      <View style={styles.card}><Text style={styles.sectionTitle}>إرسال المهمة</Text><Text style={styles.copy}>راجع بيانات المهمة قبل التأكيد، ثم أرسلها إلى الموظف المختار.</Text><Text style={styles.label}>الفرع المستلم</Text><View style={styles.chips}><Pressable style={[styles.chip, selectedBranchId === '' && styles.chipSelected]} onPress={() => { setSelectedBranchId(''); setSelectedEmployeeId(''); }}><Text style={selectedBranchId === '' ? styles.chipTextSelected : styles.chipText}>كل الفروع</Text></Pressable>{activeBranches.map((branch) => <Pressable key={branch.id} style={[styles.chip, selectedBranchId === branch.id && styles.chipSelected]} onPress={() => { setSelectedBranchId(branch.id); setSelectedEmployeeId(''); }}><Text style={selectedBranchId === branch.id ? styles.chipTextSelected : styles.chipText}>{branch.name}</Text></Pressable>)}</View><Text style={styles.label}>الموظف المستلم</Text><View style={styles.chips}>{employeeOptions.map((employee) => <Pressable key={employee.id} style={[styles.chip, selectedEmployeeId === employee.id && styles.chipSelected]} onPress={() => setSelectedEmployeeId(employee.id)}><Text style={selectedEmployeeId === employee.id ? styles.chipTextSelected : styles.chipText}>{employee.name}</Text></Pressable>)}</View>{!employeeOptions.length && <Text style={styles.notice}>لا يوجد موظف نشط مرتبط بهذا الدور والفرع بحساب دخول.</Text>}<Text style={styles.label}>الموعد النهائي</Text><AdenDeadlinePicker date={dueDate} time={dueTime} onChange={(date, time) => { setDueDate(date); setDueTime(time); }} /><Pressable disabled={busy || !selectedEmployeeId} style={styles.primary} onPress={sendDirectly}><Text style={styles.primaryText}>{busy ? 'جارٍ الإرسال…' : 'مراجعة وإرسال المهمة'}</Text></Pressable></View>
+      <View style={styles.card}><Text style={styles.sectionTitle}>إعداد النشر والمراجعة</Text><Text style={styles.copy}>احفظ التصميم وأرسله للمراجعة الإدارية. بعد اعتماد صاحب المؤسسة تُنشر تلقائياً لكل الموظفين النشطين المطابقين للتصنيف والفرع.</Text><Text style={styles.label}>الفرع المستهدف</Text><View style={styles.chips}><Pressable style={[styles.chip, selectedBranchId === '' && styles.chipSelected]} onPress={() => setSelectedBranchId('')}><Text style={selectedBranchId === '' ? styles.chipTextSelected : styles.chipText}>جميع الفروع</Text></Pressable>{activeBranches.map((branch) => <Pressable key={branch.id} style={[styles.chip, selectedBranchId === branch.id && styles.chipSelected]} onPress={() => setSelectedBranchId(branch.id)}><Text style={selectedBranchId === branch.id ? styles.chipTextSelected : styles.chipText}>{branch.name}</Text></Pressable>)}</View><Text style={styles.label}>المستهدفون حسب التصنيف الوظيفي</Text><Text style={styles.copy}>{roles.find(([code]) => code === selectedRole)?.[1]} · {eligibleCount} موظف مطابق حالياً. لا يلزم اختيار موظف بالاسم.</Text><Text style={styles.label}>الموعد النهائي</Text><AdenDeadlinePicker date={dueDate} time={dueTime} onChange={(date, time) => { setDueDate(date); setDueTime(time); }} /><Pressable disabled={busy || submittedForReview || eligibleCount === 0} style={styles.primary} onPress={sendDirectly}><Text style={styles.primaryText}>{busy ? 'جارٍ الحفظ والإرسال…' : 'حفظ وإرسال للمراجعة الإدارية'}</Text></Pressable></View>
       <View style={styles.card}><Text style={styles.sectionTitle}>إعدادات الدوام</Text><TextInput style={styles.input} value={title} onChangeText={setTitle} placeholder="عنوان الجدول التنظيمي" /><Text style={styles.label}>الدور الوظيفي</Text><View style={styles.chips}>{roles.map(([code, label]) => <Pressable key={code} style={[styles.chip, selectedRole === code && styles.chipSelected]} onPress={() => setSelectedRole(code)}><Text style={selectedRole === code ? styles.chipTextSelected : styles.chipText}>{label}</Text></Pressable>)}</View>{rolePresets[selectedRole] && <Pressable style={styles.presetButton} onPress={() => applyRolePreset(selectedRole)}><Text style={styles.presetText}>إضافة بطاقات {roles.find(([code]) => code === selectedRole)?.[1]} الجاهزة</Text></Pressable>}{selectedRole === 'accountant' && <Pressable style={styles.presetButton} onPress={addAccountantMissingCards}><Text style={styles.presetText}>إضافة البطاقات المحاسبية الناقصة</Text></Pressable>}<TextInput style={styles.input} value={days} onChangeText={setDays} placeholder="أيام العمل" /><View style={styles.threeColumns}><TextInput style={styles.input} value={morning} onChangeText={setMorning} placeholder="الفترة الصباحية" /><TextInput style={styles.input} value={breakTime} onChangeText={setBreakTime} placeholder="فترة الاستراحة" /><TextInput style={styles.input} value={evening} onChangeText={setEvening} placeholder="الفترة المسائية" /></View></View>
       <View style={styles.card}><View style={styles.sectionHeader}><Text style={styles.sectionTitle}>توزيع المهام حسب ساعات الدوام</Text><Pressable style={styles.addButton} onPress={addRow}><Text style={styles.addText}>+ إضافة صف</Text></Pressable></View>{rows.map((row, index) => <View style={styles.rowCard} key={row.id}><View style={styles.rowHeader}><Text style={styles.rowTitle}>المهمة {index + 1}</Text><Pressable onPress={() => removeRow(row.id)}><Text style={styles.deleteText}>حذف</Text></Pressable></View><TextInput style={styles.input} value={row.timeSlot} onChangeText={(value) => updateRow(row.id, { timeSlot: value })} placeholder="الفترة الزمنية" /><TextInput style={[styles.input, styles.multiline]} value={row.responsibility} onChangeText={(value) => updateRow(row.id, { responsibility: value })} placeholder="اكتب المهمة والمسؤولية" multiline /><Text style={styles.label}>البنود الفرعية</Text>{row.subItems.map((item, itemIndex) => <View style={styles.subItemRow} key={`${row.id}-sub-${itemIndex}`}><Text style={styles.bullet}>•</Text><Text style={styles.subItemText}>{item}</Text><Pressable onPress={() => removeSubItem(row.id, itemIndex)}><Text style={styles.deleteText}>حذف</Text></Pressable></View>)}<View style={styles.kpiAddRow}><TextInput style={styles.input} value={subItemDrafts[row.id] ?? ""} onChangeText={(value) => setSubItemDrafts((current) => ({ ...current, [row.id]: value }))} placeholder="إضافة بند فرعي" /><Pressable style={styles.addButton} onPress={() => addSubItem(row.id)}><Text style={styles.addText}>+ إضافة</Text></Pressable></View><View style={styles.sectionHeader}><Text style={styles.label}>مؤشر الأداء</Text>{canManage && <Pressable style={styles.addButton} onPress={() => { setKpiTargetRowId(row.id); setShowKpiInput(true); }}><Text style={styles.addText}>+ إضافة مؤشر</Text></Pressable>}</View>{canManage && showKpiInput && kpiTargetRowId === row.id && <View style={styles.kpiAddRow}><TextInput autoFocus style={styles.input} value={newKpi} onChangeText={setNewKpi} placeholder="اسم مؤشر الأداء الجديد" /><Pressable style={styles.addButton} onPress={addKpi}><Text style={styles.addText}>إضافة</Text></Pressable></View>}<View style={styles.chips}>{kpis.map((kpi) => <Pressable key={kpi} style={[styles.chip, row.kpiIndicator === kpi && styles.chipSelected]} onPress={() => updateRow(row.id, { kpiIndicator: kpi })}><Text style={row.kpiIndicator === kpi ? styles.chipTextSelected : styles.chipText}>{kpi}</Text></Pressable>)}</View><TextInput style={styles.input} value={row.proofRequirement} onChangeText={(value) => updateRow(row.id, { proofRequirement: value })} placeholder="الإثبات أو الشرط" /><Pressable style={[styles.proofToggle, row.requiresProof && styles.proofToggleActive]} onPress={() => updateRow(row.id, { requiresProof: !row.requiresProof })}><Text style={row.requiresProof ? styles.proofTextActive : styles.proofText}>{row.requiresProof ? 'الإثبات مطلوب ✓' : 'الإثبات اختياري'}</Text></Pressable></View>)}</View>
       <EditableList title="المهام المستمرة طوال الدوام" items={continuous} icon="↻" onChange={(index, value) => updateList(setContinuous, continuous, index, value)} onAdd={() => addListItem(setContinuous, continuous)} />
       <EditableList title="بنود التقرير اليومي للموظف" items={reportFields} icon="✓" onChange={(index, value) => updateList(setReportFields, reportFields, index, value)} onAdd={() => addListItem(setReportFields, reportFields)} />
       <EditableList title="التوصيات والضوابط الإدارية" items={recommendations} icon="◆" onChange={(index, value) => updateList(setRecommendations, recommendations, index, value)} onAdd={() => addListItem(setRecommendations, recommendations)} />
-      <View style={styles.actions}><Pressable disabled={busy} style={styles.primary} onPress={() => void save()}><Text style={styles.primaryText}>{busy ? 'جارٍ الحفظ…' : 'حفظ الجدول التنظيمي'}</Text></Pressable><Pressable style={styles.secondary} onPress={() => void onList?.()}><Text style={styles.secondaryText}>عرض الجداول المحفوظة</Text></Pressable></View>
+      <View style={styles.actions}><Pressable disabled={busy || submittedForReview} style={styles.primary} onPress={() => void save()}><Text style={styles.primaryText}>{busy ? 'جارٍ الحفظ والإرسال…' : 'حفظ وإرسال للمراجعة'}</Text></Pressable><Pressable style={styles.secondary} onPress={() => void onList?.()}><Text style={styles.secondaryText}>عرض الجداول المحفوظة</Text></Pressable></View>
     </ScrollView>
   </View>;
 }

@@ -10,5 +10,5 @@ for (const forbidden of ['TaskCostDraft','approveAdministrativeTaskCost','task_c
 }
 assert.match(adminData, /export type AdminTask = \{/);
 assert.match(adminData, /export async function createAdministrativeTask/);
-assert.match(designer, /onSend\?: \(draft: TaskTemplateDraft, employeeId: string, branchId: string \| null, dueAt: string, idempotencyKey: string\)/);
+assert.match(designer, /onSend\?: \(draft: TaskTemplateDraft, branchId: string \| null, dueAt: string, idempotencyKey: string\)/);
 console.log('Task cost separation checks passed.');

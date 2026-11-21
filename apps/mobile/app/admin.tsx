@@ -19,6 +19,8 @@ import { reviewEmployeeRoleReport } from '../lib/employeeRoleReports';
 import PerformanceAnalytics from '../components/PerformanceAnalytics';
 import { readSessionCache, writeSessionCache } from '../lib/mobileSessionCache';
 import ReportSubmissionReviewPanel from '../components/ReportSubmissionReviewPanel';
+import TaskPublicationReviewPanel from '../components/TaskPublicationReviewPanel';
+import { submitTaskPublicationRequest } from '../lib/taskPublication';
 
 type Section = 'overview' | 'tasks' | 'task-designer' | 'report-designer' | 'reports' | 'performance' | 'hr' | 'branches' | 'employees' | 'activity';
 const sections: Array<[Section, string]> = [['overview', 'الرئيسية'], ['tasks', 'إدارة المهام'], ['task-designer', 'الجدول التنظيمي'], ['report-designer', 'مصمم التقارير'], ['reports', 'تقارير الموظفين'], ['performance', 'إحصائيات الأداء'], ['branches', 'الفروع'], ['employees', 'الموظفون'], ['activity', 'السجل والمرفقات']];
@@ -219,24 +221,9 @@ export default function AdminScreen() {
     await load(true);
     return saved;
   }
-  async function sendDesignerTask(draft: TaskTemplateDraft, employeeId: string, branchId: string | null, dueAt: string, idempotencyKey: string) {
-    const linkedReport = draft.reports[0];
-    const executionDetails = draft.steps.map((step, index) => `${index + 1}. ${step.title}\n${step.instructions || 'تأكيد الإنجاز'}`).join('\n');
-    await createAdministrativeTask({
-      title: draft.title,
-      description: [draft.description, 'تفاصيل التنفيذ:', executionDetails].filter(Boolean).join('\n\n'),
-      dueAt,
-      priority: draft.priority,
-      roleCode: draft.roleCode,
-      branchId,
-      assignedEmployeeId: employeeId,
-      templateId: draft.id ?? null,
-      reportTemplateId: linkedReport?.reportTemplateId ?? null,
-      reportVersionId: linkedReport?.approvedVersionId ?? null,
-      reportRequired: Boolean(linkedReport?.approvedVersionId),
-      reportOverrides: draft.reports,
-      idempotencyKey,
-    });
+  async function sendDesignerTask(draft: TaskTemplateDraft, branchId: string | null, dueAt: string, idempotencyKey: string) {
+    if (!draft.id) throw new Error('task_template_save_response_invalid');
+    await submitTaskPublicationRequest(draft.id, branchId, dueAt, idempotencyKey);
     await load(true);
   }
   const canManageTasks = permissions.includes('tasks.manage');
@@ -273,7 +260,7 @@ export default function AdminScreen() {
 
       {section === 'overview' && !profile && <Overview counts={counts} data={data} fmt={fmt} onSection={setSection} onSettings={() => router.push('/settings')} onHR={() => router.push('/hr' as never)} canDesign={canManageTaskLibrary} canDesignReports={canManageReports} />}
       {section === 'tasks' && <TasksSection data={data} designerTemplates={designerTemplates} canDesign={canManageTaskLibrary} showCreate={showCreate} setShowCreate={setShowCreate} draft={draft} setDraft={setDraft} createTask={createTask} fmt={fmt} onOpenTasks={() => router.push('/tasks')} canManage={canManageTasks} institutionId={profile?.institutionId ?? ''} onReload={load} onTaskUpdated={updateTaskLocally} onTaskDeleted={removeTaskLocally} onTaskRestored={restoreTaskLocally} onDesignerSave={saveDesignerTask} onDesignerSend={sendDesignerTask} />}
-      {section === 'task-designer' && (canManageTaskLibrary ? <TaskTemplatesSection templates={taskDesignerTemplates} categories={taskCategories} employees={data?.employees ?? []} branches={data?.branches ?? []} onReload={load} /> : <Unavailable title="الجدول التنظيمي" text="لا تملك صلاحية إدارة الجداول التنظيمية." />)}
+      {section === 'task-designer' && (canManageTaskLibrary ? <><Text style={styles.sectionTitle}>طلبات اعتماد ونشر المهام</Text>{profile?.roles.some((role) => role.code === 'owner') && <TaskPublicationReviewPanel branches={data?.branches ?? []} onPublished={() => load(true)} />}<TaskTemplatesSection templates={taskDesignerTemplates} categories={taskCategories} employees={data?.employees ?? []} branches={data?.branches ?? []} onReload={load} /></> : <Unavailable title="الجدول التنظيمي" text="لا تملك صلاحية إدارة الجداول التنظيمية." />)}
       {section === 'report-designer' && (canManageReports ? <ReportDesigner organizationId={profile?.institutionId ?? ''} /> : <Unavailable title="مصمم التقارير" text="لا تملك صلاحية إدارة نماذج التقارير." />)}
       {section === 'reports' && (canViewReports ? <View style={{ gap: 14 }}><ReportSubmissionReviewPanel canReview={permissions.includes('report_submissions.review')} canApprove={permissions.includes('report_submissions.approve')} /><ReportsSection data={data} fmt={fmt} onOpenTasks={() => router.push('/tasks')} canManage={canManageEmployees} institutionId={profile?.institutionId ?? ''} onReportUpdated={updateReportLocally} onReportDeleted={removeReportLocally} /></View> : <Unavailable title="تقارير الموظفين" text="لا تملك صلاحية قراءة تقارير المؤسسة أو مراجعتها." />)}
       {section === 'performance' && (canViewReports ? <PerformanceAnalytics /> : <Unavailable title="إحصائيات ومقارنة الأداء" text="لا تملك صلاحية عرض إحصائيات الأداء." />)}
@@ -337,7 +324,7 @@ function TasksSection({ data, designerTemplates, canDesign, showCreate, setShowC
       <View style={styles.taskHeadingCopy}><Text style={styles.sectionTitle}>قائمة التكليفات</Text><Text style={styles.taskSectionHint}>المهام المسجلة في المؤسسة</Text></View>
       <View style={styles.actionsRow}>{canDesign ? <Pressable style={styles.taskCreateButton} onPress={() => { setShowDesigner(!showDesigner); setShowCreate(false); }}><Text style={styles.taskCreateButtonText}>{showDesigner ? 'إغلاق النموذج' : '＋ من مصمم المهام — إنشاء تكليف'}</Text></Pressable> : <Pressable style={styles.taskCreateButton} onPress={() => { setShowCreate(!showCreate); setShowDesigner(false); }}><Text style={styles.taskCreateButtonText}>{showCreate?'إغلاق':'＋ إنشاء تكليف'}</Text></Pressable>}</View>
     </View>
-    {canDesign && showDesigner && <View style={styles.card}><Text style={styles.formTitle}>إرسال مهمة من المصمم</Text><Text style={styles.copy}>صمّم المهمة وحدد المسؤول والفرع والموعد وخطوات التنفيذ، ثم احفظها وأرسلها مباشرة إلى تبويب مهام الموظف.</Text><OrganizationalTaskDesigner employees={data?.employees ?? []} branches={data?.branches ?? []} canManage={canManage} onSave={onDesignerSave} onSend={onDesignerSend} onList={onReload} /></View>}
+    {canDesign && showDesigner && <View style={styles.card}><Text style={styles.formTitle}>إرسال مهمة من المصمم</Text><Text style={styles.copy}>صمّم المهمة واحفظها ثم أرسلها للمراجعة والاعتماد الإداري؛ وبعد الاعتماد تصل تلقائياً للموظفين المطابقين للتصنيف والفرع.</Text><OrganizationalTaskDesigner employees={data?.employees ?? []} branches={data?.branches ?? []} canManage={canManage} onSave={onDesignerSave} onSend={onDesignerSend} onList={onReload} /></View>}
     {showCreate && <View style={styles.form}>
       <View style={styles.formTitleRow}><Text style={styles.formTitle}>بيانات التكليف الجديد</Text><Text style={styles.formStep}>1 · التفاصيل</Text></View>
       {[['title', 'عنوان المهمة'], ['description', 'وصف وتعليمات التنفيذ']].map(([key, label]) => <TextInput key={key} style={styles.input} placeholder={label} value={draft[key]} onChangeText={(value) => setDraft({ ...draft, [key]: value })} multiline={key === 'description'} />)}
@@ -461,9 +448,9 @@ function TaskTemplatesSection({ templates, categories, employees, branches, onRe
       throw cause;
     }
   }
-  async function sendDirectly(draft: TaskTemplateDraft, employeeId: string, branchId: string | null, dueAt: string, idempotencyKey?: string) {
-    const executionDetails = draft.steps.map((step, index) => `${index + 1}. ${step.title}\nالفترة: ${step.instructions}\nالإثبات: ${step.evidenceInstructions || 'تأكيد الإنجاز'}`).join('\n');
-    await createAdministrativeTask({ title: draft.title, description: [draft.description, 'تفاصيل التنفيذ المباشر:', executionDetails].filter(Boolean).join('\n\n'), dueAt, priority: draft.priority, roleCode: draft.roleCode, branchId, assignedEmployeeId: employeeId, templateId: draft.id ?? null, reportTemplateId: null, reportVersionId: null, reportRequired: draft.reportFields.length > 0, reportOverrides: [], idempotencyKey });
+  async function sendDirectly(draft: TaskTemplateDraft, branchId: string | null, dueAt: string, idempotencyKey: string) {
+    if (!draft.id) throw new Error('task_template_save_response_invalid');
+    await submitTaskPublicationRequest(draft.id, branchId, dueAt, idempotencyKey);
     await onReload();
     setSelected(null);
     setEditing(false);
