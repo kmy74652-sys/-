@@ -46,11 +46,13 @@ begin
     where f.version_id = v_version_id and f.is_required
   loop
     v_answer := new.answers -> v_field.field_key;
-    if v_answer is null
-       or jsonb_typeof(v_answer) = 'null'
-       or (jsonb_typeof(v_answer) = 'string' and btrim(v_answer #>> '{}') = '')
-       or (jsonb_typeof(v_answer) = 'array' and jsonb_array_length(v_answer) = 0)
-       or (jsonb_typeof(v_answer) = 'object' and v_answer = '{}'::jsonb) then
+    if v_answer is null or jsonb_typeof(v_answer) = 'null' then
+      raise exception 'الحقل المطلوب غير مكتمل: %', v_field.label;
+    elsif jsonb_typeof(v_answer) = 'string' and btrim(v_answer #>> '{}') = '' then
+      raise exception 'الحقل المطلوب غير مكتمل: %', v_field.label;
+    elsif jsonb_typeof(v_answer) = 'array' and jsonb_array_length(v_answer) = 0 then
+      raise exception 'الحقل المطلوب غير مكتمل: %', v_field.label;
+    elsif jsonb_typeof(v_answer) = 'object' and v_answer = '{}'::jsonb then
       raise exception 'الحقل المطلوب غير مكتمل: %', v_field.label;
     end if;
   end loop;
