@@ -114,7 +114,7 @@ begin
     raise exception using errcode = '42501', message = 'task_cost_proposal_permission_denied';
   end if;
 
-  insert into public.task_costs (
+  insert into public.task_costs as current_costs (
     organization_id,
     task_id,
     budget_amount,
@@ -140,7 +140,7 @@ begin
       proposed_by = excluded.proposed_by,
       proposed_at = excluded.proposed_at,
       updated_at = v_proposed_at
-  where public.task_costs.organization_id = p_organization_id
+  where current_costs.organization_id = p_organization_id
   returning id into v_cost_id;
 
   if v_cost_id is null then
