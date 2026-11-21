@@ -213,6 +213,30 @@ export default function AdminScreen() {
       setShowCreate(false); setNotice('تم إنشاء المهمة وإسنادها للموظف المحدد. ظهرت مباشرة في القائمة.');
     } catch (cause) { setError(friendlyDataError(cause, 'تعذر إنشاء المهمة. تأكد من وجود موظف نشط ضمن التصنيف والفرع المحددين.')); }
   }
+  async function saveDesignerTask(draft: TaskTemplateDraft) {
+    const saved = await saveTaskDesignerTemplate(draft, taskCategories);
+    await load(true);
+    return saved;
+  }
+  async function sendDesignerTask(draft: TaskTemplateDraft, employeeId: string, branchId: string | null, dueAt: string) {
+    const linkedReport = draft.reports[0];
+    const executionDetails = draft.steps.map((step, index) => `${index + 1}. ${step.title}\n${step.instructions || 'تأكيد الإنجاز'}`).join('\n');
+    await createAdministrativeTask({
+      title: draft.title,
+      description: [draft.description, 'تفاصيل التنفيذ:', executionDetails].filter(Boolean).join('\n\n'),
+      dueAt,
+      priority: draft.priority,
+      roleCode: draft.roleCode,
+      branchId,
+      assignedEmployeeId: employeeId,
+      templateId: draft.id ?? null,
+      reportTemplateId: linkedReport?.reportTemplateId ?? null,
+      reportVersionId: linkedReport?.approvedVersionId ?? null,
+      reportRequired: Boolean(linkedReport?.approvedVersionId),
+      reportOverrides: draft.reports,
+    });
+    await load(true);
+  }
   const canManageTaskLibrary = permissions.includes('task_library.manage');
   const canManageReports = permissions.includes('report_forms.manage');
   const canViewReports = permissions.includes('reports.read_all') || permissions.includes('tasks.review');
@@ -245,7 +269,7 @@ export default function AdminScreen() {
     {!!notice && <Text style={styles.notice}>{notice}</Text>}
 
       {section === 'overview' && !profile && <Overview counts={counts} data={data} fmt={fmt} onSection={setSection} onSettings={() => router.push('/settings')} onHR={() => router.push('/hr' as never)} canDesign={canManageTaskLibrary} canDesignReports={canManageReports} />}
-      {section === 'tasks' && <TasksSection data={data} designerTemplates={designerTemplates} showCreate={showCreate} setShowCreate={setShowCreate} draft={draft} setDraft={setDraft} createTask={createTask} fmt={fmt} onOpenTasks={() => router.push('/tasks')} canManage={canManageEmployees} institutionId={profile?.institutionId ?? ''} onReload={load} onTaskUpdated={updateTaskLocally} onTaskDeleted={removeTaskLocally} onTaskRestored={restoreTaskLocally} />}
+      {section === 'tasks' && <TasksSection data={data} designerTemplates={designerTemplates} canDesign={canManageTaskLibrary} showCreate={showCreate} setShowCreate={setShowCreate} draft={draft} setDraft={setDraft} createTask={createTask} fmt={fmt} onOpenTasks={() => router.push('/tasks')} canManage={canManageEmployees} institutionId={profile?.institutionId ?? ''} onReload={load} onTaskUpdated={updateTaskLocally} onTaskDeleted={removeTaskLocally} onTaskRestored={restoreTaskLocally} onDesignerSave={saveDesignerTask} onDesignerSend={sendDesignerTask} />}
       {section === 'task-designer' && (canManageTaskLibrary ? <TaskTemplatesSection templates={taskDesignerTemplates} categories={taskCategories} employees={data?.employees ?? []} branches={data?.branches ?? []} onReload={load} /> : <Unavailable title="الجدول التنظيمي" text="لا تملك صلاحية إدارة الجداول التنظيمية." />)}
       {section === 'report-designer' && (canManageReports && canManageEmployees ? <ReportDesigner organizationId={profile?.institutionId ?? ''} /> : <Unavailable title="مصمم التقارير" text="لا تملك صلاحية إدارة نماذج التقارير." />)}
       {section === 'reports' && (canViewReports ? <ReportsSection data={data} fmt={fmt} onOpenTasks={() => router.push('/tasks')} canManage={canManageEmployees} institutionId={profile?.institutionId ?? ''} onReportUpdated={updateReportLocally} onReportDeleted={removeReportLocally} /> : <Unavailable title="تقارير الموظفين" text="لا تملك صلاحية قراءة تقارير المؤسسة أو مراجعتها." />)}
@@ -268,11 +292,12 @@ function Overview({ counts, data, fmt, onSection, onSettings, onHR, canDesign, c
   <View style={styles.activityPreview}><Text style={styles.sectionTitle}>آخر النشاط</Text>{(data?.activity ?? []).slice(0,3).map((item)=><View style={styles.activityPreviewRow} key={item.id}><Text style={styles.cardTitle}>{item.action}</Text><Text style={styles.meta}>{fmt(item.createdAt)}</Text></View>)}{!(data?.activity ?? []).length&&<Text style={styles.muted}>لا توجد أنشطة حديثة.</Text>}</View>
 </>; }
 
-function TasksSection({ data, designerTemplates, showCreate, setShowCreate, draft, setDraft, createTask, fmt, onOpenTasks, canManage, institutionId, onReload, onTaskUpdated, onTaskDeleted, onTaskRestored }: any) {
+function TasksSection({ data, designerTemplates, canDesign, showCreate, setShowCreate, draft, setDraft, createTask, fmt, onOpenTasks, canManage, institutionId, onReload, onTaskUpdated, onTaskDeleted, onTaskRestored, onDesignerSave, onDesignerSend }: any) {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [edits, setEdits] = useState<Record<string, { title: string; description: string }>>({});
   const [busyMutation, setBusyMutation] = useState<string | null>(null);
+  const [showDesigner, setShowDesigner] = useState(false);
   const tasks = data?.tasks ?? [];
   const statusOptions = [
     ['all','الكل'],['new','جديدة'],['received','مستلمة'],['in_progress','قيد التنفيذ'],
@@ -307,8 +332,9 @@ function TasksSection({ data, designerTemplates, showCreate, setShowCreate, draf
     </View>
     <View style={styles.taskSectionHeading}>
       <View style={styles.taskHeadingCopy}><Text style={styles.sectionTitle}>قائمة التكليفات</Text><Text style={styles.taskSectionHint}>المهام المسجلة في المؤسسة</Text></View>
-      <Pressable style={styles.taskCreateButton} onPress={() => setShowCreate(!showCreate)}><Text style={styles.taskCreateButtonText}>{showCreate?'إغلاق':'＋ إنشاء تكليف'}</Text></Pressable>
+      <View style={styles.actionsRow}>{canDesign && <Pressable style={styles.taskCreateButton} onPress={() => { setShowDesigner(!showDesigner); setShowCreate(false); }}><Text style={styles.taskCreateButtonText}>{showDesigner ? 'إغلاق المصمم' : '＋ من مصمم المهام'}</Text></Pressable>}<Pressable style={styles.taskCreateButton} onPress={() => { setShowCreate(!showCreate); setShowDesigner(false); }}><Text style={styles.taskCreateButtonText}>{showCreate?'إغلاق':'＋ إنشاء تكليف'}</Text></Pressable></View>
     </View>
+    {canDesign && showDesigner && <View style={styles.card}><Text style={styles.formTitle}>إرسال مهمة من المصمم</Text><Text style={styles.copy}>صمّم المهمة واختر الموظف والفرع والموعد من هنا، وسيتم حفظ القالب وإرسال التنفيذ مباشرة إلى تبويب مهام الموظف.</Text><OrganizationalTaskDesigner employees={data?.employees ?? []} branches={data?.branches ?? []} canManage={canManage} onSave={onDesignerSave} onSend={onDesignerSend} onList={onReload} /></View>}
     {showCreate && <View style={styles.form}>
       <View style={styles.formTitleRow}><Text style={styles.formTitle}>بيانات التكليف الجديد</Text><Text style={styles.formStep}>1 · التفاصيل</Text></View>
       {[['title', 'عنوان المهمة'], ['description', 'وصف وتعليمات التنفيذ']].map(([key, label]) => <TextInput key={key} style={styles.input} placeholder={label} value={draft[key]} onChangeText={(value) => setDraft({ ...draft, [key]: value })} multiline={key === 'description'} />)}
