@@ -15,7 +15,7 @@ assert(admin.includes('ReportSubmissionReviewPanel') && admin.includes("permissi
 assert(employee.includes("from('report_submissions')") && employee.includes("status:submit?'submitted':'draft'"), 'employee form must save drafts and submit to report_submissions');
 assert(employee.includes("status==='returned'"), 'employee must be able to edit and resubmit returned reports');
 assert(employee.includes('listMyDynamicReports()'), 'employee form must use the approved role-specific form schema');
-assert(tasks.includes('ReportSubmissionEmployeePanel') && tasks.includes('branchId={employeeBranchId}'), 'employee reports tab must mount the new submission form');
+assert(tasks.includes('EmployeeDynamicReportsPanel') && tasks.includes('branchId={employeeBranchId}'), 'employee reports tab must mount the currently selected dynamic report panel');
 assert(!employee.includes("from('employee_dynamic_reports')"), 'new form must not write to the legacy report table');
 assert(validationMigration.includes('validate_report_submission_answers') && validationMigration.includes('f.is_required'), 'database must enforce required form fields before submission');
 assert(!migration.match(/(?:drop|truncate)\s+(?:table\s+)?public\.(?:employee_dynamic_reports|employee_role_reports)/i), 'legacy report tables must not be dropped or truncated');
