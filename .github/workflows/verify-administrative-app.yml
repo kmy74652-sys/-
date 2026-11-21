@@ -31,6 +31,7 @@ jobs:
           pnpm test:employee-screen
           pnpm test:report-designer
           pnpm test:report-security
+          pnpm test:report-submissions-ui
           pnpm test:employee-agreements
           pnpm test:employee-hr
           pnpm test:task-designer
