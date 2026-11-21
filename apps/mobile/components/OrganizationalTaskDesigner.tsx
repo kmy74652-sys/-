@@ -8,7 +8,7 @@ type ScheduleRow = { id: string; timeSlot: string; responsibility: string; kpiIn
 type EmployeeOption = { id: string; userId?: string | null; name: string; active: boolean; roles?: string[]; assignments?: Array<{ roleCode: string; branchId: string | null }> };
 type BranchOption = { id: string; name: string; isActive?: boolean };
 type SaveResult = { templateId?: string; reports?: TaskReportSelection[] };
-type Props = { initialTemplate?: Partial<TaskTemplateDraft>; employees?: EmployeeOption[]; branches?: BranchOption[]; canManage?: boolean; onSave?: (draft: TaskTemplateDraft) => void | Promise<SaveResult | void>; onSend?: (draft: TaskTemplateDraft, branchId: string | null, dueAt: string) => void | Promise<void>; onList?: () => void | Promise<void> };
+type Props = { initialTemplate?: Partial<TaskTemplateDraft>; employees?: EmployeeOption[]; branches?: BranchOption[]; canManage?: boolean; onSave?: (draft: TaskTemplateDraft) => void | Promise<SaveResult | void>; onSend?: (draft: TaskTemplateDraft, branchId: string | null, dueAt: string, idempotencyKey: string) => void | Promise<void>; onList?: () => void | Promise<void> };
 
 const roles: Array<[TaskRoleCode, string]> = [
   ['owner', 'صاحب المؤسسة'], ['admin_followup', 'المدير التنفيذي'], ['accountant', 'المحاسب'], ['warehouse_keeper', 'أمين المخازن'], ['warehouse_worker', 'عمال التحميل'],
@@ -115,6 +115,7 @@ export default function OrganizationalTaskDesigner({ initialTemplate, employees 
   const [selectedBranchId, setSelectedBranchId] = useState('');
   const [dueDate, setDueDate] = useState(initialDeadline.date);
   const [dueTime, setDueTime] = useState(initialDeadline.time);
+  const [dispatchKey, setDispatchKey] = useState(() => `task-publication:${key()}`);
   const activeBranches = branches.filter((branch) => branch.isActive !== false);
   const eligibleEmployees = employees.filter((employee) => employee.active && Boolean(employee.userId) && (employee.assignments ?? []).some((assignment) => assignment.roleCode === selectedRole && (selectedBranchId === '' || assignment.branchId === selectedBranchId)));
   const eligibleCount = new Set(eligibleEmployees.map((employee) => employee.userId)).size;
@@ -191,7 +192,8 @@ export default function OrganizationalTaskDesigner({ initialTemplate, employees 
       const saveResult = await onSave?.(draft);
       const templateId = saveResult?.templateId ?? draft.id;
       if (!templateId) throw new Error('task_template_save_response_invalid');
-      await onSend?.({ ...draft, id: templateId, reports: saveResult?.reports ?? draft.reports }, selectedBranchId || null, dueAt);
+      await onSend?.({ ...draft, id: templateId, reports: saveResult?.reports ?? draft.reports }, selectedBranchId || null, dueAt, dispatchKey);
+      setDispatchKey(`task-publication:${key()}`);
       setNotice('تم حفظ تصميم المهمة وإرساله إلى الإدارة للمراجعة والاعتماد. لن يصل إلى الموظفين قبل الاعتماد.');
     } catch (cause) { setNotice(dispatchError(cause)); } finally { setBusy(false); }
   }
