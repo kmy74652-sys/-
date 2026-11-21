@@ -43,7 +43,7 @@ assert.match(adminData, /task_costs\.propose/);
 assert.match(adminData, /task_cost_permission_denied/);
 assert.match(dashboardData, /const dashboardCache = new Map<string, \{ value: DashboardData; loadedAt: number \}>\(\)/);
 assert.match(dashboardData, /const dashboardRequests = new Map<string, Promise<DashboardData>>\(\)/);
-assert.match(dashboardData, /const cacheKey = `\\$\\{authData\.user\.id\\}:\\$\\{organizationId\\}`/);
+assert.ok(dashboardData.includes('const cacheKey = `${authData.user.id}:${organizationId}`;'));
 assert.match(dashboardData, /dashboardCache\.get\(cacheKey\)/);
 assert.match(dashboardData, /dashboardRequests\.get\(cacheKey\)/);
 
