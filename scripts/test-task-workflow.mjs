@@ -26,6 +26,11 @@ assert(admin.includes("section === 'report-designer' && (canmanagereports ? <rep
 assert(mobile.includes('(!reportsonly || hasreport)'), 'report workspace must show only tasks with assigned report forms');
 assert(mobile.includes('إرسال التقرير مرة واحدة') && !mobile.includes('تم ترحيل هذا التقرير ولا يمكن تعديله'), 'report workspace must expose one submission without showing the internal lock message');
 assert(mobile.includes('structuredassignmentdescription') && mobile.includes('assignmentsectiontitle') && mobile.includes('assignmentitemtext') && mobile.includes('تفاصيل التكليف'), 'employee assignments must render as organized Arabic sections and readable bullet fields');
+const taskDesigner = read('apps/mobile/components/OrganizationalTaskDesigner.tsx');
+const taskSnapshotMigration = read('supabase/migrations/088_task_designer_report_fields_snapshot.sql');
+assert(taskDesigner.includes('__alshaairy_task_designer_v1') && taskDesigner.includes('schedule:') && taskDesigner.includes('rows:'), 'task designer must preserve its schedule as structured task data');
+assert(mobile.includes('taskdesignerassignmentview') && mobile.includes('جدول المهام حسب ساعات الدوام') && mobile.includes('مؤشر الأداء'), 'employee task screen must render the designer schedule as a table');
+assert(taskSnapshotMigration.includes('task_template_report_fields') && taskSnapshotMigration.includes('task_report_form_snapshots') && taskSnapshotMigration.includes('embedded_report_fields'), 'task dispatch must snapshot embedded designer report fields for the employee');
 assert(mobile.includes("!reportsonly && <view style={styles.notifications}") && mobile.includes("!loading && !reportsonly && tasks.length > 0"), 'report workspace must hide task filters and notifications');
 assert(read('supabase/migrations/066_lock_submitted_task_report_drafts.sql').includes('report_draft_locked_after_submission'), 'submitted report draft lock migration missing');
 assert(read('apps/mobile/components/HomeDashboard.tsx').includes("view: 'reports'"), 'employee dashboard reports card must open the report workspace');
