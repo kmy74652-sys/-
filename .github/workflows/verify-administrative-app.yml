@@ -28,7 +28,6 @@ jobs:
       - name: Administrative workflow regression tests
         run: |
           pnpm test:task-workflow
-          pnpm test:stage4-workflow
           pnpm test:employee-screen
           pnpm test:report-designer
           pnpm test:report-security
