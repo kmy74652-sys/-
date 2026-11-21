@@ -461,23 +461,20 @@ function TaskTemplatesSection({ templates, categories, employees, branches, onRe
     }
   }
   async function sendDirectly(draft: TaskTemplateDraft, employeeId: string, branchId: string | null, dueAt: string, idempotencyKey?: string) {
-    const linkedReport = draft.reports[0];
-    const reportTemplateId = linkedReport?.reportTemplateId ?? null;
-    const reportVersionId = linkedReport?.approvedVersionId ?? null;
     const executionDetails = draft.steps.map((step, index) => `${index + 1}. ${step.title}\nالفترة: ${step.instructions}\nالإثبات: ${step.evidenceInstructions || 'تأكيد الإنجاز'}`).join('\n');
-    await createAdministrativeTask({ title: draft.title, description: [draft.description, 'تفاصيل التنفيذ المباشر:', executionDetails].filter(Boolean).join('\n\n'), dueAt, priority: draft.priority, roleCode: draft.roleCode, branchId, assignedEmployeeId: employeeId, templateId: draft.id ?? null, reportTemplateId, reportVersionId, reportRequired: Boolean(reportVersionId), reportOverrides: draft.reports, idempotencyKey });
+    await createAdministrativeTask({ title: draft.title, description: [draft.description, 'تفاصيل التنفيذ المباشر:', executionDetails].filter(Boolean).join('\n\n'), dueAt, priority: draft.priority, roleCode: draft.roleCode, branchId, assignedEmployeeId: employeeId, templateId: draft.id ?? null, reportTemplateId: null, reportVersionId: null, reportRequired: draft.reportFields.length > 0, reportOverrides: [], idempotencyKey });
     await onReload();
     setSelected(null);
     setEditing(false);
   }
   return <View style={{ gap: 12 }}>
-    <View style={styles.card}><Text style={styles.sectionTitle}>مصمم الجدول التنظيمي للمهام</Text><Text style={styles.copy}>أنشئ جدول الدوام، المهام اليومية، المسؤوليات، مؤشرات الأداء، متطلبات الإثبات وبنود التقرير اليومي. أما حقول التقرير نفسها فتُصمم من «مصمم التقارير» وتصل تلقائياً إلى الموظف.</Text><Pressable style={styles.primary} onPress={() => { setSelected(null); setEditing(true); setSaveError(''); }}><Text style={styles.primaryText}>جدول تنظيمي جديد</Text></Pressable></View>
+    <View style={styles.card}><Text style={styles.sectionTitle}>مصمم الجدول التنظيمي للمهام</Text><Text style={styles.copy}>أنشئ جدول الدوام، المهام اليومية، المسؤوليات، مؤشرات الأداء، متطلبات الإثبات وحقول تقرير المهمة. حقول التقرير التي تضيفها هنا تبقى داخل قالب المهمة وتصل للموظف في تبويب «إعداد التقارير» المرتبط بالمهمة، دون إنشاء نموذج في «مصمم التقارير».</Text><Pressable style={styles.primary} onPress={() => { setSelected(null); setEditing(true); setSaveError(''); }}><Text style={styles.primaryText}>جدول تنظيمي جديد</Text></Pressable></View>
     {visibleTemplates.map((template) => <View key={template.id} style={styles.templateCard}>
       <View style={styles.templateHeader}>
         <View style={styles.templateHeaderCopy}><Text style={styles.templateTitle}>{template.title}</Text><Text style={styles.templateRole}>{roleLabel(template.roleCode)}</Text></View>
         <Text style={[styles.templateStatus, template.isActive ? styles.templateStatusActive : styles.templateStatusInactive]}>{template.isActive ? 'نشط' : 'غير نشط'}</Text>
       </View>
-      <View style={styles.templateMetaRow}><View style={styles.templateMetaChip}><Text style={styles.templateMetaValue}>{template.steps.length}</Text><Text style={styles.templateMetaLabel}>خطوات</Text></View><View style={styles.templateMetaChip}><Text style={styles.templateMetaValue}>{template.reports.length}</Text><Text style={styles.templateMetaLabel}>تقارير</Text></View><View style={styles.templateMetaChip}><Text style={styles.templateMetaValue}>{template.version}</Text><Text style={styles.templateMetaLabel}>الإصدار</Text></View></View>
+      <View style={styles.templateMetaRow}><View style={styles.templateMetaChip}><Text style={styles.templateMetaValue}>{template.steps.length}</Text><Text style={styles.templateMetaLabel}>خطوات</Text></View><View style={styles.templateMetaChip}><Text style={styles.templateMetaValue}>{template.reportFields.length}</Text><Text style={styles.templateMetaLabel}>حقول التقرير</Text></View><View style={styles.templateMetaChip}><Text style={styles.templateMetaValue}>{template.version}</Text><Text style={styles.templateMetaLabel}>الإصدار</Text></View></View>
       <View style={styles.templateActions}>
         <Pressable style={styles.templateEditButton} onPress={() => { setSelected(template); setEditing(true); setSaveError(''); }}><Text style={styles.templateEditText}>تعديل القالب</Text></Pressable>
         <Pressable style={styles.templateDeleteButton} onPress={() => Alert.alert('حذف القالب نهائياً', 'سيُحذف قالب الجدول وبياناته من مكتبة القوالب نهائياً. ستبقى المهام السابقة وتقاريرها محفوظة دون ارتباط بالقالب. لا يمكن التراجع عن هذا الإجراء.', [{ text: 'إلغاء', style: 'cancel' }, { text: 'حذف نهائي', style: 'destructive', onPress: () => void (async () => { try { setSaveError(''); await deleteTaskDesignerTemplate(template.id!); setSelected(null); setEditing(false); await onReload(); } catch (cause) { setSaveError(friendlyDataError(cause, 'تعذر حذف القالب نهائياً.')); } })() }])}><Text style={styles.templateDeleteText}>حذف نهائي</Text></Pressable>

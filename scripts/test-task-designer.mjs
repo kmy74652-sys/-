@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 
 const sql = readFileSync('supabase/migrations/035_task_designer_multi_reports.sql', 'utf8');
+const decouplingMigration = readFileSync('supabase/migrations/079_decouple_task_report_fields.sql', 'utf8');
 const designer = readFileSync('apps/mobile/components/TaskDesigner.tsx', 'utf8');
 const organizational = readFileSync('apps/mobile/components/OrganizationalTaskDesigner.tsx', 'utf8');
 const library = readFileSync('apps/mobile/lib/taskDesigner.ts', 'utf8');
@@ -50,7 +51,7 @@ const checks = [
   ['task and sub-item deletion require confirmation', organizational.includes('تأكيد حذف المهمة') && organizational.includes('تأكيد حذف البند') && organizational.includes("style: 'destructive'")],
   ['report designer remains independent', admin.includes("import ReportDesigner") && admin.includes('section === \'report-designer\'') && admin.includes('<ReportDesigner')],
   ['legacy starter catalog is hidden from designer', library.includes('retiredStarterTemplateCodes') && !admin.includes('قالب التقرير القديم')],
-  ['reports are designed independently and delivered automatically by role', designer.includes('التقارير مستقلة عن قالب المهمة') && admin.includes('حقول التقرير المعتمدة للدور المحدد تُرسل تلقائياً') && admin.includes('const linkedReport = draft.reports[0]')],
+  ['task report fields stay inside task designer and are not report-designer forms', library.includes('task_template_report_fields') && library.includes('report_fields: draft.reportFields') && !library.includes('saveDesignerTemplate({') && admin.includes('reportRequired: draft.reportFields.length > 0') && designer.includes('لا تُنشئ نموذجاً داخل «مصمم التقارير»') && decouplingMigration.includes('task_template_report_fields') && decouplingMigration.includes('embedded_report_fields')],
   ['admin report review has search and status filters', (admin.includes('ابحث باسم الموظف أو المهمة') || admin.includes('ابحث باسم الموظف أو التقرير')) && admin.includes("setStatus(value)") && adminData.includes('taskTitle') && adminData.includes('values')],
   ['report submission and review notifications are automatic', reportCycle.includes('task_reports_notify_cycle') && reportCycle.includes("new.status in ('approved', 'returned')")],
   ['employee report upload tab has independent status filters', tasks.includes('تقارير المهام') && tasks.includes('جاهز للرفع') && tasks.includes('تم الرفع') && tasks.includes('reportStatusFilter') && tasks.includes('reportStatusMatches')],

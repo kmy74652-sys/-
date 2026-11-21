@@ -1,6 +1,6 @@
 import { supabase } from './supabase';
 import type { TaskCategory, TaskReportSelection, TaskTemplateDraft } from '../components/TaskDesigner';
-import { approveDesignerVersion, saveDesignerTemplate, type ReportTemplate } from './reportDesigner';
+import type { ReportTemplate } from './reportDesigner';
 
 export type TaskCategoryRow = { id: string; code: TaskCategory; title: string; parent_id: string | null; is_main: boolean; active: boolean };
 export type StoredTaskTemplate = TaskTemplateDraft & { categoryId: string; subcategoryId: string | null; version: number; code: string };
@@ -54,18 +54,12 @@ export async function listTaskDesignerTemplates(): Promise<StoredTaskTemplate[]>
   const ids = rows.map((row) => row.id);
   const [stepsResult, linksResult] = await Promise.all([
     db.from('task_template_steps').select('id,template_id,title,instructions,sort_order,is_required,evidence_required,evidence_instructions').in('template_id', ids).order('sort_order').limit(2000),
-    db.from('task_template_report_forms').select('id,template_id,version_id,sort_order,is_required').in('template_id', ids).order('sort_order').limit(1000),
+    db.from('task_template_report_fields').select('template_id,field_key,label,description,field_type,is_required,repeatable,sort_order,options,validation,config').in('template_id', ids).order('sort_order').limit(5000),
   ]);
   if (stepsResult.error) throw stepsResult.error;
   if (linksResult.error) throw linksResult.error;
-  const versionIds = [...new Set((linksResult.data ?? []).map((row) => row.version_id))];
-  const versionResult = versionIds.length ? await db.from('report_form_versions').select('id,template_id,version_no').in('id', versionIds).limit(1000) : { data: [], error: null };
-  if (versionResult.error) throw versionResult.error;
-  const fieldsResult = versionIds.length ? await db.from('report_form_version_fields').select('version_id,field_key,label,description,field_type,is_required,repeatable,sort_order,options,validation,config').in('version_id', versionIds).order('sort_order').limit(5000) : { data: [], error: null };
-  if (fieldsResult.error) throw fieldsResult.error;
-  const formTemplateByVersion = new Map((versionResult.data ?? []).map((row) => [row.id, row.template_id]));
   const fieldsByVersion = new Map<string, NonNullable<TaskTemplateDraft['reportFields']>>();
-  for (const row of fieldsResult.data ?? []) fieldsByVersion.set(row.version_id, [...(fieldsByVersion.get(row.version_id) ?? []), {
+  for (const row of linksResult.data ?? []) fieldsByVersion.set(row.template_id, [...(fieldsByVersion.get(row.template_id) ?? []), {
     field_key: row.field_key, label: row.label, description: row.description ?? '', field_type: row.field_type,
     is_required: row.is_required, repeatable: row.repeatable, sort_order: row.sort_order, options: row.options ?? [],
     validation: row.validation ?? {}, config: row.config ?? {},
@@ -76,14 +70,6 @@ export async function listTaskDesignerTemplates(): Promise<StoredTaskTemplate[]>
     id: row.id, title: row.title, instructions: row.instructions ?? '', required: row.is_required,
     evidenceRequired: row.evidence_required, evidenceInstructions: row.evidence_instructions ?? '',
   }]);
-  const reportsByTemplate = new Map<string, TaskReportSelection[]>();
-  for (const row of linksResult.data ?? []) {
-    const reportTemplateId = formTemplateByVersion.get(row.version_id);
-    if (!reportTemplateId) continue;
-    reportsByTemplate.set(row.template_id, [...(reportsByTemplate.get(row.template_id) ?? []), {
-      reportTemplateId, approvedVersionId: row.version_id, required: row.is_required,
-    }]);
-  }
   // The legacy task designer is retired. Only organizational schedules enter
   // the management and assignment UI.
   return rows.map((row) => {
@@ -97,9 +83,9 @@ export async function listTaskDesignerTemplates(): Promise<StoredTaskTemplate[]>
       roleCode: row.role_code as TaskTemplateDraft['roleCode'],
       priority: row.default_priority as TaskTemplateDraft['priority'],
       expectedDurationMinutes: row.default_duration_minutes,
-      steps: stepsByTemplate.get(row.id) ?? [], reports: reportsByTemplate.get(row.id) ?? [],
-      reportFields: (() => { const first = reportsByTemplate.get(row.id)?.[0]; return first ? fieldsByVersion.get(first.approvedVersionId) ?? [] : []; })(),
-      reportRequired: reportsByTemplate.get(row.id)?.some((item) => item.required) ?? true, isActive: row.is_active,
+      steps: stepsByTemplate.get(row.id) ?? [], reports: [],
+      reportFields: fieldsByVersion.get(row.id) ?? [],
+      reportRequired: (fieldsByVersion.get(row.id)?.length ?? 0) > 0, isActive: row.is_active,
     };
   }).filter((row) => row.category === 'admin' && row.subcategory === 'الدوام والمهام اليومية');
 }
@@ -129,33 +115,17 @@ export async function saveTaskDesignerTemplate(draft: TaskTemplateDraft, categor
   const main = categories.find((category) => category.is_main && category.code === draft.category);
   if (!main) throw new Error('task_category_not_found');
   const subcategoryId = await ensureSubcategory(main.id, draft.subcategory);
-  let reportForms = draft.reports;
-  if (draft.reportFields.length > 0) {
-    const reportDraft = await saveDesignerTemplate({
-      templateId: draft.reports[0]?.reportTemplateId,
-      title: `${title} — تقرير التنفيذ`, description: draft.description, roleCode: draft.roleCode,
-      fields: draft.reportFields, reportRequired: draft.reportRequired,
-    });
-    try {
-      await approveDesignerVersion(reportDraft.versionId);
-    } catch (cause) {
-      const message = cause instanceof Error ? cause.message : String(cause);
-      if (message.includes('owner_approval_required')) throw new Error('report_requires_owner_approval');
-      throw cause;
-    }
-    reportForms = [{ reportTemplateId: reportDraft.templateId, approvedVersionId: reportDraft.versionId, required: draft.reportRequired }];
-  }
   const payload = {
     title, description: draft.description.trim() || null, instructions: draft.instructions.trim() || null,
     role_code: draft.roleCode, task_type: 'administrative',
     default_priority: draft.priority, default_duration_minutes: draft.expectedDurationMinutes,
     category_id: main.id, subcategory_id: subcategoryId, is_active: draft.isActive,
     steps: draft.steps.map((step, sort_order) => ({ title: step.title.trim(), instructions: step.instructions.trim() || null, sort_order, is_required: step.required, evidence_required: step.evidenceRequired, evidence_instructions: step.evidenceInstructions.trim() || null })),
-    report_forms: reportForms.map((report, sort_order) => ({ version_id: report.approvedVersionId, required: report.required, sort_order })),
+    report_fields: draft.reportFields.map((field, sort_order) => ({ ...field, sort_order })),
   };
   const { data, error } = await db.rpc('save_task_designer_template', { p_organization_id: organizationId, p_template_id: draft.id ?? null, p_payload: payload });
   if (error) throw error;
-  return { templateId: data as string, reports: reportForms };
+  return { templateId: data as string, reports: [] as TaskReportSelection[] };
 }
 
 export async function setTaskDesignerTemplateActive(templateId: string, isActive: boolean) {
