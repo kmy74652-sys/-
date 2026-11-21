@@ -113,7 +113,7 @@ export async function listTaskTemplates() {
   return data ?? [];
 }
 
-export async function createAdministrativeTask(input: { title: string; description: string; dueAt: string; priority: string; branchId: string | null; roleCode: string; assignedEmployeeId: string; templateId: string | null; reportTemplateId?: string | null; reportVersionId?: string | null; reportRequired?: boolean; reportOverrides?: unknown[] }) {
+export async function createAdministrativeTask(input: { title: string; description: string; dueAt: string; priority: string; branchId: string | null; roleCode: string; assignedEmployeeId: string; templateId: string | null; reportTemplateId?: string | null; reportVersionId?: string | null; reportRequired?: boolean; reportOverrides?: unknown[]; idempotencyKey?: string }) {
   const db = client();
   const { data: authData, error: authError } = await db.auth.getUser();
   if (authError || !authData.user) throw authError ?? new Error('not_authenticated');
@@ -148,6 +148,7 @@ export async function createAdministrativeTask(input: { title: string; descripti
         p_priority: input.priority,
         p_instructions: input.description.trim() || null,
         p_report_overrides: input.reportOverrides ?? [],
+        p_idempotency_key: input.idempotencyKey ?? null,
       })
     : await db.rpc('create_task_with_report_form', {
         p_organization_id: organizationId,

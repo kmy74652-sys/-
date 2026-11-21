@@ -218,7 +218,7 @@ export default function AdminScreen() {
     await load(true);
     return saved;
   }
-  async function sendDesignerTask(draft: TaskTemplateDraft, employeeId: string, branchId: string | null, dueAt: string) {
+  async function sendDesignerTask(draft: TaskTemplateDraft, employeeId: string, branchId: string | null, dueAt: string, idempotencyKey: string) {
     const linkedReport = draft.reports[0];
     const executionDetails = draft.steps.map((step, index) => `${index + 1}. ${step.title}\n${step.instructions || 'تأكيد الإنجاز'}`).join('\n');
     await createAdministrativeTask({
@@ -234,6 +234,7 @@ export default function AdminScreen() {
       reportVersionId: linkedReport?.approvedVersionId ?? null,
       reportRequired: Boolean(linkedReport?.approvedVersionId),
       reportOverrides: draft.reports,
+      idempotencyKey,
     });
     await load(true);
   }
@@ -358,6 +359,7 @@ function TasksSection({ data, designerTemplates, canDesign, showCreate, setShowC
       return <View style={styles.taskListCard} key={task.id}>
         <View style={styles.taskListTop}><View style={[styles.taskStatusDot,{backgroundColor:late?'#c84b4b':task.status==='completed_approved'?'#29936a':task.status==='report_submitted'?'#d49a27':'#3977b8'}]} /><Text style={styles.taskListTitle}>{task.title}</Text><Text style={[styles.taskStatusBadge,late?styles.taskStatusLate:task.status==='completed_approved'?styles.taskStatusDone:task.status==='report_submitted'?styles.taskStatusReview:styles.taskStatusActive]}>{late?'متأخرة':statusLabel(task.status)}</Text></View>
         <Text style={styles.taskListMeta}>{task.branchName || 'كل الفروع'} · {task.assignedTo ? 'مُسندة لموظف' : 'بانتظار الإسناد'} · {priorityLabels[task.priority] || task.priority}</Text>
+        <Text style={styles.taskListMeta}>الوصول: {task.status === 'new' ? 'تم الإرسال — بانتظار فتح الموظف' : task.status === 'received' ? 'تم الاستلام' : task.status === 'in_progress' ? 'تم الفتح وبدأ التنفيذ' : task.status === 'report_submitted' ? 'تم التنفيذ وإرسال التقرير' : statusLabel(task.status)}</Text>
         <View style={styles.taskListFooter}><Text style={styles.taskDueLabel}>الموعد: {fmt(task.dueAt)}</Text><Text style={styles.taskIdLabel}>#{String(task.id).slice(0,8)}</Text></View>
         {canManage && <>
           <TextInput style={styles.input} placeholder="تعديل عنوان المهمة" value={edits[task.id]?.title ?? task.title} onChangeText={(value) => setEdits((current) => ({ ...current, [task.id]: { title: value, description: current[task.id]?.description ?? task.description ?? '' } }))} />

@@ -31,6 +31,7 @@ export type MobileTask = {
   due_at: string;
   priority: 'normal' | 'important' | 'urgent' | 'critical';
   status: 'pending' | 'in_progress' | 'submitted' | 'approved' | 'rejected' | 'cancelled' | 'late';
+  delivery_status: 'sent' | 'received' | 'opened';
   proof_required: boolean;
   proof_instructions: string | null;
   report_schema: ReportField[];
@@ -89,7 +90,7 @@ export async function listMyTasks(institutionId?: string, assignedTo?: string): 
   const client = getClient();
   const taskQuery = () => {
     const query = client.from('tasks')
-      .select('id,title,description,assigned_to,branch_id,position_code,due_at,priority,status,assigned_at,created_at,starts_at,report_form_snapshot_id,report_flow,task_instructions,proof_required,proof_instructions')
+      .select('id,title,description,assigned_to,branch_id,position_code,due_at,priority,status,assigned_at,received_at,opened_at,created_at,starts_at,report_form_snapshot_id,report_flow,task_instructions,proof_required,proof_instructions')
       .is('deleted_at', null)
       .order('due_at', { ascending: true }).order('id', { ascending: true });
     const scoped = institutionId ? query.eq('organization_id', institutionId) : query;
@@ -163,7 +164,7 @@ export async function listMyTasks(institutionId?: string, assignedTo?: string): 
       return { snapshot_id: snapshot.id, title: snapshot.title ?? 'نموذج تقرير', sort_order: snapshot.sort_order ?? 0, required: Boolean(snapshot.is_required), schema: rawSchema.map((field) => ({ key: String(field.key ?? ''), label: String(field.label ?? ''), description: (field.description as string | null) ?? null, type: String(field.type ?? 'short_text') as ReportField['type'], options: Array.isArray(field.options) ? field.options.map(String) : [], required: Boolean(field.required), repeatable: Boolean(field.repeatable), validation: (field.validation as Record<string, unknown>) ?? {}, config: (field.config as Record<string, unknown>) ?? {} })), report_id: latest?.id ?? null, draft_values: (latestDraft?.values as Record<string, unknown> | null) ?? null, status: latest?.status === 'returned' ? 'returned' : latest?.status === 'approved' ? 'approved' : latest?.status === 'submitted' ? 'submitted' : null, values: (latest?.values as Record<string, unknown> | null) ?? null, review_note: latest?.review_note ?? null, submitted_at: latest?.submitted_at ?? null };
     }) : [];
     const latestLegacyReport = (reportsResult.data ?? []).find((report) => report.task_id === task.id && !report.report_form_snapshot_id);
-    return { ...task, assignee_employee_id: task.assigned_to, position_code: (task.position_code as MobileTask['position_code'] | null) ?? role ?? null, starts_at: task.starts_at ?? task.assigned_at ?? task.created_at ?? task.due_at, status, proof_required: Boolean(task.proof_required), proof_instructions: task.proof_instructions, task_instructions: task.task_instructions, report_flow: task.report_flow === 'multi_form' ? 'multi_form' : 'legacy', legacy_report_values: (latestLegacyReport?.values as Record<string, unknown> | null) ?? null, execution_steps: executionSteps, report_forms: reportForms, report_schema: fieldsByTask.get(task.id) ?? [], branch_name: branchById.get(task.branch_id)?.name ?? null, branch_level: branchById.get(task.branch_id)?.branch_level ?? null };
+    return { ...task, assignee_employee_id: task.assigned_to, position_code: (task.position_code as MobileTask['position_code'] | null) ?? role ?? null, starts_at: task.starts_at ?? task.assigned_at ?? task.created_at ?? task.due_at, status, delivery_status: task.opened_at ? 'opened' : task.received_at || task.status !== 'new' ? 'received' : 'sent', proof_required: Boolean(task.proof_required), proof_instructions: task.proof_instructions, task_instructions: task.task_instructions, report_flow: task.report_flow === 'multi_form' ? 'multi_form' : 'legacy', legacy_report_values: (latestLegacyReport?.values as Record<string, unknown> | null) ?? null, execution_steps: executionSteps, report_forms: reportForms, report_schema: fieldsByTask.get(task.id) ?? [], branch_name: branchById.get(task.branch_id)?.name ?? null, branch_level: branchById.get(task.branch_id)?.branch_level ?? null };
   }) as MobileTask[];
 }
 
@@ -209,6 +210,10 @@ export async function updateTaskStatus(taskId: string, status: 'in_progress' | '
   const payload = { taskId, status, note, idempotencyKey: idempotencyKey(taskId, `status:${status}`) };
   try { await callRpc('mobile_record_task_update', { p_task_id: taskId, p_status: status, p_note: note }); }
   catch (error) { if (!isOffline(error)) throw error; await queueOperation('status', payload); }
+}
+
+export function markTaskOpened(taskId: string) {
+  return callRpc('mobile_mark_task_opened', { p_task_id: taskId });
 }
 
 export async function submitTaskReport(taskId: string, values: Record<string, unknown>, snapshotId?: string) {

@@ -18,6 +18,7 @@ import {
   getMyEmployeeProfile,
   listMyNotifications,
   listMyTasks,
+  markTaskOpened,
   listTaskTimeline,
   syncOfflineQueue,
   reviewTask,
@@ -52,6 +53,7 @@ type Task = {
   due_at: string;
   priority: 'normal' | 'important' | 'urgent' | 'critical';
   status: 'pending' | 'in_progress' | 'submitted' | 'approved' | 'rejected' | 'cancelled' | 'late';
+  delivery_status: 'sent' | 'received' | 'opened';
   proof_required: boolean;
   proof_instructions: string | null;
   report_schema: ReportField[];
@@ -101,6 +103,7 @@ const positionLabels: Record<NonNullable<Task['position_code']>, string> = {
   owner: 'صاحب المؤسسة', admin_followup: 'المدير التنفيذي', accountant: 'المحاسب',
   warehouse_keeper: 'أمين المخازن', warehouse_worker: 'عمال التحميل',
 };
+const deliveryLabels: Record<Task['delivery_status'], string> = { sent: 'أُرسلت للموظف', received: 'تم الاستلام', opened: 'تم فتح المهمة' };
 
 export default function TasksScreen() {
   // Employee flow: read task, execute steps, complete the requested report.
@@ -140,6 +143,7 @@ export default function TasksScreen() {
   const lastLoadAt = useRef(0);
   const loadInFlight = useRef(false);
   const notifiedTaskIds = useRef(new Set<string>());
+  const openedTaskIds = useRef(new Set<string>());
 
   const applyTaskRows = useCallback((taskRows: Task[]) => {
     setTasks(taskRows);
@@ -263,6 +267,16 @@ export default function TasksScreen() {
     const timer = setTimeout(() => setInAppNotification(null), 10_000);
     return () => clearTimeout(timer);
   }, [inAppNotification]);
+  useEffect(() => {
+    if (!currentUserId || reportsOnly) return;
+    for (const task of tasks.filter((item) => item.assignee_employee_id === currentUserId && item.delivery_status !== 'opened')) {
+      if (openedTaskIds.current.has(task.id)) continue;
+      openedTaskIds.current.add(task.id);
+      void markTaskOpened(task.id).then(() => {
+        setTasks((current) => current.map((item) => item.id === task.id ? { ...item, delivery_status: 'opened' } : item));
+      }).catch(() => { openedTaskIds.current.delete(task.id); });
+    }
+  }, [currentUserId, reportsOnly, tasks]);
   useEffect(() => {
     const timer = setInterval(() => void load(), 60_000);
     return () => clearInterval(timer);
@@ -548,6 +562,7 @@ export default function TasksScreen() {
             {!!task.description && <Text style={styles.body}>{task.description}</Text>}
             <Text style={styles.meta}>المنصب: {task.position_code ? positionLabels[task.position_code] : 'بحاجة إلى تصنيف'}{task.branch_name ? ` · الفرع: ${task.branch_name}${task.branch_level ? ` (المستوى ${task.branch_level})` : ''}` : task.branch_id ? ' · فرع محدد' : ''}</Text>
             <Text style={styles.meta}>الأولوية: {priorityLabels[task.priority]} · الموعد: {formatDate(task.due_at)}</Text>
+            <Text style={styles.deliveryStatus}>حالة الوصول: {deliveryLabels[task.delivery_status]}</Text>
             {task.proof_required && <Text style={styles.proof}>{task.proof_instructions || 'يتطلب إرفاق دليل إنجاز.'}</Text>}
             {(!!task.task_instructions || !!task.execution_steps.length) && <Text style={styles.cardSectionLabel}>2 · نفّذ المهمة</Text>}
             {!!task.task_instructions && <View style={styles.timeline}><Text style={styles.fieldLabel}>تعليمات التنفيذ</Text><Text style={styles.body}>{task.task_instructions}</Text></View>}
@@ -687,6 +702,7 @@ const styles = StyleSheet.create({
   neutralBadge: { color: '#39556a', backgroundColor: '#e9f0f4' },
   body: { color: '#4c6171', textAlign: 'right', lineHeight: 23 },
   meta: { color: '#718394', fontSize: 13, textAlign: 'right', lineHeight: 20 },
+  deliveryStatus: { color: '#2d6d55', fontSize: 12, fontWeight: '800', textAlign: 'right', backgroundColor: '#eef8f1', borderRadius: 8, paddingHorizontal: 9, paddingVertical: 6 },
   proof: { color: '#8c4f13', backgroundColor: '#fff7e8', borderRadius: 9, padding: 10, textAlign: 'right', lineHeight: 21 },
   field: { gap: 5 },
   choices: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 8 },
