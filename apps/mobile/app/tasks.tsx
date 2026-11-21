@@ -467,16 +467,18 @@ export default function TasksScreen() {
     const hasUploadedReport = task.report_forms.some((form) => form.status === 'submitted') || (!task.report_forms.length && task.status === 'submitted');
     const hasApprovedReport = task.report_forms.some((form) => form.status === 'approved') || (!task.report_forms.length && task.status === 'approved');
     const reportStatusMatches = reportStatusFilter === 'all' || (reportStatusFilter === 'ready' && hasReadyReport) || (reportStatusFilter === 'uploaded' && hasUploadedReport) || (reportStatusFilter === 'approved' && hasApprovedReport);
-    const modeMatches = screenMode === 'mine'
+    const modeMatches = reportsOnly
       ? task.assignee_employee_id === currentUserId
-      : screenMode === 'review'
-        ? canReview && (task.status === 'submitted' || hasPendingFormReview)
-        : canManage || canReview;
+      : screenMode === 'mine'
+        ? task.assignee_employee_id === currentUserId
+        : screenMode === 'review'
+          ? canReview && (task.status === 'submitted' || hasPendingFormReview)
+          : canManage || canReview;
     return modeMatches &&
       !isDynamicTestTitle(task.title) &&
-      taskMatchesFilter(task, statusFilter) &&
-      (!branchFilter || task.branch_id === branchFilter) &&
-      (positionFilter === 'all' || task.position_code === positionFilter) &&
+      (reportsOnly || taskMatchesFilter(task, statusFilter)) &&
+      (reportsOnly || !branchFilter || task.branch_id === branchFilter) &&
+      (reportsOnly || positionFilter === 'all' || task.position_code === positionFilter) &&
       (!reportsOnly || hasReport) &&
       (!reportsOnly || !isDynamicTestTitle(task.title)) &&
       (!reportsOnly || reportStatusMatches) &&
