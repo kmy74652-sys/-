@@ -48,6 +48,7 @@ assert.match(adminData, /proposed_at,approved_at/);
 assert.match(admin, /onTaskCostApproved=\{approveTaskCost\}/);
 assert.match(admin, /اعتماد الميزانية والمصروفات/);
 assert.match(admin, /يوجد مقترح تكلفة بانتظار اعتماد صاحب المؤسسة/);
+assert.match(admin, /new Date\(task\.costProposedAt\)\.getTime\(\) > new Date\(task\.costApprovedAt\)\.getTime\(\)/);
 assert.match(admin, /costApprovedAt: result\.approvedAt/);
 assert.match(dashboardData, /const dashboardCache = new Map<string, \{ value: DashboardData; loadedAt: number \}>\(\)/);
 assert.match(dashboardData, /const dashboardRequests = new Map<string, Promise<DashboardData>>\(\)/);
