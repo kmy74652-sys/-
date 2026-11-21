@@ -562,7 +562,7 @@ export default function TasksScreen() {
             </View>}
             {!reportsOnly && <>
             <Text style={styles.cardSectionLabel}>1 · تفاصيل التكليف</Text>
-            {!!task.description && <StructuredAssignmentDescription value={task.description} />}
+            {!!task.description && <TaskDesignerAssignmentView value={task.description} />}
             <Text style={styles.meta}>المنصب: {task.position_code ? positionLabels[task.position_code] : 'بحاجة إلى تصنيف'}{task.branch_name ? ` · الفرع: ${task.branch_name}${task.branch_level ? ` (المستوى ${task.branch_level})` : ''}` : task.branch_id ? ' · فرع محدد' : ''}</Text>
             <Text style={styles.meta}>الأولوية: {priorityLabels[task.priority]} · الموعد: {formatDate(task.due_at)}</Text>
             <Text style={styles.deliveryStatus}>حالة الوصول: {deliveryLabels[task.delivery_status]}</Text>
@@ -645,6 +645,62 @@ function parseAssignmentDescription(value: string): AssignmentSection[] {
   }
   flush();
   return sections.length ? sections : [{ title: 'تفاصيل التكليف', items: [value.trim()] }];
+}
+
+type TaskDesignerPayload = {
+  __alshaairy_task_designer_v1: true;
+  schedule?: { days?: string; morning?: string; breakTime?: string; evening?: string; summary?: string };
+  rows?: Array<{ timeSlot?: string; responsibility?: string; kpiIndicator?: string; proofRequirement?: string; requiresProof?: boolean; subItems?: string[] }>;
+  continuous?: string[];
+  reportFields?: string[];
+  recommendations?: string[];
+};
+
+function TaskDesignerAssignmentView({ value }: { value: string }) {
+  let payload: TaskDesignerPayload | null = null;
+  try {
+    const parsed = JSON.parse(value) as Partial<TaskDesignerPayload>;
+    if (parsed?.__alshaairy_task_designer_v1 === true) payload = parsed as TaskDesignerPayload;
+  } catch { /* Older tasks keep their readable text description. */ }
+  if (!payload) return <StructuredAssignmentDescription value={value} />;
+
+  const sections = [
+    { title: 'المهام المستمرة طوال الدوام', items: payload.continuous ?? [] },
+    { title: 'بنود التقرير اليومي', items: payload.reportFields ?? [] },
+    { title: 'التوصيات والضوابط الإدارية', items: payload.recommendations ?? [] },
+  ];
+  return <View style={styles.assignmentSections}>
+    {!!payload.schedule?.summary && <View style={styles.assignmentSection}>
+      <Text style={styles.assignmentSectionTitle}>جدول الدوام</Text>
+      <Text style={styles.assignmentItemText}>{payload.schedule.summary}</Text>
+    </View>}
+    {!!payload.rows?.length && <View style={styles.assignmentSection}>
+      <Text style={styles.assignmentSectionTitle}>جدول المهام حسب ساعات الدوام</Text>
+      <ScrollView horizontal showsHorizontalScrollIndicator>
+        <View style={{ minWidth: 650, borderWidth: 1, borderColor: '#dce6e9', borderRadius: 9, overflow: 'hidden' }}>
+          <View style={{ flexDirection: 'row-reverse', backgroundColor: '#eaf0f3' }}>
+            {['الفترة الزمنية', 'المهمة والمسؤولية', 'مؤشر الأداء', 'الإثبات'].map((label) => <Text key={label} style={{ flex: 1, minWidth: 145, padding: 9, color: '#17324d', fontWeight: '900', textAlign: 'right', borderLeftWidth: 1, borderColor: '#dce6e9' }}>{label}</Text>)}
+          </View>
+          {payload.rows.map((row, index) => <View key={index} style={{ borderTopWidth: 1, borderColor: '#dce6e9' }}>
+            <View style={{ flexDirection: 'row-reverse' }}>
+              {[row.timeSlot ?? '—', row.responsibility ?? '—', row.kpiIndicator ?? '—', row.proofRequirement ?? '—'].map((cell, cellIndex) => <Text key={cellIndex} style={{ flex: 1, minWidth: 145, padding: 9, color: '#39556a', textAlign: 'right', lineHeight: 20, borderLeftWidth: 1, borderColor: '#edf1f3' }}>{cell}</Text>)}
+            </View>
+            {!!row.subItems?.length && <View style={{ padding: 9, backgroundColor: '#fafcfd', gap: 4 }}>
+              <Text style={{ color: '#17324d', fontWeight: '800', textAlign: 'right' }}>البنود الفرعية</Text>
+              {row.subItems.map((item, itemIndex) => <Text key={itemIndex} style={{ color: '#52687a', textAlign: 'right' }}>• {item}</Text>)}
+            </View>}
+            {row.requiresProof && <Text style={{ paddingHorizontal: 9, paddingBottom: 8, color: '#8c4f13', textAlign: 'right' }}>الإثبات مطلوب</Text>}
+          </View>)}
+        </View>
+      </ScrollView>
+    </View>}
+    {sections.filter((section) => section.items.length).map((section) => <View key={section.title} style={styles.assignmentSection}>
+      <Text style={styles.assignmentSectionTitle}>{section.title}</Text>
+      {section.items.map((item, index) => <View key={index} style={styles.assignmentItem}>
+        <Text style={styles.assignmentBullet}>•</Text><Text style={styles.assignmentItemText}>{item}</Text>
+      </View>)}
+    </View>)}
+  </View>;
 }
 
 function StructuredAssignmentDescription({ value }: { value: string }) {
