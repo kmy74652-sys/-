@@ -460,12 +460,12 @@ function TaskTemplatesSection({ templates, categories, employees, branches, onRe
       throw cause;
     }
   }
-  async function sendDirectly(draft: TaskTemplateDraft, employeeId: string, branchId: string | null, dueAt: string) {
+  async function sendDirectly(draft: TaskTemplateDraft, employeeId: string, branchId: string | null, dueAt: string, idempotencyKey?: string) {
     const linkedReport = draft.reports[0];
     const reportTemplateId = linkedReport?.reportTemplateId ?? null;
     const reportVersionId = linkedReport?.approvedVersionId ?? null;
     const executionDetails = draft.steps.map((step, index) => `${index + 1}. ${step.title}\nالفترة: ${step.instructions}\nالإثبات: ${step.evidenceInstructions || 'تأكيد الإنجاز'}`).join('\n');
-    await createAdministrativeTask({ title: draft.title, description: [draft.description, 'تفاصيل التنفيذ المباشر:', executionDetails].filter(Boolean).join('\n\n'), dueAt, priority: draft.priority, roleCode: draft.roleCode, branchId, assignedEmployeeId: employeeId, templateId: draft.id ?? null, reportTemplateId, reportVersionId, reportRequired: Boolean(reportVersionId), reportOverrides: draft.reports });
+    await createAdministrativeTask({ title: draft.title, description: [draft.description, 'تفاصيل التنفيذ المباشر:', executionDetails].filter(Boolean).join('\n\n'), dueAt, priority: draft.priority, roleCode: draft.roleCode, branchId, assignedEmployeeId: employeeId, templateId: draft.id ?? null, reportTemplateId, reportVersionId, reportRequired: Boolean(reportVersionId), reportOverrides: draft.reports, idempotencyKey });
     await onReload();
     setSelected(null);
     setEditing(false);

@@ -5,10 +5,13 @@ import DateTimePicker, { type DateTimePickerEvent } from '@react-native-communit
 export const ADEN_TIME_ZONE = 'Asia/Aden';
 
 export function currentAdenDateTime() {
+  // A deadline set to the current minute can become earlier than the dispatch
+  // request by the time the assignment RPC runs.
+  const target = new Date(Date.now() + 60 * 60 * 1000);
   const parts = new Intl.DateTimeFormat('en-CA', {
     timeZone: ADEN_TIME_ZONE, year: 'numeric', month: '2-digit', day: '2-digit',
     hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
-  }).formatToParts(new Date());
+  }).formatToParts(target);
   const value = Object.fromEntries(parts.map((part) => [part.type, part.value]));
   return { date: `${value.year}-${value.month}-${value.day}`, time: `${value.hour}:${value.minute}` };
 }

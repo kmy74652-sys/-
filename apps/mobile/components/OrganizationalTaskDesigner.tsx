@@ -196,6 +196,7 @@ export default function OrganizationalTaskDesigner({ initialTemplate, employees 
     const dueAt = adenDateTimeToIso(dueDate, dueTime);
     if (!employee) { setNotice('اختر الموظف المستلم للمهمة أولاً.'); return; }
     if (!dueAt) { setNotice('أدخل موعداً نهائياً صالحاً للمهمة.'); return; }
+    if (new Date(dueAt).getTime() <= Date.now()) { setNotice('اختر موعداً نهائياً مستقبلياً، ثم أعد الإرسال.'); return; }
     const branchName = activeBranches.find((branch) => branch.id === selectedBranchId)?.name ?? 'كل الفروع';
     const reportText = reportFields.length ? `نموذج تقرير مرتبط (${reportFields.length} حقول)` : 'بدون نموذج تقرير مرتبط';
     Alert.alert('مراجعة وتأكيد الإرسال', `المهمة: ${title.trim()}\nالموظف: ${employee.name}\nالفرع: ${branchName}\nالموعد: ${dueDate} ${dueTime}\nالخطوات: ${rows.length}\n${reportText}`, [
