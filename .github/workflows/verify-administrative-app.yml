@@ -1,0 +1,44 @@
+name: Verify administrative app
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.25.0
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: TypeScript checks
+        run: pnpm typecheck
+      - name: Schema verification
+        run: pnpm schema:verify
+      - name: Administrative workflow regression tests
+        run: |
+          pnpm test:task-workflow
+          pnpm test:employee-screen
+          pnpm test:report-designer
+          pnpm test:report-security
+          pnpm test:employee-agreements
+          pnpm test:employee-hr
+          pnpm test:task-designer
+          pnpm test:task-cost-permissions
+          pnpm test:admin-management
+          pnpm test:management-mutations
+          pnpm test:home-dashboard
+          pnpm test:push-notifications
+          pnpm test:overdue-reminders
+          pnpm test:performance-analytics
+          pnpm test:task-evaluation-fields

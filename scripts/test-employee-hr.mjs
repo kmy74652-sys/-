@@ -4,6 +4,7 @@ const migration = readFileSync('supabase/migrations/065_employee_hr_mutations.sq
 const page = readFileSync('apps/mobile/app/hr.tsx', 'utf8');
 const data = readFileSync('apps/mobile/lib/hrData.ts', 'utf8');
 const admin = readFileSync('apps/mobile/app/admin.tsx', 'utf8');
+const defaults = readFileSync('supabase/migrations/082_employee_hr_yer_defaults.sql', 'utf8');
 for (const rpc of ['create_employee_contract', 'create_employee_work_schedule', 'record_employee_attendance', 'create_employee_payroll_period', 'upsert_employee_payroll_entry']) assert.match(migration, new RegExp(`create or replace function public\\.${rpc}`));
 assert.equal((migration.match(/employee_hr\.manage/g) ?? []).length >= 5, true);
 assert.match(migration, /security definer/);
@@ -15,4 +16,10 @@ assert.match(admin, /\/hr/);
 assert.match(page, /HRErrorBoundary/);
 assert.match(page, /permissions\?\.includes\('employee_hr\.manage'\)/);
 assert.match(page, /data\.contracts \?\? \[\]/);
+assert.match(page, /currency: 'YER'/);
+assert.match(page, /timezone: 'Asia\/Aden'/);
+assert.match(page, /workDays: \[6, 0, 1, 2, 3, 4\]/);
+assert.match(defaults, /salary_currency set default 'YER'/);
+assert.match(defaults, /currency set default 'YER'/);
+assert.match(defaults, /timezone set default 'Asia\/Aden'/);
 console.log(JSON.stringify({ ok: true, checks: 21, sections: ['contracts', 'attendance', 'payroll'], protectedMutations: true, routeWired: true, runtimeBoundary: true }));
