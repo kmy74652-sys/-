@@ -32,7 +32,7 @@ assert.match(admin, /const canManageTasks = permissions\.includes\('tasks\.manag
 assert.match(admin, /canReadCosts=\{canReadTaskCosts\}/);
 assert.match(admin, /canProposeCosts=\{canProposeTaskCosts\}/);
 assert.match(admin, /canApproveCosts=\{canApproveTaskCosts\}/);
-assert.match(admin, /canReadCosts && <Text style=\{styles\.taskListCost\}/);
+assert.match(admin, /canReadCosts && <>[\s\S]*taskListCost/);
 assert.match(admin, /canManage=\{canManageTasks\}/);
 assert.doesNotMatch(admin, /canManage=\{canManageEmployees\}/);
 
