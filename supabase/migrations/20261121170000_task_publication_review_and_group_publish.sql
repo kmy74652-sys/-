@@ -29,7 +29,7 @@ ALTER TABLE public.task_publication_requests ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS task_publication_requests_read ON public.task_publication_requests;
 CREATE POLICY task_publication_requests_read
   ON public.task_publication_requests FOR SELECT TO authenticated
-  USING (public.has_org_permission(organization_id, 'tasks.manage', NULL::uuid));
+  USING (alshaari_private.has_permission(organization_id, 'tasks.manage', NULL::uuid));
 
 REVOKE ALL ON public.task_publication_requests FROM public, anon, authenticated;
 GRANT SELECT ON public.task_publication_requests TO authenticated;
@@ -51,7 +51,7 @@ DECLARE
   v_snapshot jsonb;
   v_request_id uuid;
 BEGIN
-  IF v_user IS NULL OR NOT public.has_org_permission(p_organization_id, 'tasks.manage', NULL::uuid) THEN
+  IF v_user IS NULL OR NOT alshaari_private.has_permission(p_organization_id, 'tasks.manage', NULL::uuid) THEN
     RAISE EXCEPTION USING errcode='42501', message='permission_denied';
   END IF;
   IF p_due_at IS NULL OR p_due_at <= now() THEN
