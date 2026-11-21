@@ -136,7 +136,6 @@ export default function TasksScreen() {
   const [reportStatusFilter, setReportStatusFilter] = useState<'all' | 'ready' | 'uploaded' | 'approved'>('all');
   const [branchFilter, setBranchFilter] = useState('');
   const [positionFilter, setPositionFilter] = useState<Task['position_code'] | 'all'>('all');
-  const [previewTaskId, setPreviewTaskId] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [inAppNotification, setInAppNotification] = useState<{ taskId: string; title: string } | null>(null);
@@ -661,32 +660,6 @@ function StructuredAssignmentDescription({ value }: { value: string }) {
     </View>)}
   </View>;
 }
-
-function TaskStructuredPreview({ task, formatDate }: { task: Task; formatDate: (value: string) => string }) {
-  const reportNames = task.report_forms.map((form) => form.title).filter(Boolean);
-  return <View style={styles.taskPreview}>
-    <Text style={styles.taskPreviewTitle}>ملخص المهمة</Text>
-    <View style={styles.previewFields}>
-      <PreviewField label="اسم المهمة" value={task.title} />
-      <PreviewField label="الحالة" value={statusLabels[task.status]} />
-      <PreviewField label="الأولوية" value={priorityLabels[task.priority]} />
-      <PreviewField label="حالة الوصول" value={deliveryLabels[task.delivery_status]} />
-      <PreviewField label="المنصب" value={task.position_code ? positionLabels[task.position_code] : 'غير محدد'} />
-      <PreviewField label="الفرع" value={task.branch_name || 'كل الفروع'} />
-      <PreviewField label="بداية التنفيذ" value={formatDate(task.starts_at)} />
-      <PreviewField label="الموعد النهائي" value={formatDate(task.due_at)} />
-      <PreviewField label="عدد خطوات التنفيذ" value={`${task.execution_steps.length} خطوات`} />
-      <PreviewField label="التقرير المرتبط" value={reportNames.length ? reportNames.join('، ') : task.report_schema.length ? `${task.report_schema.length} حقول تقرير` : 'لا يوجد تقرير مرتبط'} />
-    </View>
-    {!!task.description && <PreviewTextField label="وصف المهمة" value={task.description} />}
-    {!!task.task_instructions && <PreviewTextField label="تعليمات التنفيذ" value={task.task_instructions} />}
-    {task.proof_required && <PreviewTextField label="متطلبات الإثبات" value={task.proof_instructions || 'إرفاق دليل إنجاز مطلوب'} tone="warning" />}
-    {!!task.execution_steps.length && <View style={styles.previewSteps}><Text style={styles.previewFieldLabel}>خطوات التنفيذ</Text>{task.execution_steps.map((step, index) => <View key={step.id} style={styles.previewStepRow}><Text style={styles.previewStepNumber}>{index + 1}</Text><View style={styles.previewStepCopy}><Text style={styles.previewStepTitle}>{step.title}</Text><Text style={styles.previewStepMeta}>{step.required ? 'إلزامية' : 'اختيارية'}{step.completed ? ' · مكتملة' : ''}{step.evidence_required ? ' · تحتاج إثباتاً' : ''}</Text></View></View>)}</View>}
-  </View>;
-}
-
-function PreviewField({ label, value }: { label: string; value: string }) { return <View style={styles.previewField}><Text style={styles.previewFieldLabel}>{label}</Text><Text style={styles.previewFieldValue}>{value}</Text></View>; }
-function PreviewTextField({ label, value, tone }: { label: string; value: string; tone?: 'warning' }) { return <View style={[styles.previewTextField, tone === 'warning' && styles.previewWarning]}><Text style={styles.previewFieldLabel}>{label}</Text><Text style={styles.previewTextValue}>{value}</Text></View>; }
 
 const styles = StyleSheet.create({
   content: { padding: 12, paddingBottom: 32, gap: 12 },
