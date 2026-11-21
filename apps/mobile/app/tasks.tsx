@@ -117,6 +117,7 @@ export default function TasksScreen() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [canReview, setCanReview] = useState(false);
   const [canManage, setCanManage] = useState(false);
+  const [canManageReports, setCanManageReports] = useState(false);
   const [currentUserId, setCurrentUserId] = useState('');
   const [employeeRoleCode, setEmployeeRoleCode] = useState('accountant');
   const [employeeName, setEmployeeName] = useState('');
@@ -194,6 +195,7 @@ export default function TasksScreen() {
       const cachedNotifications = readSessionCache<Notification[]>('employee-notifications', cacheKey);
       setCanReview(canReviewNow);
       setCanManage(canManageNow);
+      setCanManageReports(permissions.has('report_forms.manage'));
       if (cachedTasks) {
         applyTaskRows(cachedTasks);
         setLoading(false);
@@ -509,7 +511,7 @@ export default function TasksScreen() {
         {!loading && <View style={styles.workTabs}><Pressable accessibilityRole="tab" accessibilityState={{ selected: !reportsOnly }} style={[styles.workTab, !reportsOnly && styles.workTabSelected]} onPress={() => router.replace({ pathname: '/tasks', params: { mode: 'mine' } })}><Text style={[styles.workTabText, !reportsOnly && styles.workTabTextSelected]}>المهام</Text></Pressable><Pressable accessibilityRole="tab" accessibilityState={{ selected: reportsOnly }} style={[styles.workTab, reportsOnly && styles.workTabSelected]} onPress={() => router.replace({ pathname: '/tasks', params: { view: 'reports', mode: 'mine' } })}><Text style={[styles.workTabText, reportsOnly && styles.workTabTextSelected]}>إعداد التقارير</Text></Pressable></View>}
         {!loading && reportsOnly && <><View style={styles.reportUploadHeader}><Text style={styles.reportUploadTitle}>تقارير المهام</Text><Text style={styles.reportUploadSubtitle}>التقارير التي صممتها الإدارة وربطتها بالمهام. افتح الحقول، عبئها، ثم أرسل التقرير للمراجعة.</Text></View><View style={styles.reportStatusTabs}>{([['all', 'الكل'], ['ready', 'جاهز للرفع'], ['uploaded', 'تم الرفع'], ['approved', 'معتمد']] as const).map(([value, label]) => <Pressable key={value} accessibilityRole="button" accessibilityState={{ selected: reportStatusFilter === value }} style={[styles.reportStatusTab, reportStatusFilter === value && styles.reportStatusTabSelected]} onPress={() => setReportStatusFilter(value)}><Text style={reportStatusFilter === value ? styles.reportStatusTabTextSelected : styles.reportStatusTabText}>{label}</Text></Pressable>)}</View></>}
         {!loading && !reportsOnly && <View style={styles.summaryRow}><View style={styles.summaryCard}><Text style={styles.summaryValue}>{employeeSummary.pending}</Text><Text style={styles.summaryLabel}>جديدة</Text></View><View style={styles.summaryCard}><Text style={styles.summaryValue}>{employeeSummary.active}</Text><Text style={styles.summaryLabel}>قيد التنفيذ</Text></View><View style={styles.summaryCard}><Text style={styles.summaryValue}>{employeeSummary.submitted}</Text><Text style={styles.summaryLabel}>بانتظار المراجعة</Text></View></View>}
-        {!loading && reportsOnly && <View style={styles.independentReportSection}><View style={styles.reportUploadHeader}><Text style={styles.reportUploadTitle}>تقارير مصمم التقارير</Text><Text style={styles.reportUploadSubtitle}>النماذج التي اعتمدتها الإدارة من مصمم التقارير. تعبئتها مستقلة عن المهام وتُرسل مرة واحدة للمراجعة.</Text></View><EmployeeDynamicReportsPanel branchId={employeeBranchId} /><View style={styles.reportUploadHeader}><Text style={styles.reportUploadTitle}>التقارير اليومية من الإدارة</Text><Text style={styles.reportUploadSubtitle}>تقرير مستقل عن المهام، يصل حسب الدور والفرع ويُرسل مرة واحدة للمراجعة.</Text></View><EmployeeRoleReportPanel roleCode={employeeRoleCode} branchId={employeeBranchId} employeeName={employeeName} /></View>}
+        {!loading && reportsOnly && <View style={styles.independentReportSection}><View style={styles.reportUploadHeader}><Text style={styles.reportUploadTitle}>تقارير مصمم التقارير</Text><Text style={styles.reportUploadSubtitle}>النماذج التي اعتمدتها الإدارة من مصمم التقارير. تعبئتها مستقلة عن المهام وتُرسل مرة واحدة للمراجعة.</Text></View><EmployeeDynamicReportsPanel branchId={employeeBranchId} canManageReports={canManageReports && canManage} /><View style={styles.reportUploadHeader}><Text style={styles.reportUploadTitle}>التقارير اليومية من الإدارة</Text><Text style={styles.reportUploadSubtitle}>تقرير مستقل عن المهام، يصل حسب الدور والفرع ويُرسل مرة واحدة للمراجعة.</Text></View><EmployeeRoleReportPanel roleCode={employeeRoleCode} branchId={employeeBranchId} employeeName={employeeName} /></View>}
         {loading && <View style={styles.loading}><ActivityIndicator size="large" color="#17324d" /><Text style={styles.muted}>جارٍ تحميل المهام…</Text></View>}
         {!loading && !reportsOnly && (canReview || canManage) && <View style={styles.modeTabs}>
           {([
