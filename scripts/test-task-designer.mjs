@@ -2,6 +2,9 @@ import { readFileSync } from 'node:fs';
 
 const sql = readFileSync('supabase/migrations/035_task_designer_multi_reports.sql', 'utf8');
 const decouplingMigration = readFileSync('supabase/migrations/079_decouple_task_report_fields.sql', 'utf8');
+const publicationMigration = readFileSync('supabase/migrations/20261121170000_task_publication_review_and_group_publish.sql', 'utf8');
+const publicationPanel = readFileSync('apps/mobile/components/TaskPublicationReviewPanel.tsx', 'utf8');
+const publicationClient = readFileSync('apps/mobile/lib/taskPublication.ts', 'utf8');
 const designer = readFileSync('apps/mobile/components/TaskDesigner.tsx', 'utf8');
 const organizational = readFileSync('apps/mobile/components/OrganizationalTaskDesigner.tsx', 'utf8');
 const library = readFileSync('apps/mobile/lib/taskDesigner.ts', 'utf8');
@@ -32,12 +35,12 @@ const checks = [
   ['preview can move and resize', designer.includes('PanResponder') && designer.includes('تغيير الحجم')],
   ['steps support touch reorder', designer.includes('StepDragHandle') && designer.includes('onDrop')],
   ['final template delete is guarded and copy/archive are hidden', admin.includes('حذف نهائي') && admin.includes('deleteTaskDesignerTemplate') && !admin.includes('نسخ القالب') && !admin.includes('setTaskDesignerTemplateActive') && admin.includes('canManageTaskLibrary') && library.includes("delete_task_designer_template")],
-  ['direct send targets the selected employee through the saved template', organizational.includes('selectedEmployeeId') && organizational.includes('مراجعة وإرسال المهمة') && admin.includes('createAdministrativeTask') && admin.includes('templateId: draft.id ?? null') && adminData.includes("'assign_task_from_template'")],
-  ['dispatch confirmation and idempotency are visible', organizational.includes('مراجعة وتأكيد الإرسال') && organizational.includes('dispatchKey') && adminData.includes('idempotencyKey') && admin.includes('idempotencyKey')],
+  ['designer targets a role and branch without selecting an employee', organizational.includes('eligibleCount') && organizational.includes('لا يلزم اختيار موظف بالاسم') && !organizational.includes('selectedEmployeeId') && organizational.includes('حفظ وإرسال للمراجعة الإدارية')],
+  ['publication waits for owner review before group delivery', publicationMigration.includes('pending_approval') && publicationMigration.includes('review_and_publish_task_request') && publicationMigration.includes("ra.role_code='owner'") && publicationMigration.includes('approved-template:') && publicationClient.includes('submit_task_publication_request') && publicationPanel.includes('اعتماد ونشر للموظفين') && admin.includes('TaskPublicationReviewPanel') && admin.includes('submitTaskPublicationRequest')],
   ['delivery milestones are persisted and shown', tasks.includes('delivery_status') && tasks.includes('حالة الوصول') && mobileData.includes('markTaskOpened') && sql.includes('task_activity_log')],
-  ['task management embeds the designer and uses the same save/send flow', admin.includes('onDesignerSave={saveDesignerTask}') && admin.includes('onDesignerSend={sendDesignerTask}') && admin.includes('＋ من مصمم المهام') && admin.includes('<OrganizationalTaskDesigner employees={data?.employees ?? []}')],
-  ['direct send preserves role and branch validation', organizational.includes('employee.assignments') && adminData.includes('employee_assignment_invalid') && admin.includes('branchId, assignedEmployeeId: employeeId')],
-  ['save dispatches the directed task immediately', organizational.includes('const saveResult = await onSave?.(draft)') && organizational.includes('saveResult?.templateId') && organizational.includes('await onSend?.({ ...draft') && admin.includes('تفاصيل التنفيذ المباشر:')],
+  ['task management embeds the designer and routes publication to review', admin.includes('onDesignerSave={saveDesignerTask}') && admin.includes('onDesignerSend={sendDesignerTask}') && admin.includes('＋ من مصمم المهام') && admin.includes('<OrganizationalTaskDesigner employees={data?.employees ?? []}') && admin.includes('await submitTaskPublicationRequest')],
+  ['publication validates eligible active role and branch recipients', publicationMigration.includes('m.is_active AND m.user_id IS NOT NULL') && publicationMigration.includes('ra.role_code=v_template.role_code') && publicationMigration.includes('invalid_task_branch')],
+  ['save snapshots the complete design before submitting it for review', organizational.includes('const saveResult = await onSave?.(draft)') && organizational.includes('saveResult?.templateId') && organizational.includes('await onSend?.({ ...draft') && publicationMigration.includes('template_snapshot') && publicationMigration.includes("'report_fields'")],
   ['employee task tab receives assigned tasks automatically', tasks.includes('task.assignee_employee_id === currentUserId') && tasks.includes('postgres_changes') && tasks.includes('assigned_to=eq.') && tasks.includes('load({ force: true })') && mobileData.includes('assignedTo?: string')],
   ['dynamic test cards stay hidden while designer tasks remain visible', tasks.includes('isDynamicTestTitle') && tasks.includes('!isDynamicTestTitle(task.title)') && tasks.includes('اختبار مهمة ديناميكية')],
   ['manual task assignment clears stale branch and matches role-specific assignments', admin.includes("roleCode: role, branchId: '', assignedEmployeeId: ''") && admin.includes('const employeesForDraft') && admin.includes('assignment.roleCode === draft.roleCode && (!draft.branchId || assignment.branchId === draft.branchId)')],
