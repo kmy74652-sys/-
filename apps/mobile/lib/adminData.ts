@@ -30,20 +30,36 @@ export type DashboardData = {
 
 function client() { if (!supabase) throw new Error('supabase_not_configured'); return supabase; }
 
-let dashboardCache: { value: DashboardData; loadedAt: number } | null = null;
-let dashboardRequest: Promise<DashboardData> | null = null;
+const dashboardCache = new Map<string, { value: DashboardData; loadedAt: number }>();
+const dashboardRequests = new Map<string, Promise<DashboardData>>();
 
 export async function loadDashboardData(options: { force?: boolean; maxAgeMs?: number } = {}): Promise<DashboardData> {
+  const db = client();
+  const [{ data: authData, error: authError }, { data: profileData, error: profileError }] = await Promise.all([
+    db.auth.getUser(),
+    db.rpc('mobile_my_profile'),
+  ]);
+  if (authError || !authData.user) throw authError ?? new Error('not_authenticated');
+  if (profileError) throw profileError;
+  const organizationId = (profileData as { employee?: { institutionId?: string } } | null)?.employee?.institutionId;
+  if (!organizationId) throw new Error('employee_not_active');
+
+  const cacheKey = `${authData.user.id}:${organizationId}`;
   const maxAgeMs = options.maxAgeMs ?? 30_000;
-  if (!options.force && dashboardCache && Date.now() - dashboardCache.loadedAt < maxAgeMs) return dashboardCache.value;
-  if (dashboardRequest) return dashboardRequest;
-  dashboardRequest = loadDashboardDataFresh();
+  const cached = dashboardCache.get(cacheKey);
+  if (!options.force && cached && Date.now() - cached.loadedAt < maxAgeMs) return cached.value;
+
+  let request = dashboardRequests.get(cacheKey);
+  if (!request) {
+    request = loadDashboardDataFresh();
+    dashboardRequests.set(cacheKey, request);
+  }
   try {
-    const value = await dashboardRequest;
-    dashboardCache = { value, loadedAt: Date.now() };
+    const value = await request;
+    dashboardCache.set(cacheKey, { value, loadedAt: Date.now() });
     return value;
   } finally {
-    dashboardRequest = null;
+    if (dashboardRequests.get(cacheKey) === request) dashboardRequests.delete(cacheKey);
   }
 }
 
