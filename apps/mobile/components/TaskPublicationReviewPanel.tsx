@@ -22,7 +22,7 @@ export default function TaskPublicationReviewPanel({ branches, onPublished }: Pr
   const [items, setItems] = useState<TaskPublicationRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState('');
-  const [note, setNote] = useState('');
+  const [notes, setNotes] = useState<Record<string, string>>({});
   const [error, setError] = useState('');
 
   const load = useCallback(async () => {
@@ -47,8 +47,8 @@ export default function TaskPublicationReviewPanel({ branches, onPublished }: Pr
   async function performReview(item: TaskPublicationRequest, approve: boolean) {
     setBusyId(item.id); setError('');
     try {
-      const count = await reviewTaskPublicationRequest(item.id, approve, note);
-      setNote('');
+      const count = await reviewTaskPublicationRequest(item.id, approve, notes[item.id] ?? '');
+      setNotes((current) => ({ ...current, [item.id]: '' }));
       await load();
       if (approve) {
         Alert.alert('تم الاعتماد والنشر', `وصلت المهمة إلى ${count} موظفاً مطابقاً.`);
@@ -97,7 +97,7 @@ export default function TaskPublicationReviewPanel({ branches, onPublished }: Pr
             {reportFields.length > 0 && <View style={styles.fieldList}><Text style={styles.fieldTitle}>حقول التقرير التي صممتها الإدارة</Text>{reportFields.map((field: any, index: number) => <Text key={field.key ?? index} style={styles.meta}>{index + 1}. {field.label ?? field.key} · {field.type ?? 'حقل نصي'} · {field.required ? 'إلزامي' : 'اختياري'}</Text>)}</View>}
             {!!designer?.continuous?.length && <Text style={styles.meta}>المهام المستمرة: {designer.continuous.join(' · ')}</Text>}
             {!!designer?.recommendations?.length && <Text style={styles.meta}>الضوابط: {designer.recommendations.join(' · ')}</Text>}
-            <TextInput value={note} onChangeText={setNote} placeholder="ملاحظة اعتماد أو سبب الرفض (اختياري)" style={styles.note} multiline />
+            <TextInput value={notes[item.id] ?? ''} onChangeText={(value) => setNotes((current) => ({ ...current, [item.id]: value }))} placeholder="ملاحظة اعتماد أو سبب الرفض لهذه المهمة (اختياري)" style={styles.note} multiline />
             <View style={styles.actions}>
               <Pressable disabled={Boolean(busyId)} style={styles.reject} onPress={() => void review(item, false)}><Text style={styles.rejectText}>{busyId === item.id ? 'جارٍ التنفيذ…' : 'رفض وإرجاع'}</Text></Pressable>
               <Pressable disabled={Boolean(busyId)} style={styles.approve} onPress={() => void review(item, true)}><Text style={styles.approveText}>{busyId === item.id ? 'جارٍ الاعتماد…' : 'اعتماد ونشر للموظفين'}</Text></Pressable>
