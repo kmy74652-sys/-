@@ -30,6 +30,7 @@ DECLARE
   v_schema jsonb;
   v_required boolean;
   v_override jsonb;
+  v_embedded_field_count integer := 0;
 BEGIN
   IF v_user IS NULL OR NOT public.has_org_permission(p_organization_id,'tasks.manage',NULL::uuid) THEN
     RAISE EXCEPTION USING errcode='42501', message='permission_denied';
@@ -73,6 +74,7 @@ BEGIN
   INTO v_schema
   FROM public.task_template_report_fields f
   WHERE f.template_id=v_t.id;
+  v_embedded_field_count := jsonb_array_length(v_schema);
 
   INSERT INTO public.tasks(
     organization_id,branch_id,title,description,expected_result,assigned_to,created_by,due_at,starts_at,
@@ -130,9 +132,7 @@ BEGIN
   INSERT INTO public.task_activity_log(task_id,actor_id,action,details)
   VALUES(v_task,v_user,'task_assigned',jsonb_build_object(
     'template_id',v_t.id,'template_version',v_t.version,'report_flow','multi_form',
-    'delivery','sent','embedded_report_fields',jsonb_array_length(
-      (SELECT coalesce(jsonb_agg(value),'[]'::jsonb) FROM jsonb_array_elements(v_schema) value)
-    )
+    'delivery','sent','embedded_report_fields',v_embedded_field_count
   ));
   RETURN v_task;
 EXCEPTION WHEN unique_violation THEN
