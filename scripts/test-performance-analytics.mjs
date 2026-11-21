@@ -14,4 +14,5 @@ assert(!sql.includes('employee_daily_tasks') && !sql.includes('org_roles') && !s
 assert(analytics.includes('assigned_at,received_at,opened_at') && analytics.includes('receivedTotalMs') && analytics.includes('openedTotalMs'), 'delivery timing reads production task timestamps');
 assert(analytics.includes(".is('deleted_at', null)") && analytics.includes('received >= assigned') && analytics.includes('opened >= received'), 'delivery timing excludes deleted and invalid intervals');
 assert(component.includes('زمن الاستلام والفتح') && component.includes('متوسط الاستلام') && component.includes('متوسط الفتح'), 'delivery timing report is visible in the performance dashboard');
-console.log(JSON.stringify({ ok: true, checks: 10, scope: 'employee-performance-analytics-and-delivery-timing' }));
+assert(component.includes('مقارنة سرعة فتح المهام') && component.includes('chartEmployees') && component.includes('setSelectedEmployeeId') && component.includes('accessibilityLabel'), 'interactive employee opening-speed chart is wired');
+console.log(JSON.stringify({ ok: true, checks: 11, scope: 'employee-performance-analytics-and-interactive-delivery-chart' }));
