@@ -198,10 +198,7 @@ export default function TasksScreen() {
         setNotice('تُعرض آخر بيانات ناجحة، جارٍ التحديث في الخلفية…');
       }
       if (cachedNotifications) setNotifications(cachedNotifications);
-      const [taskResult, notificationResult] = await Promise.allSettled([
-        listMyTasks(identity.employee.institutionId, canManage || canReview ? undefined : identity.userId),
-        listMyNotifications(),
-      ]);
+      const [taskResult, notificationResult] = await Promise.allSettled([listMyTasks(identity.employee.institutionId, canManage || canReview ? undefined : identity.userId), listMyNotifications()]);
       if (taskResult.status === 'rejected') throw taskResult.reason;
       const taskRows = taskResult.value;
       const notificationRows = notificationResult.status === 'fulfilled' ? notificationResult.value : cachedNotifications ?? [];
@@ -576,41 +573,11 @@ export default function TasksScreen() {
               {!step.completed && step.evidence_required && <><Pressable style={styles.secondaryButton} onPress={()=>void chooseStepEvidence(task,step.id)}><Text style={styles.secondaryText}>{stepAttachments[task.id]?.[step.id]?.name ?? 'اختيار إثبات للخطوة'}</Text></Pressable>{!!stepAttachments[task.id]?.[step.id] && <Text style={styles.meta}>المرفق جاهز: {stepAttachments[task.id][step.id].name}</Text>}</>}
               {!step.completed && <Pressable disabled={busyTask===task.id || (step.evidence_required&&!stepAttachments[task.id]?.[step.id])} style={[styles.primaryButton,{opacity:step.evidence_required&&!stepAttachments[task.id]?.[step.id]?0.5:1}]} onPress={()=>void mutate(task,()=>completeTaskExecutionStep(step.id,stepAttachments[task.id]?.[step.id]?[stepAttachments[task.id][step.id].id]:[]),'تم تسجيل إكمال الخطوة.') }><Text style={styles.primaryText}>إكمال الخطوة</Text></Pressable>}
             </View>)}</View>}
+            {!!task.report_forms.length || !!task.report_schema.length ? <View style={styles.reportSeparationNotice}><Text style={styles.reportSeparationTitle}>التقرير في تبويب إعداد التقارير</Text><Text style={styles.reportSeparationText}>تنفيذ المهمة وإكمال خطواتها هنا فقط. افتح تبويب «إعداد التقارير» لتعبئة التقرير وإرساله.</Text></View> : null}
             <Pressable style={styles.secondaryButton} onPress={() => void showTimeline(task)}><Text style={styles.secondaryText}>عرض السجل الزمني</Text></Pressable>
             {!!timeline[task.id]?.length && <View style={styles.timeline}>{timeline[task.id].map((entry) => <Text key={entry.id} style={styles.meta}>{formatDate(entry.created_at)} · {entry.status} · {entry.actor_name}{entry.note ? ` — ${entry.note}` : ''}</Text>)}</View>}
             </>}
 
-            {!reportsOnly && reportTask === task.id && (task.report_schema ?? []).filter((field) => isReportFieldVisible(field, draftValuesForTask(task))).map((field) => <ReportFieldInput
-              key={field.key} field={field} raw={drafts[task.id]?.[field.key] ?? ''}
-              attachments={attachments[task.id]?.[field.key] ?? []} calculated={calculatedValue(task.id, field)} calculationError={calculationError(task.id, field)}
-              rows={field.type === 'table' ? tableRows(task.id, field) : []}
-              onDraftChange={(value) => setDrafts((current) => ({ ...current, [task.id]: { ...current[task.id], [field.key]: value } }))}
-              onTableChange={(rows) => updateTable(task.id, field, rows)}
-              onChooseAttachment={() => void chooseAttachment(task, field.key)}
-            />)}
-
-            {!reportsOnly && (!!task.report_forms.length || (!!task.report_schema?.length && ['in_progress', 'rejected'].includes(task.status))) && <Text style={styles.cardSectionLabel}>3 · عبّئ التقرير وأرسله</Text>}
-            {!reportsOnly && !!task.report_forms.length && ['in_progress', 'rejected'].includes(task.status) && (() => { const firstForm = task.report_forms.find((form) => Boolean(form.snapshot_id) && !['submitted', 'approved'].includes(form.status ?? '')); const snapshotId = firstForm?.snapshot_id; return firstForm && snapshotId ? <Pressable accessibilityRole="button" style={styles.reportQuickButton} onPress={() => { setError(''); setActiveReportForm({ taskId: task.id, snapshotId }); }}><Text style={styles.reportQuickTitle}>التقرير المطلوب من الإدارة</Text><Text style={styles.reportQuickText}>اضغط هنا لفتح النموذج وتعبئته ثم إرساله للمراجعة</Text><Text style={styles.reportQuickAction}>فتح التقرير الآن ←</Text></Pressable> : null; })()}
-            {!reportsOnly && !!task.report_forms.length && <View style={styles.timeline}><Text style={styles.fieldLabel}>نماذج التقارير المرتبطة</Text>{task.report_forms.map((form)=>{
-              const key=formDraftKey(task,form); const opened=activeReportForm?.taskId===task.id&&activeReportForm.snapshotId===form.snapshot_id;
-              const statusLabel=form.status==='submitted'?'بانتظار مراجعة هذا النموذج':form.status==='approved'?'تم اعتماد هذا النموذج':form.status==='returned'?'أُعيد هذا النموذج للتعديل':form.required?'مطلوب الإرسال':'اختياري';
-              const canEdit=['in_progress','rejected','submitted'].includes(task.status)&&form.status!=='submitted'&&form.status!=='approved';
-              return <View key={form.snapshot_id} style={styles.reportCard}>
-                <View style={styles.taskHeading}><Text style={styles.taskTitle}>{form.title}</Text><Text style={[styles.badge,form.status==='approved'?styles.goodBadge:form.status==='returned'?styles.warnBadge:styles.neutralBadge]}>{statusLabel}</Text></View>
-                <Text style={styles.meta}>{form.required?'إلزامي لإكمال المهمة':'اختياري'} · {form.schema.length} حقول</Text>
-                {!!form.review_note&&form.status==='returned'&&<Text style={styles.proof}>ملاحظة المراجع: {form.review_note}</Text>}
-                {form.status==='submitted'&&<ReportReadOnly fields={form.schema} values={form.values}/>}
-                {canReview&&form.status==='submitted'&&form.report_id&&<><TextInput style={styles.input} value={reviewNote} onChangeText={setReviewNote} placeholder="ملاحظة المراجعة" accessibilityLabel={`ملاحظة مراجعة ${form.title}`}/><Pressable disabled={busyTask===task.id} style={styles.primaryButton} onPress={()=>void mutate(task,()=>reviewTaskFormReport(form.report_id!,'approved',reviewNote||null),`تم اعتماد «${form.title}» فقط.`)}><Text style={styles.primaryText}>اعتماد هذا التقرير</Text></Pressable><Pressable disabled={busyTask===task.id||!reviewNote.trim()} style={styles.secondaryButton} onPress={()=>void mutate(task,()=>reviewTaskFormReport(form.report_id!,'returned',reviewNote),`أعيد «${form.title}» للتعديل.`)}><Text style={styles.secondaryText}>إرجاع هذا التقرير مع سبب</Text></Pressable></>}
-                {canEdit&&!opened&&<Pressable style={styles.secondaryButton} onPress={()=>{setError('');setActiveReportForm({taskId:task.id,snapshotId:form.snapshot_id});}}><Text style={styles.secondaryText}>{form.status==='returned'?'تعديل وإعادة إرسال':'فتح هذا التقرير'}</Text></Pressable>}
-                {canEdit&&opened&&<>{form.schema.filter((field)=>isReportFieldVisible(field,valuesForReportForm(task,form))).map((field)=><ReportFieldInput key={field.key} field={field} raw={drafts[key]?.[field.key]??''} attachments={attachments[key]?.[field.key]??[]} calculated={evaluateReportField(field,form.schema,valuesForReportForm(task,form)).value} calculationError={evaluateReportField(field,form.schema,valuesForReportForm(task,form)).error} rows={field.type==='table'?tableRows(key,field):[]} onDraftChange={(value)=>setDrafts((current)=>({...current,[key]:{...current[key],[field.key]:value}}))} onTableChange={(rows)=>updateTable(key,field,rows)} onChooseAttachment={()=>void chooseFormAttachment(task,form,field.key)}/>)}<Pressable style={styles.secondaryButton} onPress={()=>void saveSeparateDraft(task,form)}><Text style={styles.secondaryText}>حفظ المسودة</Text></Pressable><Pressable disabled={busyTask===task.id} style={styles.primaryButton} onPress={()=>submitSeparateReport(task,form)}><Text style={styles.primaryText}>{busyTask===task.id?'جارٍ الإرسال…':'إرسال هذا التقرير فقط'}</Text></Pressable><Pressable style={styles.secondaryButton} onPress={()=>setActiveReportForm(null)}><Text style={styles.secondaryText}>إغلاق النموذج</Text></Pressable></>}
-              </View>;
-            })}</View>}
-
-            {!reportsOnly && task.report_flow !== 'multi_form' && !!task.report_schema?.length && ['in_progress', 'rejected'].includes(task.status) && reportTask !== task.id && (
-              <Pressable accessibilityRole="button" style={styles.secondaryButton} onPress={() => { setError(''); setReportTask(task.id); }}>
-                <Text style={styles.secondaryText}>كتابة التقرير</Text>
-              </Pressable>
-            )}
 
             {!reportsOnly && <View style={styles.actions}><Text style={styles.cardSectionLabel}>الإجراء التالي</Text>
               {['pending', 'rejected'].includes(task.status) && (
@@ -618,18 +585,11 @@ export default function TasksScreen() {
                   <Text style={styles.primaryText}>بدء التنفيذ</Text>
                 </Pressable>
               )}
+              {!!task.report_forms.length || !!task.report_schema.length ? <Pressable style={styles.secondaryButton} onPress={() => router.replace({ pathname: '/tasks', params: { view: 'reports', mode: 'mine' } })}><Text style={styles.secondaryText}>فتح تبويب التقارير</Text></Pressable> : null}
               {task.status === 'in_progress' && !task.report_schema?.length && !task.report_forms.length && (
                 <Pressable disabled={busyTask === task.id} style={styles.primaryButton} onPress={() => void mutate(task, () => submitTaskReport(task.id, {}), 'أرسلت المهمة للمراجعة.')}>
                   <Text style={styles.primaryText}>إرسال للمراجعة</Text>
                 </Pressable>
-              )}
-              {reportTask === task.id && (
-                <>
-                  <Pressable disabled={busyTask === task.id} style={styles.primaryButton} onPress={() => submitReport(task)}>
-                    <Text style={styles.primaryText}>{busyTask === task.id ? 'جارٍ الإرسال…' : 'إرسال التقرير'}</Text>
-                  </Pressable>
-                  <Pressable style={styles.secondaryButton} onPress={() => setReportTask('')}><Text style={styles.secondaryText}>إلغاء</Text></Pressable>
-                </>
               )}
               {canReview && task.report_flow !== 'multi_form' && task.status === 'submitted' && (
                 <>
@@ -703,6 +663,9 @@ const styles = StyleSheet.create({
   workTabText: { color: '#39556a', fontWeight: '800', fontSize: 13 },
   workTabTextSelected: { color: '#17324d', fontWeight: '900' },
   reportUploadHeader: { backgroundColor: '#fff', borderRadius: 14, borderWidth: 1, borderColor: '#e2e9eb', padding: 14, gap: 5 },
+  reportSeparationNotice: { backgroundColor: '#eef6f2', borderColor: '#cce4d6', borderWidth: 1, borderRadius: 12, padding: 12, gap: 4, marginTop: 8 },
+  reportSeparationTitle: { color: '#245d43', fontSize: 14, fontWeight: '900', textAlign: 'right' },
+  reportSeparationText: { color: '#47715d', fontSize: 12, lineHeight: 19, textAlign: 'right' },
   reportUploadTitle: { color: '#17324d', fontSize: 17, fontWeight: '900', textAlign: 'right' },
   reportUploadSubtitle: { color: '#718394', fontSize: 12, lineHeight: 20, textAlign: 'right' },
   reportStatusTabs: { flexDirection: 'row-reverse', gap: 7, paddingVertical: 2 },
