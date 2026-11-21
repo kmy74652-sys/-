@@ -78,20 +78,23 @@ export default function TaskPublicationReviewPanel({ branches, onPublished }: Pr
           const designer = readDesignerDescription(snapshot.description);
           const rows = Array.isArray(designer?.rows) ? designer.rows : [];
           const steps = Array.isArray(snapshot.steps) ? snapshot.steps : [];
+          const reportFields = Array.isArray(snapshot.report_fields) ? snapshot.report_fields : [];
           const branchName = branches.find((branch) => branch.id === item.branch_id)?.name ?? (item.branch_id ? 'فرع غير معروف' : 'جميع الفروع');
           return <View key={item.id} style={styles.card}>
             <Text style={styles.taskTitle}>{snapshot.title ?? 'مهمة بدون عنوان'}</Text>
             <Text style={styles.meta}>التصنيف: {roleNames[item.role_code] ?? item.role_code} · الفرع: {branchName}</Text>
-            <Text style={styles.meta}>عدد صفوف الجدول: {rows.length || steps.length} · الحقول: {Array.isArray(snapshot.report_fields) ? snapshot.report_fields.length : 0}</Text>
+            <Text style={styles.meta}>عدد صفوف الجدول: {rows.length || steps.length} · الحقول: {reportFields.length}</Text>
+            {!!designer?.schedule?.summary && <Text style={styles.meta}>الدوام: {designer.schedule.summary}</Text>}
             <Text style={styles.meta}>موعد التسليم: {new Date(item.due_at).toLocaleString('ar')}</Text>
             {rows.length > 0 ? <View style={styles.table}>
-              <View style={styles.tableHeader}><Text style={[styles.cell, styles.headerCell]}>الفترة</Text><Text style={[styles.cell, styles.headerCell]}>المهمة والمسؤولية</Text><Text style={[styles.cell, styles.headerCell]}>مؤشر الأداء</Text></View>
+              <View style={styles.tableHeader}><Text style={[styles.cell, styles.headerCell]}>الفترة</Text><Text style={[styles.cell, styles.headerCell]}>المهمة والمسؤولية</Text><Text style={[styles.cell, styles.headerCell]}>مؤشر الأداء</Text><Text style={[styles.cell, styles.headerCell]}>الإثبات</Text></View>
               {rows.map((row: any, index: number) => <View key={index} style={styles.tableRow}>
                 <Text style={styles.cell}>{row.timeSlot ?? '—'}</Text>
                 <Text style={styles.cell}>{row.responsibility ?? '—'}{Array.isArray(row.subItems) && row.subItems.length ? '\n' + row.subItems.map((v: string) => '• ' + v).join('\n') : ''}</Text>
                 <Text style={styles.cell}>{row.kpiIndicator ?? '—'}</Text>
               </View>)}
             </View> : <View style={styles.table}>{steps.map((step: any, index: number) => <Text key={index} style={styles.meta}>{index + 1}. {step.title} — {step.instructions ?? ''}</Text>)}</View>}
+            {reportFields.length > 0 && <View style={styles.fieldList}><Text style={styles.fieldTitle}>حقول التقرير التي صممتها الإدارة</Text>{reportFields.map((field: any, index: number) => <Text key={field.key ?? index} style={styles.meta}>{index + 1}. {field.label ?? field.key} · {field.type ?? 'حقل نصي'} · {field.required ? 'إلزامي' : 'اختياري'}</Text>)}</View>}
             {!!designer?.continuous?.length && <Text style={styles.meta}>المهام المستمرة: {designer.continuous.join(' · ')}</Text>}
             {!!designer?.recommendations?.length && <Text style={styles.meta}>الضوابط: {designer.recommendations.join(' · ')}</Text>}
             <TextInput value={note} onChangeText={setNote} placeholder="ملاحظة اعتماد أو سبب الرفض (اختياري)" style={styles.note} multiline />
@@ -122,6 +125,8 @@ const styles = StyleSheet.create({
   tableRow: { flexDirection: 'row-reverse', borderTopWidth: 1, borderTopColor: '#e3e9ed' },
   cell: { flex: 1, color: '#31495d', textAlign: 'right', fontSize: 11, lineHeight: 17, padding: 6, borderLeftWidth: 1, borderLeftColor: '#e3e9ed' },
   headerCell: { color: '#17324d', fontWeight: '900' },
+  fieldList: { backgroundColor: '#f7f9fb', borderWidth: 1, borderColor: '#e0e7eb', borderRadius: 8, padding: 8, gap: 5 },
+  fieldTitle: { color: '#17324d', fontWeight: '900', textAlign: 'right', fontSize: 12 },
   note: { minHeight: 42, borderWidth: 1, borderColor: '#d5dfe4', borderRadius: 8, padding: 9, textAlign: 'right', color: '#17324d' },
   actions: { flexDirection: 'row-reverse', gap: 8 },
   reject: { flex: 1, backgroundColor: '#fff1ef', borderRadius: 8, padding: 11, alignItems: 'center' },
