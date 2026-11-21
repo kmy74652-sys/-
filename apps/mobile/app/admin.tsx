@@ -222,7 +222,7 @@ export default function AdminScreen() {
   }
   async function approveTaskCost(taskId: string, values: { budgetAmount: number; estimatedAmount: number; spentAmount: number; notes: string }) {
     const result = await approveAdministrativeTaskCost({ taskId, ...values });
-    updateTaskLocally(taskId, { ...values, costApprovedAt: result.approvedAt });
+    updateTaskLocally(taskId, { budgetAmount: values.budgetAmount, estimatedAmount: values.estimatedAmount, spentAmount: values.spentAmount, costNotes: values.notes, costApprovedAt: result.approvedAt });
   }
   async function saveDesignerTask(draft: TaskTemplateDraft) {
     const saved = await saveTaskDesignerTemplate(draft, taskCategories);
