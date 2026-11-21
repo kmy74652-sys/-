@@ -6,13 +6,12 @@ import AdenDeadlinePicker, { adenDateTimeToIso, currentAdenDateTime } from '../c
 import HomeDashboard from '../components/HomeDashboard';
 import AppShell, { type ShellTab } from '../components/AppShell';
 import { friendlyDataError, getMyEmployeeProfile, type MobileProfile } from '../lib/mobileData';
-import { approveAdministrativeTaskCost, createAdministrativeTask, loadDashboardData, roleLabel, statusLabel, type DashboardData } from '../lib/adminData';
+import { createAdministrativeTask, loadDashboardData, roleLabel, statusLabel, type DashboardData } from '../lib/adminData';
 import { supabase } from '../lib/supabase';
 import { loadOrganizationBranding } from '../lib/organizationBranding';
 import { listApprovedDesignerTemplates, type ReportTemplate } from '../lib/reportDesigner';
 import ReportDesigner from '../components/ReportDesigner';
 import { type TaskTemplateDraft } from '../components/TaskDesigner';
-import type { TaskCostDraft } from '../components/OrganizationalTaskDesigner';
 import OrganizationalTaskDesigner from '../components/OrganizationalTaskDesigner';
 import { deleteTaskDesignerTemplate, listApprovedTaskReportForms, listTaskDesignerCategories, listTaskDesignerTemplates, saveTaskDesignerTemplate, type StoredTaskTemplate, type TaskCategoryRow } from '../lib/taskDesigner';
 import { deleteManagedBranch, deleteManagedReport, deleteManagedTask, updateManagedTask } from '../lib/managementData';
@@ -204,12 +203,6 @@ export default function AdminScreen() {
             dueAt,
             priority: draft.priority,
             status: 'new' as const,
-            budgetAmount: 0,
-            estimatedAmount: 0,
-            spentAmount: 0,
-            costNotes: null,
-            costProposedAt: null,
-            costApprovedAt: null,
           }].sort((left, right) => (left.dueAt ?? '').localeCompare(right.dueAt ?? '')),
         };
         if (adminCacheKey.current) writeSessionCache('admin-dashboard', adminCacheKey.current, next);
@@ -220,16 +213,12 @@ export default function AdminScreen() {
       setShowCreate(false); setNotice('تم إنشاء المهمة وإسنادها للموظف المحدد. ظهرت مباشرة في القائمة.');
     } catch (cause) { setError(friendlyDataError(cause, 'تعذر إنشاء المهمة. تأكد من وجود موظف نشط ضمن التصنيف والفرع المحددين.')); }
   }
-  async function approveTaskCost(taskId: string, values: { budgetAmount: number; estimatedAmount: number; spentAmount: number; notes: string }) {
-    const result = await approveAdministrativeTaskCost({ taskId, ...values });
-    updateTaskLocally(taskId, { budgetAmount: values.budgetAmount, estimatedAmount: values.estimatedAmount, spentAmount: values.spentAmount, costNotes: values.notes, costApprovedAt: result.approvedAt });
-  }
   async function saveDesignerTask(draft: TaskTemplateDraft) {
     const saved = await saveTaskDesignerTemplate(draft, taskCategories);
     await load(true);
     return saved;
   }
-  async function sendDesignerTask(draft: TaskTemplateDraft, employeeId: string, branchId: string | null, dueAt: string, idempotencyKey: string, cost: TaskCostDraft) {
+  async function sendDesignerTask(draft: TaskTemplateDraft, employeeId: string, branchId: string | null, dueAt: string, idempotencyKey: string) {
     const linkedReport = draft.reports[0];
     const executionDetails = draft.steps.map((step, index) => `${index + 1}. ${step.title}\n${step.instructions || 'تأكيد الإنجاز'}`).join('\n');
     await createAdministrativeTask({
@@ -246,18 +235,11 @@ export default function AdminScreen() {
       reportRequired: Boolean(linkedReport?.approvedVersionId),
       reportOverrides: draft.reports,
       idempotencyKey,
-      budgetAmount: cost.budgetAmount,
-      estimatedAmount: cost.estimatedAmount,
-      spentAmount: cost.spentAmount,
-      costNotes: cost.notes,
     });
     await load(true);
   }
   const canManageTasks = permissions.includes('tasks.manage');
   const canManageTaskLibrary = permissions.includes('task_library.manage');
-  const canReadTaskCosts = permissions.includes('task_costs.read');
-  const canProposeTaskCosts = permissions.includes('task_costs.propose');
-  const canApproveTaskCosts = permissions.includes('task_costs.approve');
   const canManageReports = permissions.includes('report_forms.manage');
   const canViewReports = permissions.includes('reports.read_all') || permissions.includes('tasks.review');
   const canManageEmployees = Boolean(profile?.roles.some((role) => role.code === 'owner' || role.code === 'admin_followup') && permissions.includes('employees.manage'));
@@ -289,7 +271,7 @@ export default function AdminScreen() {
     {!!notice && <Text style={styles.notice}>{notice}</Text>}
 
       {section === 'overview' && !profile && <Overview counts={counts} data={data} fmt={fmt} onSection={setSection} onSettings={() => router.push('/settings')} onHR={() => router.push('/hr' as never)} canDesign={canManageTaskLibrary} canDesignReports={canManageReports} />}
-      {section === 'tasks' && <TasksSection data={data} designerTemplates={designerTemplates} canDesign={canManageTaskLibrary} showCreate={showCreate} setShowCreate={setShowCreate} draft={draft} setDraft={setDraft} createTask={createTask} fmt={fmt} onOpenTasks={() => router.push('/tasks')} canManage={canManageTasks} canReadCosts={canReadTaskCosts} canProposeCosts={canProposeTaskCosts} canApproveCosts={canApproveTaskCosts} institutionId={profile?.institutionId ?? ''} onReload={load} onTaskUpdated={updateTaskLocally} onTaskDeleted={removeTaskLocally} onTaskRestored={restoreTaskLocally} onTaskCostApproved={approveTaskCost} onDesignerSave={saveDesignerTask} onDesignerSend={sendDesignerTask} />}
+      {section === 'tasks' && <TasksSection data={data} designerTemplates={designerTemplates} canDesign={canManageTaskLibrary} showCreate={showCreate} setShowCreate={setShowCreate} draft={draft} setDraft={setDraft} createTask={createTask} fmt={fmt} onOpenTasks={() => router.push('/tasks')} canManage={canManageTasks} institutionId={profile?.institutionId ?? ''} onReload={load} onTaskUpdated={updateTaskLocally} onTaskDeleted={removeTaskLocally} onTaskRestored={restoreTaskLocally} onDesignerSave={saveDesignerTask} onDesignerSend={sendDesignerTask} />}
       {section === 'task-designer' && (canManageTaskLibrary ? <TaskTemplatesSection templates={taskDesignerTemplates} categories={taskCategories} employees={data?.employees ?? []} branches={data?.branches ?? []} onReload={load} /> : <Unavailable title="الجدول التنظيمي" text="لا تملك صلاحية إدارة الجداول التنظيمية." />)}
       {section === 'report-designer' && (canManageReports ? <ReportDesigner organizationId={profile?.institutionId ?? ''} /> : <Unavailable title="مصمم التقارير" text="لا تملك صلاحية إدارة نماذج التقارير." />)}
       {section === 'reports' && (canViewReports ? <ReportsSection data={data} fmt={fmt} onOpenTasks={() => router.push('/tasks')} canManage={canManageEmployees} institutionId={profile?.institutionId ?? ''} onReportUpdated={updateReportLocally} onReportDeleted={removeReportLocally} /> : <Unavailable title="تقارير الموظفين" text="لا تملك صلاحية قراءة تقارير المؤسسة أو مراجعتها." />)}
@@ -312,11 +294,10 @@ function Overview({ counts, data, fmt, onSection, onSettings, onHR, canDesign, c
   <View style={styles.activityPreview}><Text style={styles.sectionTitle}>آخر النشاط</Text>{(data?.activity ?? []).slice(0,3).map((item)=><View style={styles.activityPreviewRow} key={item.id}><Text style={styles.cardTitle}>{item.action}</Text><Text style={styles.meta}>{fmt(item.createdAt)}</Text></View>)}{!(data?.activity ?? []).length&&<Text style={styles.muted}>لا توجد أنشطة حديثة.</Text>}</View>
 </>; }
 
-function TasksSection({ data, designerTemplates, canDesign, showCreate, setShowCreate, draft, setDraft, createTask, fmt, onOpenTasks, canManage, canReadCosts, canProposeCosts, canApproveCosts, institutionId, onReload, onTaskUpdated, onTaskDeleted, onTaskRestored, onTaskCostApproved, onDesignerSave, onDesignerSend }: any) {
+function TasksSection({ data, designerTemplates, canDesign, showCreate, setShowCreate, draft, setDraft, createTask, fmt, onOpenTasks, canManage, institutionId, onReload, onTaskUpdated, onTaskDeleted, onTaskRestored, onTaskCostApproved, onDesignerSave, onDesignerSend }: any) {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [edits, setEdits] = useState<Record<string, { title: string; description: string }>>({});
-  const [costEdits, setCostEdits] = useState<Record<string, { budget: string; estimated: string; spent: string; notes: string }>>({});
   const [busyMutation, setBusyMutation] = useState<string | null>(null);
   const [showDesigner, setShowDesigner] = useState(false);
   const tasks = data?.tasks ?? [];
@@ -353,9 +334,9 @@ function TasksSection({ data, designerTemplates, canDesign, showCreate, setShowC
     </View>
     <View style={styles.taskSectionHeading}>
       <View style={styles.taskHeadingCopy}><Text style={styles.sectionTitle}>قائمة التكليفات</Text><Text style={styles.taskSectionHint}>المهام المسجلة في المؤسسة</Text></View>
-      <View style={styles.actionsRow}>{canDesign ? <Pressable style={styles.taskCreateButton} onPress={() => { setShowDesigner(!showDesigner); setShowCreate(false); }}><Text style={styles.taskCreateButtonText}>{showDesigner ? 'إغلاق النموذج' : '＋ من مصمم المهام — إنشاء تكليف وتكلفة'}</Text></Pressable> : <Pressable style={styles.taskCreateButton} onPress={() => { setShowCreate(!showCreate); setShowDesigner(false); }}><Text style={styles.taskCreateButtonText}>{showCreate?'إغلاق':'＋ إنشاء تكليف'}</Text></Pressable>}</View>
+      <View style={styles.actionsRow}>{canDesign ? <Pressable style={styles.taskCreateButton} onPress={() => { setShowDesigner(!showDesigner); setShowCreate(false); }}><Text style={styles.taskCreateButtonText}>{showDesigner ? 'إغلاق النموذج' : '＋ من مصمم المهام — إنشاء تكليف'}</Text></Pressable> : <Pressable style={styles.taskCreateButton} onPress={() => { setShowCreate(!showCreate); setShowDesigner(false); }}><Text style={styles.taskCreateButtonText}>{showCreate?'إغلاق':'＋ إنشاء تكليف'}</Text></Pressable>}</View>
     </View>
-    {canDesign && showDesigner && <View style={styles.card}><Text style={styles.formTitle}>إرسال مهمة من المصمم</Text><Text style={styles.copy}>صمّم المهمة وحدد المسؤول والفرع والموعد والميزانية والمصروفات من مسار واحد، ثم احفظها وأرسلها مباشرة إلى تبويب مهام الموظف.</Text><OrganizationalTaskDesigner employees={data?.employees ?? []} branches={data?.branches ?? []} canManage={canManage} canProposeCosts={canProposeCosts} canApproveCosts={canApproveCosts} onSave={onDesignerSave} onSend={onDesignerSend} onList={onReload} /></View>}
+    {canDesign && showDesigner && <View style={styles.card}><Text style={styles.formTitle}>إرسال مهمة من المصمم</Text><Text style={styles.copy}>صمّم المهمة وحدد المسؤول والفرع والموعد وخطوات التنفيذ، ثم احفظها وأرسلها مباشرة إلى تبويب مهام الموظف.</Text><OrganizationalTaskDesigner employees={data?.employees ?? []} branches={data?.branches ?? []} canManage={canManage} onSave={onDesignerSave} onSend={onDesignerSend} onList={onReload} /></View>}
     {showCreate && <View style={styles.form}>
       <View style={styles.formTitleRow}><Text style={styles.formTitle}>بيانات التكليف الجديد</Text><Text style={styles.formStep}>1 · التفاصيل</Text></View>
       {[['title', 'عنوان المهمة'], ['description', 'وصف وتعليمات التنفيذ']].map(([key, label]) => <TextInput key={key} style={styles.input} placeholder={label} value={draft[key]} onChangeText={(value) => setDraft({ ...draft, [key]: value })} multiline={key === 'description'} />)}
@@ -379,8 +360,7 @@ function TasksSection({ data, designerTemplates, canDesign, showCreate, setShowC
       return <View style={styles.taskListCard} key={task.id}>
         <View style={styles.taskListTop}><View style={[styles.taskStatusDot,{backgroundColor:late?'#c84b4b':task.status==='completed_approved'?'#29936a':task.status==='report_submitted'?'#d49a27':'#3977b8'}]} /><Text style={styles.taskListTitle}>{task.title}</Text><Text style={[styles.taskStatusBadge,late?styles.taskStatusLate:task.status==='completed_approved'?styles.taskStatusDone:task.status==='report_submitted'?styles.taskStatusReview:styles.taskStatusActive]}>{late?'متأخرة':statusLabel(task.status)}</Text></View>
         <Text style={styles.taskListMeta}>{task.branchName || 'كل الفروع'} · {task.assignedTo ? 'مُسندة لموظف' : 'بانتظار الإسناد'} · {priorityLabels[task.priority] || task.priority}</Text>
-        <Text style={styles.taskListMeta}>الوصول: {task.status === 'new' ? 'تم الإرسال — بانتظار فتح الموظف' : task.status === 'received' ? 'تم الاستلام' : task.status === 'in_progress' ? 'تم الفتح وبدأ التنفيذ' : task.status === 'report_submitted' ? 'تم التنفيذ وإرسال التقرير' : statusLabel(task.status)}</Text>{canReadCosts && <><Text style={styles.taskListCost}>التكلفة: الميزانية المعتمدة {Number(task.budgetAmount || 0).toLocaleString('ar-SA')} ريال يمني · التقديري {Number(task.estimatedAmount || 0).toLocaleString('ar-SA')} ريال يمني · المصروف {Number(task.spentAmount || 0).toLocaleString('ar-SA')} ريال يمني · المتبقي {Math.max(0, Number(task.budgetAmount || 0) - Number(task.spentAmount || 0)).toLocaleString('ar-SA')} ريال يمني</Text><Text style={styles.taskListMeta}>{task.costProposedAt && (!task.costApprovedAt || new Date(task.costProposedAt).getTime() > new Date(task.costApprovedAt).getTime()) ? 'يوجد مقترح تكلفة بانتظار اعتماد صاحب المؤسسة' : task.costApprovedAt ? 'التكلفة معتمدة من صاحب المؤسسة' : 'لم تُسجل تكلفة لهذه المهمة بعد'}</Text></>}{canApproveCosts && <View style={styles.costApprovalCard}><Text style={styles.formTitle}>اعتماد تكلفة المهمة</Text><View style={{ gap: 8 }}><TextInput style={styles.input} keyboardType="decimal-pad" placeholder="الميزانية المعتمدة (ريال يمني)" value={costEdits[task.id]?.budget ?? String(task.budgetAmount || 0)} onChangeText={(value) => setCostEdits((current) => ({ ...current, [task.id]: { budget: value, estimated: current[task.id]?.estimated ?? String(task.estimatedAmount || 0), spent: current[task.id]?.spent ?? String(task.spentAmount || 0), notes: current[task.id]?.notes ?? task.costNotes ?? '' } }))} /><TextInput style={styles.input} keyboardType="decimal-pad" placeholder="القيمة التقديرية" value={costEdits[task.id]?.estimated ?? String(task.estimatedAmount || 0)} onChangeText={(value) => setCostEdits((current) => ({ ...current, [task.id]: { budget: current[task.id]?.budget ?? String(task.budgetAmount || 0), estimated: value, spent: current[task.id]?.spent ?? String(task.spentAmount || 0), notes: current[task.id]?.notes ?? task.costNotes ?? '' } }))} /><TextInput style={styles.input} keyboardType="decimal-pad" placeholder="المصروف الفعلي" value={costEdits[task.id]?.spent ?? String(task.spentAmount || 0)} onChangeText={(value) => setCostEdits((current) => ({ ...current, [task.id]: { budget: current[task.id]?.budget ?? String(task.budgetAmount || 0), estimated: current[task.id]?.estimated ?? String(task.estimatedAmount || 0), spent: value, notes: current[task.id]?.notes ?? task.costNotes ?? '' } }))} /></View><TextInput style={styles.input} placeholder="ملاحظات التكلفة" value={costEdits[task.id]?.notes ?? task.costNotes ?? ''} onChangeText={(value) => setCostEdits((current) => ({ ...current, [task.id]: { budget: current[task.id]?.budget ?? String(task.budgetAmount || 0), estimated: current[task.id]?.estimated ?? String(task.estimatedAmount || 0), spent: current[task.id]?.spent ?? String(task.spentAmount || 0), notes: value } }))} /><Pressable disabled={busyMutation === `cost:${task.id}`} style={styles.primary} onPress={() => void (async () => { const values = { budgetAmount: Number(costEdits[task.id]?.budget ?? task.budgetAmount ?? 0), estimatedAmount: Number(costEdits[task.id]?.estimated ?? task.estimatedAmount ?? 0), spentAmount: Number(costEdits[task.id]?.spent ?? task.spentAmount ?? 0), notes: costEdits[task.id]?.notes ?? task.costNotes ?? '' }; if ([values.budgetAmount, values.estimatedAmount, values.spentAmount].some((value) => !Number.isFinite(value) || value < 0)) { Alert.alert('قيمة غير صحيحة', 'أدخل مبالغ صحيحة غير سالبة.'); return; } setBusyMutation(`cost:${task.id}`); try { await onTaskCostApproved(task.id, values); Alert.alert('تم الاعتماد', 'تم اعتماد تكلفة المهمة وتسجيل صاحب الاعتماد ووقته.'); } catch (error) { Alert.alert('تعذر اعتماد التكلفة', (error as Error)?.message ?? 'تحقق من الصلاحية والاتصال.'); } finally { setBusyMutation(null); } })()}><Text style={styles.primaryText}>{busyMutation === `cost:${task.id}` ? 'جارٍ الاعتماد…' : 'اعتماد الميزانية والمصروفات'}</Text></Pressable></View>}
-        <View style={styles.taskListFooter}><Text style={styles.taskDueLabel}>الموعد: {fmt(task.dueAt)}</Text><Text style={styles.taskIdLabel}>#{String(task.id).slice(0,8)}</Text></View>
+        <Text style={styles.taskListMeta}>الوصول: {task.status === 'new' ? 'تم الإرسال — بانتظار فتح الموظف' : task.status === 'received' ? 'تم الاستلام' : task.status === 'in_progress' ? 'تم الفتح وبدأ التنفيذ' : task.status === 'report_submitted' ? 'تم التنفيذ وإرسال التقرير' : statusLabel(task.status)}</Text><View style={styles.taskListFooter}><Text style={styles.taskDueLabel}>الموعد: {fmt(task.dueAt)}</Text><Text style={styles.taskIdLabel}>#{String(task.id).slice(0,8)}</Text></View>
         {canManage && <>
           <TextInput style={styles.input} placeholder="تعديل عنوان المهمة" value={edits[task.id]?.title ?? task.title} onChangeText={(value) => setEdits((current) => ({ ...current, [task.id]: { title: value, description: current[task.id]?.description ?? task.description ?? '' } }))} />
           <TextInput style={styles.input} placeholder="تعديل وصف المهمة" value={edits[task.id]?.description ?? task.description ?? ''} onChangeText={(value) => setEdits((current) => ({ ...current, [task.id]: { title: current[task.id]?.title ?? task.title, description: value } }))} multiline />
@@ -480,9 +460,9 @@ function TaskTemplatesSection({ templates, categories, employees, branches, onRe
       throw cause;
     }
   }
-  async function sendDirectly(draft: TaskTemplateDraft, employeeId: string, branchId: string | null, dueAt: string, idempotencyKey?: string, cost?: TaskCostDraft) {
+  async function sendDirectly(draft: TaskTemplateDraft, employeeId: string, branchId: string | null, dueAt: string, idempotencyKey?: string) {
     const executionDetails = draft.steps.map((step, index) => `${index + 1}. ${step.title}\nالفترة: ${step.instructions}\nالإثبات: ${step.evidenceInstructions || 'تأكيد الإنجاز'}`).join('\n');
-    await createAdministrativeTask({ title: draft.title, description: [draft.description, 'تفاصيل التنفيذ المباشر:', executionDetails].filter(Boolean).join('\n\n'), dueAt, priority: draft.priority, roleCode: draft.roleCode, branchId, assignedEmployeeId: employeeId, templateId: draft.id ?? null, reportTemplateId: null, reportVersionId: null, reportRequired: draft.reportFields.length > 0, reportOverrides: [], idempotencyKey, budgetAmount: cost?.budgetAmount, estimatedAmount: cost?.estimatedAmount, spentAmount: cost?.spentAmount, costNotes: cost?.notes });
+    await createAdministrativeTask({ title: draft.title, description: [draft.description, 'تفاصيل التنفيذ المباشر:', executionDetails].filter(Boolean).join('\n\n'), dueAt, priority: draft.priority, roleCode: draft.roleCode, branchId, assignedEmployeeId: employeeId, templateId: draft.id ?? null, reportTemplateId: null, reportVersionId: null, reportRequired: draft.reportFields.length > 0, reportOverrides: [], idempotencyKey });
     await onReload();
     setSelected(null);
     setEditing(false);
@@ -575,7 +555,7 @@ const styles = StyleSheet.create({
   taskStatusDone:{backgroundColor:'#e5f4ed',color:'#26744e'},
   taskStatusReview:{backgroundColor:'#fff3dc',color:'#946b12'},
   taskStatusActive:{backgroundColor:'#e8f0fc',color:'#315f94'},
-  costApprovalCard:{gap:8,padding:12,borderRadius:12,backgroundColor:'#f5f7fa',borderWidth:1,borderColor:'#dce3e9'},taskListMeta:{color:'#74869a',fontSize:11,textAlign:'right'},taskListCost:{color:'#23633c',fontSize:11,fontWeight:'800',textAlign:'right',backgroundColor:'#eef8f0',borderRadius:8,padding:7},
+  taskListMeta:{color:'#74869a',fontSize:11,textAlign:'right'},taskListCost:{color:'#23633c',fontSize:11,fontWeight:'800',textAlign:'right',backgroundColor:'#eef8f0',borderRadius:8,padding:7},
   taskListFooter:{borderTopWidth:1,borderTopColor:'#edf1f5',paddingTop:8,flexDirection:'row-reverse',justifyContent:'space-between',alignItems:'center'},
   taskDueLabel:{color:'#526b82',fontSize:11,fontWeight:'700'},
   taskIdLabel:{color:'#9aa6b3',fontSize:10},
