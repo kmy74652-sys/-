@@ -130,8 +130,14 @@ BEGIN
   ) VALUES (
     p_organization_id, p_template_id, v_template.version, trim(p_idempotency_key), v_template.role_code,
     p_branch_id, p_due_at, v_snapshot, v_user
-  ) RETURNING id INTO v_request_id;
+  ) ON CONFLICT (organization_id, request_key) DO NOTHING
+  RETURNING id INTO v_request_id;
 
+  IF v_request_id IS NULL THEN
+    SELECT id INTO v_request_id FROM public.task_publication_requests
+    WHERE organization_id=p_organization_id AND request_key=trim(p_idempotency_key)
+    LIMIT 1;
+  END IF;
   RETURN v_request_id;
 END;
 $$;
