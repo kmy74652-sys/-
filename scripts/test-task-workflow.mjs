@@ -24,7 +24,7 @@ assert(dynamicReportsPanel.includes("router.push('/admin?section=report-designer
 assert(admin.includes("section === 'report-designer' && (canmanagereports ? <reportdesigner") && !admin.includes('canmanagereports && canmanageemployees ? <reportdesigner'), 'designer route must not require unrelated employee-management permission');
 assert(mobile.includes('(!reportsonly || hasreport)'), 'report workspace must show only tasks with assigned report forms');
 assert(mobile.includes('إرسال التقرير مرة واحدة') && !mobile.includes('تم ترحيل هذا التقرير ولا يمكن تعديله'), 'report workspace must expose one submission without showing the internal lock message');
-assert(mobile.includes('معاينة المهمة في حقول منظمة') && mobile.includes('taskstructuredpreview') && mobile.includes('ملخص المهمة') && mobile.includes('previewfields'), 'employee task preview must expose structured Arabic fields');
+assert(mobile.includes('structuredassignmentdescription') && mobile.includes('assignmentsectiontitle') && mobile.includes('assignmentitemtext') && mobile.includes('تفاصيل التكليف'), 'employee assignments must render as organized Arabic sections and readable bullet fields');
 assert(mobile.includes("!reportsonly && <view style={styles.notifications}") && mobile.includes("!loading && !reportsonly && tasks.length > 0"), 'report workspace must hide task filters and notifications');
 assert(read('supabase/migrations/066_lock_submitted_task_report_drafts.sql').includes('report_draft_locked_after_submission'), 'submitted report draft lock migration missing');
 assert(read('apps/mobile/components/HomeDashboard.tsx').includes("view: 'reports'"), 'employee dashboard reports card must open the report workspace');
