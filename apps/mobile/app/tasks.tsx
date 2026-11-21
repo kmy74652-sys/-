@@ -563,10 +563,8 @@ export default function TasksScreen() {
               </View>}
             </View>}
             {!reportsOnly && <>
-            <Pressable accessibilityRole="button" accessibilityState={{ expanded: previewTaskId === task.id }} style={styles.previewButton} onPress={() => setPreviewTaskId((current) => current === task.id ? null : task.id)}><Text style={styles.previewButtonText}>{previewTaskId === task.id ? 'إخفاء المعاينة المنظمة' : 'معاينة المهمة في حقول منظمة'}</Text><Text style={styles.previewButtonHint}>عرض سريع وواضح قبل بدء التنفيذ</Text></Pressable>
-            {previewTaskId === task.id && <TaskStructuredPreview task={task} formatDate={formatDate} />}
-            <Text style={styles.cardSectionLabel}>1 · اقرأ التكليف</Text>
-            {!!task.description && <Text style={styles.body}>{task.description}</Text>}
+            <Text style={styles.cardSectionLabel}>1 · تفاصيل التكليف</Text>
+            {!!task.description && <StructuredAssignmentDescription value={task.description} />}
             <Text style={styles.meta}>المنصب: {task.position_code ? positionLabels[task.position_code] : 'بحاجة إلى تصنيف'}{task.branch_name ? ` · الفرع: ${task.branch_name}${task.branch_level ? ` (المستوى ${task.branch_level})` : ''}` : task.branch_id ? ' · فرع محدد' : ''}</Text>
             <Text style={styles.meta}>الأولوية: {priorityLabels[task.priority]} · الموعد: {formatDate(task.due_at)}</Text>
             <Text style={styles.deliveryStatus}>حالة الوصول: {deliveryLabels[task.delivery_status]}</Text>
@@ -625,6 +623,43 @@ export default function TasksScreen() {
       </ScrollView>
     </AppShell>
   );
+}
+
+type AssignmentSection = { title: string; items: string[] };
+
+function parseAssignmentDescription(value: string): AssignmentSection[] {
+  const sections: AssignmentSection[] = [];
+  let current: AssignmentSection = { title: 'معلومات التكليف', items: [] };
+  const flush = () => {
+    if (current.items.length) sections.push(current);
+  };
+
+  for (const rawLine of value.split(/\\r?\\n/)) {
+    const line = rawLine.trim().replace(/^[-•–—]\\s*/, '');
+    if (!line) continue;
+    const isHeading = /[:：]$/.test(line) && line.length <= 90;
+    if (isHeading) {
+      flush();
+      current = { title: line.replace(/[:：]$/, '').trim(), items: [] };
+    } else {
+      current.items.push(line);
+    }
+  }
+  flush();
+  return sections.length ? sections : [{ title: 'تفاصيل التكليف', items: [value.trim()] }];
+}
+
+function StructuredAssignmentDescription({ value }: { value: string }) {
+  const sections = parseAssignmentDescription(value);
+  return <View style={styles.assignmentSections}>
+    {sections.map((section, sectionIndex) => <View key={sectionIndex} style={styles.assignmentSection}>
+      <Text style={styles.assignmentSectionTitle}>{section.title}</Text>
+      {section.items.map((item, itemIndex) => <View key={itemIndex} style={styles.assignmentItem}>
+        <Text style={styles.assignmentBullet}>•</Text>
+        <Text style={styles.assignmentItemText}>{item}</Text>
+      </View>)}
+    </View>)}
+  </View>;
 }
 
 function TaskStructuredPreview({ task, formatDate }: { task: Task; formatDate: (value: string) => string }) {
@@ -706,6 +741,12 @@ const styles = StyleSheet.create({
   previewTextField: { backgroundColor: '#fff', borderRadius: 9, borderWidth: 1, borderColor: '#e2eaed', padding: 9, gap: 4 },
   previewTextValue: { color: '#39556a', textAlign: 'right', lineHeight: 20 },
   previewWarning: { backgroundColor: '#fff7e8', borderColor: '#ecd49e' },
+  assignmentSections: { gap: 10 },
+  assignmentSection: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#dce8eb', borderRadius: 12, padding: 12, gap: 8 },
+  assignmentSectionTitle: { color: '#17324d', fontSize: 14, fontWeight: '900', textAlign: 'right', backgroundColor: '#eef5f7', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8 },
+  assignmentItem: { flexDirection: 'row-reverse', alignItems: 'flex-start', gap: 8 },
+  assignmentBullet: { color: '#c18a16', fontSize: 17, fontWeight: '900', lineHeight: 23 },
+  assignmentItemText: { flex: 1, color: '#39556a', textAlign: 'right', lineHeight: 23, fontSize: 14 },
   previewSteps: { gap: 6 },
   previewStepRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 8, backgroundColor: '#fff', borderRadius: 8, padding: 8 },
   previewStepNumber: { width: 25, height: 25, borderRadius: 13, backgroundColor: '#e5b336', color: '#17324d', textAlign: 'center', textAlignVertical: 'center', fontWeight: '900', paddingTop: 3 },
