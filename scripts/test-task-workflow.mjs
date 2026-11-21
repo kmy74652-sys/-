@@ -5,6 +5,8 @@ const workflow = read('supabase/migrations/001_extensions.sql') + read('supabase
 const access = read('supabase/migrations/005_security.sql') + read('supabase/seed/001_roles_permissions.sql') + read('supabase/migrations/007_task_authorization.sql') + read('supabase/migrations/025_production_task_attachments_timeline.sql');
 const mobile = read('apps/mobile/app/tasks.tsx');
 const mobileData = read('apps/mobile/lib/mobileData.ts');
+const dynamicReportsPanel = read('apps/mobile/components/EmployeeDynamicReportsPanel.tsx');
+const admin = read('apps/mobile/app/admin.tsx');
 for (const status of ['pending', 'in_progress', 'submitted', 'approved', 'rejected', 'cancelled']) assert(workflow.includes(`'${status}'`), `missing status ${status}`);
 assert(workflow.includes('late'), 'missing computed late status');
 for (const role of ['owner', 'admin_followup', 'accountant', 'warehouse_keeper', 'warehouse_worker']) assert(workflow.includes(role) || access.includes(role), `missing role ${role}`);
@@ -17,6 +19,9 @@ assert(mobileData.includes("callrpc('mobile_record_task_update', { p_task_id: ta
 assert(mobile.includes("canreview && (task.status === 'submitted' || haspendingformreview)"), 'manager review queue must include legacy and dynamic submitted reports');
 assert(mobile.includes("['mine', 'مهامي']") && mobile.includes("['review', 'مراجعة التقارير']"), 'role-based task/review tabs missing');
 assert(mobile.includes("firstsearchparam(routeparams.view) === 'reports'") && mobile.includes('إعداد التقارير'), 'employee report workspace tab missing');
+assert(mobile.includes("setcanmanagereports(permissions.has('report_forms.manage'))") && mobile.includes('canmanagereports={canmanagereports && canmanage}'), 'report designer access must be permission-gated in employee workspace');
+assert(dynamicReportsPanel.includes("router.push('/admin?section=report-designer'") && dynamicReportsPanel.includes('فتح مصمم التقارير وإنشاء نموذج'), 'authorized managers must have a direct designer shortcut from the empty reports state');
+assert(admin.includes("section === 'report-designer' && (canmanagereports ? <reportdesigner") && !admin.includes('canmanagereports && canmanageemployees ? <reportdesigner'), 'designer route must not require unrelated employee-management permission');
 assert(mobile.includes('(!reportsonly || hasreport)'), 'report workspace must show only tasks with assigned report forms');
 assert(mobile.includes('إرسال التقرير مرة واحدة') && !mobile.includes('تم ترحيل هذا التقرير ولا يمكن تعديله'), 'report workspace must expose one submission without showing the internal lock message');
 assert(mobile.includes('معاينة المهمة في حقول منظمة') && mobile.includes('taskstructuredpreview') && mobile.includes('ملخص المهمة') && mobile.includes('previewfields'), 'employee task preview must expose structured Arabic fields');
