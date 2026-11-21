@@ -42,7 +42,7 @@ export default function ReportSubmissionEmployeePanel({branchId,canManageReports
     const next={...current};
     for(const form of available){
      const row=byForm[form.template_id];const draft={...(next[form.template_id]??{})};
-     for(const field of form.fields){if(draft[field.key]===undefined)draft[field.key]=rawValue(field,row?.answers?.[field.key]??(row?undefined:form.values?.[field.key]));}
+     for(const field of form.fields){if(draft[field.key]===undefined)draft[field.key]=rawValue(field,row?.answers?.[field.key]);}
      next[form.template_id]=draft;
     }return next;
    });
@@ -72,7 +72,8 @@ export default function ReportSubmissionEmployeePanel({branchId,canManageReports
   try{
    const answers=buildAnswers(form,submit);
    if(!current){
-    const {data,error}=await supabase.from('report_submissions').insert({form_id:form.template_id,employee_id:(await supabase.auth.getUser()).data.user?.id,branch_id:branchId,report_date:form.report_date,answers,status:submit?'submitted':'draft'}).select('id').single();
+    const auth=await supabase.auth.getUser();if(auth.error||!auth.data.user)throw auth.error??new Error('not_authenticated');
+    const {data,error}=await supabase.from('report_submissions').insert({form_id:form.template_id,employee_id:auth.data.user.id,branch_id:branchId,report_date:form.report_date,answers,status:submit?'submitted':'draft'}).select('id').single();
     if(error)throw error;if(!data?.id)throw new Error('لم يتم إنشاء سجل التقرير.');
    }else{
     const {error}=await supabase.from('report_submissions').update({answers,...(submit?{status:'submitted'}:{})}).eq('id',current.id).select('id').single();
