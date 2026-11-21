@@ -294,7 +294,7 @@ function Overview({ counts, data, fmt, onSection, onSettings, onHR, canDesign, c
   <View style={styles.activityPreview}><Text style={styles.sectionTitle}>آخر النشاط</Text>{(data?.activity ?? []).slice(0,3).map((item)=><View style={styles.activityPreviewRow} key={item.id}><Text style={styles.cardTitle}>{item.action}</Text><Text style={styles.meta}>{fmt(item.createdAt)}</Text></View>)}{!(data?.activity ?? []).length&&<Text style={styles.muted}>لا توجد أنشطة حديثة.</Text>}</View>
 </>; }
 
-function TasksSection({ data, designerTemplates, canDesign, showCreate, setShowCreate, draft, setDraft, createTask, fmt, onOpenTasks, canManage, institutionId, onReload, onTaskUpdated, onTaskDeleted, onTaskRestored, onTaskCostApproved, onDesignerSave, onDesignerSend }: any) {
+function TasksSection({ data, designerTemplates, canDesign, showCreate, setShowCreate, draft, setDraft, createTask, fmt, onOpenTasks, canManage, institutionId, onReload, onTaskUpdated, onTaskDeleted, onTaskRestored, onDesignerSave, onDesignerSend }: any) {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [edits, setEdits] = useState<Record<string, { title: string; description: string }>>({});
@@ -555,7 +555,7 @@ const styles = StyleSheet.create({
   taskStatusDone:{backgroundColor:'#e5f4ed',color:'#26744e'},
   taskStatusReview:{backgroundColor:'#fff3dc',color:'#946b12'},
   taskStatusActive:{backgroundColor:'#e8f0fc',color:'#315f94'},
-  taskListMeta:{color:'#74869a',fontSize:11,textAlign:'right'},taskListCost:{color:'#23633c',fontSize:11,fontWeight:'800',textAlign:'right',backgroundColor:'#eef8f0',borderRadius:8,padding:7},
+  taskListMeta:{color:'#74869a',fontSize:11,textAlign:'right'},
   taskListFooter:{borderTopWidth:1,borderTopColor:'#edf1f5',paddingTop:8,flexDirection:'row-reverse',justifyContent:'space-between',alignItems:'center'},
   taskDueLabel:{color:'#526b82',fontSize:11,fontWeight:'700'},
   taskIdLabel:{color:'#9aa6b3',fontSize:10},
