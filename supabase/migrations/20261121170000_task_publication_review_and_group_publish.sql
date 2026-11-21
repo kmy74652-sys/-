@@ -6,6 +6,7 @@ CREATE TABLE IF NOT EXISTS public.task_publication_requests (
   organization_id uuid NOT NULL REFERENCES public.organizations(id) ON DELETE CASCADE,
   template_id uuid NOT NULL REFERENCES public.task_templates(id) ON DELETE RESTRICT,
   template_version integer NOT NULL,
+  request_key text NOT NULL,
   role_code text NOT NULL,
   branch_id uuid NULL REFERENCES public.branches(id) ON DELETE RESTRICT,
   due_at timestamptz NOT NULL,
@@ -24,6 +25,8 @@ CREATE TABLE IF NOT EXISTS public.task_publication_requests (
 
 CREATE INDEX IF NOT EXISTS task_publication_requests_review_idx
   ON public.task_publication_requests (organization_id, status, requested_at DESC);
+CREATE UNIQUE INDEX IF NOT EXISTS task_publication_requests_idempotency_idx
+  ON public.task_publication_requests (organization_id, request_key);
 
 ALTER TABLE public.task_publication_requests ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS task_publication_requests_read ON public.task_publication_requests;
@@ -38,7 +41,8 @@ CREATE OR REPLACE FUNCTION public.submit_task_publication_request(
   p_organization_id uuid,
   p_template_id uuid,
   p_branch_id uuid,
-  p_due_at timestamptz
+  p_due_at timestamptz,
+  p_idempotency_key text
 )
 RETURNS uuid
 LANGUAGE plpgsql
@@ -57,6 +61,13 @@ BEGIN
   IF p_due_at IS NULL OR p_due_at <= now() THEN
     RAISE EXCEPTION USING errcode='22023', message='invalid_task_schedule';
   END IF;
+  IF p_idempotency_key IS NULL OR length(trim(p_idempotency_key)) = 0 OR length(p_idempotency_key) > 200 THEN
+    RAISE EXCEPTION USING errcode='22023', message='invalid_task_publication_key';
+  END IF;
+  SELECT id INTO v_request_id FROM public.task_publication_requests
+  WHERE organization_id=p_organization_id AND request_key=trim(p_idempotency_key)
+  LIMIT 1;
+  IF v_request_id IS NOT NULL THEN RETURN v_request_id; END IF;
 
   SELECT * INTO v_template
   FROM public.task_templates
@@ -114,10 +125,10 @@ BEGIN
   END IF;
 
   INSERT INTO public.task_publication_requests(
-    organization_id, template_id, template_version, role_code, branch_id,
+    organization_id, template_id, template_version, request_key, role_code, branch_id,
     due_at, template_snapshot, requested_by
   ) VALUES (
-    p_organization_id, p_template_id, v_template.version, v_template.role_code,
+    p_organization_id, p_template_id, v_template.version, trim(p_idempotency_key), v_template.role_code,
     p_branch_id, p_due_at, v_snapshot, v_user
   ) RETURNING id INTO v_request_id;
 
@@ -272,8 +283,8 @@ BEGIN
 END;
 $$;
 
-REVOKE ALL ON FUNCTION public.submit_task_publication_request(uuid,uuid,uuid,timestamptz) FROM PUBLIC, anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.submit_task_publication_request(uuid,uuid,uuid,timestamptz) TO authenticated;
+REVOKE ALL ON FUNCTION public.submit_task_publication_request(uuid,uuid,uuid,timestamptz,text) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.submit_task_publication_request(uuid,uuid,uuid,timestamptz,text) TO authenticated;
 REVOKE ALL ON FUNCTION public.review_and_publish_task_request(uuid,uuid,boolean,text) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.review_and_publish_task_request(uuid,uuid,boolean,text) TO authenticated;
 
