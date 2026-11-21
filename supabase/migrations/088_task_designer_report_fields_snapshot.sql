@@ -32,7 +32,7 @@ DECLARE
   v_override jsonb;
   v_embedded_field_count integer := 0;
 BEGIN
-  IF v_user IS NULL OR NOT public.has_org_permission(p_organization_id,'tasks.manage',NULL::uuid) THEN
+  IF v_user IS NULL OR NOT alshaari_private.has_permission(p_organization_id,'tasks.manage',NULL::uuid) THEN
     RAISE EXCEPTION USING errcode='42501', message='permission_denied';
   END IF;
   IF p_idempotency_key IS NOT NULL AND (length(trim(p_idempotency_key)) = 0 OR length(p_idempotency_key) > 200) THEN
