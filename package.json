@@ -20,6 +20,7 @@
     "supabase:push": "supabase db push",
     "supabase:reset": "supabase db reset",
     "test:task-designer": "node scripts/test-task-designer.mjs",
+    "test:task-cost-permissions": "node scripts/test-task-cost-permissions.mjs",
     "test:admin-management": "node scripts/test-admin-management.mjs",
     "test:management-mutations": "node scripts/test-management-mutations.mjs",
     "test:home-dashboard": "node scripts/test-home-dashboard.mjs",

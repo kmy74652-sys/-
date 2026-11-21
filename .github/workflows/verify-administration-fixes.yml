@@ -32,6 +32,8 @@ jobs:
         run: pnpm test:task-workflow
       - name: Existing task designer tests
         run: pnpm test:task-designer
+      - name: Task cost permission boundary tests
+        run: pnpm test:task-cost-permissions
       - name: Existing report designer tests
         run: pnpm test:report-designer
       - name: TypeScript checks

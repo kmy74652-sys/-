@@ -15,6 +15,8 @@ export type AdminTask = {
   estimatedAmount: number;
   spentAmount: number;
   costNotes: string | null;
+  costProposedAt?: string | null;
+  costApprovedAt?: string | null;
 };
 export type AdminBranch = { id: string; code: string; name: string; isActive: boolean; level: string | null };
 export type AdminEmployee = { id: string; userId: string | null; name: string; employeeNo: string | null; active: boolean; roles: string[]; branchId: string | null; branchName: string | null; assignments: Array<{ roleCode: string; branchId: string | null }> };
@@ -30,20 +32,36 @@ export type DashboardData = {
 
 function client() { if (!supabase) throw new Error('supabase_not_configured'); return supabase; }
 
-let dashboardCache: { value: DashboardData; loadedAt: number } | null = null;
-let dashboardRequest: Promise<DashboardData> | null = null;
+const dashboardCache = new Map<string, { value: DashboardData; loadedAt: number }>();
+const dashboardRequests = new Map<string, Promise<DashboardData>>();
 
 export async function loadDashboardData(options: { force?: boolean; maxAgeMs?: number } = {}): Promise<DashboardData> {
+  const db = client();
+  const [{ data: authData, error: authError }, { data: profileData, error: profileError }] = await Promise.all([
+    db.auth.getUser(),
+    db.rpc('mobile_my_profile'),
+  ]);
+  if (authError || !authData.user) throw authError ?? new Error('not_authenticated');
+  if (profileError) throw profileError;
+  const organizationId = (profileData as { employee?: { institutionId?: string } } | null)?.employee?.institutionId;
+  if (!organizationId) throw new Error('employee_not_active');
+
+  const cacheKey = `${authData.user.id}:${organizationId}`;
   const maxAgeMs = options.maxAgeMs ?? 30_000;
-  if (!options.force && dashboardCache && Date.now() - dashboardCache.loadedAt < maxAgeMs) return dashboardCache.value;
-  if (dashboardRequest) return dashboardRequest;
-  dashboardRequest = loadDashboardDataFresh();
+  const cached = dashboardCache.get(cacheKey);
+  if (!options.force && cached && Date.now() - cached.loadedAt < maxAgeMs) return cached.value;
+
+  let request = dashboardRequests.get(cacheKey);
+  if (!request) {
+    request = loadDashboardDataFresh();
+    dashboardRequests.set(cacheKey, request);
+  }
   try {
-    const value = await dashboardRequest;
-    dashboardCache = { value, loadedAt: Date.now() };
+    const value = await request;
+    dashboardCache.set(cacheKey, { value, loadedAt: Date.now() });
     return value;
   } finally {
-    dashboardRequest = null;
+    if (dashboardRequests.get(cacheKey) === request) dashboardRequests.delete(cacheKey);
   }
 }
 
@@ -56,7 +74,7 @@ async function loadDashboardDataFresh(): Promise<DashboardData> {
     db.from('task_reports').select('id,task_id,status,submitted_at,review_note,values,report_form_snapshot_id').order('submitted_at', { ascending: false }).limit(100),
     db.from('employee_role_reports').select('id,employee_user_id,role_code,branch_id,report_date,report_title,status,submitted_at,review_note,values').order('submitted_at', { ascending: false }).limit(100),
     db.from('task_activity_log').select('id,task_id,action,created_at').order('created_at', { ascending: false }).limit(100),
-    db.from('task_costs').select('task_id,budget_amount,estimated_amount,spent_amount,notes').limit(200),
+    db.from('task_costs').select('task_id,budget_amount,estimated_amount,spent_amount,notes,proposed_at,approved_at').limit(200),
   ]);
   for (const result of [tasksResult, branchesResult, employeesResult, reportsResult, roleReportsResult, activityResult, costsResult]) if (result.error) throw result.error;
   const branches = (branchesResult.data ?? []).map((row) => ({ id: row.id, code: row.code, name: row.name, isActive: row.is_active, level: row.branch_level }));
@@ -89,7 +107,7 @@ async function loadDashboardDataFresh(): Promise<DashboardData> {
   const costsByTaskId = new Map((costsResult.data ?? []).map((row) => [row.task_id, row]));
   const tasks = (tasksResult.data ?? []).map((row) => {
     const cost = costsByTaskId.get(row.id);
-    return { id: row.id, title: row.title, description: row.description, branchId: row.branch_id, branchName: row.branch_id ? branchNames.get(row.branch_id) ?? null : null, assignedTo: row.assigned_to, dueAt: row.due_at, priority: row.priority, status: row.status, budgetAmount: Number(cost?.budget_amount ?? 0), estimatedAmount: Number(cost?.estimated_amount ?? 0), spentAmount: Number(cost?.spent_amount ?? 0), costNotes: cost?.notes ?? null };
+    return { id: row.id, title: row.title, description: row.description, branchId: row.branch_id, branchName: row.branch_id ? branchNames.get(row.branch_id) ?? null : null, assignedTo: row.assigned_to, dueAt: row.due_at, priority: row.priority, status: row.status, budgetAmount: Number(cost?.budget_amount ?? 0), estimatedAmount: Number(cost?.estimated_amount ?? 0), spentAmount: Number(cost?.spent_amount ?? 0), costNotes: cost?.notes ?? null, costProposedAt: cost?.proposed_at ?? null, costApprovedAt: cost?.approved_at ?? null };
   });
   const snapshotIds = (reportsResult.data ?? []).map((row) => row.report_form_snapshot_id).filter((id): id is string => Boolean(id));
   const snapshotsResult = snapshotIds.length ? await db.from('task_report_form_snapshots').select('id,title,schema').in('id', snapshotIds).limit(500) : { data: [], error: null };
@@ -128,7 +146,9 @@ export async function createAdministrativeTask(input: { title: string; descripti
   if (authError || !authData.user) throw authError ?? new Error('not_authenticated');
   const { data: profileData, error: profileError } = await db.rpc('mobile_my_profile');
   if (profileError) throw profileError;
-  const organizationId = (profileData as { employee?: { institutionId?: string } } | null)?.employee?.institutionId;
+  const employeeProfile = (profileData as { employee?: { institutionId?: string; permissions?: string[] } } | null)?.employee;
+  const organizationId = employeeProfile?.institutionId;
+  const currentPermissions = new Set(employeeProfile?.permissions ?? []);
   if (!organizationId) throw new Error('employee_not_active');
   const reportTemplateId = input.reportTemplateId ?? null;
   const reportVersionId = input.reportVersionId ?? null;
@@ -176,11 +196,48 @@ export async function createAdministrativeTask(input: { title: string; descripti
   if (error) throw error;
   const taskId = typeof task === 'string' ? task : (task as { id?: string } | null)?.id;
   if (!taskId) throw new Error('task_create_response_invalid');
-  if (input.budgetAmount !== undefined || input.estimatedAmount !== undefined || input.spentAmount !== undefined || input.costNotes) {
-    const { error: costError } = await db.from('task_costs').upsert({ organization_id: organizationId, task_id: taskId, budget_amount: Math.max(0, input.budgetAmount ?? 0), estimated_amount: Math.max(0, input.estimatedAmount ?? 0), spent_amount: Math.max(0, input.spentAmount ?? 0), notes: input.costNotes?.trim() || null }, { onConflict: 'task_id' });
+  const hasCostInput = (input.budgetAmount ?? 0) > 0 || (input.estimatedAmount ?? 0) > 0 || (input.spentAmount ?? 0) > 0 || Boolean(input.costNotes?.trim());
+  if (hasCostInput && currentPermissions.has('task_costs.approve')) {
+    const { error: costError } = await db.from('task_costs').upsert({ organization_id: organizationId, task_id: taskId, budget_amount: Math.max(0, input.budgetAmount ?? 0), estimated_amount: Math.max(0, input.estimatedAmount ?? 0), spent_amount: Math.max(0, input.spentAmount ?? 0), notes: input.costNotes?.trim() || null, approved_by: authData.user.id, approved_at: new Date().toISOString() }, { onConflict: 'task_id' });
     if (costError) throw costError;
+  } else if (hasCostInput && currentPermissions.has('task_costs.propose')) {
+    const { error: costError } = await db.rpc('propose_task_cost', { p_organization_id: organizationId, p_task_id: taskId, p_estimated_amount: Math.max(0, input.estimatedAmount ?? 0), p_notes: input.costNotes?.trim() || null });
+    if (costError) throw costError;
+  } else if (hasCostInput) {
+    throw new Error('task_cost_permission_denied');
   }
   return { id: taskId, assigned_to: assignee.user_id };
+}
+
+export async function approveAdministrativeTaskCost(input: { taskId: string; budgetAmount: number; estimatedAmount: number; spentAmount: number; notes?: string | null }) {
+  const db = client();
+  const [{ data: authData, error: authError }, { data: profileData, error: profileError }] = await Promise.all([
+    db.auth.getUser(),
+    db.rpc('mobile_my_profile'),
+  ]);
+  if (authError || !authData.user) throw authError ?? new Error('not_authenticated');
+  if (profileError) throw profileError;
+  const employee = (profileData as { employee?: { institutionId?: string; permissions?: string[] } } | null)?.employee;
+  const organizationId = employee?.institutionId;
+  if (!organizationId) throw new Error('employee_not_active');
+  if (!employee?.permissions?.includes('task_costs.approve')) throw new Error('task_cost_approval_permission_denied');
+
+  const amounts = [input.budgetAmount, input.estimatedAmount, input.spentAmount];
+  if (amounts.some((value) => !Number.isFinite(value) || value < 0)) throw new Error('invalid_task_cost_amount');
+
+  const approvedAt = new Date().toISOString();
+  const { error } = await db.from('task_costs').upsert({
+    organization_id: organizationId,
+    task_id: input.taskId,
+    budget_amount: input.budgetAmount,
+    estimated_amount: input.estimatedAmount,
+    spent_amount: input.spentAmount,
+    notes: input.notes?.trim() || null,
+    approved_by: authData.user.id,
+    approved_at: approvedAt,
+  }, { onConflict: 'task_id' });
+  if (error) throw error;
+  return { approvedAt };
 }
 
 export const statusLabel = (status: string) => ({ new: 'جديدة', received: 'مستلمة', in_progress: 'قيد التنفيذ', on_hold: 'معلّقة', report_submitted: 'بانتظار المراجعة', needs_revision: 'تحتاج تصحيحًا', completed_approved: 'منجزة ومعتمدة', late: 'متأخرة' }[status] ?? status);
