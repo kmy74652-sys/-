@@ -970,9 +970,11 @@ class _TaskPublicationReviewScreenState extends State<TaskPublicationReviewScree
                           firstDate: DateTime.now(),
                           lastDate: DateTime.now().add(const Duration(days: 365)),
                         );
-                        if (picked != null) refresh(() {
-                          dueAt = DateTime(picked.year, picked.month, picked.day, 17);
-                        });
+                        if (picked != null) {
+                          refresh(() {
+                            dueAt = DateTime(picked.year, picked.month, picked.day, 17);
+                          });
+                        }
                       },
                     ),
                     if (eligible.isEmpty)
@@ -1098,7 +1100,6 @@ class _TaskPublicationReviewScreenState extends State<TaskPublicationReviewScree
                     const SizedBox(height: 8),
                     if (_approved.isEmpty) const _InfoCard(text: 'بعد اعتماد نموذج تقرير سيظهر هنا لتحديد الفرع والموظف وموعد التسليم.'),
                     ..._approved.map((version) {
-                      final id = version['id'].toString();
                       final template = (version['report_form_templates'] as Map?)?.cast<String, dynamic>() ?? {};
                       final fields = (version['report_form_version_fields'] as List? ?? []).length;
                       return Card(
