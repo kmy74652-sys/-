@@ -585,8 +585,8 @@ class _TaskDesignerScreenState extends State<TaskDesignerScreen> {
   Widget _stepsGrid() => SingleChildScrollView(
         scrollDirection: Axis.horizontal,
         child: DataTable(
-          headingRowColor: MaterialStatePropertyAll(
-            AppColors.primary.withOpacity(.08),
+          headingRowColor: WidgetStatePropertyAll(
+            AppColors.navy.withOpacity(.08),
           ),
           columnSpacing: 18,
           dataRowMinHeight: 72,
