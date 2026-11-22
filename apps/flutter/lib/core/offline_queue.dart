@@ -296,7 +296,7 @@ class OfflineQueue {
                 payload: candidate.payload,
                 attempts: candidate.attempts + 1,
                 createdAt: candidate.createdAt,
-                nextAttemptAt: network
+                nextAttemptAt: network && candidate.attempts + 1 < maxAttempts
                     ? DateTime.now().toUtc().add(
                         Duration(
                           milliseconds: delay > 1800000 ? 1800000 : delay,
@@ -304,7 +304,7 @@ class OfflineQueue {
                       )
                     : DateTime.now().toUtc().add(const Duration(days: 3650)),
                 lastError: error.toString(),
-                blocked: !network,
+                blocked: !network || candidate.attempts + 1 >= maxAttempts,
               );
             }).toList(),
           );
