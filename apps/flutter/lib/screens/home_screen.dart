@@ -82,9 +82,15 @@ class _HomeScreenState extends State<HomeScreen> {
             final name = profile['fullName'] as String? ?? 'الموظف';
             final employeeNo = profile['employeeNo']?.toString() ?? '—';
             final role = _roleLabel(profile['roles']);
+            final roleCodes = (profile['roles'] as List? ?? [])
+                .whereType<Map>()
+                .map((entry) => entry['code'])
+                .whereType<String>()
+                .toSet();
             final permissions = (profile['permissions'] as List? ?? []).map((e) => e.toString()).toSet();
             final canDesignTasks = permissions.contains('task_library.manage') &&
                 (permissions.contains('tasks.manage') || permissions.contains('tasks.read_all'));
+            final canApproveTaskPublication = roleCodes.contains('owner');
 
             return ListView(
               padding: const EdgeInsets.all(20),
@@ -121,9 +127,20 @@ class _HomeScreenState extends State<HomeScreen> {
                   _ModuleAction(
                     icon: Icons.dashboard_customize_outlined,
                     title: 'مصمم المهام',
-                    description: 'إنشاء قالب مهمة وإضافة حقول التقرير ثم إسناده للموظف.',
+                    description: 'إنشاء قالب وحقول التقرير وإرسال طلب اعتماد لصاحب المؤسسة.',
                     onTap: () => Navigator.of(context).push(MaterialPageRoute(
                       builder: (_) => TaskDesignerScreen(profile: profile),
+                    )),
+                  ),
+                ],
+                if (canApproveTaskPublication) ...[
+                  const SizedBox(height: 10),
+                  _ModuleAction(
+                    icon: Icons.fact_check_outlined,
+                    title: 'اعتماد ونشر المهام',
+                    description: 'مراجعة طلبات النشر واعتمادها أو رفضها قبل وصولها للموظفين.',
+                    onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                      builder: (_) => TaskPublicationReviewScreen(profile: profile),
                     )),
                   ),
                 ],
