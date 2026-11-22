@@ -13,7 +13,7 @@ Future<void> main() async {
   const supabasePublishableKey = String.fromEnvironment('SUPABASE_PUBLISHABLE_KEY');
 
   final hasSupabaseConfig =
-      supabaseUrl.startsWith('https://') && supabaseAnonKey.isNotEmpty;
+      supabaseUrl.startsWith('https://') && supabasePublishableKey.isNotEmpty;
 
   if (hasSupabaseConfig) {
     await Supabase.initialize(url: supabaseUrl, anonKey: supabaseAnonKey);
