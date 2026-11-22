@@ -600,9 +600,12 @@ class _TaskDesignerScreenState extends State<TaskDesignerScreen> {
   final List<Map<String, dynamic>> _fields = [];
   List<Map<String, dynamic>> _categories = [];
   List<Map<String, dynamic>> _templates = [];
+  List<Map<String, dynamic>> _branches = [];
   String _role = 'accountant';
   String _priority = 'normal';
   String? _categoryId;
+  String? _branchId;
+  DateTime _dueAt = DateTime.now().add(const Duration(days: 1));
   bool _busy = false;
   String? _error;
 
@@ -633,10 +636,13 @@ class _TaskDesignerScreenState extends State<TaskDesignerScreen> {
       final templates = await _db.from('task_templates')
           .select('id,title,role_code,default_priority,is_active,version')
           .eq('organization_id', _org).order('updated_at', ascending: false).limit(100);
+      final branches = await _db.from('branches')
+          .select('id,name').eq('organization_id', _org).eq('is_active', true).order('name');
       if (!mounted) return;
       setState(() {
         _categories = List<Map<String, dynamic>>.from(categories);
         _templates = List<Map<String, dynamic>>.from(templates);
+        _branches = List<Map<String, dynamic>>.from(branches);
         _categoryId ??= _categories.isEmpty ? null : _categories.first['id'].toString();
       });
     } catch (error) {
@@ -749,16 +755,16 @@ class _TaskDesignerScreenState extends State<TaskDesignerScreen> {
         'p_payload': payload,
       }) as String;
       if (!mounted) return;
-      final assigned = await _assignTemplate(templateId, _role);
+      final requestId = await _submitForApproval(templateId);
       await _load();
       _title.clear();
       _description.clear();
       _instructions.clear();
       setState(() => _fields.clear());
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(assigned
-            ? 'تم حفظ قالب المهمة وإسناده للموظف.'
-            : 'تم حفظ القالب، ولم يتم إسناد المهمة لأن نافذة الإسناد أُغلقت.'),
+        content: Text(requestId == null
+            ? 'تم حفظ القالب، ولم يُرسل طلب النشر.'
+            : 'تم حفظ القالب وإرسال طلب الاعتماد لصاحب المؤسسة. لن تظهر المهمة للموظفين قبل اعتماد عبدالرحمن.'),
       ));
     } catch (error) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(_friendlyError(error))));
@@ -767,77 +773,37 @@ class _TaskDesignerScreenState extends State<TaskDesignerScreen> {
     }
   }
 
-  Future<bool> _assignTemplate(String templateId, String roleCode) async {
-    final memberships = await _db.from('organization_memberships')
-        .select('id,user_id,display_name,employee_no')
-        .eq('organization_id', _org).eq('is_active', true)
-        .order('display_name');
-    final rows = List<Map<String, dynamic>>.from(memberships);
-    final assignments = await _db.from('role_assignments')
-        .select('membership_id,role_code,branch_id')
-        .eq('organization_id', _org).eq('role_code', roleCode);
-    final matching = assignments.map((e) => e['membership_id'].toString()).toSet();
-    final eligible = rows.where((row) => matching.contains(row['id'].toString())).toList();
-    if (eligible.isEmpty) throw Exception('no_employee_for_role_branch');
-    if (!mounted) return false;
-    String selectedUser = eligible.first['user_id'].toString();
-    String? branchId;
-    final branches = await _db.from('branches')
-        .select('id,name').eq('organization_id', _org).eq('is_active', true).order('name');
-    final branchRows = List<Map<String, dynamic>>.from(branches);
-    if (!mounted) return false;
-    final choice = await showDialog<Map<String, dynamic>>(
-      context: context,
-      builder: (dialogContext) => StatefulBuilder(
-        builder: (context, refresh) => AlertDialog(
-          title: const Text('إسناد المهمة'),
-          content: Column(mainAxisSize: MainAxisSize.min, children: [
-            DropdownButtonFormField<String>(
-              value: selectedUser,
-              decoration: const InputDecoration(labelText: 'الموظف'),
-              items: eligible.map((employee) => DropdownMenuItem(
-                value: employee['user_id'].toString(),
-                child: Text('${employee['display_name'] ?? 'موظف'} — ${employee['employee_no'] ?? ''}'),
-              )).toList(),
-              onChanged: (value) => refresh(() => selectedUser = value ?? selectedUser),
-            ),
-            const SizedBox(height: 12),
-            DropdownButtonFormField<String?>(
-              value: branchId,
-              decoration: const InputDecoration(labelText: 'الفرع (اختياري)'),
-              items: [
-                const DropdownMenuItem<String?>(value: null, child: Text('كل الفروع / دون تحديد')),
-                ...branchRows.map((branch) => DropdownMenuItem<String?>(
-                  value: branch['id'].toString(), child: Text(branch['name'].toString()),
-                )),
-              ],
-              onChanged: (value) => refresh(() => branchId = value),
-            ),
-          ]),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('إلغاء')),
-            FilledButton(onPressed: () => Navigator.pop(dialogContext, {'user': selectedUser, 'branch': branchId}), child: const Text('إرسال المهمة')),
-          ],
-        ),
-      ),
-    );
-    if (choice == null) return false;
-    final now = DateTime.now();
-    final starts = DateTime(now.year, now.month, now.day);
-    final due = starts.add(const Duration(days: 1));
-    await _db.rpc('assign_task_from_template', params: {
+  Future<String?> _submitForApproval(String templateId) async {
+    if (_dueAt.isBefore(DateTime.now().add(const Duration(minutes: 1)))) {
+      throw Exception('invalid_task_schedule');
+    }
+    final key = 'flutter-publication:$templateId:${DateTime.now().microsecondsSinceEpoch}';
+    final result = await _db.rpc('submit_task_publication_request', params: {
       'p_organization_id': _org,
       'p_template_id': templateId,
-      'p_assigned_to': choice['user'],
-      'p_branch_id': choice['branch'],
-      'p_starts_at': starts.toUtc().toIso8601String(),
-      'p_due_at': due.toUtc().toIso8601String(),
-      'p_priority': _priority,
-      'p_instructions': null,
-      'p_report_overrides': [],
-      'p_idempotency_key': 'flutter-task:$templateId:${DateTime.now().microsecondsSinceEpoch}',
+      'p_branch_id': _branchId,
+      'p_due_at': _dueAt.toUtc().toIso8601String(),
+      'p_idempotency_key': key,
     });
-    return true;
+    return result is String ? result : null;
+  }
+
+  Future<void> _chooseDueAt() async {
+    final date = await showDatePicker(
+      context: context,
+      initialDate: _dueAt.isAfter(DateTime.now()) ? _dueAt : DateTime.now().add(const Duration(days: 1)),
+      firstDate: DateTime.now(),
+      lastDate: DateTime.now().add(const Duration(days: 365)),
+      helpText: 'حدد موعد تسليم المهمة',
+    );
+    if (date == null || !mounted) return;
+    final time = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.fromDateTime(_dueAt),
+      helpText: 'حدد وقت التسليم',
+    );
+    if (time == null || !mounted) return;
+    setState(() => _dueAt = DateTime(date.year, date.month, date.day, time.hour, time.minute));
   }
 
   @override
@@ -885,6 +851,28 @@ class _TaskDesignerScreenState extends State<TaskDesignerScreen> {
                     value: category['id'].toString(), child: Text(category['title'].toString()),
                   )).toList(),
                   onChanged: (value) => setState(() => _categoryId = value),
+                ),
+                const SizedBox(height: 10),
+                DropdownButtonFormField<String?>(
+                  value: _branchId,
+                  decoration: const InputDecoration(labelText: 'الفرع المستهدف'),
+                  items: [
+                    const DropdownMenuItem<String?>(value: null, child: Text('جميع الفروع')),
+                    ..._branches.map((branch) => DropdownMenuItem<String?>(
+                      value: branch['id'].toString(), child: Text(branch['name'].toString()),
+                    )),
+                  ],
+                  onChanged: (value) => setState(() => _branchId = value),
+                ),
+                const SizedBox(height: 8),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.event),
+                  title: const Text('موعد التسليم'),
+                  subtitle: Text(_date(_dueAt.toIso8601String()) + ' · ' +
+                    '${_dueAt.hour.toString().padLeft(2, '0')}:${_dueAt.minute.toString().padLeft(2, '0')}'),
+                  trailing: const Icon(Icons.edit_calendar_outlined),
+                  onTap: _chooseDueAt,
                 ),
                 const SizedBox(height: 18),
                 Row(children: [
