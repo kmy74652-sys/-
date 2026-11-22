@@ -912,6 +912,210 @@ class _TaskDesignerScreenState extends State<TaskDesignerScreen> {
   );
 }
 
+class TaskPublicationReviewScreen extends StatefulWidget {
+  const TaskPublicationReviewScreen({super.key, required this.profile});
+  final Map<String, dynamic> profile;
+
+  @override
+  State<TaskPublicationReviewScreen> createState() => _TaskPublicationReviewScreenState();
+}
+
+class _TaskPublicationReviewScreenState extends State<TaskPublicationReviewScreen> {
+  bool _loading = true;
+  String? _error;
+  String _busyId = '';
+  List<Map<String, dynamic>> _requests = [];
+  List<Map<String, dynamic>> _branches = [];
+  final Map<String, String> _notes = {};
+
+  SupabaseClient get _db => Supabase.instance.client;
+  String get _org => widget.profile['institutionId'] as String? ?? '';
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    setState(() { _loading = true; _error = null; });
+    try {
+      final results = await Future.wait([
+        _db.from('task_publication_requests')
+            .select('id,template_id,template_version,role_code,branch_id,due_at,template_snapshot,status,requested_at')
+            .eq('organization_id', _org)
+            .eq('status', 'pending_approval')
+            .order('requested_at')
+            .limit(100),
+        _db.from('branches')
+            .select('id,name')
+            .eq('organization_id', _org)
+            .eq('is_active', true)
+            .order('name'),
+      ]);
+      if (!mounted) return;
+      setState(() {
+        _requests = List<Map<String, dynamic>>.from(results[0] as List);
+        _branches = List<Map<String, dynamic>>.from(results[1] as List);
+      });
+    } catch (error) {
+      if (mounted) setState(() => _error = _friendlyError(error));
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _review(Map<String, dynamic> request, bool approve) async {
+    final title = request['template_snapshot'] is Map
+        ? (request['template_snapshot'] as Map)['title']?.toString() ?? 'المهمة'
+        : 'المهمة';
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(approve ? 'اعتماد ونشر المهمة' : 'رفض طلب النشر'),
+        content: Text(approve
+            ? 'سيتم نشر «$title» تلقائياً لكل الموظفين النشطين المطابقين للدور والفرع. هل تعتمد النشر؟'
+            : 'سيتم رفض طلب «$title» ولن تصل المهمة إلى الموظفين.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('إلغاء')),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: Text(approve ? 'اعتماد ونشر' : 'تأكيد الرفض'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    final id = request['id'].toString();
+    setState(() => _busyId = id);
+    try {
+      final count = await _db.rpc('review_and_publish_task_request', params: {
+        'p_organization_id': _org,
+        'p_request_id': id,
+        'p_approve': approve,
+        'p_review_note': (_notes[id] ?? '').trim().isEmpty ? null : _notes[id]!.trim(),
+      });
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(approve
+            ? 'تم الاعتماد والنشر. وصل التكليف إلى $count موظفاً مطابقاً.'
+            : 'تم رفض الطلب، ولم يُرسل التكليف إلى الموظفين.'),
+      ));
+      _notes.remove(id);
+      await _load();
+    } catch (error) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(_friendlyError(error))));
+    } finally {
+      if (mounted) setState(() => _busyId = '');
+    }
+  }
+
+  String _role(String? code) => _roleNames[code] ?? code ?? 'غير محدد';
+
+  @override
+  Widget build(BuildContext context) => Directionality(
+    textDirection: TextDirection.rtl,
+    child: Scaffold(
+      appBar: AppBar(
+        title: const Text('اعتماد ونشر المهام'),
+        actions: [IconButton(onPressed: _load, icon: const Icon(Icons.refresh))],
+      ),
+      body: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : _error != null
+              ? _ErrorState(message: _error!, onRetry: _load)
+              : _requests.isEmpty
+                  ? const Center(child: Text('لا توجد طلبات مهام بانتظار اعتماد صاحب المؤسسة.'))
+                  : ListView.separated(
+                      padding: const EdgeInsets.all(16),
+                      itemCount: _requests.length,
+                      separatorBuilder: (_, __) => const SizedBox(height: 12),
+                      itemBuilder: (context, index) {
+                        final request = _requests[index];
+                        final id = request['id'].toString();
+                        final snapshot = (request['template_snapshot'] as Map?)?.cast<String, dynamic>() ?? {};
+                        final fields = (snapshot['report_fields'] as List? ?? [])
+                            .map((e) => Map<String, dynamic>.from(e as Map)).toList();
+                        final steps = (snapshot['steps'] as List? ?? []);
+                        final branch = _branches.where((b) => b['id'].toString() == request['branch_id']?.toString()).firstOrNull;
+                        final branchName = request['branch_id'] == null ? 'جميع الفروع' : branch?['name']?.toString() ?? 'فرع غير معروف';
+                        return Card(
+                          elevation: 0,
+                          child: Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                Text(snapshot['title']?.toString() ?? 'مهمة بدون عنوان',
+                                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
+                                const SizedBox(height: 8),
+                                Text('الدور المستهدف: ${_role(request['role_code']?.toString())}'),
+                                Text('الفرع: $branchName'),
+                                Text('موعد التسليم: ${_date(request['due_at'].toString())}'),
+                                Text('إصدار القالب: ${request['template_version']}'),
+                                const Divider(height: 22),
+                                const Text('تعليمات المهمة', style: TextStyle(fontWeight: FontWeight.w800)),
+                                Text(snapshot['instructions']?.toString().isNotEmpty == true
+                                    ? snapshot['instructions'].toString()
+                                    : snapshot['description']?.toString() ?? 'لا توجد تعليمات إضافية.'),
+                                if (steps.isNotEmpty) ...[
+                                  const SizedBox(height: 12),
+                                  const Text('خطوات التنفيذ', style: TextStyle(fontWeight: FontWeight.w800)),
+                                  ...steps.asMap().entries.map((entry) {
+                                    final step = entry.value is Map ? entry.value as Map : {};
+                                    return Padding(
+                                      padding: const EdgeInsets.only(top: 5),
+                                      child: Text('${entry.key + 1}. ${step['title'] ?? ''} — ${step['instructions'] ?? ''}'),
+                                    );
+                                  }),
+                                ],
+                                const SizedBox(height: 12),
+                                const Text('حقول التقرير التي ستصل للموظف', style: TextStyle(fontWeight: FontWeight.w800)),
+                                if (fields.isEmpty) const Text('لا يحتوي القالب على حقول تقرير.'),
+                                ...fields.map((field) => Padding(
+                                  padding: const EdgeInsets.only(top: 6),
+                                  child: Row(children: [
+                                    Expanded(child: Text(field['label']?.toString() ?? field['key']?.toString() ?? 'حقل')),
+                                    Text('${field['type'] ?? 'text'} · ${field['required'] == true ? 'إلزامي' : 'اختياري'}',
+                                        style: TextStyle(color: Colors.blueGrey.shade600, fontSize: 11)),
+                                  ]),
+                                )),
+                                const SizedBox(height: 12),
+                                TextField(
+                                  minLines: 1,
+                                  maxLines: 3,
+                                  onChanged: (value) => _notes[id] = value,
+                                  decoration: const InputDecoration(
+                                    labelText: 'ملاحظة الاعتماد أو سبب الرفض',
+                                    border: OutlineInputBorder(),
+                                  ),
+                                ),
+                                const SizedBox(height: 12),
+                                Row(children: [
+                                  Expanded(
+                                    child: OutlinedButton(
+                                      onPressed: _busyId.isEmpty ? () => _review(request, false) : null,
+                                      child: Text(_busyId == id ? 'جارٍ التنفيذ...' : 'رفض الطلب'),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: FilledButton(
+                                      onPressed: _busyId.isEmpty ? () => _review(request, true) : null,
+                                      child: Text(_busyId == id ? 'جارٍ الاعتماد...' : 'اعتماد ونشر للموظفين'),
+                                    ),
+                                  ),
+                                ]),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+    ),
+  );
+}
+
 class _InfoCard extends StatelessWidget {
   const _InfoCard({required this.text});
   final String text;
