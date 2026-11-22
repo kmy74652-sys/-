@@ -26,7 +26,7 @@ void main() {
     await tester.enterText(find.byType(TextFormField).at(0), '1001');
     await tester.enterText(find.byType(TextFormField).at(1), 'password123');
     await tester.tap(find.text('دخول'));
-    await tester.pump();
+    await tester.pumpAndSettle();
 
     expect(find.text('الاتصال بقاعدة البيانات غير مُعدّ بعد.'), findsOneWidget);
   });
