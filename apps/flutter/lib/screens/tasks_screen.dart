@@ -725,67 +725,45 @@ class _TaskDesignerScreenState extends State<TaskDesignerScreen> {
 
   Future<void> _saveAndAssign() async {
     if (_title.text.trim().length < 2) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('اكتب عنوان المهمة أولاً.')));
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('اكتب عنوان نموذج التقرير أولاً.')));
       return;
     }
-    if (_categoryId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('لا توجد فئة مهمة نشطة في قاعدة البيانات.')));
+    if (_fields.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('أضف حقلاً واحداً على الأقل إلى نموذج التقرير.')));
       return;
     }
     setState(() => _busy = true);
     try {
-      final payload = {
-        'title': _title.text.trim(),
-        'description': _description.text.trim(),
-        'instructions': _instructions.text.trim(),
-        'role_code': _role,
-        'task_type': 'operational',
-        'default_priority': _priority,
-        'category_id': _categoryId,
-        'is_active': true,
-        'steps': <Map<String, dynamic>>[],
-        'report_fields': _fields.asMap().entries.map((entry) => {
+      final result = await _db.rpc('save_report_form_draft', params: {
+        'p_organization_id': _org,
+        'p_template_id': null,
+        'p_title': _title.text.trim(),
+        'p_description': _description.text.trim(),
+        'p_role_code': _role,
+        'p_fields': _fields.asMap().entries.map((entry) => {
           ...entry.value,
           'sort_order': entry.key,
         }).toList(),
-      };
-      final templateId = await _db.rpc('save_task_designer_template', params: {
-        'p_organization_id': _org,
-        'p_template_id': null,
-        'p_payload': payload,
-      }) as String;
+        'p_report_required': true,
+      });
+      final draft = Map<String, dynamic>.from(result as Map);
+      final versionId = draft['version_id']?.toString();
+      if (versionId == null || versionId.isEmpty) {
+        throw Exception('report_form_draft_id_missing');
+      }
       if (!mounted) return;
-      final requestId = await _submitForApproval(templateId);
-      await _load();
       _title.clear();
       _description.clear();
       _instructions.clear();
       setState(() => _fields.clear());
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(requestId == null
-            ? 'تم حفظ القالب، ولم يُرسل طلب النشر.'
-            : 'تم حفظ القالب وإرسال طلب الاعتماد لصاحب المؤسسة. لن تظهر المهمة للموظفين قبل اعتماد عبدالرحمن.'),
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('تم حفظ نموذج التقرير كمسودة. أُرسل إلى شاشة اعتماد صاحب المؤسسة، ولن يُستخدم في مهام الموظفين قبل اعتماده.'),
       ));
     } catch (error) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(_friendlyError(error))));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
-  }
-
-  Future<String?> _submitForApproval(String templateId) async {
-    if (_dueAt.isBefore(DateTime.now().add(const Duration(minutes: 1)))) {
-      throw Exception('invalid_task_schedule');
-    }
-    final key = 'flutter-publication:$templateId:${DateTime.now().microsecondsSinceEpoch}';
-    final result = await _db.rpc('submit_task_publication_request', params: {
-      'p_organization_id': _org,
-      'p_template_id': templateId,
-      'p_branch_id': _branchId,
-      'p_due_at': _dueAt.toUtc().toIso8601String(),
-      'p_idempotency_key': key,
-    });
-    return result is String ? result : null;
   }
 
   Future<void> _chooseDueAt() async {
@@ -923,9 +901,7 @@ class _TaskPublicationReviewScreenState extends State<TaskPublicationReviewScree
   bool _loading = true;
   String? _error;
   String _busyId = '';
-  List<Map<String, dynamic>> _requests = [];
-  List<Map<String, dynamic>> _branches = [];
-  final Map<String, String> _notes = {};
+  List<Map<String, dynamic>> _drafts = [];
 
   SupabaseClient get _db => Supabase.instance.client;
   String get _org => widget.profile['institutionId'] as String? ?? '';
@@ -939,24 +915,25 @@ class _TaskPublicationReviewScreenState extends State<TaskPublicationReviewScree
   Future<void> _load() async {
     setState(() { _loading = true; _error = null; });
     try {
-      final results = await Future.wait([
-        _db.from('task_publication_requests')
-            .select('id,template_id,template_version,role_code,branch_id,due_at,template_snapshot,status,requested_at')
-            .eq('organization_id', _org)
-            .eq('status', 'pending_approval')
-            .order('requested_at')
-            .limit(100),
-        _db.from('branches')
-            .select('id,name')
-            .eq('organization_id', _org)
-            .eq('is_active', true)
-            .order('name'),
-      ]);
+      final rows = await _db.from('report_form_versions')
+          .select('id,template_id,version_no,status,created_at,report_required,report_form_templates!inner(title,role_code,organization_id),report_form_version_fields(field_key,label,field_type,is_required,sort_order,options,config)')
+          .eq('report_form_templates.organization_id', _org)
+          .eq('status', 'draft')
+          .order('created_at')
+          .limit(100);
+      final drafts = List<Map<String, dynamic>>.from(rows);
+      for (final draft in drafts) {
+        final rawFields = draft['report_form_version_fields'];
+        if (rawFields is List) {
+          rawFields.sort((a, b) {
+            final aa = a is Map ? int.tryParse(a['sort_order']?.toString() ?? '') ?? 0 : 0;
+            final bb = b is Map ? int.tryParse(b['sort_order']?.toString() ?? '') ?? 0 : 0;
+            return aa.compareTo(bb);
+          });
+        }
+      }
       if (!mounted) return;
-      setState(() {
-        _requests = List<Map<String, dynamic>>.from(results[0] as List);
-        _branches = List<Map<String, dynamic>>.from(results[1] as List);
-      });
+      setState(() => _drafts = drafts);
     } catch (error) {
       if (mounted) setState(() => _error = _friendlyError(error));
     } finally {
@@ -964,43 +941,29 @@ class _TaskPublicationReviewScreenState extends State<TaskPublicationReviewScree
     }
   }
 
-  Future<void> _review(Map<String, dynamic> request, bool approve) async {
-    final title = request['template_snapshot'] is Map
-        ? (request['template_snapshot'] as Map)['title']?.toString() ?? 'المهمة'
-        : 'المهمة';
+  Future<void> _approve(Map<String, dynamic> draft) async {
+    final template = (draft['report_form_templates'] as Map?)?.cast<String, dynamic>() ?? {};
+    final title = template['title']?.toString() ?? 'نموذج التقرير';
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: Text(approve ? 'اعتماد ونشر المهمة' : 'رفض طلب النشر'),
-        content: Text(approve
-            ? 'سيتم نشر «$title» تلقائياً لكل الموظفين النشطين المطابقين للدور والفرع. هل تعتمد النشر؟'
-            : 'سيتم رفض طلب «$title» ولن تصل المهمة إلى الموظفين.'),
+        title: const Text('اعتماد نموذج التقرير'),
+        content: Text('هل تعتمد نموذج «$title»؟ بعد الاعتماد يمكن ربطه بمهمة وإسنادها للموظف المناسب.'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('إلغاء')),
-          FilledButton(
-            onPressed: () => Navigator.pop(dialogContext, true),
-            child: Text(approve ? 'اعتماد ونشر' : 'تأكيد الرفض'),
-          ),
+          TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('مراجعة لاحقاً')),
+          FilledButton(onPressed: () => Navigator.pop(dialogContext, true), child: const Text('اعتماد النموذج')),
         ],
       ),
     );
     if (confirmed != true || !mounted) return;
-    final id = request['id'].toString();
+    final id = draft['id'].toString();
     setState(() => _busyId = id);
     try {
-      final count = await _db.rpc('review_and_publish_task_request', params: {
-        'p_organization_id': _org,
-        'p_request_id': id,
-        'p_approve': approve,
-        'p_review_note': (_notes[id] ?? '').trim().isEmpty ? null : _notes[id]!.trim(),
-      });
+      await _db.rpc('approve_report_form_version', params: {'p_version_id': id});
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(approve
-            ? 'تم الاعتماد والنشر. وصل التكليف إلى $count موظفاً مطابقاً.'
-            : 'تم رفض الطلب، ولم يُرسل التكليف إلى الموظفين.'),
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('تم اعتماد نموذج التقرير. أصبح جاهزاً للربط بمهمة.'),
       ));
-      _notes.remove(id);
       await _load();
     } catch (error) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(_friendlyError(error))));
@@ -1016,29 +979,25 @@ class _TaskPublicationReviewScreenState extends State<TaskPublicationReviewScree
     textDirection: TextDirection.rtl,
     child: Scaffold(
       appBar: AppBar(
-        title: const Text('اعتماد ونشر المهام'),
+        title: const Text('اعتماد نماذج التقارير'),
         actions: [IconButton(onPressed: _load, icon: const Icon(Icons.refresh))],
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _error != null
               ? _ErrorState(message: _error!, onRetry: _load)
-              : _requests.isEmpty
-                  ? const Center(child: Text('لا توجد طلبات مهام بانتظار اعتماد صاحب المؤسسة.'))
+              : _drafts.isEmpty
+                  ? const Center(child: Text('لا توجد نماذج تقارير بانتظار اعتماد صاحب المؤسسة.'))
                   : ListView.separated(
                       padding: const EdgeInsets.all(16),
-                      itemCount: _requests.length,
+                      itemCount: _drafts.length,
                       separatorBuilder: (_, __) => const SizedBox(height: 12),
                       itemBuilder: (context, index) {
-                        final request = _requests[index];
-                        final id = request['id'].toString();
-                        final snapshot = (request['template_snapshot'] as Map?)?.cast<String, dynamic>() ?? {};
-                        final fields = (snapshot['report_fields'] as List? ?? [])
-                            .map((e) => Map<String, dynamic>.from(e as Map)).toList();
-                        final steps = (snapshot['steps'] as List? ?? []);
-                        final branchMatches = _branches.where((b) => b['id'].toString() == request['branch_id']?.toString()).toList();
-                        final branch = branchMatches.isEmpty ? null : branchMatches.first;
-                        final branchName = request['branch_id'] == null ? 'جميع الفروع' : branch?['name']?.toString() ?? 'فرع غير معروف';
+                        final draft = _drafts[index];
+                        final id = draft['id'].toString();
+                        final template = (draft['report_form_templates'] as Map?)?.cast<String, dynamic>() ?? {};
+                        final fields = (draft['report_form_version_fields'] as List? ?? [])
+                            .whereType<Map>().map((field) => Map<String, dynamic>.from(field)).toList();
                         return Card(
                           elevation: 0,
                           child: Padding(
@@ -1046,66 +1005,26 @@ class _TaskPublicationReviewScreenState extends State<TaskPublicationReviewScree
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.stretch,
                               children: [
-                                Text(snapshot['title']?.toString() ?? 'مهمة بدون عنوان',
+                                Text(template['title']?.toString() ?? 'نموذج تقرير',
                                     style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
-                                const SizedBox(height: 8),
-                                Text('الدور المستهدف: ${_role(request['role_code']?.toString())}'),
-                                Text('الفرع: $branchName'),
-                                Text('موعد التسليم: ${_date(request['due_at'].toString())}'),
-                                Text('إصدار القالب: ${request['template_version']}'),
+                                const SizedBox(height: 6),
+                                Text('الدور المستهدف: ${_role(template['role_code']?.toString())}'),
+                                Text('الإصدار: ${draft['version_no']} · الحقول: ${fields.length}'),
                                 const Divider(height: 22),
-                                const Text('تعليمات المهمة', style: TextStyle(fontWeight: FontWeight.w800)),
-                                Text(snapshot['instructions']?.toString().isNotEmpty == true
-                                    ? snapshot['instructions'].toString()
-                                    : snapshot['description']?.toString() ?? 'لا توجد تعليمات إضافية.'),
-                                if (steps.isNotEmpty) ...[
-                                  const SizedBox(height: 12),
-                                  const Text('خطوات التنفيذ', style: TextStyle(fontWeight: FontWeight.w800)),
-                                  ...steps.asMap().entries.map((entry) {
-                                    final step = entry.value is Map ? entry.value as Map : {};
-                                    return Padding(
-                                      padding: const EdgeInsets.only(top: 5),
-                                      child: Text('${entry.key + 1}. ${step['title'] ?? ''} — ${step['instructions'] ?? ''}'),
-                                    );
-                                  }),
-                                ],
-                                const SizedBox(height: 12),
-                                const Text('حقول التقرير التي ستصل للموظف', style: TextStyle(fontWeight: FontWeight.w800)),
-                                if (fields.isEmpty) const Text('لا يحتوي القالب على حقول تقرير.'),
+                                const Text('الحقول التي ستظهر للموظف', style: TextStyle(fontWeight: FontWeight.w800)),
                                 ...fields.map((field) => Padding(
-                                  padding: const EdgeInsets.only(top: 6),
+                                  padding: const EdgeInsets.only(top: 7),
                                   child: Row(children: [
-                                    Expanded(child: Text(field['label']?.toString() ?? field['key']?.toString() ?? 'حقل')),
-                                    Text('${field['type'] ?? 'text'} · ${field['required'] == true ? 'إلزامي' : 'اختياري'}',
+                                    Expanded(child: Text(field['label']?.toString() ?? field['field_key']?.toString() ?? 'حقل')),
+                                    Text('${field['field_type'] ?? 'text'} · ${field['is_required'] == true ? 'إلزامي' : 'اختياري'}',
                                         style: TextStyle(color: Colors.blueGrey.shade600, fontSize: 11)),
                                   ]),
                                 )),
-                                const SizedBox(height: 12),
-                                TextField(
-                                  minLines: 1,
-                                  maxLines: 3,
-                                  onChanged: (value) => _notes[id] = value,
-                                  decoration: const InputDecoration(
-                                    labelText: 'ملاحظة الاعتماد أو سبب الرفض',
-                                    border: OutlineInputBorder(),
-                                  ),
+                                const SizedBox(height: 14),
+                                FilledButton(
+                                  onPressed: _busyId.isEmpty ? () => _approve(draft) : null,
+                                  child: Text(_busyId == id ? 'جارٍ الاعتماد...' : 'اعتماد نموذج التقرير'),
                                 ),
-                                const SizedBox(height: 12),
-                                Row(children: [
-                                  Expanded(
-                                    child: OutlinedButton(
-                                      onPressed: _busyId.isEmpty ? () => _review(request, false) : null,
-                                      child: Text(_busyId == id ? 'جارٍ التنفيذ...' : 'رفض الطلب'),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: FilledButton(
-                                      onPressed: _busyId.isEmpty ? () => _review(request, true) : null,
-                                      child: Text(_busyId == id ? 'جارٍ الاعتماد...' : 'اعتماد ونشر للموظفين'),
-                                    ),
-                                  ),
-                                ]),
                               ],
                             ),
                           ),
