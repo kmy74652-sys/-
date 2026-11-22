@@ -7,6 +7,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/theme.dart';
 import '../../core/offline_queue.dart';
+import '../../core/task_cache.dart';
 import '../../shared/app_shell.dart';
 
 class TasksScreen extends StatefulWidget {
@@ -15,10 +16,12 @@ class TasksScreen extends StatefulWidget {
   State<TasksScreen> createState() => _TasksScreenState();
 }
 
-class _TasksScreenState extends State<TasksScreen> {
+class _TasksScreenState extends State<TasksScreen>
+    with WidgetsBindingObserver {
   bool _loading = true;
   String? _error;
   List<Map<String, dynamic>> _tasks = [];
+  bool _showingCachedTasks = false;
   final TextEditingController _searchController = TextEditingController();
   String _search = '';
   String _statusFilter = 'all';
@@ -46,6 +49,7 @@ class _TasksScreenState extends State<TasksScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _load();
     _connectivitySubscription = Connectivity().onConnectivityChanged.listen((
       results,
@@ -56,9 +60,15 @@ class _TasksScreenState extends State<TasksScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _connectivitySubscription?.cancel();
     _searchController.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _load();
   }
 
   Future<void> _load() async {
@@ -68,6 +78,7 @@ class _TasksScreenState extends State<TasksScreen> {
     });
     try {
       final client = Supabase.instance.client;
+      final uid = client.auth.currentUser?.id;
       final rows = <Map<String, dynamic>>[];
       for (var offset = 0; ; offset += 500) {
         final page = await client
@@ -82,13 +93,23 @@ class _TasksScreenState extends State<TasksScreen> {
         if (page.length < 500) break;
       }
       _tasks = rows;
-      if (client.auth.currentUser != null) {
+      _showingCachedTasks = false;
+      if (uid != null) {
+        await TaskCache.save(uid, rows);
         await OfflineQueue.flush();
         _pendingCount = await OfflineQueue.pendingCount();
         _failedCount = await OfflineQueue.failedCount();
       }
     } catch (error) {
-      _error = 'تعذر تحميل المهام. تحقق من الاتصال وصلاحيات حسابك.';
+      final uid = Supabase.instance.client.auth.currentUser?.id;
+      final cached = uid == null ? null : await TaskCache.load(uid);
+      if (cached != null) {
+        _tasks = cached.tasks;
+        _showingCachedTasks = true;
+        _error = null;
+      } else {
+        _error = 'تعذر تحميل المهام. تحقق من الاتصال وصلاحيات حسابك.';
+      }
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -208,6 +229,22 @@ class _TasksScreenState extends State<TasksScreen> {
                 return ListView(
                   padding: const EdgeInsets.all(12),
                   children: [
+                    if (_showingCachedTasks)
+                      Card(
+                        color: Colors.amber.shade50,
+                        child: const ListTile(
+                          dense: true,
+                          leading: Icon(Icons.cloud_off),
+                          title: Text(
+                            'تُعرض آخر نسخة محفوظة من المهام',
+                            textAlign: TextAlign.right,
+                          ),
+                          subtitle: Text(
+                            'ستتم المزامنة تلقائيًا عند عودة الاتصال.',
+                            textAlign: TextAlign.right,
+                          ),
+                        ),
+                      ),
                     if (_pendingCount > 0)
                       Padding(
                         padding: const EdgeInsets.only(bottom: 8),
