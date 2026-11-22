@@ -556,17 +556,43 @@ class _DynamicTableEditor extends StatelessWidget {
                 ...columns.map((column) {
                   final key = (column['key'] ?? column['label'] ?? 'value').toString();
                   final label = (column['label'] ?? key).toString();
+                  final type = column['type']?.toString() ?? 'short_text';
+                  final current = entry.value[key];
+                  void updateCell(dynamic value) {
+                    final next = rows.map((row) => Map<String, dynamic>.from(row)).toList();
+                    next[entry.key][key] = value;
+                    onChanged(next);
+                  }
+
+                  Widget editor;
+                  if (type == 'select') {
+                    final options = (column['options'] as List? ?? []).map((option) => option.toString()).toList();
+                    editor = DropdownButtonFormField<String>(
+                      value: options.contains(current?.toString()) ? current.toString() : null,
+                      decoration: InputDecoration(labelText: label, border: const OutlineInputBorder()),
+                      items: options.map((option) => DropdownMenuItem(value: option, child: Text(option))).toList(),
+                      onChanged: updateCell,
+                    );
+                  } else if (type == 'boolean') {
+                    editor = SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: Text(label),
+                      value: current == true || current?.toString() == 'true',
+                      onChanged: updateCell,
+                    );
+                  } else {
+                    editor = TextFormField(
+                      initialValue: current?.toString() ?? '',
+                      keyboardType: ['integer','quantity','money'].contains(type)
+                          ? const TextInputType.numberWithOptions(decimal: true)
+                          : TextInputType.text,
+                      decoration: InputDecoration(labelText: label, border: const OutlineInputBorder()),
+                      onChanged: updateCell,
+                    );
+                  }
                   return Padding(
                     padding: const EdgeInsets.only(bottom: 8),
-                    child: TextFormField(
-                      initialValue: entry.value[key]?.toString() ?? '',
-                      decoration: InputDecoration(labelText: label, border: const OutlineInputBorder()),
-                      onChanged: (value) {
-                        final next = rows.map((row) => Map<String, dynamic>.from(row)).toList();
-                        next[entry.key][key] = value;
-                        onChanged(next);
-                      },
-                    ),
+                    child: editor,
                   );
                 }),
               ],
