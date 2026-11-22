@@ -18,9 +18,8 @@ class _TaskDesignerScreenState extends State<TaskDesignerScreen> {
   List<Map<String, dynamic>> _templates = [],
       _categories = [],
       _roles = [],
-      _forms = [],
       _steps = [],
-      _links = [];
+      _reportFields = [];
   String? _templateId, _categoryId, _subcategoryId, _roleCode;
   String _priority = 'normal';
   bool _active = true;
@@ -97,10 +96,6 @@ class _TaskDesignerScreenState extends State<TaskDesignerScreen> {
             .select('code,name_ar')
             .order('name_ar')
             .limit(200),
-        _db.rpc(
-          'list_task_library_report_forms',
-          params: {'p_organization_id': org},
-        ),
         _db
             .from('task_templates')
             .select(
@@ -115,8 +110,7 @@ class _TaskDesignerScreenState extends State<TaskDesignerScreen> {
         _orgId = org;
         _categories = _rows(results[0]);
         _roles = _rows(results[1]);
-        _forms = _rows(results[2]);
-        _templates = _rows(results[3]);
+        _templates = _rows(results[2]);
       });
     } catch (e) {
       if (mounted)
@@ -141,7 +135,7 @@ class _TaskDesignerScreenState extends State<TaskDesignerScreen> {
         _priority = 'normal';
         _active = true;
         _steps = [];
-        _links = [];
+        _reportFields = [];
       });
       return;
     }
@@ -161,8 +155,8 @@ class _TaskDesignerScreenState extends State<TaskDesignerScreen> {
             .order('sort_order')
             .limit(300),
         _db
-            .from('task_template_report_forms')
-            .select('version_id,sort_order,is_required')
+            .from('task_template_report_fields')
+            .select('field_key,label,field_type,is_required,options,sort_order,description,repeatable,validation,config')
             .eq('template_id', id)
             .order('sort_order')
             .limit(300),
@@ -189,14 +183,7 @@ class _TaskDesignerScreenState extends State<TaskDesignerScreen> {
               },
             )
             .toList();
-        _links = _rows(values[1])
-            .map(
-              (f) => {
-                'version_id': _str(f['version_id']),
-                'required': f['is_required'] == true,
-              },
-            )
-            .toList();
+        _reportFields = _rows(values[1]);
         _editing = true;
       });
     } catch (e) {
@@ -221,6 +208,14 @@ class _TaskDesignerScreenState extends State<TaskDesignerScreen> {
     }
     if (_steps.any((s) => _str(s['title']).trim().isEmpty)) {
       _message('أدخل عنواناً لكل خطوة أو احذف الخطوة الفارغة.');
+      return;
+    }
+    if (_reportFields.any((f) {
+      final key = _str(f['field_key']).trim();
+      final label = _str(f['label']).trim();
+      return label.isEmpty || !RegExp(r'^[a-z][a-z0-9_]{0,63}$').hasMatch(key);
+    })) {
+      _message('أدخل اسم كل بند ومفتاحاً يبدأ بحرف إنجليزي ويحتوي a-z أو _.');
       return;
     }
     if (_roleCode == null || _orgId == null) {
@@ -272,14 +267,29 @@ class _TaskDesignerScreenState extends State<TaskDesignerScreen> {
               },
             )
             .toList(),
-        'report_forms': _links
+        'report_fields': _reportFields
             .asMap()
             .entries
             .map(
               (entry) => <String, dynamic>{
-                'version_id': entry.value['version_id'],
+                'field_key': _str(entry.value['field_key']).trim(),
+                'label': _str(entry.value['label']).trim(),
+                'field_type': _str(entry.value['field_type'], 'text'),
+                'is_required': entry.value['is_required'] == true,
                 'sort_order': entry.key,
-                'required': entry.value['required'] == true,
+                'description': _str(entry.value['description']).trim().isEmpty
+                    ? null
+                    : _str(entry.value['description']).trim(),
+                'repeatable': entry.value['repeatable'] == true,
+                'options': entry.value['options'] is List
+                    ? entry.value['options']
+                    : <dynamic>[],
+                'validation': entry.value['validation'] is Map
+                    ? entry.value['validation']
+                    : <String, dynamic>{},
+                'config': entry.value['config'] is Map
+                    ? entry.value['config']
+                    : <String, dynamic>{},
               },
             )
             .toList(),
@@ -308,15 +318,6 @@ class _TaskDesignerScreenState extends State<TaskDesignerScreen> {
     ScaffoldMessenger.of(
       context,
     ).showSnackBar(SnackBar(content: Text(text, textAlign: TextAlign.right)));
-  }
-
-  void _toggleForm(String versionId, bool checked) {
-    setState(() {
-      final index = _links.indexWhere((e) => e['version_id'] == versionId);
-      if (checked && index < 0)
-        _links.add({'version_id': versionId, 'required': true});
-      if (!checked && index >= 0) _links.removeAt(index);
-    });
   }
 
   @override
@@ -444,7 +445,6 @@ class _TaskDesignerScreenState extends State<TaskDesignerScreen> {
                 .toList(),
             (v) => setState(() {
               _roleCode = v;
-              _links.clear();
             }),
           ),
           const SizedBox(height: 10),
@@ -535,51 +535,38 @@ class _TaskDesignerScreenState extends State<TaskDesignerScreen> {
             ),
     ),
     SectionCard(
-      title: 'نماذج التقارير المعتمدة',
-      child: _forms.isEmpty
+      title: 'حقول التقرير والجدول',
+      trailing: IconButton(
+        onPressed: () => setState(() => _reportFields.add({
+          'field_key': 'field_${_reportFields.length + 1}',
+          'label': '',
+          'field_type': 'text',
+          'is_required': false,
+          'repeatable': false,
+          'options': <dynamic>[],
+        })),
+        icon: const Icon(Icons.add_circle_outline),
+        tooltip: 'إضافة حقل تقرير',
+      ),
+      child: _reportFields.isEmpty
           ? const Text(
-              'لا توجد نماذج تقارير معتمدة متاحة لهذا الدور.',
+              'أضف بنود التقرير كحقول مستقلة. ستظهر للموظف كحقول إدخال منظمة، ويمكن تكرارها كسجلات جدول.',
               textAlign: TextAlign.right,
             )
           : Column(
-              children: _forms.where((f) => _str(f['role_code']) == _roleCode).map((
-                form,
-              ) {
-                final version = _str(form['approved_version_id']);
-                final index = _links.indexWhere(
-                  (e) => e['version_id'] == version,
-                );
-                final selected = index >= 0;
-                return Column(
-                  children: [
-                    CheckboxListTile(
-                      contentPadding: EdgeInsets.zero,
-                      controlAffinity: ListTileControlAffinity.leading,
-                      title: Text(
-                        '${_str(form['title'])} · إصدار ${_str(form['approved_version_no'])}',
-                        textAlign: TextAlign.right,
-                      ),
-                      subtitle: Text(
-                        _str(form['description']),
-                        textAlign: TextAlign.right,
-                      ),
-                      value: selected,
-                      onChanged: (v) => _toggleForm(version, v == true),
-                    ),
-                    if (selected)
-                      SwitchListTile(
-                        contentPadding: const EdgeInsets.only(right: 24),
-                        title: const Text(
-                          'التقرير مطلوب',
-                          textAlign: TextAlign.right,
-                        ),
-                        value: _links[index]['required'] == true,
-                        onChanged: (v) =>
-                            setState(() => _links[index]['required'] = v),
-                      ),
-                  ],
-                );
-              }).toList(),
+              children: [
+                const Align(
+                  alignment: Alignment.centerRight,
+                  child: Text(
+                    'المفتاح يجب أن يكون إنجليزياً (مثل attendance_time)، أما الاسم الظاهر فاكتبه بالعربية.',
+                    style: TextStyle(fontSize: 12),
+                    textAlign: TextAlign.right,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                for (var i = 0; i < _reportFields.length; i++)
+                  _reportFieldEditor(i),
+              ],
             ),
     ),
     const SizedBox(height: 8),
@@ -670,6 +657,82 @@ class _TaskDesignerScreenState extends State<TaskDesignerScreen> {
                 decoration: const InputDecoration(labelText: 'تعليمات الإثبات'),
                 onChanged: (v) => step['evidence_instructions'] = v,
               ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _reportFieldEditor(int index) {
+    final field = _reportFields[index];
+    return Card(
+      color: AppColors.canvas,
+      margin: const EdgeInsets.only(bottom: 10),
+      child: Padding(
+        padding: const EdgeInsets.all(10),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text('بند التقرير ${index + 1}',
+                      style: const TextStyle(fontWeight: FontWeight.bold)),
+                ),
+                IconButton(
+                  onPressed: () => setState(() => _reportFields.removeAt(index)),
+                  icon: const Icon(Icons.delete_outline, color: Colors.red),
+                  tooltip: 'حذف البند',
+                ),
+              ],
+            ),
+            TextFormField(
+              initialValue: _str(field['field_key']),
+              textAlign: TextAlign.right,
+              decoration: const InputDecoration(labelText: 'المفتاح البرمجي *'),
+              onChanged: (v) => field['field_key'] = v.trim().toLowerCase(),
+            ),
+            const SizedBox(height: 8),
+            TextFormField(
+              initialValue: _str(field['label']),
+              textAlign: TextAlign.right,
+              decoration: const InputDecoration(labelText: 'اسم البند الظاهر *'),
+              onChanged: (v) => field['label'] = v,
+            ),
+            const SizedBox(height: 8),
+            _dropdown<String>(
+              'نوع الحقل',
+              _str(field['field_type'], 'text'),
+              const [
+                DropdownMenuItem(value: 'text', child: Text('نص قصير')),
+                DropdownMenuItem(value: 'long_text', child: Text('نص طويل')),
+                DropdownMenuItem(value: 'number', child: Text('رقم')),
+                DropdownMenuItem(value: 'date', child: Text('تاريخ')),
+                DropdownMenuItem(value: 'select', child: Text('اختيار')),
+                DropdownMenuItem(value: 'multi_select', child: Text('اختيارات متعددة')),
+                DropdownMenuItem(value: 'attachment', child: Text('مرفق / صورة')),
+              ],
+              (v) => setState(() => field['field_type'] = v ?? 'text'),
+            ),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('البند إلزامي', textAlign: TextAlign.right),
+              value: field['is_required'] == true,
+              onChanged: (v) => setState(() => field['is_required'] = v),
+            ),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('سجلات متكررة (عرض جدولي)', textAlign: TextAlign.right),
+              subtitle: const Text('فعّلها للدوام أو المصروفات أو الحضور المتعدد.', textAlign: TextAlign.right),
+              value: field['repeatable'] == true,
+              onChanged: (v) => setState(() => field['repeatable'] = v),
+            ),
+            TextFormField(
+              initialValue: _str(field['description']),
+              textAlign: TextAlign.right,
+              decoration: const InputDecoration(labelText: 'شرح البند (اختياري)'),
+              onChanged: (v) => field['description'] = v,
+            ),
           ],
         ),
       ),

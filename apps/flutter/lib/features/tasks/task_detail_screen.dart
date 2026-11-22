@@ -1364,19 +1364,25 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                         'موعد الاستحقاق: ${_task!['due_at']}',
                         textAlign: TextAlign.right,
                       ),
-                    if (_task?['description'] != null)
-                      Text(
-                        '${_task!['description']}',
-                        textAlign: TextAlign.right,
-                      ),
-                    if (_task?['task_instructions'] != null)
-                      Text(
-                        '${_task!['task_instructions']}',
-                        textAlign: TextAlign.right,
-                      ),
                   ],
                 ),
               ),
+              if ('${_task?['description'] ?? ''}'.trim().isNotEmpty)
+                SectionCard(
+                  title: 'وصف المهمة',
+                  child: Text(
+                    '${_task!['description']}',
+                    textAlign: TextAlign.right,
+                  ),
+                ),
+              if ('${_task?['task_instructions'] ?? ''}'.trim().isNotEmpty)
+                SectionCard(
+                  title: 'تعليمات التنفيذ',
+                  child: Text(
+                    '${_task!['task_instructions']}',
+                    textAlign: TextAlign.right,
+                  ),
+                ),
               if (_steps.isNotEmpty)
                 SectionCard(
                   title: 'خطوات التنفيذ',

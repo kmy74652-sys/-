@@ -434,6 +434,8 @@ class _TasksScreenState extends State<TasksScreen>
                                     Text(
                                       '${task['description']}',
                                       textAlign: TextAlign.right,
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
                                     ),
                                   Text(
                                     'الحالة: ${_statusLabels[_normalizedStatus(task)] ?? task['status'] ?? 'جديدة'} · الأولوية: ${_priorityLabels['${task['priority'] ?? 'normal'}'] ?? task['priority'] ?? 'عادية'}',
