@@ -3,7 +3,9 @@ import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-enum OfflineQueueKind { status, report }
+import 'offline_attachment_store.dart';
+
+enum OfflineQueueKind { status, report, attachment }
 
 class OfflineQueueItem {
   const OfflineQueueItem({
@@ -231,6 +233,33 @@ class OfflineQueue {
           'p_note': p['note'],
         },
       );
+    } else if (item.kind == OfflineQueueKind.attachment) {
+      final localPath = '${p['localPath'] ?? ''}';
+      if (localPath.isEmpty) throw StateError('المرفق المحلي غير موجود.');
+      final bytes = await OfflineAttachmentStore.read(localPath);
+      await db.storage.from('task-attachments').uploadBinary(
+            '${p['storagePath']}',
+            bytes,
+            fileOptions: FileOptions(
+              contentType: '${p['mimeType']}',
+              upsert: false,
+            ),
+          );
+      try {
+        await db.from('task_attachments').insert({
+          'task_id': p['taskId'],
+          'execution_step_id': p['stepId'],
+          'uploaded_by': item.ownerUid,
+          'file_name': p['fileName'],
+          'storage_path': p['storagePath'],
+          'mime_type': p['mimeType'],
+          'size_bytes': p['size'],
+        });
+      } catch (_) {
+        await db.storage.from('task-attachments').remove(['${p['storagePath']}']);
+        rethrow;
+      }
+      await OfflineAttachmentStore.delete(localPath);
     } else if (p['snapshotId'] != null) {
       await db.rpc(
         'mobile_submit_task_report_form',

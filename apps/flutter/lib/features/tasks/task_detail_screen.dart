@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:math' as math;
+import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
@@ -7,6 +8,7 @@ import 'package:go_router/go_router.dart';
 import 'package:mime/mime.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../core/offline_attachment_store.dart';
 import '../../core/offline_queue.dart';
 import '../../shared/app_shell.dart';
 
@@ -1125,20 +1127,26 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
   }
 
   Future<void> _uploadEvidence(String stepId) async {
+    PlatformFile? selectedFile;
+    Uint8List? selectedBytes;
+    String? ownerUid;
+    String? storagePath;
+    String? mime;
     try {
-      final file = await FilePicker.pickFile(type: FileType.any);
-      if (file == null) return;
-      final size = await file.length() ?? 0;
+      selectedFile = await FilePicker.pickFile(type: FileType.any);
+      if (selectedFile == null) return;
+      final size = await selectedFile.length() ?? 0;
       if (size <= 0 || size > 20 * 1024 * 1024)
         throw Exception('الحد الأعلى لحجم المرفق 20 ميجابايت.');
-      final bytes = await file.readAsBytes();
+      selectedBytes = await selectedFile.readAsBytes();
       final db = Supabase.instance.client;
       final user = db.auth.currentUser;
       if (user == null) throw Exception('سجّل الدخول مجددًا.');
-      final safeName = file.name.replaceAll(RegExp(r'[^a-zA-Z0-9._-]'), '_');
-      final path =
+      ownerUid = user.id;
+      final safeName = selectedFile.name.replaceAll(RegExp(r'[^a-zA-Z0-9._-]'), '_');
+      storagePath =
           '${widget.taskId}/${DateTime.now().microsecondsSinceEpoch}-$safeName';
-      final mime = switch (file.extension?.toLowerCase()) {
+      mime = switch (selectedFile.extension?.toLowerCase()) {
         'pdf' => 'application/pdf',
         'png' => 'image/png',
         'jpg' || 'jpeg' => 'image/jpeg',
@@ -1149,8 +1157,8 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
       await db.storage
           .from('task-attachments')
           .uploadBinary(
-            path,
-            bytes,
+            storagePath,
+            selectedBytes,
             fileOptions: FileOptions(contentType: mime, upsert: false),
           );
       try {
@@ -1160,8 +1168,8 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
               'task_id': widget.taskId,
               'execution_step_id': stepId,
               'uploaded_by': user.id,
-              'file_name': file.name,
-              'storage_path': path,
+              'file_name': selectedFile.name,
+              'storage_path': storagePath,
               'mime_type': mime,
               'size_bytes': size,
             })
@@ -1170,10 +1178,40 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
         _evidenceIds.putIfAbsent(stepId, () => []).add('${metadata['id']}');
         if (mounted) setState(() {});
       } catch (_) {
-        await db.storage.from('task-attachments').remove([path]);
+        await db.storage.from('task-attachments').remove([storagePath]);
         rethrow;
       }
     } catch (error) {
+      if (ownerUid != null &&
+          selectedFile != null &&
+          selectedBytes != null &&
+          storagePath != null &&
+          mime != null &&
+          await OfflineQueue.isNetworkError(error)) {
+        try {
+          final localPath = await OfflineAttachmentStore.save(
+            ownerUid: ownerUid,
+            attachmentId: storagePath.split('/').last,
+            bytes: selectedBytes,
+          );
+          await OfflineQueue.enqueue(OfflineQueueKind.attachment, {
+            'taskId': widget.taskId,
+            'stepId': stepId,
+            'idempotencyKey': 'evidence:$storagePath',
+            'localPath': localPath,
+            'storagePath': storagePath,
+            'fileName': selectedFile.name,
+            'mimeType': mime,
+            'size': selectedBytes.length,
+          });
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('تم حفظ الدليل محليًا وسيُرفع تلقائيًا عند عودة الاتصال.')),
+            );
+          }
+          return;
+        } catch (_) {}
+      }
       if (mounted)
         ScaffoldMessenger.of(context)
             .showSnackBar(SnackBar(content: Text('تعذر رفع المرفق: $error')));
