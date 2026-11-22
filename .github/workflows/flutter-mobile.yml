@@ -1,5 +1,9 @@
 name: Flutter mobile checks
 
+concurrency:
+  group: flutter-mobile-${{ github.ref }}
+  cancel-in-progress: true
+
 on:
   push:
     branches:
@@ -31,3 +35,11 @@ jobs:
         run: flutter analyze
       - name: Run widget tests
         run: flutter test
+      - name: Build Android APK
+        run: flutter build apk --release
+      - name: Upload Android APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: alshaeri-flutter-android-apk
+          path: apps/flutter/build/app/outputs/flutter-apk/app-release.apk
+          if-no-files-found: error
