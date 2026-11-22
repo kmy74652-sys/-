@@ -23,7 +23,7 @@ concurrency:
 env:
   FLUTTER_VERSION: '3.50.1'
   JAVA_VERSION: '17'
-  ANDROID_API_LEVEL: '35'
+  ANDROID_API_LEVEL: '36'
   ANDROID_BUILD_TOOLS: '35.0.0'
 
 jobs:
@@ -54,7 +54,7 @@ jobs:
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
         with:
-          packages: platform-tools platforms;android-35 build-tools;35.0.0
+          packages: platform-tools platforms;android-36 build-tools;35.0.0
           accept-android-sdk-licenses: true
 
       - name: Install Android SDK packages
@@ -108,7 +108,7 @@ jobs:
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
         with:
-          packages: platform-tools platforms;android-35 build-tools;35.0.0
+          packages: platform-tools platforms;android-36 build-tools;35.0.0
           accept-android-sdk-licenses: true
 
       - name: Install dependencies
@@ -159,7 +159,7 @@ jobs:
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
         with:
-          packages: platform-tools platforms;android-35 build-tools;35.0.0
+          packages: platform-tools platforms;android-36 build-tools;35.0.0
           accept-android-sdk-licenses: true
 
       - name: Install dependencies
