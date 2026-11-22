@@ -35,6 +35,9 @@ jobs:
         run: flutter analyze
       - name: Run widget tests
         run: flutter test
+      - name: Generate Android platform files
+        run: flutter create --platforms=android --org com.alshaairy --project-name alshaeri .
+
       - name: Build Android APK
         run: flutter build apk --release
       - name: Upload Android APK
