@@ -228,7 +228,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
     }
     setState(() => _saving = true);
     try {
-      final values = {
+      var values = <String, dynamic>{
         for (final field in _fields)
           '${field['field_key']}': _convert(
             _inputs['${field['field_key']}']?.text ?? '',
@@ -238,6 +238,10 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
       final idempotencyKey =
           'flutter:${widget.taskId}:${DateTime.now().microsecondsSinceEpoch}';
       try {
+        values = await OfflineQueue.resolvePendingAttachments(
+          values,
+          widget.taskId,
+        );
         await Supabase.instance.client.rpc(
           'mobile_submit_task_report',
           params: {
@@ -655,13 +659,17 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
     String snapshotId,
     List<Map<String, dynamic>> schema,
   ) async {
-    final values = <String, dynamic>{};
+    var values = <String, dynamic>{};
     for (final field in schema) {
       final value = _snapshotValue(field, snapshotId);
       if (value != null) values['${field['key']}'] = value;
     }
     setState(() => _saving = true);
     try {
+      values = await OfflineQueue.resolvePendingAttachments(
+        values,
+        widget.taskId,
+      );
       await Supabase.instance.client.rpc(
         'save_task_report_draft',
         params: {
@@ -696,7 +704,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
         return;
       }
     }
-    final values = <String, dynamic>{};
+    var values = <String, dynamic>{};
     for (final field in schema) {
       final value = _snapshotValue(field, snapshotId);
       if (value != null) values['${field['key']}'] = value;
@@ -706,6 +714,10 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
         'report:$snapshotId:${widget.taskId}:${DateTime.now().millisecondsSinceEpoch}';
     try {
       try {
+        values = await OfflineQueue.resolvePendingAttachments(
+          values,
+          widget.taskId,
+        );
         await Supabase.instance.client.rpc(
           'mobile_submit_task_report_form',
           params: {
@@ -792,13 +804,32 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
         final safe = file.name.replaceAll(RegExp(r'[^a-zA-Z0-9._-]'), '_');
         final path =
             '${widget.taskId}/${DateTime.now().microsecondsSinceEpoch}-${math.Random.secure().nextInt(1 << 32)}-$safe';
-        await db.storage
-            .from('task-attachments')
-            .uploadBinary(
-              path,
-              bytes,
-              fileOptions: FileOptions(contentType: mime, upsert: false),
+        try {
+          await db.storage
+              .from('task-attachments')
+              .uploadBinary(
+                path,
+                bytes,
+                fileOptions: FileOptions(contentType: mime, upsert: false),
+              );
+        } catch (error) {
+          if (await OfflineQueue.isNetworkError(error)) {
+            final localPath = await OfflineAttachmentStore.save(
+              ownerUid: user.id,
+              attachmentId: path.split('/').last,
+              bytes: bytes,
             );
+            current.add({
+              'pendingUpload': true,
+              'localPath': localPath,
+              'name': file.name,
+              'mimeType': mime,
+              'size': size,
+            });
+            continue;
+          }
+          rethrow;
+        }
         try {
           final row = await db
               .from('task_attachments')

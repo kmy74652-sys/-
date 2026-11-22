@@ -199,16 +199,26 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
                                       color: AppColors.muted,
                                     ),
                                   ),
-                            onTap: item.taskId == null
-                                ? null
-                                : () {
-                                    final taskId = item.taskId!;
-                                    Navigator.pop(sheetContext);
-                                    if (taskId.isNotEmpty) {
-                                      NotificationsRepository.markTaskOpened(taskId);
-                                      context.go('/tasks/$taskId');
-                                    }
-                                  },
+                            onTap: () async {
+                              try {
+                                await NotificationsRepository.markRead(item.id);
+                                if (mounted && item.isUnread) {
+                                  setState(
+                                    () => _unreadCount =
+                                        (_unreadCount - 1).clamp(0, 999999).toInt(),
+                                  );
+                                }
+                              } catch (_) {
+                                // لا يمنع فشل الشبكة قراءة الإشعار أو فتح المهمة.
+                              }
+                              final taskId = item.taskId;
+                              if (!sheetContext.mounted) return;
+                              Navigator.pop(sheetContext);
+                              if (taskId != null && taskId.isNotEmpty) {
+                                NotificationsRepository.markTaskOpened(taskId);
+                                context.go('/tasks/$taskId');
+                              }
+                            },
                           );
                         },
                       ),

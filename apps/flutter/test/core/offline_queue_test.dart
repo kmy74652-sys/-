@@ -132,5 +132,40 @@ void main() {
       expect(restored.payload['stepId'], 'step-3');
       expect(restored.payload['size'], 128);
     });
+
+    test('preserves pending report attachment metadata without embedding bytes', () {
+      final item = OfflineQueueItem(
+        id: 'report:task-4:key-4',
+        ownerUid: 'user-4',
+        kind: OfflineQueueKind.report,
+        payload: {
+          'taskId': 'task-4',
+          'idempotencyKey': 'key-4',
+          'values': {
+            'proof': [
+              {
+                'pendingUpload': true,
+                'localPath': '/app-support/offline-attachments/user-4/a.bin',
+                'name': 'a.pdf',
+                'mimeType': 'application/pdf',
+                'size': 2048,
+              },
+            ],
+          },
+        },
+        attempts: 0,
+        createdAt: DateTime.utc(2026, 11, 22, 10),
+        nextAttemptAt: DateTime.utc(2026, 11, 22, 10),
+      );
+
+      final restored = OfflineQueueItem.fromJson(item.toJson());
+
+      expect(restored, isNotNull);
+      expect(restored!.payload['values'], item.payload['values']);
+      expect(
+        (restored.payload['values'] as Map)['proof'][0]['pendingUpload'],
+        isTrue,
+      );
+    });
   });
 }
