@@ -11,11 +11,11 @@ Future<void> main() async {
 
   const supabaseUrl = String.fromEnvironment(
     'SUPABASE_URL',
-    defaultValue: 'https://fjmryqhdwxsocdzswnkq.supabase.co',
+    defaultValue: 'https://qoeruidmtsasvhxejyga.supabase.co',
   );
   const supabasePublishableKey = String.fromEnvironment(
     'SUPABASE_PUBLISHABLE_KEY',
-    defaultValue: 'sb_publishable_vRWbeJO5I_KJwJjqVDSZLA_pEHABsPk',
+    defaultValue: 'sb_publishable_9eVggM535cGiWxO6GBe9TA_o8HL_o6y',
   );
 
   final hasSupabaseConfig =
