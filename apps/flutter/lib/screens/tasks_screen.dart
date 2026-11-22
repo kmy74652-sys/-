@@ -743,8 +743,12 @@ class _TaskDesignerScreenState extends State<TaskDesignerScreen> {
                   final minRows = int.tryParse(minRowsController.text.trim());
                   final maxRows = int.tryParse(maxRowsController.text.trim());
                   if (columns.isEmpty || minRows == null || maxRows == null ||
-                      minRows < 0 || maxRows < 1 || minRows > maxRows || maxRows > 500) return;
-                  if (columns.map((column) => column['key']).toSet().length != columns.length) return;
+                      minRows < 0 || maxRows < 1 || minRows > maxRows || maxRows > 500) {
+                    return;
+                  }
+                  if (columns.map((column) => column['key']).toSet().length != columns.length) {
+                    return;
+                  }
                   config = {'columns': columns, 'min_rows': minRows, 'max_rows': maxRows};
                 }
 
