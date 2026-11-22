@@ -509,44 +509,25 @@ class _TaskDesignerScreenState extends State<TaskDesignerScreen> {
       ),
     ),
     SectionCard(
-      title: 'خطوات التنفيذ',
-      trailing: IconButton(
-        onPressed: () => setState(
-          () => _steps.add({
-            'title': '',
-            'instructions': '',
-            'is_required': true,
-            'evidence_required': false,
-            'evidence_instructions': '',
-          }),
-        ),
-        icon: const Icon(Icons.add_circle_outline),
-        tooltip: 'إضافة خطوة',
+      title: 'جدول خطوات التنفيذ',
+      trailing: FilledButton.icon(
+        onPressed: _addStep,
+        icon: const Icon(Icons.add),
+        label: const Text('إضافة صف'),
       ),
       child: _steps.isEmpty
           ? const Text(
-              'أضف الخطوات بالترتيب المطلوب.',
+              'أضف صفًا لكل خطوة. ستُنقل الصفوف نفسها إلى تنفيذ المهمة بالترتيب الظاهر هنا.',
               textAlign: TextAlign.right,
             )
-          : Column(
-              children: [
-                for (var i = 0; i < _steps.length; i++) _stepEditor(i),
-              ],
-            ),
+          : _stepsGrid(),
     ),
     SectionCard(
-      title: 'حقول التقرير والجدول',
-      trailing: IconButton(
-        onPressed: () => setState(() => _reportFields.add({
-          'field_key': 'field_${_reportFields.length + 1}',
-          'label': '',
-          'field_type': 'text',
-          'is_required': false,
-          'repeatable': false,
-          'options': <dynamic>[],
-        })),
-        icon: const Icon(Icons.add_circle_outline),
-        tooltip: 'إضافة حقل تقرير',
+      title: 'مصمم التقرير الديناميكي',
+      trailing: FilledButton.icon(
+        onPressed: _addReportField,
+        icon: const Icon(Icons.add),
+        label: const Text('إضافة حقل'),
       ),
       child: _reportFields.isEmpty
           ? const Text(
@@ -555,10 +536,10 @@ class _TaskDesignerScreenState extends State<TaskDesignerScreen> {
             )
           : Column(
               children: [
-                const Align(
+              const Align(
                   alignment: Alignment.centerRight,
                   child: Text(
-                    'المفتاح يجب أن يكون إنجليزياً (مثل attendance_time)، أما الاسم الظاهر فاكتبه بالعربية.',
+                    'صمّم التقرير من نفس الشاشة. اختر «جدول متعدد الصفوف» لإضافة أعمدة وصفوف التقرير وحفظها مع القالب.',
                     style: TextStyle(fontSize: 12),
                     textAlign: TextAlign.right,
                   ),
@@ -582,6 +563,106 @@ class _TaskDesignerScreenState extends State<TaskDesignerScreen> {
       label: Text(_saving ? 'جارٍ الحفظ…' : 'حفظ القالب'),
     ),
   ];
+
+  void _addStep() => setState(() => _steps.add({
+        'title': '',
+        'instructions': '',
+        'is_required': true,
+        'evidence_required': false,
+        'evidence_instructions': '',
+      }));
+
+  void _addReportField() => setState(() => _reportFields.add({
+        'field_key': 'field_${_reportFields.length + 1}',
+        'label': '',
+        'field_type': 'short_text',
+        'is_required': false,
+        'repeatable': false,
+        'options': <dynamic>[],
+        'config': <String, dynamic>{},
+      }));
+
+  Widget _stepsGrid() => SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: DataTable(
+          headingRowColor: MaterialStatePropertyAll(
+            AppColors.primary.withOpacity(.08),
+          ),
+          columnSpacing: 18,
+          dataRowMinHeight: 72,
+          dataRowMaxHeight: 180,
+          columns: const [
+            DataColumn(label: Text('رقم')),
+            DataColumn(label: Text('عنوان الخطوة *')),
+            DataColumn(label: Text('وصف التنفيذ')),
+            DataColumn(label: Text('إلزامية')),
+            DataColumn(label: Text('إثبات')),
+            DataColumn(label: Text('إجراءات')),
+          ],
+          rows: [
+            for (var i = 0; i < _steps.length; i++) _stepRow(i),
+          ],
+        ),
+      );
+
+  DataRow _stepRow(int index) {
+    final step = _steps[index];
+    return DataRow(cells: [
+      DataCell(Text('${index + 1}')),
+      DataCell(SizedBox(
+        width: 190,
+        child: TextFormField(
+          key: ValueKey('step_title_$index'),
+          initialValue: _str(step['title']),
+          textAlign: TextAlign.right,
+          decoration: const InputDecoration(labelText: 'العنوان'),
+          onChanged: (v) => step['title'] = v,
+        ),
+      )),
+      DataCell(SizedBox(
+        width: 250,
+        child: TextFormField(
+          key: ValueKey('step_instructions_$index'),
+          initialValue: _str(step['instructions']),
+          textAlign: TextAlign.right,
+          maxLines: 3,
+          decoration: const InputDecoration(labelText: 'التعليمات'),
+          onChanged: (v) => step['instructions'] = v,
+        ),
+      )),
+      DataCell(Checkbox(
+        value: step['is_required'] == true,
+        onChanged: (v) => setState(() => step['is_required'] = v == true),
+      )),
+      DataCell(Checkbox(
+        value: step['evidence_required'] == true,
+        onChanged: (v) => setState(() => step['evidence_required'] = v == true),
+      )),
+      DataCell(Row(mainAxisSize: MainAxisSize.min, children: [
+        IconButton(
+          tooltip: 'نقل لأعلى',
+          onPressed: index == 0 ? null : () => setState(() {
+            final item = _steps.removeAt(index);
+            _steps.insert(index - 1, item);
+          }),
+          icon: const Icon(Icons.keyboard_arrow_up),
+        ),
+        IconButton(
+          tooltip: 'نقل لأسفل',
+          onPressed: index == _steps.length - 1 ? null : () => setState(() {
+            final item = _steps.removeAt(index);
+            _steps.insert(index + 1, item);
+          }),
+          icon: const Icon(Icons.keyboard_arrow_down),
+        ),
+        IconButton(
+          tooltip: 'حذف الصف من المسودة',
+          onPressed: () => setState(() => _steps.removeAt(index)),
+          icon: const Icon(Icons.delete_outline, color: Colors.red),
+        ),
+      ])),
+    ]);
+  }
 
   Widget _stepEditor(int index) {
     final step = _steps[index];
@@ -705,12 +786,14 @@ class _TaskDesignerScreenState extends State<TaskDesignerScreen> {
               _str(field['field_type'], 'text'),
               const [
                 DropdownMenuItem(value: 'text', child: Text('نص قصير')),
+                DropdownMenuItem(value: 'short_text', child: Text('نص قصير')),
                 DropdownMenuItem(value: 'long_text', child: Text('نص طويل')),
                 DropdownMenuItem(value: 'number', child: Text('رقم')),
                 DropdownMenuItem(value: 'date', child: Text('تاريخ')),
                 DropdownMenuItem(value: 'select', child: Text('اختيار')),
                 DropdownMenuItem(value: 'multi_select', child: Text('اختيارات متعددة')),
                 DropdownMenuItem(value: 'attachment', child: Text('مرفق / صورة')),
+                DropdownMenuItem(value: 'table', child: Text('جدول متعدد الصفوف')),
               ],
               (v) => setState(() => field['field_type'] = v ?? 'text'),
             ),
@@ -733,9 +816,112 @@ class _TaskDesignerScreenState extends State<TaskDesignerScreen> {
               decoration: const InputDecoration(labelText: 'شرح البند (اختياري)'),
               onChanged: (v) => field['description'] = v,
             ),
+            if (field['field_type'] == 'table') _taskTableColumnsEditor(index),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _taskTableColumnsEditor(int index) {
+    final field = _reportFields[index];
+    final raw = field['config'] is Map
+        ? (field['config'] as Map)['columns']
+        : null;
+    final columns = raw is List
+        ? raw.map((e) => Map<String, dynamic>.from(e as Map)).toList()
+        : <Map<String, dynamic>>[];
+
+    void update(List<Map<String, dynamic>> next) {
+      setState(() => field['config'] = {
+        ...(field['config'] is Map
+            ? Map<String, dynamic>.from(field['config'] as Map)
+            : <String, dynamic>{}),
+        'columns': next,
+      });
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const Divider(height: 24),
+        Row(
+          children: [
+            const Expanded(
+              child: Text(
+                'أعمدة الجدول',
+                textAlign: TextAlign.right,
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+            ),
+            TextButton.icon(
+              onPressed: () => update([
+                ...columns,
+                {
+                  'key': 'column_${columns.length + 1}',
+                  'label': 'عمود ${columns.length + 1}',
+                  'type': 'short_text',
+                  'required': false,
+                  'options': <String>[],
+                },
+              ]),
+              icon: const Icon(Icons.view_column_outlined),
+              label: const Text('إضافة عمود'),
+            ),
+          ],
+        ),
+        if (columns.isEmpty)
+          const Text(
+            'أضف أعمدة الجدول التي سيملؤها الموظف.',
+            textAlign: TextAlign.right,
+          ),
+        for (var j = 0; j < columns.length; j++)
+          Card(
+            margin: const EdgeInsets.only(top: 8),
+            child: Padding(
+              padding: const EdgeInsets.all(8),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: TextFormField(
+                      key: ValueKey('task_table_label_${index}_$j'),
+                      initialValue: _str(columns[j]['label']),
+                      textAlign: TextAlign.right,
+                      decoration: const InputDecoration(labelText: 'اسم العمود'),
+                      onChanged: (v) {
+                        final next = [...columns];
+                        next[j] = {...next[j], 'label': v};
+                        update(next);
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: TextFormField(
+                      key: ValueKey('task_table_key_${index}_$j'),
+                      initialValue: _str(columns[j]['key']),
+                      textAlign: TextAlign.left,
+                      decoration: const InputDecoration(labelText: 'المفتاح الإنجليزي'),
+                      onChanged: (v) {
+                        final next = [...columns];
+                        next[j] = {...next[j], 'key': v.trim().toLowerCase()};
+                        update(next);
+                      },
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: 'إزالة العمود',
+                    onPressed: () => update([
+                      for (var k = 0; k < columns.length; k++)
+                        if (k != j) columns[k],
+                    ]),
+                    icon: const Icon(Icons.delete_outline, color: Colors.red),
+                  ),
+                ],
+              ),
+            ),
+          ),
+      ],
     );
   }
 
