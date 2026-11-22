@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../shared/app_shell.dart';
+import '../../shared/form_widgets.dart';
 
 class TaskManagementScreen extends StatefulWidget {
   const TaskManagementScreen({super.key});
@@ -144,299 +145,109 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
 
   Future<void> _saveTask({Map<String, dynamic>? existing}) async {
     final title = TextEditingController(text: _s(existing?['title']));
-    final description = TextEditingController(
-      text: _s(existing?['description']),
-    );
-    final due = TextEditingController(
-      text: _s(existing?['due_at']).isEmpty
-          ? DateTime.now().add(const Duration(days: 1)).toIso8601String()
-          : _s(existing?['due_at']),
-    );
+    final description = TextEditingController(text: _s(existing?['description']));
+    final parsedDue = DateTime.tryParse(_s(existing?['due_at']));
+    DateTime dueDate = parsedDue?.toLocal() ?? defaultDueDate();
     String priority = _s(existing?['priority'], 'normal');
-    String? branchId = _s(existing?['branch_id']).isEmpty
-        ? null
-        : _s(existing?['branch_id']);
+    String? branchId = _s(existing?['branch_id']).isEmpty ? null : _s(existing?['branch_id']);
     String? role = 'admin_followup';
-    String? assignee = _s(existing?['assigned_to']).isEmpty
-        ? null
-        : _s(existing?['assigned_to']);
+    String? assignee = _s(existing?['assigned_to']).isEmpty ? null : _s(existing?['assigned_to']);
     String? templateId;
     bool reportRequired = false;
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, set) => AlertDialog(
-          title: Text(existing == null ? 'إنشاء مهمة' : 'تعديل المهمة'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  controller: title,
-                  textDirection: TextDirection.rtl,
-                  decoration: const InputDecoration(labelText: 'العنوان *'),
-                ),
-                TextField(
-                  controller: description,
-                  textDirection: TextDirection.rtl,
-                  maxLines: 2,
-                  decoration: const InputDecoration(labelText: 'الوصف'),
-                ),
-                TextField(
-                  controller: due,
-                  textDirection: TextDirection.ltr,
-                  decoration: const InputDecoration(
-                    labelText: 'موعد الاستحقاق ISO-8601',
-                  ),
-                ),
-                DropdownButtonFormField<String>(
-                  value: priority,
-                  isExpanded: true,
-                  decoration: const InputDecoration(labelText: 'الأولوية'),
-                  items: const [
-                    DropdownMenuItem(value: 'normal', child: Text('عادية')),
-                    DropdownMenuItem(value: 'important', child: Text('مهمة')),
-                    DropdownMenuItem(value: 'urgent', child: Text('عاجلة')),
-                    DropdownMenuItem(value: 'critical', child: Text('حرجة')),
-                  ],
-                  onChanged: (v) => set(() => priority = v ?? 'normal'),
-                ),
-                if (existing == null) ...[
-                  DropdownButtonFormField<String>(
-                    value: branchId,
-                    isExpanded: true,
-                    decoration: const InputDecoration(
-                      labelText: 'الفرع (اختياري)',
-                    ),
-                    items: [
-                      const DropdownMenuItem<String>(
-                        value: null,
-                        child: Text('كل الفروع'),
-                      ),
-                      ..._branches.map(
-                        (b) => DropdownMenuItem(
-                          value: _s(b['id']),
-                          child: Text(_s(b['name'], _s(b['code']))),
-                        ),
-                      ),
-                    ],
-                    onChanged: (v) => set(() => branchId = v),
-                  ),
-                  DropdownButtonFormField<String>(
-                    value: templateId,
-                    isExpanded: true,
-                    decoration: const InputDecoration(
-                      labelText: 'قالب المهمة (اختياري)',
-                    ),
-                    items: [
-                      const DropdownMenuItem<String>(
-                        value: null,
-                        child: Text('إنشاء مباشر'),
-                      ),
-                      ..._templates.map(
-                        (t) => DropdownMenuItem(
-                          value: _s(t['id']),
-                          child: Text(
-                            '${_s(t['title'])} · ${_s(t['role_code'])}',
-                          ),
-                        ),
-                      ),
-                    ],
-                    onChanged: (v) => set(() => templateId = v),
-                  ),
-                  DropdownButtonFormField<String>(
-                    value: role,
-                    isExpanded: true,
-                    decoration: const InputDecoration(labelText: 'الدور'),
-                    items: const [
-                      DropdownMenuItem(
-                        value: 'owner',
-                        child: Text('صاحب المؤسسة'),
-                      ),
-                      DropdownMenuItem(
-                        value: 'admin_followup',
-                        child: Text('المدير التنفيذي'),
-                      ),
-                      DropdownMenuItem(
-                        value: 'accountant',
-                        child: Text('المحاسب'),
-                      ),
-                      DropdownMenuItem(
-                        value: 'warehouse_keeper',
-                        child: Text('أمين المخازن'),
-                      ),
-                      DropdownMenuItem(
-                        value: 'warehouse_worker',
-                        child: Text('عمال التحميل'),
-                      ),
-                    ],
-                    onChanged: (v) => set(() => role = v),
-                  ),
-                  DropdownButtonFormField<String>(
-                    value: assignee,
-                    isExpanded: true,
-                    decoration: const InputDecoration(
-                      labelText: 'الموظف المكلّف',
-                    ),
-                    items: [
-                      const DropdownMenuItem<String>(
-                        value: null,
-                        child: Text('اختر موظفًا'),
-                      ),
-                      ..._employees.map(
-                        (e) => DropdownMenuItem(
-                          value: _s(e['user_id']),
-                          child: Text(
-                            _s(e['display_name'], _s(e['employee_no'])),
-                          ),
-                        ),
-                      ),
-                    ],
-                    onChanged: (v) => set(() => assignee = v),
-                  ),
-                  SwitchListTile(
-                    title: const Text('التقرير مطلوب'),
-                    value: reportRequired,
-                    onChanged: (v) => set(() => reportRequired = v),
-                  ),
-                ],
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('إلغاء'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('حفظ'),
+    var validationError = '';
+
+    final ok = await showFormSheet(
+      context,
+      title: existing == null ? 'إنشاء مهمة جديدة' : 'تعديل بيانات المهمة',
+      confirmLabel: existing == null ? 'إنشاء المهمة' : 'حفظ التعديلات',
+      builder: (ctx, set) => [
+        FormSection(
+          title: 'بيانات المهمة',
+          icon: Icons.assignment_outlined,
+          note: 'اكتب عنوانًا واضحًا يصف النتيجة المطلوبة من الموظف.',
+          children: [
+            TextField(controller: title, textDirection: TextDirection.rtl, textInputAction: TextInputAction.next, decoration: formDecoration('عنوان المهمة *', hint: 'مثال: مراجعة مخزون الفرع الرئيسي')),
+            TextField(controller: description, textDirection: TextDirection.rtl, minLines: 3, maxLines: 5, decoration: formDecoration('وصف وتعليمات المهمة', hint: 'ما المطلوب تنفيذه؟ وما النتيجة المتوقعة؟')),
+          ],
+        ),
+        FormSection(
+          title: 'الموعد والأولوية',
+          icon: Icons.event_available_outlined,
+          note: 'يتم حفظ الموعد تلقائيًا بالنظام، ويظهر لك هنا بصيغة عربية سهلة.',
+          children: [
+            DueDateField(value: dueDate, onChanged: (v) => set(() => dueDate = v)),
+            ChoiceChipsField<String>(
+              label: 'درجة الأولوية', value: priority,
+              options: const [('normal', 'عادية'), ('important', 'مهمة'), ('urgent', 'عاجلة'), ('critical', 'حرجة')],
+              onChanged: (v) => set(() => priority = v),
             ),
           ],
         ),
-      ),
+        if (existing == null)
+          FormSection(
+            title: 'التكليف والتنفيذ',
+            icon: Icons.person_add_alt_1_outlined,
+            note: 'حدد نطاق العمل والدور والموظف المسؤول قبل الإرسال.',
+            children: [
+              DropdownButtonFormField<String>(
+                value: branchId, isExpanded: true,
+                decoration: formDecoration('نطاق الفرع', hint: 'كل الفروع أو فرع محدد'),
+                items: [const DropdownMenuItem<String>(value: null, child: Text('كل الفروع')), ..._branches.map((b) => DropdownMenuItem(value: _s(b['id']), child: Text(_s(b['name'], _s(b['code'])))))],
+                onChanged: (v) => set(() => branchId = v),
+              ),
+              DropdownButtonFormField<String>(
+                value: templateId, isExpanded: true,
+                decoration: formDecoration('قالب المهمة', hint: 'اختياري — إنشاء مباشر إذا لم تحدد قالبًا'),
+                items: [const DropdownMenuItem<String>(value: null, child: Text('إنشاء مباشر')), ..._templates.map((t) => DropdownMenuItem(value: _s(t['id']), child: Text('${_s(t['title'])} · ${_s(t['role_code'])}')))],
+                onChanged: (v) => set(() => templateId = v),
+              ),
+              DropdownButtonFormField<String>(
+                value: role, isExpanded: true, decoration: formDecoration('الدور الوظيفي'),
+                items: const [DropdownMenuItem(value: 'owner', child: Text('صاحب المؤسسة')), DropdownMenuItem(value: 'admin_followup', child: Text('المدير التنفيذي')), DropdownMenuItem(value: 'accountant', child: Text('المحاسب')), DropdownMenuItem(value: 'warehouse_keeper', child: Text('أمين المخازن')), DropdownMenuItem(value: 'warehouse_worker', child: Text('عمال التحميل'))],
+                onChanged: (v) => set(() => role = v),
+              ),
+              DropdownButtonFormField<String>(
+                value: assignee, isExpanded: true, decoration: formDecoration('الموظف المسؤول *', hint: 'اختر الموظف المكلف'),
+                items: [const DropdownMenuItem<String>(value: null, child: Text('اختر موظفًا')), ..._employees.map((e) => DropdownMenuItem(value: _s(e['user_id']), child: Text(_s(e['display_name'], _s(e['employee_no'])))))],
+                onChanged: (v) => set(() => assignee = v),
+              ),
+              SwitchListTile(contentPadding: EdgeInsets.zero, title: const Text('إرفاق تقرير عند الإنجاز'), subtitle: const Text('يطلب من الموظف تعبئة التقرير قبل التسليم'), value: reportRequired, onChanged: (v) => set(() => reportRequired = v)),
+            ],
+          ),
+        if (validationError.isNotEmpty) Padding(padding: const EdgeInsets.only(bottom: 10), child: Text(validationError, style: const TextStyle(color: Colors.red, fontWeight: FontWeight.w700))),
+      ],
+      onConfirm: (set) {
+        if (title.text.trim().length < 2) { set(() => validationError = 'اكتب عنوان المهمة أولاً.'); return false; }
+        if (existing == null && (assignee == null || role == null)) { set(() => validationError = 'اختر الدور والموظف المسؤول قبل إنشاء المهمة.'); return false; }
+        return true;
+      },
     );
     if (ok != true) {
       title.dispose();
       description.dispose();
-      due.dispose();
       return;
     }
-    if (title.text.trim().length < 2 ||
-        DateTime.tryParse(due.text.trim()) == null) {
-      _message('أدخل عنوانًا وموعدًا صالحين.');
-      title.dispose();
-      description.dispose();
-      due.dispose();
-      return;
-    }
+
     setState(() => _busy = true);
     try {
+      final dueIso = dueToIso(dueDate);
       if (existing != null) {
-        await _db.rpc(
-          'admin_update_task',
-          params: {
-            'p_organization_id': _orgId,
-            'p_task_id': existing['id'],
-            'p_title': title.text.trim(),
-            'p_description': description.text.trim().isEmpty
-                ? null
-                : description.text.trim(),
-            'p_due_at': due.text.trim(),
-          },
-        );
+        await _db.rpc('admin_update_task', params: {'p_organization_id': _orgId, 'p_task_id': existing['id'], 'p_title': title.text.trim(), 'p_description': description.text.trim().isEmpty ? null : description.text.trim(), 'p_due_at': dueIso});
+      } else if (templateId != null) {
+        await _db.rpc('assign_task_from_template', params: {'p_organization_id': _orgId, 'p_template_id': templateId, 'p_assigned_to': assignee, 'p_branch_id': branchId, 'p_starts_at': DateTime.now().toUtc().toIso8601String(), 'p_due_at': dueIso, 'p_priority': priority, 'p_instructions': description.text.trim().isEmpty ? null : description.text.trim(), 'p_report_overrides': <dynamic>[], 'p_idempotency_key': 'flutter-template:$templateId:$assignee:$dueIso'});
       } else {
-        if (assignee == null || role == null)
-          throw Exception('اختر الموظف والدور قبل الإنشاء.');
-        if (templateId != null) {
-          await _db.rpc(
-            'assign_task_from_template',
-            params: {
-              'p_organization_id': _orgId,
-              'p_template_id': templateId,
-              'p_assigned_to': assignee,
-              'p_branch_id': branchId,
-              'p_starts_at': DateTime.now().toUtc().toIso8601String(),
-              'p_due_at': due.text.trim(),
-              'p_priority': priority,
-              'p_instructions': description.text.trim().isEmpty
-                  ? null
-                  : description.text.trim(),
-              'p_report_overrides': <dynamic>[],
-              'p_idempotency_key':
-                  'flutter-template:$templateId:$assignee:${due.text.trim()}',
-            },
-          );
-        } else {
-          await _db.rpc(
-            'create_task_with_report_form',
-            params: {
-              'p_organization_id': _orgId,
-              'p_title': title.text.trim(),
-              'p_description': description.text.trim().isEmpty
-                  ? null
-                  : description.text.trim(),
-              'p_due_at': due.text.trim(),
-              'p_priority': priority,
-              'p_branch_id': branchId,
-              'p_role_code': role,
-              'p_template_id': null,
-              'p_assigned_to': assignee,
-              'p_report_template_id': null,
-              'p_report_version_id': null,
-              'p_report_required': reportRequired,
-            },
-          );
-        }
+        await _db.rpc('create_task_with_report_form', params: {'p_organization_id': _orgId, 'p_title': title.text.trim(), 'p_description': description.text.trim().isEmpty ? null : description.text.trim(), 'p_due_at': dueIso, 'p_priority': priority, 'p_branch_id': branchId, 'p_role_code': role, 'p_template_id': null, 'p_assigned_to': assignee, 'p_report_template_id': null, 'p_report_version_id': null, 'p_report_required': reportRequired});
       }
-      _message(existing == null ? 'تم إنشاء المهمة.' : 'تم تعديل المهمة.');
+      _message(existing == null ? 'تم إنشاء المهمة وإرسالها للموظف.' : 'تم حفظ تعديلات المهمة.');
       await _load();
     } catch (e) {
       _message('تعذر الحفظ: ${e.toString().replaceFirst('Exception: ', '')}');
     } finally {
-      if (mounted) setState(() => _busy = false);
       title.dispose();
       description.dispose();
-      due.dispose();
-    }
-  }
-
-  Future<void> _delete(Map<String, dynamic> task) async {
-    final yes = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('حذف المهمة'),
-        content: const Text(
-          'سيتم تنفيذ الحذف الآمن/الأرشفة حسب عقد Backend مع الحفاظ على سجل النشاط.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('إلغاء'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('متابعة'),
-          ),
-        ],
-      ),
-    );
-    if (yes != true) return;
-    setState(() => _busy = true);
-    try {
-      await _db.rpc(
-        'admin_delete_task',
-        params: {'p_organization_id': _orgId, 'p_task_id': task['id']},
-      );
-      _message('تمت أرشفة المهمة وحجبها من القوائم.');
-      await _load();
-    } catch (e) {
-      _message('تعذر حذف المهمة: $e');
-    } finally {
       if (mounted) setState(() => _busy = false);
     }
   }
-
   Future<void> _publicationRequest() async {
     if (_templates.isEmpty) {
       _message('لا توجد قوالب نشطة للنشر.');
@@ -444,9 +255,7 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
     }
     String? template = _s(_templates.first['id']);
     String? branch;
-    final due = TextEditingController(
-      text: DateTime.now().add(const Duration(days: 1)).toIso8601String(),
-    );
+    DateTime dueDate = defaultDueDate();
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => StatefulBuilder(
@@ -488,11 +297,9 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
                 ],
                 onChanged: (v) => set(() => branch = v),
               ),
-              TextField(
-                controller: due,
-                decoration: const InputDecoration(
-                  labelText: 'موعد الاستحقاق ISO-8601',
-                ),
+              DueDateField(
+                value: dueDate,
+                onChanged: (value) => set(() => dueDate = value),
               ),
             ],
           ),
@@ -509,10 +316,7 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
         ),
       ),
     );
-    if (ok != true || template == null) {
-      due.dispose();
-      return;
-    }
+    if (ok != true || template == null) return;
     try {
       await _db.rpc(
         'submit_task_publication_request',
@@ -520,17 +324,15 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
           'p_organization_id': _orgId,
           'p_template_id': template,
           'p_branch_id': branch,
-          'p_due_at': due.text.trim(),
+          'p_due_at': dueToIso(dueDate),
           'p_idempotency_key':
-              'flutter-publication:${template}:${branch ?? 'all'}:${due.text.trim()}',
+              'flutter-publication:${template}:${branch ?? 'all'}:${dueToIso(dueDate)}',
         },
       );
       _message('تم إرسال طلب النشر للموافقة.');
       await _load();
     } catch (e) {
       _message('تعذر إرسال طلب النشر: $e');
-    } finally {
-      due.dispose();
     }
   }
 
