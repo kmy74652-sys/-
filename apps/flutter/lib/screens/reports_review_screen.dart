@@ -140,9 +140,16 @@ class _ReportsReviewScreenState extends State<ReportsReviewScreen> {
         actions: [
           TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('إلغاء')),
           FilledButton(
-            onPressed: decision == 'returned' && noteController.text.trim().isEmpty
-                ? null
-                : () => Navigator.pop(dialogContext, noteController.text.trim()),
+            onPressed: () {
+              final value = noteController.text.trim();
+              if (decision == 'returned' && value.isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('اكتب سبب إعادة التقرير للموظف.')),
+                );
+                return;
+              }
+              Navigator.pop(dialogContext, value);
+            },
             child: const Text('تأكيد'),
           ),
         ],
