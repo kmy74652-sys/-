@@ -127,7 +127,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   _ModuleAction(
                     icon: Icons.dashboard_customize_outlined,
                     title: 'مصمم المهام',
-                    description: 'إنشاء قالب وحقول التقرير وإرسال طلب اعتماد لصاحب المؤسسة.',
+                    description: 'إنشاء نموذج تقرير ديناميكي وإرساله كمسودة لاعتماد صاحب المؤسسة.',
                     onTap: () => Navigator.of(context).push(MaterialPageRoute(
                       builder: (_) => TaskDesignerScreen(profile: profile),
                     )),
@@ -138,7 +138,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   _ModuleAction(
                     icon: Icons.fact_check_outlined,
                     title: 'اعتماد ونشر المهام',
-                    description: 'مراجعة طلبات النشر واعتمادها أو رفضها قبل وصولها للموظفين.',
+                    description: 'مراجعة نماذج التقارير واعتمادها قبل ربطها بالمهام.',
                     onTap: () => Navigator.of(context).push(MaterialPageRoute(
                       builder: (_) => TaskPublicationReviewScreen(profile: profile),
                     )),
