@@ -162,11 +162,32 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
     _markOpened();
   }
 
+  bool _starting = false;
+
   Future<void> _markOpened() async {
     try {
       await _db.rpc('mobile_mark_task_opened', params: {'p_task_id': widget.task['id']});
     } catch (_) {
       // Opening the task must remain possible if the optional receipt RPC is unavailable.
+    }
+  }
+
+  Future<void> _startTask() async {
+    setState(() => _starting = true);
+    try {
+      await _db.rpc('mobile_record_task_update', params: {
+        'p_task_id': widget.task['id'],
+        'p_status': 'in_progress',
+        'p_note': 'بدأ الموظف تنفيذ المهمة من تطبيق Flutter',
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم بدء تنفيذ المهمة.')));
+        Navigator.of(context).pop();
+      }
+    } catch (error) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(_friendlyError(error))));
+    } finally {
+      if (mounted) setState(() => _starting = false);
     }
   }
 
@@ -224,6 +245,15 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                           style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800)),
                       const SizedBox(height: 8),
                       Text((task['task_instructions'] ?? task['description'] ?? '').toString()),
+                      if (!['in_progress', 'on_hold', 'report_submitted', 'submitted', 'completed_approved', 'approved'].contains(task['status']))
+                        Padding(
+                          padding: const EdgeInsets.only(top: 16),
+                          child: FilledButton.icon(
+                            onPressed: _starting ? null : _startTask,
+                            icon: const Icon(Icons.play_arrow),
+                            label: _starting ? const Text('جارٍ بدء المهمة...') : const Text('بدء تنفيذ المهمة'),
+                          ),
+                        ),
                       const SizedBox(height: 18),
                       const Text('نماذج التقرير والحقول المطلوبة',
                           style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
@@ -321,6 +351,23 @@ class _DynamicReportScreenState extends State<DynamicReportScreen> {
         if (validation['max'] != null && number > num.parse(validation['max'].toString())) return 'قيمة ${field['label']} تتجاوز الحد الأعلى';
       }
       if (type == 'select' && !(field['options'] as List? ?? []).map((e) => e.toString()).contains(value)) return 'اختر قيمة صحيحة في ${field['label']}';
+      if (type == 'table' && value is List) {
+        final config = (field['config'] as Map?)?.cast<String, dynamic>() ?? {};
+        final minRows = int.tryParse(config['min_rows']?.toString() ?? '') ?? 0;
+        if (value.length < minRows) return 'أضف $minRows صفوف على الأقل في جدول ${field['label']}';
+        final columns = (config['columns'] as List? ?? []);
+        for (var rowIndex = 0; rowIndex < value.length; rowIndex++) {
+          final row = value[rowIndex] is Map ? value[rowIndex] as Map : {};
+          for (final rawColumn in columns) {
+            final column = rawColumn is Map ? rawColumn : {'label': rawColumn.toString(), 'key': rawColumn.toString()};
+            final requiredCell = column['required'] == true || column['is_required'] == true;
+            final columnKey = (column['key'] ?? column['label'] ?? '').toString();
+            if (requiredCell && (row[columnKey] == null || row[columnKey].toString().trim().isEmpty)) {
+              return 'أكمل عمود ${column['label'] ?? columnKey} في الصف ${rowIndex + 1} من ${field['label']}';
+            }
+          }
+        }
+      }
     }
     return null;
   }
