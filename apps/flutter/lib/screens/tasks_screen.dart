@@ -354,7 +354,9 @@ class _DynamicReportScreenState extends State<DynamicReportScreen> {
       if (type == 'table' && value is List) {
         final config = (field['config'] as Map?)?.cast<String, dynamic>() ?? {};
         final minRows = int.tryParse(config['min_rows']?.toString() ?? '') ?? 0;
+        final maxRows = int.tryParse(config['max_rows']?.toString() ?? '') ?? 100;
         if (value.length < minRows) return 'أضف $minRows صفوف على الأقل في جدول ${field['label']}';
+        if (value.length > maxRows) return 'لا يمكن أن يتجاوز جدول ${field['label']} عدد $maxRows صفوف';
         final columns = (config['columns'] as List? ?? []);
         for (var rowIndex = 0; rowIndex < value.length; rowIndex++) {
           final row = value[rowIndex] is Map ? value[rowIndex] as Map : {};
@@ -747,13 +749,17 @@ class _TaskDesignerScreenState extends State<TaskDesignerScreen> {
         'p_payload': payload,
       }) as String;
       if (!mounted) return;
-      await _assignTemplate(templateId, _role);
+      final assigned = await _assignTemplate(templateId, _role);
       await _load();
       _title.clear();
       _description.clear();
       _instructions.clear();
       setState(() => _fields.clear());
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم حفظ قالب المهمة وإسناده للموظف.')));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(assigned
+            ? 'تم حفظ قالب المهمة وإسناده للموظف.'
+            : 'تم حفظ القالب، ولم يتم إسناد المهمة لأن نافذة الإسناد أُغلقت.'),
+      ));
     } catch (error) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(_friendlyError(error))));
     } finally {
@@ -761,7 +767,7 @@ class _TaskDesignerScreenState extends State<TaskDesignerScreen> {
     }
   }
 
-  Future<void> _assignTemplate(String templateId, String roleCode) async {
+  Future<bool> _assignTemplate(String templateId, String roleCode) async {
     final memberships = await _db.from('organization_memberships')
         .select('id,user_id,display_name,employee_no')
         .eq('organization_id', _org).eq('is_active', true)
@@ -773,13 +779,13 @@ class _TaskDesignerScreenState extends State<TaskDesignerScreen> {
     final matching = assignments.map((e) => e['membership_id'].toString()).toSet();
     final eligible = rows.where((row) => matching.contains(row['id'].toString())).toList();
     if (eligible.isEmpty) throw Exception('no_employee_for_role_branch');
-    if (!mounted) return;
+    if (!mounted) return false;
     String selectedUser = eligible.first['user_id'].toString();
     String? branchId;
     final branches = await _db.from('branches')
         .select('id,name').eq('organization_id', _org).eq('is_active', true).order('name');
     final branchRows = List<Map<String, dynamic>>.from(branches);
-    if (!mounted) return;
+    if (!mounted) return false;
     final choice = await showDialog<Map<String, dynamic>>(
       context: context,
       builder: (dialogContext) => StatefulBuilder(
@@ -815,7 +821,7 @@ class _TaskDesignerScreenState extends State<TaskDesignerScreen> {
         ),
       ),
     );
-    if (choice == null) return;
+    if (choice == null) return false;
     final now = DateTime.now();
     final starts = DateTime(now.year, now.month, now.day);
     final due = starts.add(const Duration(days: 1));
@@ -831,6 +837,7 @@ class _TaskDesignerScreenState extends State<TaskDesignerScreen> {
       'p_report_overrides': [],
       'p_idempotency_key': 'flutter-task:$templateId:${DateTime.now().microsecondsSinceEpoch}',
     });
+    return true;
   }
 
   @override
