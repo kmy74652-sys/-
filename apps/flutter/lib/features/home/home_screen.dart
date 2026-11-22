@@ -15,7 +15,6 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _loading = true;
   String? _name;
   String? _error;
-  String? _organizationName;
   Map<String, int>? _summary;
   Set<String> _permissions = {};
   Set<String> _roles = {};
@@ -271,7 +270,6 @@ class _HomeScreenState extends State<HomeScreen> {
         _roles = roles;
       });
 
-      final brandingFuture = _loadBranding(client, organization);
       final summary = await _loadSummary(
         client,
         organization,
@@ -279,11 +277,9 @@ class _HomeScreenState extends State<HomeScreen> {
         permissions.contains('tasks.manage'),
         permissions.contains('tasks.execute'),
       );
-      final brand = await brandingFuture;
       if (ticket != _request || !mounted) return;
       setState(() {
         _summary = summary;
-        _organizationName = brand;
       });
     } catch (e) {
       if (ticket == _request && mounted)
@@ -303,26 +299,6 @@ class _HomeScreenState extends State<HomeScreen> {
       }
     }
     return null;
-  }
-
-  Future<String?> _loadBranding(
-    SupabaseClient client,
-    String? organization,
-  ) async {
-    if (organization == null || organization.isEmpty) return null;
-    try {
-      final row = await client
-          .from('organizations')
-          .select('name,settings')
-          .eq('id', organization)
-          .maybeSingle();
-      final name = row?['name'];
-      return name == null || name.toString().trim().isEmpty
-          ? null
-          : name.toString();
-    } catch (_) {
-      return null;
-    }
   }
 
   Future<Map<String, int>> _loadSummary(
@@ -419,16 +395,14 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) => AppShell(
     title: 'الرئيسية',
-    subtitle:
-        _organizationName ??
-        (_name == null || _name!.isEmpty
-            ? 'بوابة العمل والتواصل الإداري'
-            : 'مرحبًا ${_name!}'),
+    subtitle: _name == null || _name!.isEmpty
+        ? 'بوابة العمل والتواصل الإداري'
+        : 'مرحبًا ${_name!}',
     child: RefreshIndicator(
       onRefresh: _load,
       child: ListView(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(12, 10, 12, 22),
+        padding: const EdgeInsets.fromLTRB(10, 12, 10, 22),
         children: [
           if (_error != null)
             SectionCard(
@@ -550,17 +524,22 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
           ),
-          Wrap(
-            textDirection: TextDirection.rtl,
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              for (final item in visible)
-                SizedBox(
-                  width: (MediaQuery.sizeOf(context).width - 40) / 2,
-                  child: _moduleCard(item),
-                ),
-            ],
+          LayoutBuilder(
+            builder: (context, constraints) {
+              const gap = 8.0;
+              final columns = constraints.maxWidth >= 560 ? 3 : 2;
+              final cardWidth =
+                  (constraints.maxWidth - gap * (columns - 1)) / columns;
+              return Wrap(
+                textDirection: TextDirection.rtl,
+                spacing: gap,
+                runSpacing: gap,
+                children: [
+                  for (final item in visible)
+                    SizedBox(width: cardWidth, child: _moduleCard(item)),
+                ],
+              );
+            },
           ),
         ],
       ),

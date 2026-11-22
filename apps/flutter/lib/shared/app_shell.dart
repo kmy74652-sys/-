@@ -56,12 +56,16 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     try {
       final items = await NotificationsRepository.load(uid: uid);
       if (mounted) {
-        setState(() => _unreadCount = items.where((item) => item.isUnread).length);
+        setState(
+          () => _unreadCount = items.where((item) => item.isUnread).length,
+        );
       }
     } catch (_) {
       final cached = await NotificationsRepository.loadCached(uid);
       if (mounted && cached != null) {
-        setState(() => _unreadCount = cached.where((item) => item.isUnread).length);
+        setState(
+          () => _unreadCount = cached.where((item) => item.isUnread).length,
+        );
       }
     }
   }
@@ -81,6 +85,17 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     // on their current route; this only highlights the nearest shell section.
     if (path == '/hr' || path.startsWith('/hr/')) return 1;
     return 3;
+  }
+
+  /// Parent route for pages that are not one of the bottom-navigation roots.
+  /// Returns null on root pages so no back button is shown there.
+  String? _backRoute(String path) {
+    const roots = {'/', '/settings', '/tasks', '/admin'};
+    if (path.isEmpty || roots.contains(path)) return null;
+    final segments = path.split('/').where((e) => e.isNotEmpty).toList();
+    if (segments.length <= 1) return '/';
+    final parent = '/${segments.sublist(0, segments.length - 1).join('/')}';
+    return parent;
   }
 
   Future<void> _signOut(BuildContext context) async {
@@ -110,7 +125,10 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
       failed = notifications.isEmpty;
     }
     if (mounted) {
-      setState(() => _unreadCount = notifications.where((item) => item.isUnread).length);
+      setState(
+        () =>
+            _unreadCount = notifications.where((item) => item.isUnread).length,
+      );
     }
     if (!context.mounted) return;
     await showModalBottomSheet<void>(
@@ -212,8 +230,9 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
                                 await NotificationsRepository.markRead(item.id);
                                 if (mounted && item.isUnread) {
                                   setState(
-                                    () => _unreadCount =
-                                        (_unreadCount - 1).clamp(0, 999999).toInt(),
+                                    () => _unreadCount = (_unreadCount - 1)
+                                        .clamp(0, 999999)
+                                        .toInt(),
                                   );
                                 }
                               } catch (_) {
@@ -254,15 +273,20 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
               child: Column(
                 children: [
                   _BrandHeader(
-                    title: widget.title,
-                    subtitle: widget.subtitle,
                     unreadCount: _unreadCount,
                     onAccount: () => _signOut(context),
                     onNotifications: () => _showNotifications(context),
                   ),
+                  _PageTitleBar(
+                    title: widget.title,
+                    subtitle: widget.subtitle,
+                    onBack: _backRoute(path) == null
+                        ? null
+                        : () => context.go(_backRoute(path)!),
+                  ),
                   Expanded(
                     child: Padding(
-                      padding: const EdgeInsets.fromLTRB(12, 12, 12, 20),
+                      padding: const EdgeInsets.fromLTRB(4, 4, 4, 0),
                       child: widget.child,
                     ),
                   ),
@@ -309,143 +333,109 @@ class _ShellTab {
 
 class _BrandHeader extends StatelessWidget {
   const _BrandHeader({
-    required this.title,
-    this.subtitle,
     required this.unreadCount,
     required this.onAccount,
     required this.onNotifications,
   });
-  final String title;
-  final String? subtitle;
+
   final int unreadCount;
   final VoidCallback onAccount;
   final VoidCallback onNotifications;
+
+  static const _navy = Color(0xFF0B3458);
+  static const _gold = Color(0xFFDBA62A);
 
   @override
   Widget build(BuildContext context) {
     final compact = MediaQuery.sizeOf(context).width < 370;
     return Container(
       width: double.infinity,
-      constraints: const BoxConstraints(minHeight: 104),
-      padding: EdgeInsets.symmetric(horizontal: compact ? 7 : 10, vertical: 7),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        border: Border(bottom: BorderSide(color: Color(0xFFE4EAF0))),
-      ),
+      padding: EdgeInsets.symmetric(horizontal: compact ? 10 : 14, vertical: 8),
+      decoration: const BoxDecoration(color: Colors.white),
       child: Row(
         children: [
+          Image.asset(
+            'assets/images/alshaeri-official-logo.png',
+            width: compact ? 50 : 58,
+            height: compact ? 58 : 66,
+            fit: BoxFit.contain,
+            semanticLabel: 'الشعار الرسمي لمؤسسة الشاعري',
+          ),
+          const SizedBox(width: 10),
           Expanded(
-            child: Row(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Image.asset(
-                  'assets/images/alshaeri-official-logo.png',
-                  width: compact ? 63 : 74,
-                  height: compact ? 73 : 86,
-                  fit: BoxFit.contain,
-                  semanticLabel: 'الشعار الرسمي لمؤسسة الشاعري',
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Text(
-                        'مانجمنت',
-                        style: TextStyle(
-                          color: const Color(0xFF0B3458),
-                          fontSize: compact ? 17 : 20,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                      const Text(
-                        'مؤسسة الشاعري للتجارة العامة',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: Color(0xFF0B3458),
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      const Row(
-                        mainAxisAlignment: MainAxisAlignment.end,
-                        children: [
-                          SizedBox(
-                            width: 13,
-                            child: Divider(
-                              color: Color(0xFFDBA62A),
-                              thickness: 1,
-                            ),
-                          ),
-                          Padding(
-                            padding: EdgeInsets.symmetric(horizontal: 4),
-                            child: Text(
-                              'معاً .. نحو إدارة أفضل',
-                              style: TextStyle(
-                                color: Color(0xFF9A6814),
-                                fontSize: 9,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                          ),
-                          SizedBox(
-                            width: 13,
-                            child: Divider(
-                              color: Color(0xFFDBA62A),
-                              thickness: 1,
-                            ),
-                          ),
-                        ],
-                      ),
-                      Text(
-                        title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: Color(0xFF0B3458),
-                          fontSize: 16,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                      if (subtitle != null && subtitle!.isNotEmpty)
-                        Text(
-                          subtitle!,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: Color(0xFF637188),
-                            fontSize: 10,
-                          ),
-                        ),
-                    ],
+                Text(
+                  'مانجمنت',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: _navy,
+                    fontSize: compact ? 18 : 21,
+                    height: 1.15,
+                    fontWeight: FontWeight.w900,
                   ),
+                ),
+                const SizedBox(height: 2),
+                const Text(
+                  'مؤسسة الشاعري للتجارة العامة',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: _navy,
+                    fontSize: 12,
+                    height: 1.2,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Row(
+                  children: [
+                    Container(width: 14, height: 1.2, color: _gold),
+                    const SizedBox(width: 5),
+                    const Flexible(
+                      child: Text(
+                        'معاً .. نحو إدارة أفضل',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: Color(0xFF9A6814),
+                          fontSize: 10,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 5),
+                    Container(width: 14, height: 1.2, color: _gold),
+                  ],
                 ),
               ],
             ),
           ),
-          const SizedBox(width: 7),
+          const SizedBox(width: 8),
           IconButton(
             tooltip: 'تبديل الحساب: تسجيل الخروج',
             onPressed: onAccount,
             style: IconButton.styleFrom(
-              fixedSize: const Size(40, 40),
+              fixedSize: const Size(42, 42),
               backgroundColor: const Color(0xFFF4F8FB),
-              foregroundColor: const Color(0xFF0B3458),
+              foregroundColor: _navy,
               side: const BorderSide(color: Color(0xFFD5E0EA)),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(11),
+                borderRadius: BorderRadius.circular(12),
               ),
             ),
             icon: const Icon(Icons.account_circle_outlined, size: 23),
           ),
-          const SizedBox(width: 4),
+          const SizedBox(width: 6),
           IconButton(
             tooltip: 'التنبيهات',
             onPressed: onNotifications,
             style: IconButton.styleFrom(
               fixedSize: const Size(42, 42),
-              backgroundColor: const Color(0xFF0B3458),
+              backgroundColor: _navy,
               foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
@@ -458,23 +448,106 @@ class _BrandHeader extends StatelessWidget {
                 if (unreadCount > 0)
                   Positioned(
                     top: -8,
-                    right: -9,
+                    left: -9,
                     child: Container(
                       constraints: const BoxConstraints(minWidth: 17),
                       padding: const EdgeInsets.symmetric(horizontal: 4),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFDBA62A),
+                        color: _gold,
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: Text(
                         unreadCount > 99 ? '99+' : '$unreadCount',
                         textAlign: TextAlign.center,
                         style: const TextStyle(
-                          color: Color(0xFF0B3458),
+                          color: _navy,
                           fontSize: 10,
                           fontWeight: FontWeight.w900,
                         ),
                       ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Slim page-title strip under the brand header: back button (on inner
+/// pages), page title and an optional one-line subtitle.
+class _PageTitleBar extends StatelessWidget {
+  const _PageTitleBar({required this.title, this.subtitle, this.onBack});
+
+  final String title;
+  final String? subtitle;
+  final VoidCallback? onBack;
+
+  static const _orgName = 'مؤسسة الشاعري للتجارة العامة';
+
+  @override
+  Widget build(BuildContext context) {
+    final sub = subtitle?.trim() ?? '';
+    final showSub = sub.isNotEmpty && sub != _orgName && sub != title;
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.fromLTRB(onBack == null ? 16 : 6, 8, 16, 8),
+      decoration: const BoxDecoration(
+        color: Color(0xFFF9FBFD),
+        border: Border(
+          top: BorderSide(color: Color(0xFFE4EAF0)),
+          bottom: BorderSide(color: Color(0xFFE4EAF0)),
+        ),
+      ),
+      child: Row(
+        children: [
+          if (onBack != null)
+            IconButton(
+              tooltip: 'رجوع',
+              onPressed: onBack,
+              visualDensity: VisualDensity.compact,
+              icon: const Icon(
+                Icons.arrow_back,
+                size: 22,
+                color: Color(0xFF0B3458),
+              ),
+            ),
+          Container(
+            width: 4,
+            height: showSub ? 34 : 22,
+            margin: const EdgeInsetsDirectional.only(end: 10),
+            decoration: BoxDecoration(
+              color: const Color(0xFFDBA62A),
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          Expanded(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Color(0xFF0B3458),
+                    fontSize: 17,
+                    height: 1.2,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                if (showSub)
+                  Text(
+                    sub,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Color(0xFF637188),
+                      fontSize: 11.5,
+                      height: 1.3,
                     ),
                   ),
               ],
