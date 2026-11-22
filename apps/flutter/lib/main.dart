@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'screens/home_screen.dart';
 import 'screens/login_screen.dart';
 import 'theme/app_theme.dart';
 
@@ -15,10 +16,7 @@ Future<void> main() async {
       supabaseUrl.startsWith('https://') && supabaseAnonKey.isNotEmpty;
 
   if (hasSupabaseConfig) {
-    await Supabase.initialize(
-      url: supabaseUrl,
-      anonKey: supabaseAnonKey,
-    );
+    await Supabase.initialize(url: supabaseUrl, anonKey: supabaseAnonKey);
   }
 
   runApp(AlshaeriApp(isSupabaseConfigured: hasSupabaseConfig));
@@ -38,7 +36,28 @@ class AlshaeriApp extends StatelessWidget {
       locale: const Locale('ar'),
       supportedLocales: const [Locale('ar'), Locale('en')],
       localizationsDelegates: GlobalMaterialLocalizations.delegates,
-      home: LoginScreen(isSupabaseConfigured: isSupabaseConfigured),
+      home: isSupabaseConfigured
+          ? const _AuthenticationGate()
+          : const LoginScreen(isSupabaseConfigured: false),
+    );
+  }
+}
+
+class _AuthenticationGate extends StatelessWidget {
+  const _AuthenticationGate();
+
+  @override
+  Widget build(BuildContext context) {
+    final client = Supabase.instance.client;
+    return StreamBuilder<AuthState>(
+      stream: client.auth.onAuthStateChange,
+      builder: (context, snapshot) {
+        final session = snapshot.data?.session ?? client.auth.currentSession;
+        if (session == null) {
+          return const LoginScreen(isSupabaseConfigured: true);
+        }
+        return const HomeScreen();
+      },
     );
   }
 }
