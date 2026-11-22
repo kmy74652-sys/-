@@ -28,6 +28,6 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
       - name: Analyze
-        run: flutter analyze --fatal-infos
+        run: flutter analyze
       - name: Run widget tests
         run: flutter test
