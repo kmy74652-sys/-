@@ -10,7 +10,7 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   const supabaseUrl = String.fromEnvironment('SUPABASE_URL');
-  const supabaseAnonKey = String.fromEnvironment('SUPABASE_ANON_KEY');
+  const supabasePublishableKey = String.fromEnvironment('SUPABASE_PUBLISHABLE_KEY');
 
   final hasSupabaseConfig =
       supabaseUrl.startsWith('https://') && supabaseAnonKey.isNotEmpty;
