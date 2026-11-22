@@ -103,5 +103,34 @@ void main() {
       expect(restored!.blocked, isTrue);
       expect(restored.lastError, 'permission_denied');
     });
+
+    test('round-trips an offline attachment with a local file reference', () {
+      final item = OfflineQueueItem(
+        id: 'attachment:task-3:evidence:key',
+        ownerUid: 'user-3',
+        kind: OfflineQueueKind.attachment,
+        payload: {
+          'taskId': 'task-3',
+          'stepId': 'step-3',
+          'idempotencyKey': 'evidence:key',
+          'localPath': '/app-support/offline-attachments/user-3/key.bin',
+          'storagePath': 'task-3/key-report.pdf',
+          'fileName': 'report.pdf',
+          'mimeType': 'application/pdf',
+          'size': 128,
+        },
+        attempts: 0,
+        createdAt: DateTime.utc(2026, 11, 22, 10),
+        nextAttemptAt: DateTime.utc(2026, 11, 22, 10),
+      );
+
+      final restored = OfflineQueueItem.fromJson(item.toJson());
+
+      expect(restored, isNotNull);
+      expect(restored!.kind, OfflineQueueKind.attachment);
+      expect(restored.payload['localPath'], item.payload['localPath']);
+      expect(restored.payload['stepId'], 'step-3');
+      expect(restored.payload['size'], 128);
+    });
   });
 }
