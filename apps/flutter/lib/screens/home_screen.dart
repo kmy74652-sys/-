@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../theme/app_theme.dart';
 import 'tasks_screen.dart';
+import 'reports_review_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -91,6 +92,7 @@ class _HomeScreenState extends State<HomeScreen> {
             final canDesignTasks = permissions.contains('task_library.manage') &&
                 (permissions.contains('tasks.manage') || permissions.contains('tasks.read_all'));
             final canApproveTaskPublication = roleCodes.contains('owner');
+            final canReviewReports = permissions.contains('tasks.review');
 
             return ListView(
               padding: const EdgeInsets.all(20),
@@ -130,6 +132,17 @@ class _HomeScreenState extends State<HomeScreen> {
                     description: 'إنشاء نموذج تقرير ديناميكي وإرساله كمسودة لاعتماد صاحب المؤسسة.',
                     onTap: () => Navigator.of(context).push(MaterialPageRoute(
                       builder: (_) => TaskDesignerScreen(profile: profile),
+                    )),
+                  ),
+                ],
+                if (canReviewReports) ...[
+                  const SizedBox(height: 10),
+                  _ModuleAction(
+                    icon: Icons.fact_check_outlined,
+                    title: 'مراجعة تقارير الموظفين',
+                    description: 'عرض التقارير المرسلة واعتمادها أو إعادتها للموظف مع توضيح المطلوب.',
+                    onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                      builder: (_) => ReportsReviewScreen(profile: profile),
                     )),
                   ),
                 ],
