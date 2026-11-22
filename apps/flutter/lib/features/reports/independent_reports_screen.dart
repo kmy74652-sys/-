@@ -793,7 +793,7 @@ class _IndependentReportsScreenState extends State<IndependentReportsScreen> {
           field.type == 'attachment' ||
           field.type == 'file' ||
           field.type == 'multi_image';
-      final result = await FilePicker.platform.pickFiles(
+      final result = await FilePicker.pickFiles(
         type: field.type == 'image' || field.type == 'multi_image'
             ? FileType.image
             : FileType.any,

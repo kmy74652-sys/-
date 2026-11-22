@@ -764,7 +764,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
     if (_saving || ctl == null) return;
     try {
       final multi = type == 'multi_image';
-      final result = await FilePicker.platform.pickFiles(
+      final result = await FilePicker.pickFiles(
         type: multi ? FileType.image : FileType.any,
         allowMultiple: multi || type == 'file' || type == 'attachment',
         withData: true,
@@ -1123,7 +1123,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
 
   Future<void> _uploadEvidence(String stepId) async {
     try {
-      final result = await FilePicker.platform.pickFiles(
+      final result = await FilePicker.pickFiles(
         type: FileType.any,
         allowMultiple: false,
         withData: true,

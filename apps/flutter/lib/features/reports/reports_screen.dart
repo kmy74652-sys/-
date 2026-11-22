@@ -254,7 +254,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
       return;
     }
     final bytes = Uint8List.fromList(utf8.encode('\uFEFF${_csvFor(rows)}'));
-    final path = await FilePicker.platform.saveFile(
+    final path = await FilePicker.saveFile(
       dialogTitle: 'حفظ تقارير الشاعري بصيغة CSV',
       fileName: 'alshaeri-reports-${DateTime.now().millisecondsSinceEpoch}.csv',
       type: FileType.custom,
