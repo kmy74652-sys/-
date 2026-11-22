@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/notifications_repository.dart';
+import '../core/notifications_runtime.dart';
 import '../core/theme.dart';
 
 class AppShell extends StatefulWidget {
@@ -29,12 +30,19 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _refreshUnreadCount();
+    NotificationsRuntime.start(onOpen: _openTaskFromNotification);
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    NotificationsRuntime.stop();
     super.dispose();
+  }
+
+  void _openTaskFromNotification(String? taskId) {
+    if (!mounted || taskId == null || taskId.isEmpty) return;
+    context.go('/tasks/$taskId');
   }
 
   @override
