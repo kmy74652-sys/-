@@ -94,9 +94,8 @@ class _TaskDesignerScreenState extends State<TaskDesignerScreen> {
             .limit(500),
         _db
             .from('roles')
-            .select('institution_id,code,title')
-            .eq('institution_id', org)
-            .order('title')
+            .select('code,name_ar')
+            .order('name_ar')
             .limit(200),
         _db.rpc(
           'list_task_library_report_forms',
@@ -437,7 +436,9 @@ class _TaskDesignerScreenState extends State<TaskDesignerScreen> {
                 .map(
                   (r) => DropdownMenuItem(
                     value: _str(r['code']),
-                    child: Text(_str(r['title'], _str(r['code']))),
+                    child: Text(
+                      _str(r['title'], _str(r['name_ar'], _str(r['code']))),
+                    ),
                   ),
                 )
                 .toList(),
