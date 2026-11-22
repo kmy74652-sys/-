@@ -523,32 +523,18 @@ class _TaskDesignerScreenState extends State<TaskDesignerScreen> {
           : _stepsGrid(),
     ),
     SectionCard(
-      title: 'مصمم التقرير الديناميكي',
+      title: 'مخطط التقرير الديناميكي — صفوف وأعمدة',
       trailing: FilledButton.icon(
         onPressed: _addReportField,
         icon: const Icon(Icons.add),
-        label: const Text('إضافة حقل'),
+        label: const Text('إضافة صف'),
       ),
       child: _reportFields.isEmpty
           ? const Text(
-              'أضف بنود التقرير كحقول مستقلة. ستظهر للموظف كحقول إدخال منظمة، ويمكن تكرارها كسجلات جدول.',
+              'أنشئ صفًا لكل بند في التقرير، ثم أضف أعمدة الجدول عند الحاجة. سيظهر التصميم نفسه للموظف عند تنفيذ المهمة.',
               textAlign: TextAlign.right,
             )
-          : Column(
-              children: [
-              const Align(
-                  alignment: Alignment.centerRight,
-                  child: Text(
-                    'صمّم التقرير من نفس الشاشة. اختر «جدول متعدد الصفوف» لإضافة أعمدة وصفوف التقرير وحفظها مع القالب.',
-                    style: TextStyle(fontSize: 12),
-                    textAlign: TextAlign.right,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                for (var i = 0; i < _reportFields.length; i++)
-                  _reportFieldEditor(i),
-              ],
-            ),
+          : _reportDesignerGrid(),
     ),
     const SizedBox(height: 8),
     FilledButton.icon(
@@ -581,6 +567,123 @@ class _TaskDesignerScreenState extends State<TaskDesignerScreen> {
         'options': <dynamic>[],
         'config': <String, dynamic>{},
       }));
+
+  Widget _reportDesignerGrid() => Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Text(
+            'كل صف يمثل بندًا في التقرير. اختر «جدول متعدد الصفوف» من عمود النوع لإضافة أعمدة الجدول لهذا الصف.',
+            textAlign: TextAlign.right,
+            style: TextStyle(fontSize: 12),
+          ),
+          const SizedBox(height: 8),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: DataTable(
+              headingRowColor: WidgetStatePropertyAll(
+                AppColors.navy.withOpacity(.08),
+              ),
+              columnSpacing: 18,
+              dataRowMinHeight: 72,
+              dataRowMaxHeight: 110,
+              columns: const [
+                DataColumn(label: Text('رقم')),
+                DataColumn(label: Text('المفتاح')),
+                DataColumn(label: Text('اسم البند *')),
+                DataColumn(label: Text('نوع العمود')),
+                DataColumn(label: Text('إلزامي')),
+                DataColumn(label: Text('متكرر')),
+                DataColumn(label: Text('إجراء')),
+              ],
+              rows: [
+                for (var i = 0; i < _reportFields.length; i++)
+                  _reportGridRow(i),
+              ],
+            ),
+          ),
+          for (var i = 0; i < _reportFields.length; i++)
+            if (_str(_reportFields[i]['field_type']) == 'table')
+              _taskTableColumnsEditor(i),
+        ],
+      );
+
+  DataRow _reportGridRow(int index) {
+    final field = _reportFields[index];
+    const supportedTypes = {
+      'short_text',
+      'long_text',
+      'number',
+      'date',
+      'select',
+      'multi_select',
+      'attachment',
+      'table',
+    };
+    final storedType = _str(field['field_type'], 'short_text');
+    final type = supportedTypes.contains(storedType)
+        ? storedType
+        : 'short_text';
+    return DataRow(cells: [
+      DataCell(Text('${index + 1}')),
+      DataCell(SizedBox(
+        width: 150,
+        child: TextFormField(
+          key: ValueKey('report_key_$index'),
+          initialValue: _str(field['field_key']),
+          textAlign: TextAlign.left,
+          decoration: const InputDecoration(labelText: 'key'),
+          onChanged: (v) => field['field_key'] = v.trim().toLowerCase(),
+        ),
+      )),
+      DataCell(SizedBox(
+        width: 190,
+        child: TextFormField(
+          key: ValueKey('report_label_$index'),
+          initialValue: _str(field['label']),
+          textAlign: TextAlign.right,
+          decoration: const InputDecoration(labelText: 'اسم الصف'),
+          onChanged: (v) => field['label'] = v,
+        ),
+      )),
+      DataCell(SizedBox(
+        width: 170,
+        child: DropdownButtonFormField<String>(
+          value: type,
+          isExpanded: true,
+          decoration: const InputDecoration(labelText: 'النوع'),
+          items: const [
+            DropdownMenuItem(value: 'short_text', child: Text('نص قصير')),
+            DropdownMenuItem(value: 'long_text', child: Text('نص طويل')),
+            DropdownMenuItem(value: 'number', child: Text('رقم')),
+            DropdownMenuItem(value: 'date', child: Text('تاريخ')),
+            DropdownMenuItem(value: 'select', child: Text('اختيار')),
+            DropdownMenuItem(value: 'multi_select', child: Text('اختيارات متعددة')),
+            DropdownMenuItem(value: 'attachment', child: Text('مرفق / صورة')),
+            DropdownMenuItem(value: 'table', child: Text('جدول متعدد الصفوف')),
+          ],
+          onChanged: (v) => setState(() {
+            field['field_type'] = v ?? 'short_text';
+            if (v == 'table' && field['config'] is! Map) {
+              field['config'] = <String, dynamic>{};
+            }
+          }),
+        ),
+      )),
+      DataCell(Checkbox(
+        value: field['is_required'] == true,
+        onChanged: (v) => setState(() => field['is_required'] = v == true),
+      )),
+      DataCell(Checkbox(
+        value: field['repeatable'] == true,
+        onChanged: (v) => setState(() => field['repeatable'] = v == true),
+      )),
+      DataCell(IconButton(
+        tooltip: 'حذف الصف من المسودة',
+        onPressed: () => setState(() => _reportFields.removeAt(index)),
+        icon: const Icon(Icons.delete_outline, color: Colors.red),
+      )),
+    ]);
+  }
 
   Widget _stepsGrid() => SingleChildScrollView(
         scrollDirection: Axis.horizontal,
