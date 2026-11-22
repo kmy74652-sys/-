@@ -221,6 +221,73 @@ class OfflineQueue {
     ].any(message.contains);
   }
 
+  static Future<Map<String, dynamic>> resolvePendingAttachments(
+    Map<String, dynamic> values,
+    String taskId,
+  ) async {
+    final resolved = await _resolvePending(values, taskId);
+    return Map<String, dynamic>.from(resolved as Map);
+  }
+
+  static Future<dynamic> _resolvePending(dynamic value, String taskId) async {
+    if (value is List) {
+      return [for (final item in value) await _resolvePending(item, taskId)];
+    }
+    if (value is! Map) return value;
+    final map = Map<String, dynamic>.from(value);
+    if (map['pendingUpload'] == true && map['localPath'] != null) {
+      final localPath = map['localPath'].toString();
+      final bytes = await OfflineAttachmentStore.read(localPath);
+      final safeName = '${map['name'] ?? 'attachment'}'.replaceAll(
+        RegExp(r'[^a-zA-Z0-9._-]'),
+        '_',
+      );
+      final path =
+          '$taskId/${DateTime.now().microsecondsSinceEpoch}-$safeName';
+      final db = Supabase.instance.client;
+      final user = db.auth.currentUser;
+      if (user == null) throw StateError('سجّل الدخول مجددًا.');
+      await db.storage.from('task-attachments').uploadBinary(
+            path,
+            bytes,
+            fileOptions: FileOptions(
+              contentType: '${map['mimeType'] ?? 'application/octet-stream'}',
+              upsert: false,
+            ),
+          );
+      try {
+        final row = await db
+            .from('task_attachments')
+            .insert({
+              'task_id': taskId,
+              'execution_step_id': null,
+              'uploaded_by': user.id,
+              'file_name': map['name'],
+              'storage_path': path,
+              'mime_type': map['mimeType'],
+              'size_bytes': map['size'],
+            })
+            .select('id')
+            .single();
+        await OfflineAttachmentStore.delete(localPath);
+        return {
+          'id': '${row['id']}',
+          'path': path,
+          'name': map['name'],
+          'mimeType': map['mimeType'],
+          'size': map['size'],
+        };
+      } catch (_) {
+        await db.storage.from('task-attachments').remove([path]);
+        rethrow;
+      }
+    }
+    return {
+      for (final entry in map.entries)
+        entry.key: await _resolvePending(entry.value, taskId),
+    };
+  }
+
   static Future<void> _execute(OfflineQueueItem item) async {
     final db = Supabase.instance.client;
     final p = item.payload;
@@ -261,21 +328,29 @@ class OfflineQueue {
       }
       await OfflineAttachmentStore.delete(localPath);
     } else if (p['snapshotId'] != null) {
+      final values = await resolvePendingAttachments(
+        Map<String, dynamic>.from(p['values'] as Map),
+        '${p['taskId']}',
+      );
       await db.rpc(
         'mobile_submit_task_report_form',
         params: {
           'p_task_id': p['taskId'],
           'p_snapshot_id': p['snapshotId'],
-          'p_values': p['values'],
+          'p_values': values,
           'p_idempotency_key': p['idempotencyKey'],
         },
       );
     } else {
+      final values = await resolvePendingAttachments(
+        Map<String, dynamic>.from(p['values'] as Map),
+        '${p['taskId']}',
+      );
       await db.rpc(
         'mobile_submit_task_report',
         params: {
           'p_task_id': p['taskId'],
-          'p_values': p['values'],
+          'p_values': values,
           'p_idempotency_key': p['idempotencyKey'],
         },
       );
