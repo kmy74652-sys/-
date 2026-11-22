@@ -1,0 +1,1375 @@
+import 'dart:convert';
+import 'dart:math' as math;
+import 'package:file_picker/file_picker.dart';
+import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import 'package:mime/mime.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../core/offline_queue.dart';
+import '../../shared/app_shell.dart';
+
+class TaskDetailScreen extends StatefulWidget {
+  const TaskDetailScreen({super.key, required this.taskId});
+  final String taskId;
+  @override
+  State<TaskDetailScreen> createState() => _TaskDetailScreenState();
+}
+
+class _TaskDetailScreenState extends State<TaskDetailScreen> {
+  bool _busy = true, _saving = false;
+  String? _error;
+  Map<String, dynamic>? _task;
+  List<Map<String, dynamic>> _fields = [], _steps = [];
+  final Map<String, TextEditingController> _inputs = {};
+  final Map<String, List<String>> _evidenceIds = {};
+  List<Map<String, dynamic>> _forms = [];
+  final Map<String, TextEditingController> _formInputs = {};
+  String _formInputKey(String snapshot, String field) => '$snapshot:$field';
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  @override
+  void dispose() {
+    for (final controller in _inputs.values) {
+      controller.dispose();
+    }
+    for (final controller in _formInputs.values) {
+      controller.dispose();
+    }
+    super.dispose();
+  }
+
+  Future<void> _load() async {
+    if (mounted) setState(() => _busy = true);
+    try {
+      final db = Supabase.instance.client;
+      final results = await Future.wait([
+        db
+            .from('tasks')
+            .select(
+                'id,title,description,due_at,priority,status,task_instructions,proof_required,proof_instructions,report_flow')
+            .eq('id', widget.taskId)
+            .single(),
+        db
+            .from('task_report_fields')
+            .select(
+                'id,label,field_key,field_type,is_required,options,sort_order')
+            .eq('task_id', widget.taskId)
+            .order('sort_order'),
+        db
+            .from('task_execution_steps')
+            .select(
+                'id,title,instructions,sort_order,is_required,evidence_required,evidence_instructions,completed_at')
+            .eq('task_id', widget.taskId)
+            .order('sort_order'),
+      ]);
+      _task = Map<String, dynamic>.from(results[0] as Map);
+      _fields = List<Map<String, dynamic>>.from(results[1] as List);
+      _steps = List<Map<String, dynamic>>.from(results[2] as List);
+      _forms = [];
+      if (_task!['report_flow'] == 'multi_form') {
+        final snapshots = await db
+            .from('task_report_form_snapshots')
+            .select('id,title,sort_order,is_required,schema')
+            .eq('task_id', widget.taskId)
+            .order('sort_order')
+            .order('id');
+        final reports = await db
+            .from('task_reports')
+            .select('id,report_form_snapshot_id,values,status,review_note')
+            .eq('task_id', widget.taskId)
+            .order('submitted_at', ascending: false);
+        final drafts = await db
+            .from('task_report_drafts')
+            .select('snapshot_id,values,updated_at')
+            .eq('task_id', widget.taskId)
+            .order('updated_at', ascending: false);
+        final reportRows = List<Map<String, dynamic>>.from(reports);
+        final draftRows = List<Map<String, dynamic>>.from(drafts);
+        _forms = List<Map<String, dynamic>>.from(snapshots).map((snapshot) {
+          final sid = '${snapshot['id']}';
+          final matchingReports =
+              reportRows.where((r) => r['report_form_snapshot_id'] == sid);
+          final matchingDrafts =
+              draftRows.where((r) => r['snapshot_id'] == sid);
+          final report = matchingReports.isEmpty ? null : matchingReports.first;
+          final draft = matchingDrafts.isEmpty ? null : matchingDrafts.first;
+          final schema = (snapshot['schema'] is List)
+              ? List<Map<String, dynamic>>.from((snapshot['schema'] as List)
+                  .map((f) => Map<String, dynamic>.from(f as Map)))
+              : <Map<String, dynamic>>[];
+          final values = Map<String, dynamic>.from(
+              (draft?['values'] as Map?) ?? (report?['values'] as Map?) ?? {});
+          for (final field in schema) {
+            final name = '${field['key'] ?? ''}';
+            final initial = values[name];
+            final text = initial == null
+                ? ''
+                : (initial is String &&
+                        ![
+                          'attachment',
+                          'file',
+                          'image',
+                          'multi_image',
+                          'signature'
+                        ].contains('${field['type']}')
+                    ? initial
+                    : jsonEncode(initial));
+            final inputKey = _formInputKey(sid, name);
+            if (_formInputs.containsKey(inputKey)) {
+              _formInputs[inputKey]!.text = text;
+            } else {
+              _formInputs[inputKey] = TextEditingController(text: text);
+            }
+          }
+          return {
+            ...snapshot,
+            'schema': schema,
+            'status': report?['status'],
+            'values': report?['values'],
+            'review_note': report?['review_note']
+          };
+        }).toList();
+      }
+      for (final field in _fields) {
+        _inputs.putIfAbsent('${field['field_key']}', TextEditingController.new);
+      }
+      await db
+          .rpc('mobile_mark_task_opened', params: {'p_task_id': widget.taskId});
+      _error = null;
+    } catch (_) {
+      _error = 'تعذر تحميل تفاصيل المهمة. تحقق من صلاحيات الحساب والاتصال.';
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _status(String status) async {
+    setState(() => _saving = true);
+    try {
+      try {
+        await Supabase.instance.client
+            .rpc('mobile_record_task_update', params: {
+          'p_task_id': widget.taskId,
+          'p_status': status,
+          'p_note': null,
+        });
+        await _load();
+        if (mounted)
+          ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('تم تحديث حالة المهمة')));
+      } catch (error) {
+        if (!await OfflineQueue.isNetworkError(error)) rethrow;
+        await OfflineQueue.enqueue(OfflineQueueKind.status, {
+          'taskId': widget.taskId,
+          'status': status,
+          'note': null,
+          'idempotencyKey':
+              'status:$status:${DateTime.now().microsecondsSinceEpoch}',
+        });
+        if (mounted)
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+              content:
+                  Text('تم حفظ الطلب؛ بانتظار المزامنة عند عودة الاتصال')));
+      }
+    } catch (_) {
+      if (mounted)
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text(
+                'تعذر تحديث المهمة. تحقق من حالة المهمة أو صلاحيات الحساب.')));
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  Future<void> _submitReport() async {
+    final missing = _fields.where((field) =>
+        field['is_required'] == true &&
+        (_inputs['${field['field_key']}']?.text.trim().isEmpty ?? true));
+    if (missing.isNotEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(
+              'أكمل الحقول المطلوبة: ${missing.map((e) => e['label']).join('، ')}')));
+      return;
+    }
+    setState(() => _saving = true);
+    try {
+      final values = {
+        for (final field in _fields)
+          '${field['field_key']}': _convert(
+              _inputs['${field['field_key']}']?.text ?? '',
+              '${field['field_type']}')
+      };
+      final idempotencyKey =
+          'flutter:${widget.taskId}:${DateTime.now().microsecondsSinceEpoch}';
+      try {
+        await Supabase.instance.client
+            .rpc('mobile_submit_task_report', params: {
+          'p_task_id': widget.taskId,
+          'p_values': values,
+          'p_idempotency_key': idempotencyKey,
+        });
+        await _load();
+        if (mounted)
+          ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('تم إرسال التقرير للمراجعة')));
+      } catch (error) {
+        if (!await OfflineQueue.isNetworkError(error)) rethrow;
+        await OfflineQueue.enqueue(OfflineQueueKind.report, {
+          'taskId': widget.taskId,
+          'values': values,
+          'idempotencyKey': idempotencyKey
+        });
+        if (mounted)
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+              content:
+                  Text('تم حفظ التقرير؛ بانتظار المزامنة عند عودة الاتصال')));
+      }
+    } catch (_) {
+      if (mounted)
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text(
+                'تعذر إرسال التقرير. راجع الحقول المطلوبة أو تحقق من الاتصال.')));
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  Object? _convert(String value, String type) {
+    if (value.isEmpty) return null;
+    if (type == 'integer' || type == 'number' || type == 'decimal')
+      return num.tryParse(value);
+    if (type == 'boolean') return value == 'true';
+    return value;
+  }
+
+  Object? _snapshotValue(Map<String, dynamic> field, String snapshotId) {
+    final key = '${field['key'] ?? ''}';
+    final raw = _formInputs[_formInputKey(snapshotId, key)]?.text.trim() ?? '';
+    final type = '${field['type'] ?? ''}';
+    if (raw.isEmpty) return null;
+    if ([
+      'table',
+      'multiselect',
+      'date_range',
+      'attachment',
+      'file',
+      'image',
+      'multi_image',
+      'signature'
+    ].contains(type)) {
+      try {
+        return jsonDecode(raw);
+      } catch (_) {
+        return null;
+      }
+    }
+    if ([
+      'integer',
+      'number',
+      'decimal',
+      'percentage',
+      'quantity',
+      'money',
+      'progress',
+      'calculated'
+    ].contains(type)) return num.tryParse(raw);
+    if (type == 'boolean' || type == 'checkbox')
+      return raw == 'true'
+          ? true
+          : raw == 'false'
+              ? false
+              : null;
+    return raw;
+  }
+
+  Map<String, dynamic> _obj(dynamic v) =>
+      v is Map ? Map<String, dynamic>.from(v) : <String, dynamic>{};
+  List<Map<String, dynamic>> _rows(String raw) {
+    try {
+      final v = jsonDecode(raw);
+      return v is List
+          ? v.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList()
+          : [];
+    } catch (_) {
+      return [];
+    }
+  }
+
+  List<Map<String, dynamic>> _cols(Map<String, dynamic> f) {
+    final raw = _obj(f['config'])['columns'];
+    if (raw is! List) return [];
+    return raw.asMap().entries.map((e) {
+      if (e.value is String)
+        return {
+          'key': e.value,
+          'label': e.value,
+          'type': 'short_text',
+          'required': false
+        };
+      final c = _obj(e.value);
+      return {
+        'key': '${c['key'] ?? 'column_${e.key + 1}'}',
+        'label': '${c['label'] ?? c['name'] ?? c['key'] ?? 'عمود'}',
+        'type': '${c['type'] ?? c['field_type'] ?? 'short_text'}',
+        'required': c['required'] == true || c['is_required'] == true,
+        'options': c['options'] is List ? c['options'] : <dynamic>[]
+      };
+    }).toList();
+  }
+
+  String? _validateSnapshot(Map<String, dynamic> f, String sid) {
+    final v = _snapshotValue(f, sid),
+        type = '${f['type']}',
+        label = '${f['label'] ?? f['key']}';
+    if (v == null) {
+      final raw =
+          _formInputs[_formInputKey(sid, '${f['key']}')]?.text.trim() ?? '';
+      return raw.isNotEmpty
+          ? 'تحقق من صيغة الحقل «$label».'
+          : (f['required'] == true ? 'أكمل الحقل «$label».' : null);
+    }
+    if (type == 'signature') {
+      final sig = _obj(v),
+          strokes = sig['strokes'],
+          consent = '${_obj(f['config'])['consent_text'] ?? ''}'.trim();
+      if (strokes is! List ||
+          ((f['required'] == true || consent.isNotEmpty) && strokes.isEmpty) ||
+          strokes.length > 200 ||
+          strokes.any((x) =>
+              x is! String ||
+              x.length > 15000 ||
+              !RegExp(r'^[ML0-9 .+\-]+$').hasMatch(x)) ||
+          strokes.fold<int>(0, (n, x) => n + (x is String ? x.length : 0)) >
+              200000) return 'التوقيع في «$label» غير صالح.';
+      if (consent.isNotEmpty && sig['acknowledged'] != true)
+        return 'يرجى الموافقة على «$label».';
+    }
+    if (['attachment', 'file', 'image', 'multi_image'].contains(type)) {
+      if (v is! List ||
+          v.length > 20 ||
+          v.any(
+              (x) => x is! Map || x['path'] is! String || x['id'] is! String) ||
+          (type == 'image' && v.length > 1))
+        return 'المرفقات في «$label» غير صالحة.';
+    }
+    if ([
+          'integer',
+          'number',
+          'decimal',
+          'percentage',
+          'quantity',
+          'money',
+          'progress'
+        ].contains(type) &&
+        (v is! num || !v.isFinite || (type == 'integer' && v % 1 != 0)))
+      return 'أدخل رقمًا صالحًا في «$label». ${type == 'integer' ? 'يجب أن يكون عددًا صحيحًا.' : ''}';
+    if (type == 'select' &&
+        (!(f['options'] is List) || !(f['options'] as List).contains(v)))
+      return 'اختر قيمة متاحة في «$label».';
+    if (type == 'multiselect' &&
+        (v is! List ||
+            (f['required'] == true && v.isEmpty) ||
+            v.any((x) => !(f['options'] as List? ?? []).contains(x))))
+      return 'تحقق من الاختيارات في «$label».';
+    if ((type == 'boolean' || type == 'checkbox') && v is! bool)
+      return 'اختر نعم أو لا في «$label».';
+    if ((type == 'date' || type == 'datetime') &&
+        (v is! String || DateTime.tryParse(v) == null))
+      return 'أدخل تاريخًا صالحًا في «$label».';
+    if (type == 'date_range') {
+      final r = _obj(v);
+      final a = DateTime.tryParse('${r['from'] ?? ''}'),
+          b = DateTime.tryParse('${r['to'] ?? ''}');
+      if (a == null || b == null)
+        return 'حدد تاريخ البداية والنهاية في «$label».';
+      if (a.isAfter(b))
+        return 'تاريخ البداية يجب ألا يتجاوز النهاية في «$label».';
+    }
+    if (type == 'table') {
+      if (v is! List) return 'بيانات الجدول «$label» غير صالحة.';
+      final cfg = _obj(f['config']);
+      final min = int.tryParse('${cfg['min_rows'] ?? 0}') ?? 0,
+          max = int.tryParse('${cfg['max_rows'] ?? 0}') ?? 0;
+      if (v.length < min) return 'أضف $min صفوفًا على الأقل إلى «$label».';
+      if (max > 0 && v.length > max)
+        return 'الحد الأقصى لجدول «$label» هو $max صفًا.';
+      final cols = _cols(f);
+      for (var i = 0; i < v.length; i++) {
+        final row = _obj(v[i]);
+        for (final c in cols) {
+          final cell = row['${c['key']}'],
+              str = '${cell ?? ''}'.trim(),
+              ct = '${c['type']}';
+          if (str.isEmpty && c['required'] == true)
+            return 'أكمل «${c['label']}» في الصف ${i + 1}.';
+          if (str.isEmpty) continue;
+          if (['integer', 'decimal', 'quantity', 'money'].contains(ct) &&
+              (num.tryParse(str) == null ||
+                  (ct == 'integer' && num.parse(str) % 1 != 0)))
+            return 'أدخل رقمًا صالحًا في «${c['label']}» بالصف ${i + 1}.';
+          if (ct == 'select' && !(c['options'] as List).contains(str))
+            return 'اختر خيارًا صالحًا في «${c['label']}» بالصف ${i + 1}.';
+          if (ct == 'boolean' &&
+              cell != true &&
+              cell != false &&
+              cell != 'true' &&
+              cell != 'false')
+            return 'اختر نعم أو لا في «${c['label']}» بالصف ${i + 1}.';
+        }
+      }
+    }
+    return null;
+  }
+
+  double? _arithmetic(String src) {
+    final s = src.replaceAll(' ', '');
+    if (!RegExp(r'^[0-9.+*/()\-]+$').hasMatch(s)) throw const FormatException();
+    final t = RegExp(r'\d+(?:\.\d+)?|[()+*/-]')
+        .allMatches(s)
+        .map((m) => m.group(0)!)
+        .toList();
+    var i = 0;
+    late double Function() expr;
+    double primary() {
+      if (i >= t.length) throw const FormatException();
+      final x = t[i++];
+      if (x == '-') return -primary();
+      if (x == '+') return primary();
+      if (x == '(') {
+        final n = expr();
+        if (i >= t.length || t[i++] != ')') throw const FormatException();
+        return n;
+      }
+      return double.parse(x);
+    }
+
+    double term() {
+      var n = primary();
+      while (i < t.length && (t[i] == '*' || t[i] == '/')) {
+        final o = t[i++], r = primary();
+        if (o == '/' && r == 0) throw const FormatException();
+        n = o == '*' ? n * r : n / r;
+      }
+      return n;
+    }
+
+    double expression() {
+      var n = term();
+      while (i < t.length && (t[i] == '+' || t[i] == '-')) {
+        final o = t[i++], r = term();
+        n = o == '+' ? n + r : n - r;
+      }
+      return n;
+    }
+
+    expr = expression;
+    final n = expr();
+    if (i != t.length || !n.isFinite) throw const FormatException();
+    return n;
+  }
+
+  Widget _tableField(Map<String, dynamic> f, String sid, String title) {
+    final ctl = _formInputs[_formInputKey(sid, '${f['key']}')]!,
+        cols = _cols(f),
+        cfg = _obj(f['config']),
+        rows = _rows(ctl.text);
+    final max = int.tryParse('${cfg['max_rows'] ?? 0}') ?? 0,
+        min = int.tryParse('${cfg['min_rows'] ?? 0}') ?? 0;
+    void save(List<Map<String, dynamic>> r) {
+      ctl.text = jsonEncode(r);
+      setState(() {});
+    }
+
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      Text(title, textAlign: TextAlign.right),
+      for (var i = 0; i < rows.length; i++)
+        Card(
+            child: Padding(
+                padding: const EdgeInsets.all(8),
+                child: Column(children: [
+                  Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text('صف ${i + 1}'),
+                        IconButton(
+                            onPressed: _saving || rows.length <= min
+                                ? null
+                                : () {
+                                    final n = [...rows]..removeAt(i);
+                                    save(n);
+                                  },
+                            icon: const Icon(Icons.delete_outline))
+                      ]),
+                  for (final c in cols)
+                    _tableCell(c, rows[i]['${c['key']}'], (v) {
+                      final n = [...rows];
+                      n[i] = {...n[i], '${c['key']}': v};
+                      save(n);
+                    })
+                ]))),
+      if (cols.any((c) => ['integer', 'decimal', 'quantity', 'money']
+              .contains(c['type'])) &&
+          rows.isNotEmpty)
+        for (final c in cols.where((c) =>
+            ['integer', 'decimal', 'quantity', 'money'].contains(c['type'])))
+          Text(
+              'إجمالي ${c['label']}: ${rows.fold<double>(0, (a, r) => a + (num.tryParse('${r[c['key']] ?? ''}') ?? 0))}',
+              textAlign: TextAlign.right),
+      Align(
+          alignment: Alignment.centerRight,
+          child: OutlinedButton.icon(
+              onPressed: _saving || (max > 0 && rows.length >= max)
+                  ? null
+                  : () {
+                      save([
+                        ...rows,
+                        {
+                          for (final c in cols)
+                            '${c['key']}': c['type'] == 'boolean' ? null : ''
+                        }
+                      ]);
+                    },
+              icon: const Icon(Icons.add),
+              label: Text(max > 0 && rows.length >= max
+                  ? 'بلغت الحد الأعلى'
+                  : 'إضافة صف')))
+    ]);
+  }
+
+  Widget _tableCell(
+      Map<String, dynamic> c, dynamic value, ValueChanged<dynamic> onChange) {
+    final type = '${c['type']}',
+        label = '${c['label']}${c['required'] == true ? ' *' : ''}';
+    if (type == 'select')
+      return DropdownButtonFormField<String>(
+          value: (c['options'] as List)
+                  .map((e) => '$e')
+                  .contains(value?.toString())
+              ? value.toString()
+              : null,
+          decoration: InputDecoration(labelText: label),
+          items: (c['options'] as List)
+              .map((e) => DropdownMenuItem(value: '$e', child: Text('$e')))
+              .toList(),
+          onChanged: onChange);
+    if (type == 'boolean')
+      return CheckboxListTile(
+          tristate: true,
+          value: value == true || value == 'true'
+              ? true
+              : value == false || value == 'false'
+                  ? false
+                  : null,
+          title: Text(label),
+          controlAffinity: ListTileControlAffinity.leading,
+          onChanged: onChange);
+    return TextFormField(
+        key: ValueKey('${c['key']}_$value'),
+        initialValue: '${value ?? ''}',
+        maxLines: type == 'long_text' ? 3 : 1,
+        keyboardType: ['integer', 'decimal', 'quantity', 'money'].contains(type)
+            ? TextInputType.number
+            : TextInputType.text,
+        decoration: InputDecoration(labelText: label),
+        onChanged: onChange);
+  }
+
+  Future<void> _saveSnapshotDraft(
+      String snapshotId, List<Map<String, dynamic>> schema) async {
+    final values = <String, dynamic>{};
+    for (final field in schema) {
+      final value = _snapshotValue(field, snapshotId);
+      if (value != null) values['${field['key']}'] = value;
+    }
+    setState(() => _saving = true);
+    try {
+      await Supabase.instance.client.rpc('save_task_report_draft', params: {
+        'p_task_id': widget.taskId,
+        'p_snapshot_id': snapshotId,
+        'p_values': values
+      });
+      if (mounted)
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('تم حفظ مسودة النموذج')));
+    } catch (_) {
+      if (mounted)
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('تعذر حفظ المسودة. تحقق من الاتصال.')));
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  Future<void> _submitSnapshot(
+      String snapshotId, List<Map<String, dynamic>> schema) async {
+    for (final f in schema) {
+      final issue = _validateSnapshot(f, snapshotId);
+      if (issue != null) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(issue)));
+        return;
+      }
+    }
+    final values = <String, dynamic>{};
+    for (final field in schema) {
+      final value = _snapshotValue(field, snapshotId);
+      if (value != null) values['${field['key']}'] = value;
+    }
+    setState(() => _saving = true);
+    final idempotencyKey =
+        'report:$snapshotId:${widget.taskId}:${DateTime.now().millisecondsSinceEpoch}';
+    try {
+      try {
+        await Supabase.instance.client
+            .rpc('mobile_submit_task_report_form', params: {
+          'p_task_id': widget.taskId,
+          'p_snapshot_id': snapshotId,
+          'p_values': values,
+          'p_idempotency_key': idempotencyKey
+        });
+        await _load();
+        if (mounted)
+          ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('تم إرسال النموذج للمراجعة')));
+      } catch (error) {
+        if (!await OfflineQueue.isNetworkError(error)) rethrow;
+        await OfflineQueue.enqueue(OfflineQueueKind.report, {
+          'taskId': widget.taskId,
+          'snapshotId': snapshotId,
+          'values': values,
+          'idempotencyKey': idempotencyKey
+        });
+        if (mounted)
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+              content:
+                  Text('تم حفظ النموذج؛ بانتظار المزامنة عند عودة الاتصال')));
+      }
+    } catch (_) {
+      if (mounted)
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content:
+                Text('تعذر إرسال النموذج. راجع الحقول المطلوبة أو الاتصال.')));
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  List<Map<String, dynamic>> _attachmentList(TextEditingController? ctl) {
+    try {
+      final x = jsonDecode(ctl?.text ?? '[]');
+      return x is List
+          ? x.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList()
+          : [];
+    } catch (_) {
+      return [];
+    }
+  }
+
+  Future<void> _pickReportFiles(TextEditingController? ctl, String type) async {
+    if (_saving || ctl == null) return;
+    try {
+      final multi = type == 'multi_image';
+      final result = await FilePicker.platform.pickFiles(
+          type: multi ? FileType.image : FileType.any,
+          allowMultiple: multi || type == 'file' || type == 'attachment',
+          withData: true);
+      if (result == null) return;
+      final db = Supabase.instance.client, user = db.auth.currentUser;
+      if (user == null) throw Exception('سجّل الدخول مجددًا.');
+      final current = _attachmentList(ctl);
+      if (current.length + result.files.length > 20 ||
+          (type == 'image' && current.length + result.files.length > 1))
+        throw Exception('الحد 20 مرفقًا ويسمح بصورة واحدة لهذا الحقل.');
+      for (final file in result.files) {
+        if (file.size <= 0 || file.size > 20 * 1024 * 1024)
+          throw Exception('الحد الأعلى لكل ملف 20 ميجابايت.');
+        final mime = lookupMimeType(file.name) ?? 'application/octet-stream';
+        if ((multi || type == 'image') && !mime.startsWith('image/'))
+          throw Exception('اختر ملف صورة.');
+        final bytes = file.bytes;
+        if (bytes == null) throw Exception('تعذرت قراءة الملف.');
+        final safe = file.name.replaceAll(RegExp(r'[^a-zA-Z0-9._-]'), '_');
+        final path =
+            '${widget.taskId}/${DateTime.now().microsecondsSinceEpoch}-${math.Random.secure().nextInt(1 << 32)}-$safe';
+        await db.storage.from('task-attachments').uploadBinary(path, bytes,
+            fileOptions: FileOptions(contentType: mime, upsert: false));
+        try {
+          final row = await db
+              .from('task_attachments')
+              .insert({
+                'task_id': widget.taskId,
+                'execution_step_id': null,
+                'uploaded_by': user.id,
+                'file_name': file.name,
+                'storage_path': path,
+                'mime_type': mime,
+                'size_bytes': file.size
+              })
+              .select('id')
+              .single();
+          current.add({
+            'id': '${row['id']}',
+            'path': path,
+            'name': file.name,
+            'mimeType': mime,
+            'size': file.size
+          });
+        } catch (_) {
+          await db.storage.from('task-attachments').remove([path]);
+          rethrow;
+        }
+      }
+      ctl.text = jsonEncode(current);
+      if (mounted) setState(() {});
+    } catch (e) {
+      if (mounted)
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('تعذر رفع المرفق: $e')));
+    }
+  }
+
+  Widget _snapshotField(Map<String, dynamic> field, String snapshotId) {
+    final type = '${field['type'] ?? 'short_text'}';
+    final title =
+        '${field['label'] ?? field['key'] ?? 'حقل'}${field['required'] == true ? ' *' : ''}';
+    final controller =
+        _formInputs[_formInputKey(snapshotId, '${field['key'] ?? ''}')];
+    final options = field['options'] is List
+        ? (field['options'] as List).map((v) => '$v').toList()
+        : <String>[];
+    if (type == 'table') return _tableField(field, snapshotId, title);
+    if (type == 'multiselect') {
+      List<String> selected = [];
+      try {
+        final v = jsonDecode(controller?.text ?? '[]');
+        if (v is List) selected = v.map((x) => '$x').toList();
+      } catch (_) {}
+      return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Text(title, textAlign: TextAlign.right),
+        Wrap(
+            alignment: WrapAlignment.end,
+            spacing: 6,
+            children: options
+                .map((o) => FilterChip(
+                    label: Text(o),
+                    selected: selected.contains(o),
+                    onSelected: (yes) {
+                      if (yes) {
+                        selected.add(o);
+                      } else {
+                        selected.remove(o);
+                      }
+                      controller?.text = jsonEncode(selected);
+                      setState(() {});
+                    }))
+                .toList())
+      ]);
+    }
+    if (['attachment', 'file', 'image', 'multi_image'].contains(type)) {
+      final items = _attachmentList(controller);
+      final max = type == 'image' ? 1 : 20;
+      return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Text(title, textAlign: TextAlign.right),
+        for (var i = 0; i < items.length; i++)
+          ListTile(
+              title: Text('${items[i]['name'] ?? items[i]['path']}',
+                  textAlign: TextAlign.right),
+              trailing: IconButton(
+                  onPressed: _saving
+                      ? null
+                      : () {
+                          items.removeAt(i);
+                          controller?.text = jsonEncode(items);
+                          setState(() {});
+                        },
+                  icon: const Icon(Icons.remove_circle_outline))),
+        OutlinedButton.icon(
+            onPressed: _saving || items.length >= max
+                ? null
+                : () => _pickReportFiles(controller, type),
+            icon: const Icon(Icons.upload_file),
+            label: const Text('إضافة مرفق'))
+      ]);
+    }
+    if (type == 'signature') {
+      Map<String, dynamic> v = {};
+      try {
+        v = _obj(jsonDecode(controller?.text ?? '{}'));
+      } catch (_) {}
+      final consent = '${_obj(field['config'])['consent_text'] ?? ''}';
+      final st = v['strokes'] is List
+          ? (v['strokes'] as List).whereType<String>().toList()
+          : <String>[];
+      return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Text(title, textAlign: TextAlign.right),
+        if (consent.trim().isNotEmpty)
+          Text(consent, textAlign: TextAlign.right),
+        SignatureCapture(
+            strokes: st,
+            enabled: !_saving,
+            onChanged: (paths) {
+              v['strokes'] = paths;
+              v.putIfAbsent('acknowledged', () => false);
+              controller?.text = jsonEncode(v);
+            }),
+        if (consent.trim().isNotEmpty)
+          CheckboxListTile(
+              value: v['acknowledged'] == true,
+              title: const Text('أوافق على النص أعلاه'),
+              controlAffinity: ListTileControlAffinity.leading,
+              onChanged: _saving
+                  ? null
+                  : (b) {
+                      v['acknowledged'] = b == true;
+                      controller?.text = jsonEncode(v);
+                      setState(() {});
+                    }),
+        TextButton(
+            onPressed: _saving
+                ? null
+                : () {
+                    v = {'strokes': <String>[], 'acknowledged': false};
+                    controller?.text = jsonEncode(v);
+                    setState(() {});
+                  },
+            child: const Text('مسح التوقيع'))
+      ]);
+    }
+    if (type == 'system_reference')
+      return TextField(
+          controller: controller,
+          decoration: InputDecoration(
+              labelText: title, helperText: 'أدخل معرّف السجل المرتبط يدويًا'));
+    if (type == 'date_range') {
+      Map<String, dynamic> r = {};
+      try {
+        r = _obj(jsonDecode(controller?.text ?? '{}'));
+      } catch (_) {}
+      return Column(children: [
+        Text(title, textAlign: TextAlign.right),
+        Row(
+            children: ['from', 'to']
+                .map((k) => Expanded(
+                    child: TextField(
+                        key: ValueKey('${snapshotId}_${field['key']}_$k'),
+                        controller: TextEditingController(text: '${r[k] ?? ''}')
+                          ..selection = TextSelection.collapsed(
+                              offset: '${r[k] ?? ''}'.length),
+                        decoration: InputDecoration(
+                            labelText: k == 'from'
+                                ? 'من (YYYY-MM-DD)'
+                                : 'إلى (YYYY-MM-DD)'),
+                        onChanged: (v) {
+                          r[k] = v;
+                          controller?.text = jsonEncode(r);
+                        })))
+                .toList())
+      ]);
+    }
+    if (type == 'calculated') {
+      final formula = '${_obj(field['config'])['formula'] ?? ''}';
+      String? error;
+      double? result;
+      try {
+        final sum =
+            RegExp(r'^sum_rows\(([a-z][a-z0-9_]*)\.([a-z][a-z0-9_]*)\)$')
+                .firstMatch(formula);
+        if (sum != null) {
+          final rows = _rows(
+              _formInputs[_formInputKey(snapshotId, sum.group(1)!)]?.text ??
+                  '[]');
+          result = rows.fold<double>(
+              0, (a, r) => a + (num.tryParse('${r[sum.group(2)] ?? ''}') ?? 0));
+        } else {
+          var expr = formula;
+          for (final m
+              in RegExp(r'\{([a-z][a-z0-9_]*)\}').allMatches(formula)) {
+            final n = num.tryParse(
+                _formInputs[_formInputKey(snapshotId, m.group(1)!)]?.text ??
+                    '');
+            if (n == null) throw const FormatException();
+            expr = expr.replaceAll(m.group(0)!, '$n');
+          }
+          result = _arithmetic(expr);
+        }
+      } catch (_) {
+        error =
+            'تعذر حساب الصيغة؛ استخدم مراجع {field_key} والعمليات + − × ÷ أو sum_rows(جدول.عمود).';
+      }
+      return ListTile(
+          title: Text(title, textAlign: TextAlign.right),
+          subtitle: Text(
+              error ?? (result?.toString() ?? 'أكمل الحقول المرتبطة'),
+              textAlign: TextAlign.right));
+    }
+    if (type == 'select' && options.isNotEmpty) {
+      return DropdownButtonFormField<String>(
+          value: options.contains(controller?.text) ? controller!.text : null,
+          decoration: InputDecoration(labelText: title),
+          items: options
+              .map((v) => DropdownMenuItem(value: v, child: Text(v)))
+              .toList(),
+          onChanged: (v) {
+            if (v != null) {
+              controller?.text = v;
+              setState(() {});
+            }
+          });
+    }
+    if (type == 'boolean' || type == 'checkbox')
+      return CheckboxListTile(
+          value: controller?.text == 'true',
+          onChanged: (v) {
+            controller?.text = '${v == true}';
+            setState(() {});
+          },
+          title: Text(title),
+          controlAffinity: ListTileControlAffinity.leading);
+    const supported = [
+      'text',
+      'short_text',
+      'textarea',
+      'long_text',
+      'notes',
+      'decision_notes',
+      'number',
+      'integer',
+      'decimal',
+      'percentage',
+      'quantity',
+      'money',
+      'progress',
+      'date',
+      'datetime',
+      'barcode',
+      'status'
+    ];
+    if (!supported.contains(type))
+      return ListTile(
+          title: Text(title),
+          subtitle: Text(
+              'نوع الحقل «$type» غير مدعوم في Flutter؛ أكمل هذا النموذج من التطبيق المدعوم.'));
+    if (type == 'datetime' &&
+        _obj(field['config'])['auto_now'] == true &&
+        (controller?.text.isEmpty ?? true))
+      controller?.text = DateTime.now().toUtc().toIso8601String();
+    return TextField(
+        controller: controller,
+        readOnly:
+            type == 'datetime' && _obj(field['config'])['auto_now'] == true,
+        maxLines:
+            ['textarea', 'long_text', 'notes', 'decision_notes'].contains(type)
+                ? 4
+                : 1,
+        keyboardType: [
+          'number',
+          'integer',
+          'decimal',
+          'percentage',
+          'quantity',
+          'money',
+          'progress'
+        ].contains(type)
+            ? TextInputType.number
+            : TextInputType.text,
+        decoration: InputDecoration(
+            labelText: title, helperText: '${field['description'] ?? ''}'));
+  }
+
+  Future<void> _uploadEvidence(String stepId) async {
+    try {
+      final result = await FilePicker.platform
+          .pickFiles(type: FileType.any, allowMultiple: false, withData: true);
+      if (result == null || result.files.isEmpty) return;
+      final file = result.files.single;
+      if (file.size <= 0 || file.size > 20 * 1024 * 1024)
+        throw Exception('الحد الأعلى لحجم المرفق 20 ميجابايت.');
+      final bytes = file.bytes;
+      if (bytes == null) throw Exception('تعذرت قراءة الملف المحدد.');
+      final db = Supabase.instance.client;
+      final user = db.auth.currentUser;
+      if (user == null) throw Exception('سجّل الدخول مجددًا.');
+      final safeName = file.name.replaceAll(RegExp(r'[^a-zA-Z0-9._-]'), '_');
+      final path =
+          '${widget.taskId}/${DateTime.now().microsecondsSinceEpoch}-$safeName';
+      final mime = switch (file.extension?.toLowerCase()) {
+        'pdf' => 'application/pdf',
+        'png' => 'image/png',
+        'jpg' || 'jpeg' => 'image/jpeg',
+        'webp' => 'image/webp',
+        'txt' => 'text/plain',
+        _ => 'application/octet-stream',
+      };
+      await db.storage.from('task-attachments').uploadBinary(path, bytes,
+          fileOptions: FileOptions(contentType: mime, upsert: false));
+      try {
+        final metadata = await db
+            .from('task_attachments')
+            .insert({
+              'task_id': widget.taskId,
+              'execution_step_id': stepId,
+              'uploaded_by': user.id,
+              'file_name': file.name,
+              'storage_path': path,
+              'mime_type': mime,
+              'size_bytes': file.size,
+            })
+            .select('id')
+            .single();
+        _evidenceIds.putIfAbsent(stepId, () => []).add('${metadata['id']}');
+        if (mounted) setState(() {});
+      } catch (_) {
+        await db.storage.from('task-attachments').remove([path]);
+        rethrow;
+      }
+    } catch (error) {
+      if (mounted)
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('تعذر رفع المرفق: $error')));
+    }
+  }
+
+  Future<void> _completeStep(String id) async {
+    final step = _steps.firstWhere((row) => '${row['id']}' == id,
+        orElse: () => <String, dynamic>{});
+    final evidenceRequired = step['evidence_required'] == true;
+    final evidence = _evidenceIds[id] ?? const <String>[];
+    if (evidenceRequired && evidence.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('هذه الخطوة تتطلب رفع إثبات قبل إكمالها.')));
+      }
+      return;
+    }
+    try {
+      await Supabase.instance.client.rpc('mobile_complete_task_step', params: {
+        'p_step_id': id,
+        'p_evidence_attachment_ids': _evidenceIds[id] ?? <String>[],
+      });
+      await _load();
+    } catch (_) {
+      if (mounted)
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text(
+                'تعذر إكمال الخطوة. أضف الدليل المطلوب أو تحقق من الصلاحية.')));
+    }
+  }
+
+  Future<void> _timeline() async {
+    try {
+      final rows = await Supabase.instance.client
+          .rpc('mobile_task_timeline', params: {'p_task_id': widget.taskId});
+      if (!mounted) return;
+      showModalBottomSheet<void>(
+          context: context,
+          isScrollControlled: true,
+          builder: (context) => SafeArea(
+                child: ListView(padding: const EdgeInsets.all(16), children: [
+                  const Text('سجل المهمة',
+                      style:
+                          TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                  for (final row in (rows as List))
+                    ListTile(
+                      title: Text(
+                          '${row['action_type'] ?? row['new_status'] ?? ''}',
+                          textAlign: TextAlign.right),
+                      subtitle: Text(
+                          '${row['actor_name'] ?? ''} · ${row['created_at'] ?? ''}\n${row['notes'] ?? ''}',
+                          textAlign: TextAlign.right),
+                    ),
+                ]),
+              ));
+    } catch (_) {
+      if (mounted)
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('تعذر تحميل سجل المهمة.')));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => AppShell(
+        title: 'تفاصيل المهمة',
+        subtitle: _task?['title']?.toString(),
+        child: _busy
+            ? const Center(child: CircularProgressIndicator())
+            : _error != null
+                ? Center(
+                    child: Column(mainAxisSize: MainAxisSize.min, children: [
+                    Text(_error!, textAlign: TextAlign.center),
+                    TextButton(
+                        onPressed: _load, child: const Text('إعادة المحاولة')),
+                  ]))
+                : ListView(padding: const EdgeInsets.all(12), children: [
+                    SectionCard(
+                        title: _task?['title']?.toString() ?? 'مهمة',
+                        child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              Text(
+                                  'الحالة: ${_task?['status'] ?? '—'} · الأولوية: ${_task?['priority'] ?? '—'}',
+                                  textAlign: TextAlign.right),
+                              if (_task?['due_at'] != null)
+                                Text('موعد الاستحقاق: ${_task!['due_at']}',
+                                    textAlign: TextAlign.right),
+                              if (_task?['description'] != null)
+                                Text('${_task!['description']}',
+                                    textAlign: TextAlign.right),
+                              if (_task?['task_instructions'] != null)
+                                Text('${_task!['task_instructions']}',
+                                    textAlign: TextAlign.right),
+                            ])),
+                    if (_steps.isNotEmpty)
+                      SectionCard(
+                          title: 'خطوات التنفيذ',
+                          child: Column(children: [
+                            for (final step in _steps)
+                              Column(children: [
+                                CheckboxListTile(
+                                  value: step['completed_at'] != null,
+                                  onChanged: step['completed_at'] != null
+                                      ? null
+                                      : (_) => _completeStep('${step['id']}'),
+                                  title: Text('${step['title']}',
+                                      textAlign: TextAlign.right),
+                                  subtitle: Text(
+                                      '${step['instructions'] ?? ''}',
+                                      textAlign: TextAlign.right),
+                                  controlAffinity:
+                                      ListTileControlAffinity.leading,
+                                ),
+                                if (step['evidence_required'] == true &&
+                                    step['completed_at'] == null)
+                                  Align(
+                                      alignment: Alignment.centerRight,
+                                      child: TextButton.icon(
+                                        onPressed: () =>
+                                            _uploadEvidence('${step['id']}'),
+                                        icon: const Icon(Icons.attach_file),
+                                        label: Text(
+                                            'رفع دليل (${_evidenceIds['${step['id']}']?.length ?? 0})'),
+                                      )),
+                              ]),
+                          ])),
+                    if (_task?['report_flow'] == 'multi_form')
+                      for (final form in _forms)
+                        Builder(builder: (context) {
+                          final snapshotId = '${form['id']}';
+                          final schema = List<Map<String, dynamic>>.from(
+                              form['schema'] as List);
+                          final status = form['status'];
+                          final locked =
+                              status == 'submitted' || status == 'approved';
+                          final savedValues = Map<String, dynamic>.from(
+                              (form['values'] as Map?) ?? {});
+                          return SectionCard(
+                              title: '${form['title'] ?? 'نموذج تقرير'}',
+                              child: Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.stretch,
+                                  children: [
+                                    if (status == 'approved')
+                                      const Text('تم اعتماد هذا النموذج',
+                                          textAlign: TextAlign.right),
+                                    if (status == 'submitted')
+                                      const Text(
+                                          'تم إرسال هذا النموذج للمراجعة',
+                                          textAlign: TextAlign.right),
+                                    if (form['review_note'] != null)
+                                      Text(
+                                          'ملاحظة المراجعة: ${form['review_note']}',
+                                          textAlign: TextAlign.right),
+                                    if (schema.isEmpty)
+                                      const Text(
+                                          'لا يحتوي هذا النموذج على حقول.',
+                                          textAlign: TextAlign.right),
+                                    for (final field in schema)
+                                      locked
+                                          ? ListTile(
+                                              title: Text(
+                                                  '${field['label'] ?? field['key']}',
+                                                  textAlign: TextAlign.right),
+                                              subtitle: Text(
+                                                  '${savedValues[field['key']] ?? '—'}',
+                                                  textAlign: TextAlign.right))
+                                          : Padding(
+                                              padding: const EdgeInsets.only(
+                                                  bottom: 12),
+                                              child: _snapshotField(
+                                                  field, snapshotId)),
+                                    if (!locked)
+                                      Wrap(
+                                          alignment: WrapAlignment.center,
+                                          spacing: 8,
+                                          children: [
+                                            OutlinedButton(
+                                                onPressed: _saving
+                                                    ? null
+                                                    : () => _saveSnapshotDraft(
+                                                        snapshotId, schema),
+                                                child:
+                                                    const Text('حفظ المسودة')),
+                                            FilledButton(
+                                                onPressed: _saving
+                                                    ? null
+                                                    : () => _submitSnapshot(
+                                                        snapshotId, schema),
+                                                child: const Text(
+                                                    'إرسال النموذج')),
+                                          ]),
+                                  ]));
+                        }),
+                    if (_task?['report_flow'] != 'multi_form' &&
+                        _fields.isNotEmpty)
+                      SectionCard(
+                          title: 'تقرير المهمة',
+                          child: Column(children: [
+                            for (final field in _fields)
+                              Padding(
+                                  padding: const EdgeInsets.only(bottom: 12),
+                                  child: TextField(
+                                    controller:
+                                        _inputs['${field['field_key']}'],
+                                    maxLines: field['field_type'] == 'long_text'
+                                        ? 4
+                                        : 1,
+                                    keyboardType: const [
+                                      'integer',
+                                      'number',
+                                      'decimal',
+                                      'money',
+                                      'percentage'
+                                    ].contains(field['field_type'])
+                                        ? TextInputType.number
+                                        : TextInputType.text,
+                                    decoration: InputDecoration(
+                                        labelText:
+                                            '${field['label']}${field['is_required'] == true ? ' *' : ''}',
+                                        hintText:
+                                            '${field['field_type'] ?? ''}'),
+                                  )),
+                            FilledButton(
+                                onPressed: _saving ? null : _submitReport,
+                                child: const Text('إرسال التقرير للمراجعة')),
+                          ])),
+                    const SizedBox(height: 12),
+                    Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        alignment: WrapAlignment.center,
+                        children: [
+                          if (['pending', 'new', 'received']
+                              .contains(_task?['status']))
+                            FilledButton(
+                                onPressed: _saving
+                                    ? null
+                                    : () => _status('in_progress'),
+                                child: const Text('بدء التنفيذ')),
+                          if (['in_progress', 'on_hold']
+                              .contains(_task?['status']))
+                            FilledButton(
+                                onPressed:
+                                    _saving ? null : () => _status('submitted'),
+                                child: const Text('إرسال للمراجعة')),
+                          OutlinedButton.icon(
+                              onPressed: _timeline,
+                              icon: const Icon(Icons.history),
+                              label: const Text('سجل المهمة')),
+                          OutlinedButton.icon(
+                              onPressed: () => context.pop(),
+                              icon: const Icon(Icons.arrow_back),
+                              label: const Text('رجوع')),
+                        ]),
+                  ]),
+      );
+}
+
+class SignatureCapture extends StatefulWidget {
+  const SignatureCapture(
+      {super.key,
+      required this.strokes,
+      required this.enabled,
+      required this.onChanged});
+  final List<String> strokes;
+  final bool enabled;
+  final ValueChanged<List<String>> onChanged;
+  @override
+  State<SignatureCapture> createState() => _SignatureCaptureState();
+}
+
+class _SignatureCaptureState extends State<SignatureCapture> {
+  late List<String> paths;
+  List<Offset> active = [];
+  @override
+  void initState() {
+    super.initState();
+    paths = [...widget.strokes];
+  }
+
+  String _encode(List<Offset> p) => p.isEmpty
+      ? ''
+      : 'M ${p.first.dx.toStringAsFixed(1)} ${p.first.dy.toStringAsFixed(1)}' +
+          p
+              .skip(1)
+              .map((x) =>
+                  ' L ${x.dx.toStringAsFixed(1)} ${x.dy.toStringAsFixed(1)}')
+              .join();
+  @override
+  Widget build(BuildContext c) => Container(
+      height: 170,
+      decoration: BoxDecoration(
+          border: Border.all(color: Colors.grey),
+          borderRadius: BorderRadius.circular(8)),
+      child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onPanStart: widget.enabled
+              ? (d) => setState(() => active = [d.localPosition])
+              : null,
+          onPanUpdate: widget.enabled
+              ? (d) => setState(() => active = [...active, d.localPosition])
+              : null,
+          onPanEnd: widget.enabled
+              ? (_) {
+                  final p = _encode(active);
+                  if (p.isNotEmpty && paths.length < 200) {
+                    paths = [...paths, p];
+                    widget.onChanged(paths);
+                  }
+                  setState(() => active = []);
+                }
+              : null,
+          child: CustomPaint(
+              painter: _SignPainter(
+                  [...paths, if (active.isNotEmpty) _encode(active)]),
+              size: Size.infinite)));
+}
+
+class _SignPainter extends CustomPainter {
+  _SignPainter(this.paths);
+  final List<String> paths;
+  @override
+  void paint(Canvas c, Size s) {
+    final p = Paint()
+      ..color = Colors.black
+      ..strokeWidth = 2
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round;
+    for (final x in paths) {
+      final n = RegExp(r'\d+(?:\.\d+)?')
+          .allMatches(x)
+          .map((m) => double.parse(m.group(0)!))
+          .toList();
+      if (n.length < 2) continue;
+      final q = Path()..moveTo(n[0], n[1]);
+      for (var i = 2; i + 1 < n.length; i += 2) q.lineTo(n[i], n[i + 1]);
+      c.drawPath(q, p);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _SignPainter o) => true;
+}
