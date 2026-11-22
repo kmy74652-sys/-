@@ -104,17 +104,10 @@ class _HomeScreenState extends State<HomeScreen> {
       [
         _Module(
           'agreements',
-          'اتفاقية العمل',
-          'عرض وقبول اتفاقية الموظف',
+          'اتفاقية العمل والموارد البشرية',
+          'الاتفاقيات والعقود والدوام والرواتب',
           Icons.description_outlined,
           '/agreement',
-        ),
-        _Module(
-          'hr',
-          'الموارد البشرية',
-          'العقود والدوام والرواتب',
-          Icons.badge_outlined,
-          '/hr',
         ),
         _Module(
           'permissions',

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../shared/app_shell.dart';
@@ -309,8 +310,8 @@ class _AgreementsScreenState extends State<AgreementsScreen> {
   Widget build(BuildContext context) => Directionality(
     textDirection: TextDirection.rtl,
     child: AppShell(
-      title: 'اتفاقية العمل',
-      subtitle: 'اتفاقيات الموظفين',
+      title: 'اتفاقية العمل والموارد البشرية',
+      subtitle: 'الاتفاقيات والعقود والدوام والرواتب',
       child: RefreshIndicator(
         onRefresh: _load,
         child: _busy
@@ -325,7 +326,7 @@ class _AgreementsScreenState extends State<AgreementsScreen> {
                 children: [
                   Card(
                     color: const Color(0xffe8f0f8),
-                    child: const Padding(
+                    child: Padding(
                       padding: EdgeInsets.all(16),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -343,9 +344,20 @@ class _AgreementsScreenState extends State<AgreementsScreen> {
                               color: AppColors.navy,
                             ),
                           ),
-                          Text(
+                          const Text(
                             'تعرض النسخة الحالية وبنودها وحالتها. تُسجّل استجابة الموظف واعتمادات الإدارة في قاعدة البيانات.',
                           ),
+                          const SizedBox(height: 12),
+                          if (_has('employee_hr.read_all') ||
+                              _has('employee_hr.manage'))
+                            Align(
+                              alignment: Alignment.centerRight,
+                              child: OutlinedButton.icon(
+                                onPressed: () => context.push('/hr'),
+                                icon: const Icon(Icons.badge_outlined),
+                                label: const Text('فتح الموارد البشرية'),
+                              ),
+                            ),
                         ],
                       ),
                     ),
