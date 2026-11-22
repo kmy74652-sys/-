@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+
 import '../../core/theme.dart';
 import '../../shared/app_shell.dart';
 
@@ -57,20 +58,25 @@ class _TaskDesignerScreenState extends State<TaskDesignerScreen> {
     try {
       final user = _db.auth.currentUser;
       if (user == null) throw Exception('يرجى تسجيل الدخول أولاً.');
-      final memberships = _rows(await _db
-          .from('organization_memberships')
-          .select('organization_id,created_at')
-          .eq('user_id', user.id)
-          .eq('is_active', true)
-          .order('created_at')
-          .limit(100));
+      final memberships = _rows(
+        await _db
+            .from('organization_memberships')
+            .select('organization_id,created_at')
+            .eq('user_id', user.id)
+            .eq('is_active', true)
+            .order('created_at')
+            .limit(100),
+      );
       String? org;
       for (final membership in memberships) {
         final candidate = _str(membership['organization_id']);
-        final allowed = await _db.rpc('task_library_allowed_for_org', params: {
-          'p_organization_id': candidate,
-          'p_required_permission': 'task_library.manage'
-        });
+        final allowed = await _db.rpc(
+          'task_library_allowed_for_org',
+          params: {
+            'p_organization_id': candidate,
+            'p_required_permission': 'task_library.manage',
+          },
+        );
         if (allowed == true) {
           org = candidate;
           break;
@@ -92,12 +98,15 @@ class _TaskDesignerScreenState extends State<TaskDesignerScreen> {
             .eq('institution_id', org)
             .order('title')
             .limit(200),
-        _db.rpc('list_task_library_report_forms',
-            params: {'p_organization_id': org}),
+        _db.rpc(
+          'list_task_library_report_forms',
+          params: {'p_organization_id': org},
+        ),
         _db
             .from('task_templates')
             .select(
-                'id,title,description,role_code,task_type,default_priority,category_id,subcategory_id,instructions,default_duration_minutes,is_active,version')
+              'id,title,description,role_code,task_type,default_priority,category_id,subcategory_id,instructions,default_duration_minutes,is_active,version',
+            )
             .eq('organization_id', org)
             .order('title')
             .limit(300),
@@ -147,7 +156,8 @@ class _TaskDesignerScreenState extends State<TaskDesignerScreen> {
         _db
             .from('task_template_steps')
             .select(
-                'title,instructions,sort_order,is_required,evidence_required,evidence_instructions')
+              'title,instructions,sort_order,is_required,evidence_required,evidence_instructions',
+            )
             .eq('template_id', id)
             .order('sort_order')
             .limit(300),
@@ -171,18 +181,22 @@ class _TaskDesignerScreenState extends State<TaskDesignerScreen> {
         _priority = _str(row['default_priority'], 'normal');
         _active = row['is_active'] != false;
         _steps = _rows(values[0])
-            .map((s) => {
-                  ...s,
-                  'title': _str(s['title']),
-                  'instructions': _str(s['instructions']),
-                  'evidence_instructions': _str(s['evidence_instructions'])
-                })
+            .map(
+              (s) => {
+                ...s,
+                'title': _str(s['title']),
+                'instructions': _str(s['instructions']),
+                'evidence_instructions': _str(s['evidence_instructions']),
+              },
+            )
             .toList();
         _links = _rows(values[1])
-            .map((f) => {
-                  'version_id': _str(f['version_id']),
-                  'required': f['is_required'] == true
-                })
+            .map(
+              (f) => {
+                'version_id': _str(f['version_id']),
+                'required': f['is_required'] == true,
+              },
+            )
             .toList();
         _editing = true;
       });
@@ -224,8 +238,9 @@ class _TaskDesignerScreenState extends State<TaskDesignerScreen> {
     try {
       final payload = <String, dynamic>{
         'title': _title.text.trim(),
-        'description':
-            _description.text.trim().isEmpty ? null : _description.text.trim(),
+        'description': _description.text.trim().isEmpty
+            ? null
+            : _description.text.trim(),
         'role_code': _roleCode,
         'task_type': 'operational',
         'default_priority': _priority,
@@ -239,39 +254,45 @@ class _TaskDesignerScreenState extends State<TaskDesignerScreen> {
         'steps': _steps
             .asMap()
             .entries
-            .map((entry) => <String, dynamic>{
-                  'title': _str(entry.value['title']).trim(),
-                  'instructions':
-                      _str(entry.value['instructions']).trim().isEmpty
-                          ? null
-                          : _str(entry.value['instructions']).trim(),
-                  'sort_order': entry.key,
-                  'is_required': entry.value['is_required'] == true,
-                  'evidence_required': entry.value['evidence_required'] == true,
-                  'evidence_instructions':
-                      entry.value['evidence_required'] == true &&
-                              _str(entry.value['evidence_instructions'])
-                                  .trim()
-                                  .isNotEmpty
-                          ? _str(entry.value['evidence_instructions']).trim()
-                          : null,
-                })
+            .map(
+              (entry) => <String, dynamic>{
+                'title': _str(entry.value['title']).trim(),
+                'instructions': _str(entry.value['instructions']).trim().isEmpty
+                    ? null
+                    : _str(entry.value['instructions']).trim(),
+                'sort_order': entry.key,
+                'is_required': entry.value['is_required'] == true,
+                'evidence_required': entry.value['evidence_required'] == true,
+                'evidence_instructions':
+                    entry.value['evidence_required'] == true &&
+                        _str(entry.value['evidence_instructions'])
+                            .trim()
+                            .isNotEmpty
+                    ? _str(entry.value['evidence_instructions']).trim()
+                    : null,
+              },
+            )
             .toList(),
         'report_forms': _links
             .asMap()
             .entries
-            .map((entry) => <String, dynamic>{
-                  'version_id': entry.value['version_id'],
-                  'sort_order': entry.key,
-                  'required': entry.value['required'] == true
-                })
+            .map(
+              (entry) => <String, dynamic>{
+                'version_id': entry.value['version_id'],
+                'sort_order': entry.key,
+                'required': entry.value['required'] == true,
+              },
+            )
             .toList(),
       };
-      await _db.rpc('save_task_designer_template', params: {
-        'p_organization_id': _orgId,
-        'p_template_id': _templateId,
-        'p_payload': payload
-      });
+      await _db.rpc(
+        'save_task_designer_template',
+        params: {
+          'p_organization_id': _orgId,
+          'p_template_id': _templateId,
+          'p_payload': payload,
+        },
+      );
       if (!mounted) return;
       _message('تم حفظ قالب المهمة.');
       await _load();
@@ -285,8 +306,9 @@ class _TaskDesignerScreenState extends State<TaskDesignerScreen> {
   }
 
   void _message(String text) {
-    ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(text, textAlign: TextAlign.right)));
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(text, textAlign: TextAlign.right)));
   }
 
   void _toggleForm(String versionId, bool checked) {
@@ -300,304 +322,371 @@ class _TaskDesignerScreenState extends State<TaskDesignerScreen> {
 
   @override
   Widget build(BuildContext context) => AppShell(
-      title: 'مصمم قوالب المهام',
-      subtitle: 'إعداد الخطوات وربط نماذج التقارير',
-      child: Directionality(
-          textDirection: TextDirection.rtl,
-          child: _loading && _orgId == null
-              ? const Center(child: CircularProgressIndicator())
-              : RefreshIndicator(
-                  onRefresh: _load,
-                  child: ListView(padding: const EdgeInsets.all(14), children: [
-                    if (_error != null)
-                      SectionCard(
-                          title: 'تعذر إكمال العملية',
-                          child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                Text(_error!, textAlign: TextAlign.right),
-                                TextButton.icon(
-                                    onPressed: _load,
-                                    icon: const Icon(Icons.refresh),
-                                    label: const Text('إعادة المحاولة'))
-                              ])),
-                    if (_loading) const LinearProgressIndicator(),
-                    if (!_editing) ...[
-                      SectionCard(
-                          title: 'مكتبة قوالب المهام',
-                          trailing: IconButton(
-                              onPressed: _load,
-                              icon: const Icon(Icons.refresh),
-                              tooltip: 'تحديث'),
-                          child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                FilledButton.icon(
-                                    onPressed: _roles.isEmpty
-                                        ? null
-                                        : () => _edit(null),
-                                    icon: const Icon(Icons.add),
-                                    label: const Text('إنشاء قالب')),
-                                const SizedBox(height: 8),
-                                if (_templates.isEmpty)
-                                  const Text('لا توجد قوالب بعد.',
-                                      textAlign: TextAlign.right)
-                                else
-                                  ..._templates.map((t) => ListTile(
-                                      contentPadding: EdgeInsets.zero,
-                                      title: Text(_str(t['title']),
-                                          textAlign: TextAlign.right),
-                                      subtitle: Text(
-                                          '${_roleTitle(_str(t['role_code']))} · ${t['is_active'] == true ? 'نشط' : 'مؤرشف'}',
-                                          textAlign: TextAlign.right),
-                                      leading: const Icon(Icons.edit_outlined),
-                                      onTap: () => _edit(t)))
-                              ])),
-                    ] else
-                      ..._editor(),
-                  ]))));
+    title: 'مصمم قوالب المهام',
+    subtitle: 'إعداد الخطوات وربط نماذج التقارير',
+    child: Directionality(
+      textDirection: TextDirection.rtl,
+      child: _loading && _orgId == null
+          ? const Center(child: CircularProgressIndicator())
+          : RefreshIndicator(
+              onRefresh: _load,
+              child: ListView(
+                padding: const EdgeInsets.all(14),
+                children: [
+                  if (_error != null)
+                    SectionCard(
+                      title: 'تعذر إكمال العملية',
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Text(_error!, textAlign: TextAlign.right),
+                          TextButton.icon(
+                            onPressed: _load,
+                            icon: const Icon(Icons.refresh),
+                            label: const Text('إعادة المحاولة'),
+                          ),
+                        ],
+                      ),
+                    ),
+                  if (_loading) const LinearProgressIndicator(),
+                  if (!_editing) ...[
+                    SectionCard(
+                      title: 'مكتبة قوالب المهام',
+                      trailing: IconButton(
+                        onPressed: _load,
+                        icon: const Icon(Icons.refresh),
+                        tooltip: 'تحديث',
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          FilledButton.icon(
+                            onPressed: _roles.isEmpty
+                                ? null
+                                : () => _edit(null),
+                            icon: const Icon(Icons.add),
+                            label: const Text('إنشاء قالب'),
+                          ),
+                          const SizedBox(height: 8),
+                          if (_templates.isEmpty)
+                            const Text(
+                              'لا توجد قوالب بعد.',
+                              textAlign: TextAlign.right,
+                            )
+                          else
+                            ..._templates.map(
+                              (t) => ListTile(
+                                contentPadding: EdgeInsets.zero,
+                                title: Text(
+                                  _str(t['title']),
+                                  textAlign: TextAlign.right,
+                                ),
+                                subtitle: Text(
+                                  '${_roleTitle(_str(t['role_code']))} · ${t['is_active'] == true ? 'نشط' : 'مؤرشف'}',
+                                  textAlign: TextAlign.right,
+                                ),
+                                leading: const Icon(Icons.edit_outlined),
+                                onTap: () => _edit(t),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ] else
+                    ..._editor(),
+                ],
+              ),
+            ),
+    ),
+  );
 
   List<Widget> _editor() => [
-        SectionCard(
-            title:
-                _templateId == null ? 'إنشاء قالب مهمة' : 'تحرير قالب المهمة',
-            trailing: TextButton(
-                onPressed: () => setState(() => _editing = false),
-                child: const Text('رجوع')),
-            child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  TextField(
-                      controller: _title,
-                      textAlign: TextAlign.right,
-                      decoration:
-                          const InputDecoration(labelText: 'عنوان القالب *')),
-                  const SizedBox(height: 9),
-                  TextField(
-                      controller: _description,
-                      textAlign: TextAlign.right,
-                      maxLines: 3,
-                      decoration: const InputDecoration(labelText: 'الوصف')),
-                  const SizedBox(height: 9),
-                  TextField(
-                      controller: _instructions,
-                      textAlign: TextAlign.right,
-                      maxLines: 3,
-                      decoration:
-                          const InputDecoration(labelText: 'تعليمات التنفيذ')),
-                  const SizedBox(height: 12),
-                  _dropdown<String>(
-                      'الدور المسؤول',
-                      _roleCode,
-                      _roles
-                          .map((r) => DropdownMenuItem(
-                              value: _str(r['code']),
-                              child: Text(_str(r['title'], _str(r['code'])))))
-                          .toList(),
-                      (v) => setState(() {
-                            _roleCode = v;
-                            _links.clear();
-                          })),
-                  const SizedBox(height: 10),
-                  _dropdown<String>(
-                      'التصنيف',
-                      _categoryId,
-                      [
-                        const DropdownMenuItem(
-                            value: null, child: Text('بدون تصنيف')),
-                        ..._mainCategories.map((c) => DropdownMenuItem(
-                            value: _str(c['id']),
-                            child: Text(_str(c['title']))))
-                      ],
-                      (v) => setState(() {
-                            _categoryId = v;
-                            _subcategoryId = null;
-                          })),
-                  if (_categoryId != null) ...[
-                    const SizedBox(height: 10),
-                    _dropdown<String>(
-                        'التصنيف الفرعي',
-                        _subcategoryId,
-                        [
-                          const DropdownMenuItem(
-                              value: null, child: Text('بدون تصنيف فرعي')),
-                          ..._subcategories.map((c) => DropdownMenuItem(
-                              value: _str(c['id']),
-                              child: Text(_str(c['title']))))
-                        ],
-                        (v) => setState(() => _subcategoryId = v))
-                  ],
-                  const SizedBox(height: 10),
-                  _dropdown<String>(
-                      'الأولوية الافتراضية',
-                      _priority,
-                      const [
-                        DropdownMenuItem(value: 'normal', child: Text('عادية')),
-                        DropdownMenuItem(
-                            value: 'important', child: Text('مهمة')),
-                        DropdownMenuItem(value: 'urgent', child: Text('عاجلة')),
-                        DropdownMenuItem(value: 'critical', child: Text('حرجة'))
-                      ],
-                      (v) => setState(() => _priority = v ?? 'normal')),
-                  const SizedBox(height: 10),
-                  TextField(
-                      controller: _duration,
-                      textAlign: TextAlign.right,
-                      keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(
-                          labelText: 'المدة بالدقائق (اختياري)')),
-                  SwitchListTile(
+    SectionCard(
+      title: _templateId == null ? 'إنشاء قالب مهمة' : 'تحرير قالب المهمة',
+      trailing: TextButton(
+        onPressed: () => setState(() => _editing = false),
+        child: const Text('رجوع'),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          TextField(
+            controller: _title,
+            textAlign: TextAlign.right,
+            decoration: const InputDecoration(labelText: 'عنوان القالب *'),
+          ),
+          const SizedBox(height: 9),
+          TextField(
+            controller: _description,
+            textAlign: TextAlign.right,
+            maxLines: 3,
+            decoration: const InputDecoration(labelText: 'الوصف'),
+          ),
+          const SizedBox(height: 9),
+          TextField(
+            controller: _instructions,
+            textAlign: TextAlign.right,
+            maxLines: 3,
+            decoration: const InputDecoration(labelText: 'تعليمات التنفيذ'),
+          ),
+          const SizedBox(height: 12),
+          _dropdown<String>(
+            'الدور المسؤول',
+            _roleCode,
+            _roles
+                .map(
+                  (r) => DropdownMenuItem(
+                    value: _str(r['code']),
+                    child: Text(_str(r['title'], _str(r['code']))),
+                  ),
+                )
+                .toList(),
+            (v) => setState(() {
+              _roleCode = v;
+              _links.clear();
+            }),
+          ),
+          const SizedBox(height: 10),
+          _dropdown<String>(
+            'التصنيف',
+            _categoryId,
+            [
+              const DropdownMenuItem(value: null, child: Text('بدون تصنيف')),
+              ..._mainCategories.map(
+                (c) => DropdownMenuItem(
+                  value: _str(c['id']),
+                  child: Text(_str(c['title'])),
+                ),
+              ),
+            ],
+            (v) => setState(() {
+              _categoryId = v;
+              _subcategoryId = null;
+            }),
+          ),
+          if (_categoryId != null) ...[
+            const SizedBox(height: 10),
+            _dropdown<String>('التصنيف الفرعي', _subcategoryId, [
+              const DropdownMenuItem(
+                value: null,
+                child: Text('بدون تصنيف فرعي'),
+              ),
+              ..._subcategories.map(
+                (c) => DropdownMenuItem(
+                  value: _str(c['id']),
+                  child: Text(_str(c['title'])),
+                ),
+              ),
+            ], (v) => setState(() => _subcategoryId = v)),
+          ],
+          const SizedBox(height: 10),
+          _dropdown<String>('الأولوية الافتراضية', _priority, const [
+            DropdownMenuItem(value: 'normal', child: Text('عادية')),
+            DropdownMenuItem(value: 'important', child: Text('مهمة')),
+            DropdownMenuItem(value: 'urgent', child: Text('عاجلة')),
+            DropdownMenuItem(value: 'critical', child: Text('حرجة')),
+          ], (v) => setState(() => _priority = v ?? 'normal')),
+          const SizedBox(height: 10),
+          TextField(
+            controller: _duration,
+            textAlign: TextAlign.right,
+            keyboardType: TextInputType.number,
+            decoration: const InputDecoration(
+              labelText: 'المدة بالدقائق (اختياري)',
+            ),
+          ),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: Text(
+              _active ? 'القالب نشط' : 'القالب مؤرشف',
+              textAlign: TextAlign.right,
+            ),
+            value: _active,
+            onChanged: (v) => setState(() => _active = v),
+          ),
+        ],
+      ),
+    ),
+    SectionCard(
+      title: 'خطوات التنفيذ',
+      trailing: IconButton(
+        onPressed: () => setState(
+          () => _steps.add({
+            'title': '',
+            'instructions': '',
+            'is_required': true,
+            'evidence_required': false,
+            'evidence_instructions': '',
+          }),
+        ),
+        icon: const Icon(Icons.add_circle_outline),
+        tooltip: 'إضافة خطوة',
+      ),
+      child: _steps.isEmpty
+          ? const Text(
+              'أضف الخطوات بالترتيب المطلوب.',
+              textAlign: TextAlign.right,
+            )
+          : Column(
+              children: [
+                for (var i = 0; i < _steps.length; i++) _stepEditor(i),
+              ],
+            ),
+    ),
+    SectionCard(
+      title: 'نماذج التقارير المعتمدة',
+      child: _forms.isEmpty
+          ? const Text(
+              'لا توجد نماذج تقارير معتمدة متاحة لهذا الدور.',
+              textAlign: TextAlign.right,
+            )
+          : Column(
+              children: _forms.where((f) => _str(f['role_code']) == _roleCode).map((
+                form,
+              ) {
+                final version = _str(form['approved_version_id']);
+                final index = _links.indexWhere(
+                  (e) => e['version_id'] == version,
+                );
+                final selected = index >= 0;
+                return Column(
+                  children: [
+                    CheckboxListTile(
                       contentPadding: EdgeInsets.zero,
-                      title: Text(_active ? 'القالب نشط' : 'القالب مؤرشف',
-                          textAlign: TextAlign.right),
-                      value: _active,
-                      onChanged: (v) => setState(() => _active = v)),
-                ])),
-        SectionCard(
-            title: 'خطوات التنفيذ',
-            trailing: IconButton(
-                onPressed: () => setState(() => _steps.add({
-                      'title': '',
-                      'instructions': '',
-                      'is_required': true,
-                      'evidence_required': false,
-                      'evidence_instructions': ''
-                    })),
-                icon: const Icon(Icons.add_circle_outline),
-                tooltip: 'إضافة خطوة'),
-            child: _steps.isEmpty
-                ? const Text('أضف الخطوات بالترتيب المطلوب.',
-                    textAlign: TextAlign.right)
-                : Column(children: [
-                    for (var i = 0; i < _steps.length; i++) _stepEditor(i)
-                  ])),
-        SectionCard(
-            title: 'نماذج التقارير المعتمدة',
-            child: _forms.isEmpty
-                ? const Text('لا توجد نماذج تقارير معتمدة متاحة لهذا الدور.',
-                    textAlign: TextAlign.right)
-                : Column(
-                    children: _forms
-                        .where((f) => _str(f['role_code']) == _roleCode)
-                        .map((form) {
-                    final version = _str(form['approved_version_id']);
-                    final index =
-                        _links.indexWhere((e) => e['version_id'] == version);
-                    final selected = index >= 0;
-                    return Column(children: [
-                      CheckboxListTile(
-                          contentPadding: EdgeInsets.zero,
-                          controlAffinity: ListTileControlAffinity.leading,
-                          title: Text(
-                              '${_str(form['title'])} · إصدار ${_str(form['approved_version_no'])}',
-                              textAlign: TextAlign.right),
-                          subtitle: Text(_str(form['description']),
-                              textAlign: TextAlign.right),
-                          value: selected,
-                          onChanged: (v) => _toggleForm(version, v == true)),
-                      if (selected)
-                        SwitchListTile(
-                            contentPadding: const EdgeInsets.only(right: 24),
-                            title: const Text('التقرير مطلوب',
-                                textAlign: TextAlign.right),
-                            value: _links[index]['required'] == true,
-                            onChanged: (v) =>
-                                setState(() => _links[index]['required'] = v))
-                    ]);
-                  }).toList())),
-        const SizedBox(height: 8),
-        FilledButton.icon(
-            onPressed: _saving ? null : _save,
-            icon: _saving
-                ? const SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2))
-                : const Icon(Icons.save_outlined),
-            label: Text(_saving ? 'جارٍ الحفظ…' : 'حفظ القالب')),
-      ];
+                      controlAffinity: ListTileControlAffinity.leading,
+                      title: Text(
+                        '${_str(form['title'])} · إصدار ${_str(form['approved_version_no'])}',
+                        textAlign: TextAlign.right,
+                      ),
+                      subtitle: Text(
+                        _str(form['description']),
+                        textAlign: TextAlign.right,
+                      ),
+                      value: selected,
+                      onChanged: (v) => _toggleForm(version, v == true),
+                    ),
+                    if (selected)
+                      SwitchListTile(
+                        contentPadding: const EdgeInsets.only(right: 24),
+                        title: const Text(
+                          'التقرير مطلوب',
+                          textAlign: TextAlign.right,
+                        ),
+                        value: _links[index]['required'] == true,
+                        onChanged: (v) =>
+                            setState(() => _links[index]['required'] = v),
+                      ),
+                  ],
+                );
+              }).toList(),
+            ),
+    ),
+    const SizedBox(height: 8),
+    FilledButton.icon(
+      onPressed: _saving ? null : _save,
+      icon: _saving
+          ? const SizedBox(
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          : const Icon(Icons.save_outlined),
+      label: Text(_saving ? 'جارٍ الحفظ…' : 'حفظ القالب'),
+    ),
+  ];
 
   Widget _stepEditor(int index) {
     final step = _steps[index];
     return Card(
-        color: AppColors.canvas,
-        child: Padding(
-            padding: const EdgeInsets.all(10),
-            child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Row(children: [
-                    Expanded(
-                        child: Text('الخطوة ${index + 1}',
-                            style:
-                                const TextStyle(fontWeight: FontWeight.bold))),
-                    IconButton(
-                        onPressed: index == 0
-                            ? null
-                            : () => setState(() {
-                                  final item = _steps.removeAt(index);
-                                  _steps.insert(index - 1, item);
-                                }),
-                        icon: const Icon(Icons.keyboard_arrow_up)),
-                    IconButton(
-                        onPressed: index == _steps.length - 1
-                            ? null
-                            : () => setState(() {
-                                  final item = _steps.removeAt(index);
-                                  _steps.insert(index + 1, item);
-                                }),
-                        icon: const Icon(Icons.keyboard_arrow_down)),
-                    IconButton(
-                        onPressed: () => setState(() => _steps.removeAt(index)),
-                        icon:
-                            const Icon(Icons.delete_outline, color: Colors.red))
-                  ]),
-                  TextFormField(
-                      initialValue: _str(step['title']),
-                      textAlign: TextAlign.right,
-                      decoration:
-                          const InputDecoration(labelText: 'عنوان الخطوة *'),
-                      onChanged: (v) => step['title'] = v),
-                  const SizedBox(height: 8),
-                  TextFormField(
-                      initialValue: _str(step['instructions']),
-                      textAlign: TextAlign.right,
-                      maxLines: 3,
-                      decoration:
-                          const InputDecoration(labelText: 'تعليمات الخطوة'),
-                      onChanged: (v) => step['instructions'] = v),
-                  SwitchListTile(
-                      contentPadding: EdgeInsets.zero,
-                      title: const Text('الخطوة إلزامية',
-                          textAlign: TextAlign.right),
-                      value: step['is_required'] == true,
-                      onChanged: (v) =>
-                          setState(() => step['is_required'] = v)),
-                  SwitchListTile(
-                      contentPadding: EdgeInsets.zero,
-                      title: const Text('تتطلب إثباتاً',
-                          textAlign: TextAlign.right),
-                      value: step['evidence_required'] == true,
-                      onChanged: (v) =>
-                          setState(() => step['evidence_required'] = v)),
-                  if (step['evidence_required'] == true)
-                    TextFormField(
-                        initialValue: _str(step['evidence_instructions']),
-                        textAlign: TextAlign.right,
-                        decoration:
-                            const InputDecoration(labelText: 'تعليمات الإثبات'),
-                        onChanged: (v) => step['evidence_instructions'] = v),
-                ])));
+      color: AppColors.canvas,
+      child: Padding(
+        padding: const EdgeInsets.all(10),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'الخطوة ${index + 1}',
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ),
+                IconButton(
+                  onPressed: index == 0
+                      ? null
+                      : () => setState(() {
+                          final item = _steps.removeAt(index);
+                          _steps.insert(index - 1, item);
+                        }),
+                  icon: const Icon(Icons.keyboard_arrow_up),
+                ),
+                IconButton(
+                  onPressed: index == _steps.length - 1
+                      ? null
+                      : () => setState(() {
+                          final item = _steps.removeAt(index);
+                          _steps.insert(index + 1, item);
+                        }),
+                  icon: const Icon(Icons.keyboard_arrow_down),
+                ),
+                IconButton(
+                  onPressed: () => setState(() => _steps.removeAt(index)),
+                  icon: const Icon(Icons.delete_outline, color: Colors.red),
+                ),
+              ],
+            ),
+            TextFormField(
+              initialValue: _str(step['title']),
+              textAlign: TextAlign.right,
+              decoration: const InputDecoration(labelText: 'عنوان الخطوة *'),
+              onChanged: (v) => step['title'] = v,
+            ),
+            const SizedBox(height: 8),
+            TextFormField(
+              initialValue: _str(step['instructions']),
+              textAlign: TextAlign.right,
+              maxLines: 3,
+              decoration: const InputDecoration(labelText: 'تعليمات الخطوة'),
+              onChanged: (v) => step['instructions'] = v,
+            ),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('الخطوة إلزامية', textAlign: TextAlign.right),
+              value: step['is_required'] == true,
+              onChanged: (v) => setState(() => step['is_required'] = v),
+            ),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('تتطلب إثباتاً', textAlign: TextAlign.right),
+              value: step['evidence_required'] == true,
+              onChanged: (v) => setState(() => step['evidence_required'] = v),
+            ),
+            if (step['evidence_required'] == true)
+              TextFormField(
+                initialValue: _str(step['evidence_instructions']),
+                textAlign: TextAlign.right,
+                decoration: const InputDecoration(labelText: 'تعليمات الإثبات'),
+                onChanged: (v) => step['evidence_instructions'] = v,
+              ),
+          ],
+        ),
+      ),
+    );
   }
 
-  Widget _dropdown<T>(String label, T? value, List<DropdownMenuItem<T>> items,
-          ValueChanged<T?> onChanged) =>
-      DropdownButtonFormField<T>(
-          value: value,
-          isExpanded: true,
-          decoration: InputDecoration(labelText: label),
-          items: items,
-          onChanged: onChanged);
+  Widget _dropdown<T>(
+    String label,
+    T? value,
+    List<DropdownMenuItem<T>> items,
+    ValueChanged<T?> onChanged,
+  ) => DropdownButtonFormField<T>(
+    value: value,
+    isExpanded: true,
+    decoration: InputDecoration(labelText: label),
+    items: items,
+    onChanged: onChanged,
+  );
   String _roleTitle(String code) {
     for (final r in _roles) {
       if (_str(r['code']) == code) return _str(r['title'], code);

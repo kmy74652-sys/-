@@ -6,5 +6,6 @@ final sessionProvider = StreamProvider<Session?>((ref) {
   return client.auth.onAuthStateChange.map((event) => event.session);
 });
 
-final currentUserProvider =
-    Provider<User?>((ref) => Supabase.instance.client.auth.currentUser);
+final currentUserProvider = Provider<User?>(
+  (ref) => Supabase.instance.client.auth.currentUser,
+);

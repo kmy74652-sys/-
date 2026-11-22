@@ -1,11 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+
 import '../core/theme.dart';
 
 class AppShell extends StatelessWidget {
-  const AppShell(
-      {super.key, required this.title, required this.child, this.subtitle});
+  const AppShell({
+    super.key,
+    required this.title,
+    required this.child,
+    this.subtitle,
+  });
 
   final String title;
   final String? subtitle;
@@ -73,16 +78,20 @@ class AppShell extends StatelessWidget {
                 child: Row(
                   children: [
                     const Expanded(
-                      child: Text('التنبيهات',
-                          style: TextStyle(
-                              fontSize: 19,
-                              fontWeight: FontWeight.w800,
-                              color: Color(0xFF0B3458))),
+                      child: Text(
+                        'التنبيهات',
+                        style: TextStyle(
+                          fontSize: 19,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFF0B3458),
+                        ),
+                      ),
                     ),
                     IconButton(
-                        tooltip: 'إغلاق التنبيهات',
-                        onPressed: () => Navigator.pop(sheetContext),
-                        icon: const Icon(Icons.close)),
+                      tooltip: 'إغلاق التنبيهات',
+                      onPressed: () => Navigator.pop(sheetContext),
+                      icon: const Icon(Icons.close),
+                    ),
                   ],
                 ),
               ),
@@ -91,57 +100,71 @@ class AppShell extends StatelessWidget {
                 child: failed
                     ? const Center(
                         child: Padding(
-                            padding: EdgeInsets.all(24),
-                            child: Text('تعذر تحميل التنبيهات حالياً.',
-                                textAlign: TextAlign.center)))
-                    : notifications.isEmpty
-                        ? const Center(child: Text('لا توجد تنبيهات.'))
-                        : ListView.separated(
-                            padding: const EdgeInsets.all(16),
-                            itemCount: notifications.length,
-                            separatorBuilder: (_, __) =>
-                                const Divider(height: 1),
-                            itemBuilder: (context, index) {
-                              final item = notifications[index];
-                              final isUnread = item['read_at'] == null;
-                              return ListTile(
-                                contentPadding: const EdgeInsets.symmetric(
-                                    horizontal: 4, vertical: 5),
-                                leading: Icon(
-                                    isUnread
-                                        ? Icons.notifications_active_outlined
-                                        : Icons.notifications_none,
-                                    color: isUnread
-                                        ? const Color(0xFF0B3458)
-                                        : AppColors.muted),
-                                title: Text('${item['title'] ?? 'تنبيه'}',
-                                    style: TextStyle(
-                                        fontWeight: isUnread
-                                            ? FontWeight.w800
-                                            : FontWeight.w600)),
-                                subtitle: item['body'] == null
-                                    ? null
-                                    : Text('${item['body']}',
-                                        maxLines: 3,
-                                        overflow: TextOverflow.ellipsis),
-                                trailing: item['severity'] == null
-                                    ? null
-                                    : Text('${item['severity']}',
-                                        style: const TextStyle(
-                                            fontSize: 11,
-                                            color: AppColors.muted)),
-                                onTap: item['task_id'] == null
-                                    ? null
-                                    : () {
-                                        final taskId = item['task_id'].toString();
-                                        Navigator.pop(sheetContext);
-                                        if (taskId.isNotEmpty) {
-                                          context.go('/tasks/$taskId');
-                                        }
-                                      },
-                              );
-                            },
+                          padding: EdgeInsets.all(24),
+                          child: Text(
+                            'تعذر تحميل التنبيهات حالياً.',
+                            textAlign: TextAlign.center,
                           ),
+                        ),
+                      )
+                    : notifications.isEmpty
+                    ? const Center(child: Text('لا توجد تنبيهات.'))
+                    : ListView.separated(
+                        padding: const EdgeInsets.all(16),
+                        itemCount: notifications.length,
+                        separatorBuilder: (_, __) => const Divider(height: 1),
+                        itemBuilder: (context, index) {
+                          final item = notifications[index];
+                          final isUnread = item['read_at'] == null;
+                          return ListTile(
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 4,
+                              vertical: 5,
+                            ),
+                            leading: Icon(
+                              isUnread
+                                  ? Icons.notifications_active_outlined
+                                  : Icons.notifications_none,
+                              color: isUnread
+                                  ? const Color(0xFF0B3458)
+                                  : AppColors.muted,
+                            ),
+                            title: Text(
+                              '${item['title'] ?? 'تنبيه'}',
+                              style: TextStyle(
+                                fontWeight: isUnread
+                                    ? FontWeight.w800
+                                    : FontWeight.w600,
+                              ),
+                            ),
+                            subtitle: item['body'] == null
+                                ? null
+                                : Text(
+                                    '${item['body']}',
+                                    maxLines: 3,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                            trailing: item['severity'] == null
+                                ? null
+                                : Text(
+                                    '${item['severity']}',
+                                    style: const TextStyle(
+                                      fontSize: 11,
+                                      color: AppColors.muted,
+                                    ),
+                                  ),
+                            onTap: item['task_id'] == null
+                                ? null
+                                : () {
+                                    final taskId = item['task_id'].toString();
+                                    Navigator.pop(sheetContext);
+                                    if (taskId.isNotEmpty) {
+                                      context.go('/tasks/$taskId');
+                                    }
+                                  },
+                          );
+                        },
+                      ),
               ),
             ],
           ),
@@ -219,11 +242,12 @@ class _ShellTab {
 }
 
 class _BrandHeader extends StatelessWidget {
-  const _BrandHeader(
-      {required this.title,
-      this.subtitle,
-      required this.onAccount,
-      required this.onNotifications});
+  const _BrandHeader({
+    required this.title,
+    this.subtitle,
+    required this.onAccount,
+    required this.onNotifications,
+  });
   final String title;
   final String? subtitle;
   final VoidCallback onAccount;
@@ -237,68 +261,95 @@ class _BrandHeader extends StatelessWidget {
       constraints: const BoxConstraints(minHeight: 104),
       padding: EdgeInsets.symmetric(horizontal: compact ? 7 : 10, vertical: 7),
       decoration: const BoxDecoration(
-          color: Colors.white,
-          border: Border(bottom: BorderSide(color: Color(0xFFE4EAF0)))),
+        color: Colors.white,
+        border: Border(bottom: BorderSide(color: Color(0xFFE4EAF0))),
+      ),
       child: Row(
         children: [
           Expanded(
             child: Row(
               children: [
-                Image.asset('assets/images/alshaeri-official-logo.png',
-                    width: compact ? 63 : 74,
-                    height: compact ? 73 : 86,
-                    fit: BoxFit.contain,
-                    semanticLabel: 'الشعار الرسمي لمؤسسة الشاعري'),
+                Image.asset(
+                  'assets/images/alshaeri-official-logo.png',
+                  width: compact ? 63 : 74,
+                  height: compact ? 73 : 86,
+                  fit: BoxFit.contain,
+                  semanticLabel: 'الشعار الرسمي لمؤسسة الشاعري',
+                ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
-                      Text('مانجمنت',
-                          style: TextStyle(
-                              color: const Color(0xFF0B3458),
-                              fontSize: compact ? 17 : 20,
-                              fontWeight: FontWeight.w900)),
-                      const Text('مؤسسة الشاعري للتجارة العامة',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                              color: Color(0xFF0B3458),
-                              fontSize: 11,
-                              fontWeight: FontWeight.w700)),
+                      Text(
+                        'مانجمنت',
+                        style: TextStyle(
+                          color: const Color(0xFF0B3458),
+                          fontSize: compact ? 17 : 20,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      const Text(
+                        'مؤسسة الشاعري للتجارة العامة',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: Color(0xFF0B3458),
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
                       const Row(
-                          mainAxisAlignment: MainAxisAlignment.end,
-                          children: [
-                            SizedBox(
-                                width: 13,
-                                child: Divider(
-                                    color: Color(0xFFDBA62A), thickness: 1)),
-                            Padding(
-                                padding: EdgeInsets.symmetric(horizontal: 4),
-                                child: Text('معاً .. نحو إدارة أفضل',
-                                    style: TextStyle(
-                                        color: Color(0xFF9A6814),
-                                        fontSize: 9,
-                                        fontWeight: FontWeight.w800))),
-                            SizedBox(
-                                width: 13,
-                                child: Divider(
-                                    color: Color(0xFFDBA62A), thickness: 1)),
-                          ]),
-                      Text(title,
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          SizedBox(
+                            width: 13,
+                            child: Divider(
+                              color: Color(0xFFDBA62A),
+                              thickness: 1,
+                            ),
+                          ),
+                          Padding(
+                            padding: EdgeInsets.symmetric(horizontal: 4),
+                            child: Text(
+                              'معاً .. نحو إدارة أفضل',
+                              style: TextStyle(
+                                color: Color(0xFF9A6814),
+                                fontSize: 9,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                          SizedBox(
+                            width: 13,
+                            child: Divider(
+                              color: Color(0xFFDBA62A),
+                              thickness: 1,
+                            ),
+                          ),
+                        ],
+                      ),
+                      Text(
+                        title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Color(0xFF0B3458),
+                          fontSize: 16,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      if (subtitle != null && subtitle!.isNotEmpty)
+                        Text(
+                          subtitle!,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
-                              color: Color(0xFF0B3458),
-                              fontSize: 16,
-                              fontWeight: FontWeight.w900)),
-                      if (subtitle != null && subtitle!.isNotEmpty)
-                        Text(subtitle!,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                                color: Color(0xFF637188), fontSize: 10)),
+                            color: Color(0xFF637188),
+                            fontSize: 10,
+                          ),
+                        ),
                     ],
                   ),
                 ),
@@ -307,27 +358,33 @@ class _BrandHeader extends StatelessWidget {
           ),
           const SizedBox(width: 7),
           IconButton(
-              tooltip: 'تبديل الحساب: تسجيل الخروج',
-              onPressed: onAccount,
-              style: IconButton.styleFrom(
-                  fixedSize: const Size(40, 40),
-                  backgroundColor: const Color(0xFFF4F8FB),
-                  foregroundColor: const Color(0xFF0B3458),
-                  side: const BorderSide(color: Color(0xFFD5E0EA)),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(11))),
-              icon: const Icon(Icons.account_circle_outlined, size: 23)),
+            tooltip: 'تبديل الحساب: تسجيل الخروج',
+            onPressed: onAccount,
+            style: IconButton.styleFrom(
+              fixedSize: const Size(40, 40),
+              backgroundColor: const Color(0xFFF4F8FB),
+              foregroundColor: const Color(0xFF0B3458),
+              side: const BorderSide(color: Color(0xFFD5E0EA)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(11),
+              ),
+            ),
+            icon: const Icon(Icons.account_circle_outlined, size: 23),
+          ),
           const SizedBox(width: 4),
           IconButton(
-              tooltip: 'التنبيهات',
-              onPressed: onNotifications,
-              style: IconButton.styleFrom(
-                  fixedSize: const Size(42, 42),
-                  backgroundColor: const Color(0xFF0B3458),
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12))),
-              icon: const Icon(Icons.notifications_none, size: 24)),
+            tooltip: 'التنبيهات',
+            onPressed: onNotifications,
+            style: IconButton.styleFrom(
+              fixedSize: const Size(42, 42),
+              backgroundColor: const Color(0xFF0B3458),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            icon: const Icon(Icons.notifications_none, size: 24),
+          ),
         ],
       ),
     );
@@ -335,71 +392,87 @@ class _BrandHeader extends StatelessWidget {
 }
 
 class _BottomTab extends StatelessWidget {
-  const _BottomTab(
-      {required this.tab, required this.selected, required this.onTap});
+  const _BottomTab({
+    required this.tab,
+    required this.selected,
+    required this.onTap,
+  });
   final _ShellTab tab;
   final bool selected;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) => Semantics(
-        button: true,
-        selected: selected,
-        label: tab.label,
-        child: InkWell(
-          onTap: onTap,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 5),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(tab.icon,
-                    size: 22,
-                    color: selected ? const Color(0xFFFFD36A) : Colors.white70),
-                const SizedBox(height: 2),
-                Text(tab.label,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                        color:
-                            selected ? const Color(0xFFFFD36A) : Colors.white70,
-                        fontSize: 11,
-                        fontWeight:
-                            selected ? FontWeight.w800 : FontWeight.w500)),
-              ],
+    button: true,
+    selected: selected,
+    label: tab.label,
+    child: InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 5),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              tab.icon,
+              size: 22,
+              color: selected ? const Color(0xFFFFD36A) : Colors.white70,
             ),
-          ),
+            const SizedBox(height: 2),
+            Text(
+              tab.label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: selected ? const Color(0xFFFFD36A) : Colors.white70,
+                fontSize: 11,
+                fontWeight: selected ? FontWeight.w800 : FontWeight.w500,
+              ),
+            ),
+          ],
         ),
-      );
+      ),
+    ),
+  );
 }
 
 class SectionCard extends StatelessWidget {
-  const SectionCard(
-      {super.key, required this.title, required this.child, this.trailing});
+  const SectionCard({
+    super.key,
+    required this.title,
+    required this.child,
+    this.trailing,
+  });
   final String title;
   final Widget child;
   final Widget? trailing;
 
   @override
   Widget build(BuildContext context) => Card(
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+    child: Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
             children: [
-              Row(children: [
-                Expanded(
-                    child: Text(title,
-                        style: const TextStyle(
-                            fontSize: 17,
-                            fontWeight: FontWeight.w800,
-                            color: AppColors.navy))),
-                if (trailing != null) trailing!,
-              ]),
-              const SizedBox(height: 12),
-              child,
+              Expanded(
+                child: Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.navy,
+                  ),
+                ),
+              ),
+              if (trailing != null) trailing!,
             ],
           ),
-        ),
-      );
+          const SizedBox(height: 12),
+          child,
+        ],
+      ),
+    ),
+  );
 }

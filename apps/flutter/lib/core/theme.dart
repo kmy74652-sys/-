@@ -9,31 +9,37 @@ abstract final class AppColors {
 }
 
 ThemeData appTheme() => ThemeData(
-      useMaterial3: true,
-      fontFamily: 'AlshaeriArabic',
-      scaffoldBackgroundColor: AppColors.canvas,
-      colorScheme: ColorScheme.fromSeed(
-          seedColor: AppColors.navy,
-          primary: AppColors.navy,
-          secondary: AppColors.green),
-      appBarTheme: const AppBarTheme(
-          backgroundColor: AppColors.canvas,
-          foregroundColor: AppColors.navy,
-          centerTitle: false),
-      inputDecorationTheme: InputDecorationTheme(
-        filled: true,
-        fillColor: Colors.white,
-        border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: AppColors.border)),
-        enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: AppColors.border)),
-      ),
-      cardTheme: CardThemeData(
-          color: Colors.white,
-          elevation: 0,
-          shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-              side: const BorderSide(color: AppColors.border))),
-    );
+  useMaterial3: true,
+  fontFamily: 'AlshaeriArabic',
+  scaffoldBackgroundColor: AppColors.canvas,
+  colorScheme: ColorScheme.fromSeed(
+    seedColor: AppColors.navy,
+    primary: AppColors.navy,
+    secondary: AppColors.green,
+  ),
+  appBarTheme: const AppBarTheme(
+    backgroundColor: AppColors.canvas,
+    foregroundColor: AppColors.navy,
+    centerTitle: false,
+  ),
+  inputDecorationTheme: InputDecorationTheme(
+    filled: true,
+    fillColor: Colors.white,
+    border: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(12),
+      borderSide: const BorderSide(color: AppColors.border),
+    ),
+    enabledBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(12),
+      borderSide: const BorderSide(color: AppColors.border),
+    ),
+  ),
+  cardTheme: CardThemeData(
+    color: Colors.white,
+    elevation: 0,
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(16),
+      side: const BorderSide(color: AppColors.border),
+    ),
+  ),
+);

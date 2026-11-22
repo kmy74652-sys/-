@@ -1,10 +1,12 @@
 import 'dart:convert';
 import 'dart:math' as math;
+
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mime/mime.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+
 import '../../core/offline_queue.dart';
 import '../../shared/app_shell.dart';
 
@@ -51,19 +53,22 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
         db
             .from('tasks')
             .select(
-                'id,title,description,due_at,priority,status,task_instructions,proof_required,proof_instructions,report_flow')
+              'id,title,description,due_at,priority,status,task_instructions,proof_required,proof_instructions,report_flow',
+            )
             .eq('id', widget.taskId)
             .single(),
         db
             .from('task_report_fields')
             .select(
-                'id,label,field_key,field_type,is_required,options,sort_order')
+              'id,label,field_key,field_type,is_required,options,sort_order',
+            )
             .eq('task_id', widget.taskId)
             .order('sort_order'),
         db
             .from('task_execution_steps')
             .select(
-                'id,title,instructions,sort_order,is_required,evidence_required,evidence_instructions,completed_at')
+              'id,title,instructions,sort_order,is_required,evidence_required,evidence_instructions,completed_at',
+            )
             .eq('task_id', widget.taskId)
             .order('sort_order'),
       ]);
@@ -92,33 +97,39 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
         final draftRows = List<Map<String, dynamic>>.from(drafts);
         _forms = List<Map<String, dynamic>>.from(snapshots).map((snapshot) {
           final sid = '${snapshot['id']}';
-          final matchingReports =
-              reportRows.where((r) => r['report_form_snapshot_id'] == sid);
-          final matchingDrafts =
-              draftRows.where((r) => r['snapshot_id'] == sid);
+          final matchingReports = reportRows.where(
+            (r) => r['report_form_snapshot_id'] == sid,
+          );
+          final matchingDrafts = draftRows.where(
+            (r) => r['snapshot_id'] == sid,
+          );
           final report = matchingReports.isEmpty ? null : matchingReports.first;
           final draft = matchingDrafts.isEmpty ? null : matchingDrafts.first;
           final schema = (snapshot['schema'] is List)
-              ? List<Map<String, dynamic>>.from((snapshot['schema'] as List)
-                  .map((f) => Map<String, dynamic>.from(f as Map)))
+              ? List<Map<String, dynamic>>.from(
+                  (snapshot['schema'] as List).map(
+                    (f) => Map<String, dynamic>.from(f as Map),
+                  ),
+                )
               : <Map<String, dynamic>>[];
           final values = Map<String, dynamic>.from(
-              (draft?['values'] as Map?) ?? (report?['values'] as Map?) ?? {});
+            (draft?['values'] as Map?) ?? (report?['values'] as Map?) ?? {},
+          );
           for (final field in schema) {
             final name = '${field['key'] ?? ''}';
             final initial = values[name];
             final text = initial == null
                 ? ''
                 : (initial is String &&
-                        ![
-                          'attachment',
-                          'file',
-                          'image',
-                          'multi_image',
-                          'signature'
-                        ].contains('${field['type']}')
-                    ? initial
-                    : jsonEncode(initial));
+                          ![
+                            'attachment',
+                            'file',
+                            'image',
+                            'multi_image',
+                            'signature',
+                          ].contains('${field['type']}')
+                      ? initial
+                      : jsonEncode(initial));
             final inputKey = _formInputKey(sid, name);
             if (_formInputs.containsKey(inputKey)) {
               _formInputs[inputKey]!.text = text;
@@ -131,15 +142,17 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
             'schema': schema,
             'status': report?['status'],
             'values': report?['values'],
-            'review_note': report?['review_note']
+            'review_note': report?['review_note'],
           };
         }).toList();
       }
       for (final field in _fields) {
         _inputs.putIfAbsent('${field['field_key']}', TextEditingController.new);
       }
-      await db
-          .rpc('mobile_mark_task_opened', params: {'p_task_id': widget.taskId});
+      await db.rpc(
+        'mobile_mark_task_opened',
+        params: {'p_task_id': widget.taskId},
+      );
       _error = null;
     } catch (_) {
       _error = 'تعذر تحميل تفاصيل المهمة. تحقق من صلاحيات الحساب والاتصال.';
@@ -152,16 +165,19 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
     setState(() => _saving = true);
     try {
       try {
-        await Supabase.instance.client
-            .rpc('mobile_record_task_update', params: {
-          'p_task_id': widget.taskId,
-          'p_status': status,
-          'p_note': null,
-        });
+        await Supabase.instance.client.rpc(
+          'mobile_record_task_update',
+          params: {
+            'p_task_id': widget.taskId,
+            'p_status': status,
+            'p_note': null,
+          },
+        );
         await _load();
         if (mounted)
-          ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('تم تحديث حالة المهمة')));
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(const SnackBar(content: Text('تم تحديث حالة المهمة')));
       } catch (error) {
         if (!await OfflineQueue.isNetworkError(error)) rethrow;
         await OfflineQueue.enqueue(OfflineQueueKind.status, {
@@ -172,28 +188,40 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
               'status:$status:${DateTime.now().microsecondsSinceEpoch}',
         });
         if (mounted)
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-              content:
-                  Text('تم حفظ الطلب؛ بانتظار المزامنة عند عودة الاتصال')));
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('تم حفظ الطلب؛ بانتظار المزامنة عند عودة الاتصال'),
+            ),
+          );
       }
     } catch (_) {
       if (mounted)
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
             content: Text(
-                'تعذر تحديث المهمة. تحقق من حالة المهمة أو صلاحيات الحساب.')));
+              'تعذر تحديث المهمة. تحقق من حالة المهمة أو صلاحيات الحساب.',
+            ),
+          ),
+        );
     } finally {
       if (mounted) setState(() => _saving = false);
     }
   }
 
   Future<void> _submitReport() async {
-    final missing = _fields.where((field) =>
-        field['is_required'] == true &&
-        (_inputs['${field['field_key']}']?.text.trim().isEmpty ?? true));
+    final missing = _fields.where(
+      (field) =>
+          field['is_required'] == true &&
+          (_inputs['${field['field_key']}']?.text.trim().isEmpty ?? true),
+    );
     if (missing.isNotEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
           content: Text(
-              'أكمل الحقول المطلوبة: ${missing.map((e) => e['label']).join('، ')}')));
+            'أكمل الحقول المطلوبة: ${missing.map((e) => e['label']).join('، ')}',
+          ),
+        ),
+      );
       return;
     }
     setState(() => _saving = true);
@@ -201,39 +229,51 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
       final values = {
         for (final field in _fields)
           '${field['field_key']}': _convert(
-              _inputs['${field['field_key']}']?.text ?? '',
-              '${field['field_type']}')
+            _inputs['${field['field_key']}']?.text ?? '',
+            '${field['field_type']}',
+          ),
       };
       final idempotencyKey =
           'flutter:${widget.taskId}:${DateTime.now().microsecondsSinceEpoch}';
       try {
-        await Supabase.instance.client
-            .rpc('mobile_submit_task_report', params: {
-          'p_task_id': widget.taskId,
-          'p_values': values,
-          'p_idempotency_key': idempotencyKey,
-        });
+        await Supabase.instance.client.rpc(
+          'mobile_submit_task_report',
+          params: {
+            'p_task_id': widget.taskId,
+            'p_values': values,
+            'p_idempotency_key': idempotencyKey,
+          },
+        );
         await _load();
         if (mounted)
           ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('تم إرسال التقرير للمراجعة')));
+            const SnackBar(content: Text('تم إرسال التقرير للمراجعة')),
+          );
       } catch (error) {
         if (!await OfflineQueue.isNetworkError(error)) rethrow;
         await OfflineQueue.enqueue(OfflineQueueKind.report, {
           'taskId': widget.taskId,
           'values': values,
-          'idempotencyKey': idempotencyKey
+          'idempotencyKey': idempotencyKey,
         });
         if (mounted)
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-              content:
-                  Text('تم حفظ التقرير؛ بانتظار المزامنة عند عودة الاتصال')));
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'تم حفظ التقرير؛ بانتظار المزامنة عند عودة الاتصال',
+              ),
+            ),
+          );
       }
     } catch (_) {
       if (mounted)
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
             content: Text(
-                'تعذر إرسال التقرير. راجع الحقول المطلوبة أو تحقق من الاتصال.')));
+              'تعذر إرسال التقرير. راجع الحقول المطلوبة أو تحقق من الاتصال.',
+            ),
+          ),
+        );
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -260,7 +300,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
       'file',
       'image',
       'multi_image',
-      'signature'
+      'signature',
     ].contains(type)) {
       try {
         return jsonDecode(raw);
@@ -276,14 +316,15 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
       'quantity',
       'money',
       'progress',
-      'calculated'
-    ].contains(type)) return num.tryParse(raw);
+      'calculated',
+    ].contains(type))
+      return num.tryParse(raw);
     if (type == 'boolean' || type == 'checkbox')
       return raw == 'true'
           ? true
           : raw == 'false'
-              ? false
-              : null;
+          ? false
+          : null;
     return raw;
   }
 
@@ -309,7 +350,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
           'key': e.value,
           'label': e.value,
           'type': 'short_text',
-          'required': false
+          'required': false,
         };
       final c = _obj(e.value);
       return {
@@ -317,7 +358,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
         'label': '${c['label'] ?? c['name'] ?? c['key'] ?? 'عمود'}',
         'type': '${c['type'] ?? c['field_type'] ?? 'short_text'}',
         'required': c['required'] == true || c['is_required'] == true,
-        'options': c['options'] is List ? c['options'] : <dynamic>[]
+        'options': c['options'] is List ? c['options'] : <dynamic>[],
       };
     }).toList();
   }
@@ -340,12 +381,15 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
       if (strokes is! List ||
           ((f['required'] == true || consent.isNotEmpty) && strokes.isEmpty) ||
           strokes.length > 200 ||
-          strokes.any((x) =>
-              x is! String ||
-              x.length > 15000 ||
-              !RegExp(r'^[ML0-9 .+\-]+$').hasMatch(x)) ||
+          strokes.any(
+            (x) =>
+                x is! String ||
+                x.length > 15000 ||
+                !RegExp(r'^[ML0-9 .+\-]+$').hasMatch(x),
+          ) ||
           strokes.fold<int>(0, (n, x) => n + (x is String ? x.length : 0)) >
-              200000) return 'التوقيع في «$label» غير صالح.';
+              200000)
+        return 'التوقيع في «$label» غير صالح.';
       if (consent.isNotEmpty && sig['acknowledged'] != true)
         return 'يرجى الموافقة على «$label».';
     }
@@ -353,7 +397,8 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
       if (v is! List ||
           v.length > 20 ||
           v.any(
-              (x) => x is! Map || x['path'] is! String || x['id'] is! String) ||
+            (x) => x is! Map || x['path'] is! String || x['id'] is! String,
+          ) ||
           (type == 'image' && v.length > 1))
         return 'المرفقات في «$label» غير صالحة.';
     }
@@ -364,7 +409,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
           'percentage',
           'quantity',
           'money',
-          'progress'
+          'progress',
         ].contains(type) &&
         (v is! num || !v.isFinite || (type == 'integer' && v % 1 != 0)))
       return 'أدخل رقمًا صالحًا في «$label». ${type == 'integer' ? 'يجب أن يكون عددًا صحيحًا.' : ''}';
@@ -485,102 +530,129 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
       setState(() {});
     }
 
-    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      Text(title, textAlign: TextAlign.right),
-      for (var i = 0; i < rows.length; i++)
-        Card(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(title, textAlign: TextAlign.right),
+        for (var i = 0; i < rows.length; i++)
+          Card(
             child: Padding(
-                padding: const EdgeInsets.all(8),
-                child: Column(children: [
+              padding: const EdgeInsets.all(8),
+              child: Column(
+                children: [
                   Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text('صف ${i + 1}'),
-                        IconButton(
-                            onPressed: _saving || rows.length <= min
-                                ? null
-                                : () {
-                                    final n = [...rows]..removeAt(i);
-                                    save(n);
-                                  },
-                            icon: const Icon(Icons.delete_outline))
-                      ]),
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text('صف ${i + 1}'),
+                      IconButton(
+                        onPressed: _saving || rows.length <= min
+                            ? null
+                            : () {
+                                final n = [...rows]..removeAt(i);
+                                save(n);
+                              },
+                        icon: const Icon(Icons.delete_outline),
+                      ),
+                    ],
+                  ),
                   for (final c in cols)
                     _tableCell(c, rows[i]['${c['key']}'], (v) {
                       final n = [...rows];
                       n[i] = {...n[i], '${c['key']}': v};
                       save(n);
-                    })
-                ]))),
-      if (cols.any((c) => ['integer', 'decimal', 'quantity', 'money']
-              .contains(c['type'])) &&
-          rows.isNotEmpty)
-        for (final c in cols.where((c) =>
-            ['integer', 'decimal', 'quantity', 'money'].contains(c['type'])))
-          Text(
+                    }),
+                ],
+              ),
+            ),
+          ),
+        if (cols.any(
+              (c) => [
+                'integer',
+                'decimal',
+                'quantity',
+                'money',
+              ].contains(c['type']),
+            ) &&
+            rows.isNotEmpty)
+          for (final c in cols.where(
+            (c) =>
+                ['integer', 'decimal', 'quantity', 'money'].contains(c['type']),
+          ))
+            Text(
               'إجمالي ${c['label']}: ${rows.fold<double>(0, (a, r) => a + (num.tryParse('${r[c['key']] ?? ''}') ?? 0))}',
-              textAlign: TextAlign.right),
-      Align(
+              textAlign: TextAlign.right,
+            ),
+        Align(
           alignment: Alignment.centerRight,
           child: OutlinedButton.icon(
-              onPressed: _saving || (max > 0 && rows.length >= max)
-                  ? null
-                  : () {
-                      save([
-                        ...rows,
-                        {
-                          for (final c in cols)
-                            '${c['key']}': c['type'] == 'boolean' ? null : ''
-                        }
-                      ]);
-                    },
-              icon: const Icon(Icons.add),
-              label: Text(max > 0 && rows.length >= max
-                  ? 'بلغت الحد الأعلى'
-                  : 'إضافة صف')))
-    ]);
+            onPressed: _saving || (max > 0 && rows.length >= max)
+                ? null
+                : () {
+                    save([
+                      ...rows,
+                      {
+                        for (final c in cols)
+                          '${c['key']}': c['type'] == 'boolean' ? null : '',
+                      },
+                    ]);
+                  },
+            icon: const Icon(Icons.add),
+            label: Text(
+              max > 0 && rows.length >= max ? 'بلغت الحد الأعلى' : 'إضافة صف',
+            ),
+          ),
+        ),
+      ],
+    );
   }
 
   Widget _tableCell(
-      Map<String, dynamic> c, dynamic value, ValueChanged<dynamic> onChange) {
+    Map<String, dynamic> c,
+    dynamic value,
+    ValueChanged<dynamic> onChange,
+  ) {
     final type = '${c['type']}',
         label = '${c['label']}${c['required'] == true ? ' *' : ''}';
     if (type == 'select')
       return DropdownButtonFormField<String>(
-          value: (c['options'] as List)
-                  .map((e) => '$e')
-                  .contains(value?.toString())
-              ? value.toString()
-              : null,
-          decoration: InputDecoration(labelText: label),
-          items: (c['options'] as List)
-              .map((e) => DropdownMenuItem(value: '$e', child: Text('$e')))
-              .toList(),
-          onChanged: onChange);
+        value:
+            (c['options'] as List).map((e) => '$e').contains(value?.toString())
+            ? value.toString()
+            : null,
+        decoration: InputDecoration(labelText: label),
+        items: (c['options'] as List)
+            .map((e) => DropdownMenuItem(value: '$e', child: Text('$e')))
+            .toList(),
+        onChanged: onChange,
+      );
     if (type == 'boolean')
       return CheckboxListTile(
-          tristate: true,
-          value: value == true || value == 'true'
-              ? true
-              : value == false || value == 'false'
-                  ? false
-                  : null,
-          title: Text(label),
-          controlAffinity: ListTileControlAffinity.leading,
-          onChanged: onChange);
+        tristate: true,
+        value: value == true || value == 'true'
+            ? true
+            : value == false || value == 'false'
+            ? false
+            : null,
+        title: Text(label),
+        controlAffinity: ListTileControlAffinity.leading,
+        onChanged: onChange,
+      );
     return TextFormField(
-        key: ValueKey('${c['key']}_$value'),
-        initialValue: '${value ?? ''}',
-        maxLines: type == 'long_text' ? 3 : 1,
-        keyboardType: ['integer', 'decimal', 'quantity', 'money'].contains(type)
-            ? TextInputType.number
-            : TextInputType.text,
-        decoration: InputDecoration(labelText: label),
-        onChanged: onChange);
+      key: ValueKey('${c['key']}_$value'),
+      initialValue: '${value ?? ''}',
+      maxLines: type == 'long_text' ? 3 : 1,
+      keyboardType: ['integer', 'decimal', 'quantity', 'money'].contains(type)
+          ? TextInputType.number
+          : TextInputType.text,
+      decoration: InputDecoration(labelText: label),
+      onChanged: onChange,
+    );
   }
 
   Future<void> _saveSnapshotDraft(
-      String snapshotId, List<Map<String, dynamic>> schema) async {
+    String snapshotId,
+    List<Map<String, dynamic>> schema,
+  ) async {
     final values = <String, dynamic>{};
     for (final field in schema) {
       final value = _snapshotValue(field, snapshotId);
@@ -588,25 +660,32 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
     }
     setState(() => _saving = true);
     try {
-      await Supabase.instance.client.rpc('save_task_report_draft', params: {
-        'p_task_id': widget.taskId,
-        'p_snapshot_id': snapshotId,
-        'p_values': values
-      });
+      await Supabase.instance.client.rpc(
+        'save_task_report_draft',
+        params: {
+          'p_task_id': widget.taskId,
+          'p_snapshot_id': snapshotId,
+          'p_values': values,
+        },
+      );
       if (mounted)
-        ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('تم حفظ مسودة النموذج')));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('تم حفظ مسودة النموذج')));
     } catch (_) {
       if (mounted)
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-            content: Text('تعذر حفظ المسودة. تحقق من الاتصال.')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('تعذر حفظ المسودة. تحقق من الاتصال.')),
+        );
     } finally {
       if (mounted) setState(() => _saving = false);
     }
   }
 
   Future<void> _submitSnapshot(
-      String snapshotId, List<Map<String, dynamic>> schema) async {
+    String snapshotId,
+    List<Map<String, dynamic>> schema,
+  ) async {
     for (final f in schema) {
       final issue = _validateSnapshot(f, snapshotId);
       if (issue != null) {
@@ -625,35 +704,46 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
         'report:$snapshotId:${widget.taskId}:${DateTime.now().millisecondsSinceEpoch}';
     try {
       try {
-        await Supabase.instance.client
-            .rpc('mobile_submit_task_report_form', params: {
-          'p_task_id': widget.taskId,
-          'p_snapshot_id': snapshotId,
-          'p_values': values,
-          'p_idempotency_key': idempotencyKey
-        });
+        await Supabase.instance.client.rpc(
+          'mobile_submit_task_report_form',
+          params: {
+            'p_task_id': widget.taskId,
+            'p_snapshot_id': snapshotId,
+            'p_values': values,
+            'p_idempotency_key': idempotencyKey,
+          },
+        );
         await _load();
         if (mounted)
           ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('تم إرسال النموذج للمراجعة')));
+            const SnackBar(content: Text('تم إرسال النموذج للمراجعة')),
+          );
       } catch (error) {
         if (!await OfflineQueue.isNetworkError(error)) rethrow;
         await OfflineQueue.enqueue(OfflineQueueKind.report, {
           'taskId': widget.taskId,
           'snapshotId': snapshotId,
           'values': values,
-          'idempotencyKey': idempotencyKey
+          'idempotencyKey': idempotencyKey,
         });
         if (mounted)
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-              content:
-                  Text('تم حفظ النموذج؛ بانتظار المزامنة عند عودة الاتصال')));
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'تم حفظ النموذج؛ بانتظار المزامنة عند عودة الاتصال',
+              ),
+            ),
+          );
       }
     } catch (_) {
       if (mounted)
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-            content:
-                Text('تعذر إرسال النموذج. راجع الحقول المطلوبة أو الاتصال.')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'تعذر إرسال النموذج. راجع الحقول المطلوبة أو الاتصال.',
+            ),
+          ),
+        );
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -675,9 +765,10 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
     try {
       final multi = type == 'multi_image';
       final result = await FilePicker.platform.pickFiles(
-          type: multi ? FileType.image : FileType.any,
-          allowMultiple: multi || type == 'file' || type == 'attachment',
-          withData: true);
+        type: multi ? FileType.image : FileType.any,
+        allowMultiple: multi || type == 'file' || type == 'attachment',
+        withData: true,
+      );
       if (result == null) return;
       final db = Supabase.instance.client, user = db.auth.currentUser;
       if (user == null) throw Exception('سجّل الدخول مجددًا.');
@@ -696,8 +787,13 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
         final safe = file.name.replaceAll(RegExp(r'[^a-zA-Z0-9._-]'), '_');
         final path =
             '${widget.taskId}/${DateTime.now().microsecondsSinceEpoch}-${math.Random.secure().nextInt(1 << 32)}-$safe';
-        await db.storage.from('task-attachments').uploadBinary(path, bytes,
-            fileOptions: FileOptions(contentType: mime, upsert: false));
+        await db.storage
+            .from('task-attachments')
+            .uploadBinary(
+              path,
+              bytes,
+              fileOptions: FileOptions(contentType: mime, upsert: false),
+            );
         try {
           final row = await db
               .from('task_attachments')
@@ -708,7 +804,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                 'file_name': file.name,
                 'storage_path': path,
                 'mime_type': mime,
-                'size_bytes': file.size
+                'size_bytes': file.size,
               })
               .select('id')
               .single();
@@ -717,7 +813,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
             'path': path,
             'name': file.name,
             'mimeType': mime,
-            'size': file.size
+            'size': file.size,
           });
         } catch (_) {
           await db.storage.from('task-attachments').remove([path]);
@@ -749,13 +845,16 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
         final v = jsonDecode(controller?.text ?? '[]');
         if (v is List) selected = v.map((x) => '$x').toList();
       } catch (_) {}
-      return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        Text(title, textAlign: TextAlign.right),
-        Wrap(
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(title, textAlign: TextAlign.right),
+          Wrap(
             alignment: WrapAlignment.end,
             spacing: 6,
             children: options
-                .map((o) => FilterChip(
+                .map(
+                  (o) => FilterChip(
                     label: Text(o),
                     selected: selected.contains(o),
                     onSelected: (yes) {
@@ -766,35 +865,47 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                       }
                       controller?.text = jsonEncode(selected);
                       setState(() {});
-                    }))
-                .toList())
-      ]);
+                    },
+                  ),
+                )
+                .toList(),
+          ),
+        ],
+      );
     }
     if (['attachment', 'file', 'image', 'multi_image'].contains(type)) {
       final items = _attachmentList(controller);
       final max = type == 'image' ? 1 : 20;
-      return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        Text(title, textAlign: TextAlign.right),
-        for (var i = 0; i < items.length; i++)
-          ListTile(
-              title: Text('${items[i]['name'] ?? items[i]['path']}',
-                  textAlign: TextAlign.right),
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(title, textAlign: TextAlign.right),
+          for (var i = 0; i < items.length; i++)
+            ListTile(
+              title: Text(
+                '${items[i]['name'] ?? items[i]['path']}',
+                textAlign: TextAlign.right,
+              ),
               trailing: IconButton(
-                  onPressed: _saving
-                      ? null
-                      : () {
-                          items.removeAt(i);
-                          controller?.text = jsonEncode(items);
-                          setState(() {});
-                        },
-                  icon: const Icon(Icons.remove_circle_outline))),
-        OutlinedButton.icon(
+                onPressed: _saving
+                    ? null
+                    : () {
+                        items.removeAt(i);
+                        controller?.text = jsonEncode(items);
+                        setState(() {});
+                      },
+                icon: const Icon(Icons.remove_circle_outline),
+              ),
+            ),
+          OutlinedButton.icon(
             onPressed: _saving || items.length >= max
                 ? null
                 : () => _pickReportFiles(controller, type),
             icon: const Icon(Icons.upload_file),
-            label: const Text('إضافة مرفق'))
-      ]);
+            label: const Text('إضافة مرفق'),
+          ),
+        ],
+      );
     }
     if (type == 'signature') {
       Map<String, dynamic> v = {};
@@ -805,20 +916,23 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
       final st = v['strokes'] is List
           ? (v['strokes'] as List).whereType<String>().toList()
           : <String>[];
-      return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        Text(title, textAlign: TextAlign.right),
-        if (consent.trim().isNotEmpty)
-          Text(consent, textAlign: TextAlign.right),
-        SignatureCapture(
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(title, textAlign: TextAlign.right),
+          if (consent.trim().isNotEmpty)
+            Text(consent, textAlign: TextAlign.right),
+          SignatureCapture(
             strokes: st,
             enabled: !_saving,
             onChanged: (paths) {
               v['strokes'] = paths;
               v.putIfAbsent('acknowledged', () => false);
               controller?.text = jsonEncode(v);
-            }),
-        if (consent.trim().isNotEmpty)
-          CheckboxListTile(
+            },
+          ),
+          if (consent.trim().isNotEmpty)
+            CheckboxListTile(
               value: v['acknowledged'] == true,
               title: const Text('أوافق على النص أعلاه'),
               controlAffinity: ListTileControlAffinity.leading,
@@ -828,8 +942,9 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                       v['acknowledged'] = b == true;
                       controller?.text = jsonEncode(v);
                       setState(() {});
-                    }),
-        TextButton(
+                    },
+            ),
+          TextButton(
             onPressed: _saving
                 ? null
                 : () {
@@ -837,99 +952,119 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                     controller?.text = jsonEncode(v);
                     setState(() {});
                   },
-            child: const Text('مسح التوقيع'))
-      ]);
+            child: const Text('مسح التوقيع'),
+          ),
+        ],
+      );
     }
     if (type == 'system_reference')
       return TextField(
-          controller: controller,
-          decoration: InputDecoration(
-              labelText: title, helperText: 'أدخل معرّف السجل المرتبط يدويًا'));
+        controller: controller,
+        decoration: InputDecoration(
+          labelText: title,
+          helperText: 'أدخل معرّف السجل المرتبط يدويًا',
+        ),
+      );
     if (type == 'date_range') {
       Map<String, dynamic> r = {};
       try {
         r = _obj(jsonDecode(controller?.text ?? '{}'));
       } catch (_) {}
-      return Column(children: [
-        Text(title, textAlign: TextAlign.right),
-        Row(
+      return Column(
+        children: [
+          Text(title, textAlign: TextAlign.right),
+          Row(
             children: ['from', 'to']
-                .map((k) => Expanded(
+                .map(
+                  (k) => Expanded(
                     child: TextField(
-                        key: ValueKey('${snapshotId}_${field['key']}_$k'),
-                        controller: TextEditingController(text: '${r[k] ?? ''}')
-                          ..selection = TextSelection.collapsed(
-                              offset: '${r[k] ?? ''}'.length),
-                        decoration: InputDecoration(
-                            labelText: k == 'from'
-                                ? 'من (YYYY-MM-DD)'
-                                : 'إلى (YYYY-MM-DD)'),
-                        onChanged: (v) {
-                          r[k] = v;
-                          controller?.text = jsonEncode(r);
-                        })))
-                .toList())
-      ]);
+                      key: ValueKey('${snapshotId}_${field['key']}_$k'),
+                      controller: TextEditingController(text: '${r[k] ?? ''}')
+                        ..selection = TextSelection.collapsed(
+                          offset: '${r[k] ?? ''}'.length,
+                        ),
+                      decoration: InputDecoration(
+                        labelText: k == 'from'
+                            ? 'من (YYYY-MM-DD)'
+                            : 'إلى (YYYY-MM-DD)',
+                      ),
+                      onChanged: (v) {
+                        r[k] = v;
+                        controller?.text = jsonEncode(r);
+                      },
+                    ),
+                  ),
+                )
+                .toList(),
+          ),
+        ],
+      );
     }
     if (type == 'calculated') {
       final formula = '${_obj(field['config'])['formula'] ?? ''}';
       String? error;
       double? result;
       try {
-        final sum =
-            RegExp(r'^sum_rows\(([a-z][a-z0-9_]*)\.([a-z][a-z0-9_]*)\)$')
-                .firstMatch(formula);
+        final sum = RegExp(
+          r'^sum_rows\(([a-z][a-z0-9_]*)\.([a-z][a-z0-9_]*)\)$',
+        ).firstMatch(formula);
         if (sum != null) {
           final rows = _rows(
-              _formInputs[_formInputKey(snapshotId, sum.group(1)!)]?.text ??
-                  '[]');
+            _formInputs[_formInputKey(snapshotId, sum.group(1)!)]?.text ?? '[]',
+          );
           result = rows.fold<double>(
-              0, (a, r) => a + (num.tryParse('${r[sum.group(2)] ?? ''}') ?? 0));
+            0,
+            (a, r) => a + (num.tryParse('${r[sum.group(2)] ?? ''}') ?? 0),
+          );
         } else {
           var expr = formula;
-          for (final m
-              in RegExp(r'\{([a-z][a-z0-9_]*)\}').allMatches(formula)) {
+          for (final m in RegExp(
+            r'\{([a-z][a-z0-9_]*)\}',
+          ).allMatches(formula)) {
             final n = num.tryParse(
-                _formInputs[_formInputKey(snapshotId, m.group(1)!)]?.text ??
-                    '');
+              _formInputs[_formInputKey(snapshotId, m.group(1)!)]?.text ?? '',
+            );
             if (n == null) throw const FormatException();
             expr = expr.replaceAll(m.group(0)!, '$n');
           }
           result = _arithmetic(expr);
         }
       } catch (_) {
-        error =
-            'تعذر حساب الصيغة؛ استخدم مراجع {field_key} والعمليات + − × ÷ أو sum_rows(جدول.عمود).';
+        error = 'تعذر حساب الصيغة؛ استخدم مراجع {field_key} والعمليات + − × ÷ أو sum_rows(جدول.عمود).';
       }
       return ListTile(
-          title: Text(title, textAlign: TextAlign.right),
-          subtitle: Text(
-              error ?? (result?.toString() ?? 'أكمل الحقول المرتبطة'),
-              textAlign: TextAlign.right));
+        title: Text(title, textAlign: TextAlign.right),
+        subtitle: Text(
+          error ?? (result?.toString() ?? 'أكمل الحقول المرتبطة'),
+          textAlign: TextAlign.right,
+        ),
+      );
     }
     if (type == 'select' && options.isNotEmpty) {
       return DropdownButtonFormField<String>(
-          value: options.contains(controller?.text) ? controller!.text : null,
-          decoration: InputDecoration(labelText: title),
-          items: options
-              .map((v) => DropdownMenuItem(value: v, child: Text(v)))
-              .toList(),
-          onChanged: (v) {
-            if (v != null) {
-              controller?.text = v;
-              setState(() {});
-            }
-          });
+        value: options.contains(controller?.text) ? controller!.text : null,
+        decoration: InputDecoration(labelText: title),
+        items: options
+            .map((v) => DropdownMenuItem(value: v, child: Text(v)))
+            .toList(),
+        onChanged: (v) {
+          if (v != null) {
+            controller?.text = v;
+            setState(() {});
+          }
+        },
+      );
     }
     if (type == 'boolean' || type == 'checkbox')
       return CheckboxListTile(
-          value: controller?.text == 'true',
-          onChanged: (v) {
-            controller?.text = '${v == true}';
-            setState(() {});
-          },
-          title: Text(title),
-          controlAffinity: ListTileControlAffinity.leading);
+        value: controller?.text == 'true',
+        onChanged: (v) {
+          controller?.text = '${v == true}';
+          setState(() {});
+        },
+        title: Text(title),
+        controlAffinity: ListTileControlAffinity.leading,
+      );
     const supported = [
       'text',
       'short_text',
@@ -947,44 +1082,52 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
       'date',
       'datetime',
       'barcode',
-      'status'
+      'status',
     ];
     if (!supported.contains(type))
       return ListTile(
-          title: Text(title),
-          subtitle: Text(
-              'نوع الحقل «$type» غير مدعوم في Flutter؛ أكمل هذا النموذج من التطبيق المدعوم.'));
+        title: Text(title),
+        subtitle: Text(
+          'نوع الحقل «$type» غير مدعوم في Flutter؛ أكمل هذا النموذج من التطبيق المدعوم.',
+        ),
+      );
     if (type == 'datetime' &&
         _obj(field['config'])['auto_now'] == true &&
         (controller?.text.isEmpty ?? true))
       controller?.text = DateTime.now().toUtc().toIso8601String();
     return TextField(
-        controller: controller,
-        readOnly:
-            type == 'datetime' && _obj(field['config'])['auto_now'] == true,
-        maxLines:
-            ['textarea', 'long_text', 'notes', 'decision_notes'].contains(type)
-                ? 4
-                : 1,
-        keyboardType: [
-          'number',
-          'integer',
-          'decimal',
-          'percentage',
-          'quantity',
-          'money',
-          'progress'
-        ].contains(type)
-            ? TextInputType.number
-            : TextInputType.text,
-        decoration: InputDecoration(
-            labelText: title, helperText: '${field['description'] ?? ''}'));
+      controller: controller,
+      readOnly: type == 'datetime' && _obj(field['config'])['auto_now'] == true,
+      maxLines:
+          ['textarea', 'long_text', 'notes', 'decision_notes'].contains(type)
+          ? 4
+          : 1,
+      keyboardType:
+          [
+            'number',
+            'integer',
+            'decimal',
+            'percentage',
+            'quantity',
+            'money',
+            'progress',
+          ].contains(type)
+          ? TextInputType.number
+          : TextInputType.text,
+      decoration: InputDecoration(
+        labelText: title,
+        helperText: '${field['description'] ?? ''}',
+      ),
+    );
   }
 
   Future<void> _uploadEvidence(String stepId) async {
     try {
-      final result = await FilePicker.platform
-          .pickFiles(type: FileType.any, allowMultiple: false, withData: true);
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.any,
+        allowMultiple: false,
+        withData: true,
+      );
       if (result == null || result.files.isEmpty) return;
       final file = result.files.single;
       if (file.size <= 0 || file.size > 20 * 1024 * 1024)
@@ -1005,8 +1148,13 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
         'txt' => 'text/plain',
         _ => 'application/octet-stream',
       };
-      await db.storage.from('task-attachments').uploadBinary(path, bytes,
-          fileOptions: FileOptions(contentType: mime, upsert: false));
+      await db.storage
+          .from('task-attachments')
+          .uploadBinary(
+            path,
+            bytes,
+            fileOptions: FileOptions(contentType: mime, upsert: false),
+          );
       try {
         final metadata = await db
             .from('task_attachments')
@@ -1035,265 +1183,338 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
   }
 
   Future<void> _completeStep(String id) async {
-    final step = _steps.firstWhere((row) => '${row['id']}' == id,
-        orElse: () => <String, dynamic>{});
+    final step = _steps.firstWhere(
+      (row) => '${row['id']}' == id,
+      orElse: () => <String, dynamic>{},
+    );
     final evidenceRequired = step['evidence_required'] == true;
     final evidence = _evidenceIds[id] ?? const <String>[];
     if (evidenceRequired && evidence.isEmpty) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-            content: Text('هذه الخطوة تتطلب رفع إثبات قبل إكمالها.')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('هذه الخطوة تتطلب رفع إثبات قبل إكمالها.'),
+          ),
+        );
       }
       return;
     }
     try {
-      await Supabase.instance.client.rpc('mobile_complete_task_step', params: {
-        'p_step_id': id,
-        'p_evidence_attachment_ids': _evidenceIds[id] ?? <String>[],
-      });
+      await Supabase.instance.client.rpc(
+        'mobile_complete_task_step',
+        params: {
+          'p_step_id': id,
+          'p_evidence_attachment_ids': _evidenceIds[id] ?? <String>[],
+        },
+      );
       await _load();
     } catch (_) {
       if (mounted)
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
             content: Text(
-                'تعذر إكمال الخطوة. أضف الدليل المطلوب أو تحقق من الصلاحية.')));
+              'تعذر إكمال الخطوة. أضف الدليل المطلوب أو تحقق من الصلاحية.',
+            ),
+          ),
+        );
     }
   }
 
   Future<void> _timeline() async {
     try {
-      final rows = await Supabase.instance.client
-          .rpc('mobile_task_timeline', params: {'p_task_id': widget.taskId});
+      final rows = await Supabase.instance.client.rpc(
+        'mobile_task_timeline',
+        params: {'p_task_id': widget.taskId},
+      );
       if (!mounted) return;
       showModalBottomSheet<void>(
-          context: context,
-          isScrollControlled: true,
-          builder: (context) => SafeArea(
-                child: ListView(padding: const EdgeInsets.all(16), children: [
-                  const Text('سجل المهمة',
-                      style:
-                          TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-                  for (final row in (rows as List))
-                    ListTile(
-                      title: Text(
-                          '${row['action_type'] ?? row['new_status'] ?? ''}',
-                          textAlign: TextAlign.right),
-                      subtitle: Text(
-                          '${row['actor_name'] ?? ''} · ${row['created_at'] ?? ''}\n${row['notes'] ?? ''}',
-                          textAlign: TextAlign.right),
-                    ),
-                ]),
-              ));
+        context: context,
+        isScrollControlled: true,
+        builder: (context) => SafeArea(
+          child: ListView(
+            padding: const EdgeInsets.all(16),
+            children: [
+              const Text(
+                'سجل المهمة',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+              ),
+              for (final row in (rows as List))
+                ListTile(
+                  title: Text(
+                    '${row['action_type'] ?? row['new_status'] ?? ''}',
+                    textAlign: TextAlign.right,
+                  ),
+                  subtitle: Text(
+                    '${row['actor_name'] ?? ''} · ${row['created_at'] ?? ''}\n${row['notes'] ?? ''}',
+                    textAlign: TextAlign.right,
+                  ),
+                ),
+            ],
+          ),
+        ),
+      );
     } catch (_) {
       if (mounted)
-        ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('تعذر تحميل سجل المهمة.')));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('تعذر تحميل سجل المهمة.')));
     }
   }
 
   @override
   Widget build(BuildContext context) => AppShell(
-        title: 'تفاصيل المهمة',
-        subtitle: _task?['title']?.toString(),
-        child: _busy
-            ? const Center(child: CircularProgressIndicator())
-            : _error != null
-                ? Center(
-                    child: Column(mainAxisSize: MainAxisSize.min, children: [
-                    Text(_error!, textAlign: TextAlign.center),
-                    TextButton(
-                        onPressed: _load, child: const Text('إعادة المحاولة')),
-                  ]))
-                : ListView(padding: const EdgeInsets.all(12), children: [
-                    SectionCard(
-                        title: _task?['title']?.toString() ?? 'مهمة',
-                        child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              Text(
-                                  'الحالة: ${_task?['status'] ?? '—'} · الأولوية: ${_task?['priority'] ?? '—'}',
-                                  textAlign: TextAlign.right),
-                              if (_task?['due_at'] != null)
-                                Text('موعد الاستحقاق: ${_task!['due_at']}',
-                                    textAlign: TextAlign.right),
-                              if (_task?['description'] != null)
-                                Text('${_task!['description']}',
-                                    textAlign: TextAlign.right),
-                              if (_task?['task_instructions'] != null)
-                                Text('${_task!['task_instructions']}',
-                                    textAlign: TextAlign.right),
-                            ])),
-                    if (_steps.isNotEmpty)
-                      SectionCard(
-                          title: 'خطوات التنفيذ',
-                          child: Column(children: [
-                            for (final step in _steps)
-                              Column(children: [
-                                CheckboxListTile(
-                                  value: step['completed_at'] != null,
-                                  onChanged: step['completed_at'] != null
-                                      ? null
-                                      : (_) => _completeStep('${step['id']}'),
-                                  title: Text('${step['title']}',
-                                      textAlign: TextAlign.right),
-                                  subtitle: Text(
-                                      '${step['instructions'] ?? ''}',
-                                      textAlign: TextAlign.right),
-                                  controlAffinity:
-                                      ListTileControlAffinity.leading,
+    title: 'تفاصيل المهمة',
+    subtitle: _task?['title']?.toString(),
+    child: _busy
+        ? const Center(child: CircularProgressIndicator())
+        : _error != null
+        ? Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(_error!, textAlign: TextAlign.center),
+                TextButton(
+                  onPressed: _load,
+                  child: const Text('إعادة المحاولة'),
+                ),
+              ],
+            ),
+          )
+        : ListView(
+            padding: const EdgeInsets.all(12),
+            children: [
+              SectionCard(
+                title: _task?['title']?.toString() ?? 'مهمة',
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(
+                      'الحالة: ${_task?['status'] ?? '—'} · الأولوية: ${_task?['priority'] ?? '—'}',
+                      textAlign: TextAlign.right,
+                    ),
+                    if (_task?['due_at'] != null)
+                      Text(
+                        'موعد الاستحقاق: ${_task!['due_at']}',
+                        textAlign: TextAlign.right,
+                      ),
+                    if (_task?['description'] != null)
+                      Text(
+                        '${_task!['description']}',
+                        textAlign: TextAlign.right,
+                      ),
+                    if (_task?['task_instructions'] != null)
+                      Text(
+                        '${_task!['task_instructions']}',
+                        textAlign: TextAlign.right,
+                      ),
+                  ],
+                ),
+              ),
+              if (_steps.isNotEmpty)
+                SectionCard(
+                  title: 'خطوات التنفيذ',
+                  child: Column(
+                    children: [
+                      for (final step in _steps)
+                        Column(
+                          children: [
+                            CheckboxListTile(
+                              value: step['completed_at'] != null,
+                              onChanged: step['completed_at'] != null
+                                  ? null
+                                  : (_) => _completeStep('${step['id']}'),
+                              title: Text(
+                                '${step['title']}',
+                                textAlign: TextAlign.right,
+                              ),
+                              subtitle: Text(
+                                '${step['instructions'] ?? ''}',
+                                textAlign: TextAlign.right,
+                              ),
+                              controlAffinity: ListTileControlAffinity.leading,
+                            ),
+                            if (step['evidence_required'] == true &&
+                                step['completed_at'] == null)
+                              Align(
+                                alignment: Alignment.centerRight,
+                                child: TextButton.icon(
+                                  onPressed: () =>
+                                      _uploadEvidence('${step['id']}'),
+                                  icon: const Icon(Icons.attach_file),
+                                  label: Text(
+                                    'رفع دليل (${_evidenceIds['${step['id']}']?.length ?? 0})',
+                                  ),
                                 ),
-                                if (step['evidence_required'] == true &&
-                                    step['completed_at'] == null)
-                                  Align(
-                                      alignment: Alignment.centerRight,
-                                      child: TextButton.icon(
-                                        onPressed: () =>
-                                            _uploadEvidence('${step['id']}'),
-                                        icon: const Icon(Icons.attach_file),
-                                        label: Text(
-                                            'رفع دليل (${_evidenceIds['${step['id']}']?.length ?? 0})'),
-                                      )),
-                              ]),
-                          ])),
-                    if (_task?['report_flow'] == 'multi_form')
-                      for (final form in _forms)
-                        Builder(builder: (context) {
-                          final snapshotId = '${form['id']}';
-                          final schema = List<Map<String, dynamic>>.from(
-                              form['schema'] as List);
-                          final status = form['status'];
-                          final locked =
-                              status == 'submitted' || status == 'approved';
-                          final savedValues = Map<String, dynamic>.from(
-                              (form['values'] as Map?) ?? {});
-                          return SectionCard(
-                              title: '${form['title'] ?? 'نموذج تقرير'}',
-                              child: Column(
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment.stretch,
-                                  children: [
-                                    if (status == 'approved')
-                                      const Text('تم اعتماد هذا النموذج',
-                                          textAlign: TextAlign.right),
-                                    if (status == 'submitted')
-                                      const Text(
-                                          'تم إرسال هذا النموذج للمراجعة',
-                                          textAlign: TextAlign.right),
-                                    if (form['review_note'] != null)
-                                      Text(
-                                          'ملاحظة المراجعة: ${form['review_note']}',
-                                          textAlign: TextAlign.right),
-                                    if (schema.isEmpty)
-                                      const Text(
-                                          'لا يحتوي هذا النموذج على حقول.',
-                                          textAlign: TextAlign.right),
-                                    for (final field in schema)
-                                      locked
-                                          ? ListTile(
-                                              title: Text(
-                                                  '${field['label'] ?? field['key']}',
-                                                  textAlign: TextAlign.right),
-                                              subtitle: Text(
-                                                  '${savedValues[field['key']] ?? '—'}',
-                                                  textAlign: TextAlign.right))
-                                          : Padding(
-                                              padding: const EdgeInsets.only(
-                                                  bottom: 12),
-                                              child: _snapshotField(
-                                                  field, snapshotId)),
-                                    if (!locked)
-                                      Wrap(
-                                          alignment: WrapAlignment.center,
-                                          spacing: 8,
-                                          children: [
-                                            OutlinedButton(
-                                                onPressed: _saving
-                                                    ? null
-                                                    : () => _saveSnapshotDraft(
-                                                        snapshotId, schema),
-                                                child:
-                                                    const Text('حفظ المسودة')),
-                                            FilledButton(
-                                                onPressed: _saving
-                                                    ? null
-                                                    : () => _submitSnapshot(
-                                                        snapshotId, schema),
-                                                child: const Text(
-                                                    'إرسال النموذج')),
-                                          ]),
-                                  ]));
-                        }),
-                    if (_task?['report_flow'] != 'multi_form' &&
-                        _fields.isNotEmpty)
-                      SectionCard(
-                          title: 'تقرير المهمة',
-                          child: Column(children: [
-                            for (final field in _fields)
-                              Padding(
-                                  padding: const EdgeInsets.only(bottom: 12),
-                                  child: TextField(
-                                    controller:
-                                        _inputs['${field['field_key']}'],
-                                    maxLines: field['field_type'] == 'long_text'
-                                        ? 4
-                                        : 1,
-                                    keyboardType: const [
-                                      'integer',
-                                      'number',
-                                      'decimal',
-                                      'money',
-                                      'percentage'
-                                    ].contains(field['field_type'])
-                                        ? TextInputType.number
-                                        : TextInputType.text,
-                                    decoration: InputDecoration(
-                                        labelText:
-                                            '${field['label']}${field['is_required'] == true ? ' *' : ''}',
-                                        hintText:
-                                            '${field['field_type'] ?? ''}'),
-                                  )),
-                            FilledButton(
-                                onPressed: _saving ? null : _submitReport,
-                                child: const Text('إرسال التقرير للمراجعة')),
-                          ])),
-                    const SizedBox(height: 12),
-                    Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        alignment: WrapAlignment.center,
-                        children: [
-                          if (['pending', 'new', 'received']
-                              .contains(_task?['status']))
-                            FilledButton(
-                                onPressed: _saving
-                                    ? null
-                                    : () => _status('in_progress'),
-                                child: const Text('بدء التنفيذ')),
-                          if (['in_progress', 'on_hold']
-                              .contains(_task?['status']))
-                            FilledButton(
-                                onPressed:
-                                    _saving ? null : () => _status('submitted'),
-                                child: const Text('إرسال للمراجعة')),
-                          OutlinedButton.icon(
-                              onPressed: _timeline,
-                              icon: const Icon(Icons.history),
-                              label: const Text('سجل المهمة')),
-                          OutlinedButton.icon(
-                              onPressed: () => context.pop(),
-                              icon: const Icon(Icons.arrow_back),
-                              label: const Text('رجوع')),
-                        ]),
-                  ]),
-      );
+                              ),
+                          ],
+                        ),
+                    ],
+                  ),
+                ),
+              if (_task?['report_flow'] == 'multi_form')
+                for (final form in _forms)
+                  Builder(
+                    builder: (context) {
+                      final snapshotId = '${form['id']}';
+                      final schema = List<Map<String, dynamic>>.from(
+                        form['schema'] as List,
+                      );
+                      final status = form['status'];
+                      final locked =
+                          status == 'submitted' || status == 'approved';
+                      final savedValues = Map<String, dynamic>.from(
+                        (form['values'] as Map?) ?? {},
+                      );
+                      return SectionCard(
+                        title: '${form['title'] ?? 'نموذج تقرير'}',
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            if (status == 'approved')
+                              const Text(
+                                'تم اعتماد هذا النموذج',
+                                textAlign: TextAlign.right,
+                              ),
+                            if (status == 'submitted')
+                              const Text(
+                                'تم إرسال هذا النموذج للمراجعة',
+                                textAlign: TextAlign.right,
+                              ),
+                            if (form['review_note'] != null)
+                              Text(
+                                'ملاحظة المراجعة: ${form['review_note']}',
+                                textAlign: TextAlign.right,
+                              ),
+                            if (schema.isEmpty)
+                              const Text(
+                                'لا يحتوي هذا النموذج على حقول.',
+                                textAlign: TextAlign.right,
+                              ),
+                            for (final field in schema)
+                              locked
+                                  ? ListTile(
+                                      title: Text(
+                                        '${field['label'] ?? field['key']}',
+                                        textAlign: TextAlign.right,
+                                      ),
+                                      subtitle: Text(
+                                        '${savedValues[field['key']] ?? '—'}',
+                                        textAlign: TextAlign.right,
+                                      ),
+                                    )
+                                  : Padding(
+                                      padding: const EdgeInsets.only(
+                                        bottom: 12,
+                                      ),
+                                      child: _snapshotField(field, snapshotId),
+                                    ),
+                            if (!locked)
+                              Wrap(
+                                alignment: WrapAlignment.center,
+                                spacing: 8,
+                                children: [
+                                  OutlinedButton(
+                                    onPressed: _saving
+                                        ? null
+                                        : () => _saveSnapshotDraft(
+                                            snapshotId,
+                                            schema,
+                                          ),
+                                    child: const Text('حفظ المسودة'),
+                                  ),
+                                  FilledButton(
+                                    onPressed: _saving
+                                        ? null
+                                        : () => _submitSnapshot(
+                                            snapshotId,
+                                            schema,
+                                          ),
+                                    child: const Text('إرسال النموذج'),
+                                  ),
+                                ],
+                              ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+              if (_task?['report_flow'] != 'multi_form' && _fields.isNotEmpty)
+                SectionCard(
+                  title: 'تقرير المهمة',
+                  child: Column(
+                    children: [
+                      for (final field in _fields)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 12),
+                          child: TextField(
+                            controller: _inputs['${field['field_key']}'],
+                            maxLines: field['field_type'] == 'long_text'
+                                ? 4
+                                : 1,
+                            keyboardType:
+                                const [
+                                  'integer',
+                                  'number',
+                                  'decimal',
+                                  'money',
+                                  'percentage',
+                                ].contains(field['field_type'])
+                                ? TextInputType.number
+                                : TextInputType.text,
+                            decoration: InputDecoration(
+                              labelText:
+                                  '${field['label']}${field['is_required'] == true ? ' *' : ''}',
+                              hintText: '${field['field_type'] ?? ''}',
+                            ),
+                          ),
+                        ),
+                      FilledButton(
+                        onPressed: _saving ? null : _submitReport,
+                        child: const Text('إرسال التقرير للمراجعة'),
+                      ),
+                    ],
+                  ),
+                ),
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                alignment: WrapAlignment.center,
+                children: [
+                  if (['pending', 'new', 'received'].contains(_task?['status']))
+                    FilledButton(
+                      onPressed: _saving ? null : () => _status('in_progress'),
+                      child: const Text('بدء التنفيذ'),
+                    ),
+                  if (['in_progress', 'on_hold'].contains(_task?['status']))
+                    FilledButton(
+                      onPressed: _saving ? null : () => _status('submitted'),
+                      child: const Text('إرسال للمراجعة'),
+                    ),
+                  OutlinedButton.icon(
+                    onPressed: _timeline,
+                    icon: const Icon(Icons.history),
+                    label: const Text('سجل المهمة'),
+                  ),
+                  OutlinedButton.icon(
+                    onPressed: () => context.pop(),
+                    icon: const Icon(Icons.arrow_back),
+                    label: const Text('رجوع'),
+                  ),
+                ],
+              ),
+            ],
+          ),
+  );
 }
 
 class SignatureCapture extends StatefulWidget {
-  const SignatureCapture(
-      {super.key,
-      required this.strokes,
-      required this.enabled,
-      required this.onChanged});
+  const SignatureCapture({
+    super.key,
+    required this.strokes,
+    required this.enabled,
+    required this.onChanged,
+  });
   final List<String> strokes;
   final bool enabled;
   final ValueChanged<List<String>> onChanged;
@@ -1313,39 +1534,47 @@ class _SignatureCaptureState extends State<SignatureCapture> {
   String _encode(List<Offset> p) => p.isEmpty
       ? ''
       : 'M ${p.first.dx.toStringAsFixed(1)} ${p.first.dy.toStringAsFixed(1)}' +
-          p
-              .skip(1)
-              .map((x) =>
-                  ' L ${x.dx.toStringAsFixed(1)} ${x.dy.toStringAsFixed(1)}')
-              .join();
+            p
+                .skip(1)
+                .map(
+                  (x) =>
+                      ' L ${x.dx.toStringAsFixed(1)} ${x.dy.toStringAsFixed(1)}',
+                )
+                .join();
   @override
   Widget build(BuildContext c) => Container(
-      height: 170,
-      decoration: BoxDecoration(
-          border: Border.all(color: Colors.grey),
-          borderRadius: BorderRadius.circular(8)),
-      child: GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onPanStart: widget.enabled
-              ? (d) => setState(() => active = [d.localPosition])
-              : null,
-          onPanUpdate: widget.enabled
-              ? (d) => setState(() => active = [...active, d.localPosition])
-              : null,
-          onPanEnd: widget.enabled
-              ? (_) {
-                  final p = _encode(active);
-                  if (p.isNotEmpty && paths.length < 200) {
-                    paths = [...paths, p];
-                    widget.onChanged(paths);
-                  }
-                  setState(() => active = []);
-                }
-              : null,
-          child: CustomPaint(
-              painter: _SignPainter(
-                  [...paths, if (active.isNotEmpty) _encode(active)]),
-              size: Size.infinite)));
+    height: 170,
+    decoration: BoxDecoration(
+      border: Border.all(color: Colors.grey),
+      borderRadius: BorderRadius.circular(8),
+    ),
+    child: GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onPanStart: widget.enabled
+          ? (d) => setState(() => active = [d.localPosition])
+          : null,
+      onPanUpdate: widget.enabled
+          ? (d) => setState(() => active = [...active, d.localPosition])
+          : null,
+      onPanEnd: widget.enabled
+          ? (_) {
+              final p = _encode(active);
+              if (p.isNotEmpty && paths.length < 200) {
+                paths = [...paths, p];
+                widget.onChanged(paths);
+              }
+              setState(() => active = []);
+            }
+          : null,
+      child: CustomPaint(
+        painter: _SignPainter([
+          ...paths,
+          if (active.isNotEmpty) _encode(active),
+        ]),
+        size: Size.infinite,
+      ),
+    ),
+  );
 }
 
 class _SignPainter extends CustomPainter {

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+
 import '../../shared/app_shell.dart';
 import '../../core/theme.dart';
 
@@ -48,7 +49,7 @@ class _HrScreenState extends State<HrScreen> {
       'periodEnd': DateTime.now().toIso8601String().substring(0, 10),
       'base': '',
       'additions': '0',
-      'deductions': '0'
+      'deductions': '0',
     }.entries) {
       field(e.key, e.value);
     }
@@ -75,13 +76,15 @@ class _HrScreenState extends State<HrScreen> {
       final employee = root['employee'];
       if (employee is! Map)
         throw Exception(
-            'الحساب غير مرتبط بملف موظف نشط. تواصل مع مسؤول النظام.');
+          'الحساب غير مرتبط بملف موظف نشط. تواصل مع مسؤول النظام.',
+        );
       final org = employee['institutionId'] ?? employee['institution_id'];
       if (org == null || org.toString().isEmpty)
         throw Exception('ملف الموظف لا يتضمن المؤسسة.');
       final permissions = employee['permissions'];
       _organizationId = org.toString();
-      _canManage = permissions is List &&
+      _canManage =
+          permissions is List &&
           permissions.map((e) => e.toString()).contains('employee_hr.manage');
       final results = await Future.wait([
         _client
@@ -94,21 +97,24 @@ class _HrScreenState extends State<HrScreen> {
         _client
             .from('employee_contracts')
             .select(
-                'id,membership_id,contract_no,contract_type,status,start_date,end_date,base_salary,salary_currency,pay_frequency,duties')
+              'id,membership_id,contract_no,contract_type,status,start_date,end_date,base_salary,salary_currency,pay_frequency,duties',
+            )
             .eq('organization_id', _organizationId!)
             .order('start_date', ascending: false)
             .limit(100),
         _client
             .from('employee_work_schedules')
             .select(
-                'id,membership_id,name,timezone,work_days,start_time,end_time,break_minutes,effective_from,effective_to,is_active')
+              'id,membership_id,name,timezone,work_days,start_time,end_time,break_minutes,effective_from,effective_to,is_active',
+            )
             .eq('organization_id', _organizationId!)
             .order('effective_from', ascending: false)
             .limit(100),
         _client
             .from('employee_attendance_records')
             .select(
-                'id,membership_id,work_date,status,check_in_at,check_out_at,note')
+              'id,membership_id,work_date,status,check_in_at,check_out_at,note',
+            )
             .eq('organization_id', _organizationId!)
             .order('work_date', ascending: false)
             .limit(100),
@@ -129,7 +135,8 @@ class _HrScreenState extends State<HrScreen> {
         final entries = await _client
             .from('employee_payroll_entries')
             .select(
-                'period_id,membership_id,base_amount,additions,deductions,net_amount,currency')
+              'period_id,membership_id,base_amount,additions,deductions,net_amount,currency',
+            )
             .inFilter('period_id', ids)
             .limit(500);
         for (final p in _periods) {
@@ -211,22 +218,25 @@ class _HrScreenState extends State<HrScreen> {
       return;
     }
     await _run('تم حفظ عقد الموظف.', () async {
-      await _client.rpc('create_employee_contract', params: {
-        'p_organization_id': _organizationId,
-        'p_membership_id': id,
-        'p_contract_no': _text('contractNo'),
-        'p_contract_type': _text('contractType'),
-        'p_start_date': start,
-        'p_end_date': end.isEmpty ? null : end,
-        'p_base_salary': salary,
-        'p_currency': 'SAR',
-        'p_pay_frequency': 'monthly',
-        'p_duties': _text('duties')
-            .split('\n')
-            .map((e) => e.trim())
-            .where((e) => e.isNotEmpty)
-            .toList()
-      });
+      await _client.rpc(
+        'create_employee_contract',
+        params: {
+          'p_organization_id': _organizationId,
+          'p_membership_id': id,
+          'p_contract_no': _text('contractNo'),
+          'p_contract_type': _text('contractType'),
+          'p_start_date': start,
+          'p_end_date': end.isEmpty ? null : end,
+          'p_base_salary': salary,
+          'p_currency': 'SAR',
+          'p_pay_frequency': 'monthly',
+          'p_duties': _text('duties')
+              .split('\n')
+              .map((e) => e.trim())
+              .where((e) => e.isNotEmpty)
+              .toList(),
+        },
+      );
     });
   }
 
@@ -245,23 +255,28 @@ class _HrScreenState extends State<HrScreen> {
         !_time(_text('startTime')) ||
         !_time(_text('endTime')) ||
         _timeMinutes(_text('endTime'))! <= _timeMinutes(_text('startTime'))!) {
-      setState(() =>
-          _error = 'تحقق من اسم الجدول والتواريخ والأوقات ودقائق الاستراحة.');
+      setState(
+        () =>
+            _error = 'تحقق من اسم الجدول والتواريخ والأوقات ودقائق الاستراحة.',
+      );
       return;
     }
     await _run('تم حفظ جدول الدوام.', () async {
-      await _client.rpc('create_employee_work_schedule', params: {
-        'p_organization_id': _organizationId,
-        'p_membership_id': id,
-        'p_name': _text('scheduleName'),
-        'p_timezone': 'Asia/Aden',
-        'p_work_days': [6, 0, 1, 2, 3, 4],
-        'p_start_time': _text('startTime'),
-        'p_end_time': _text('endTime'),
-        'p_break_minutes': mins,
-        'p_effective_from': start,
-        'p_effective_to': end.isEmpty ? null : end
-      });
+      await _client.rpc(
+        'create_employee_work_schedule',
+        params: {
+          'p_organization_id': _organizationId,
+          'p_membership_id': id,
+          'p_name': _text('scheduleName'),
+          'p_timezone': 'Asia/Aden',
+          'p_work_days': [6, 0, 1, 2, 3, 4],
+          'p_start_time': _text('startTime'),
+          'p_end_time': _text('endTime'),
+          'p_break_minutes': mins,
+          'p_effective_from': start,
+          'p_effective_to': end.isEmpty ? null : end,
+        },
+      );
     });
   }
 
@@ -271,6 +286,7 @@ class _HrScreenState extends State<HrScreen> {
     final parts = v.split(':');
     return int.parse(parts[0]) * 60 + int.parse(parts[1]);
   }
+
   Future<void> _recordAttendance() async {
     final id = _memberId;
     final date = _text('workDate');
@@ -278,29 +294,41 @@ class _HrScreenState extends State<HrScreen> {
     final ci = _text('checkIn'), co = _text('checkOut');
     if (id == null ||
         !_validDate(date) ||
-        !['present', 'absent', 'late', 'leave', 'holiday', 'incomplete'].contains(status) ||
+        ![
+          'present',
+          'absent',
+          'late',
+          'leave',
+          'holiday',
+          'incomplete',
+        ].contains(status) ||
         (ci.isNotEmpty && !_time(ci)) ||
         (co.isNotEmpty && !_time(co)) ||
-        (ci.isNotEmpty && co.isNotEmpty &&
-            _timeMinutes(co)! < _timeMinutes(ci)!) ) {
-      setState(() => _error =
-          'تحقق من التاريخ والحالة (present/absent/late/leave/holiday/incomplete) والأوقات.');
+        (ci.isNotEmpty &&
+            co.isNotEmpty &&
+            _timeMinutes(co)! < _timeMinutes(ci)!)) {
+      setState(
+        () => _error = 'تحقق من التاريخ والحالة (present/absent/late/leave/holiday/incomplete) والأوقات.',
+      );
       return;
     }
     await _run('تم تسجيل الحضور.', () async {
-      await _client.rpc('record_employee_attendance', params: {
-        'p_organization_id': _organizationId,
-        'p_membership_id': id,
-        'p_work_date': date,
-        'p_status': status,
-        'p_check_in_at': ci.isEmpty
-            ? null
-            : DateTime.parse('${date}T$ci:00').toUtc().toIso8601String(),
-        'p_check_out_at': co.isEmpty
-            ? null
-            : DateTime.parse('${date}T$co:00').toUtc().toIso8601String(),
-        'p_note': _text('note')
-      });
+      await _client.rpc(
+        'record_employee_attendance',
+        params: {
+          'p_organization_id': _organizationId,
+          'p_membership_id': id,
+          'p_work_date': date,
+          'p_status': status,
+          'p_check_in_at': ci.isEmpty
+              ? null
+              : DateTime.parse('${date}T$ci:00').toUtc().toIso8601String(),
+          'p_check_out_at': co.isEmpty
+              ? null
+              : DateTime.parse('${date}T$co:00').toUtc().toIso8601String(),
+          'p_note': _text('note'),
+        },
+      );
     });
   }
 
@@ -311,11 +339,14 @@ class _HrScreenState extends State<HrScreen> {
       return;
     }
     await _run('تم إنشاء فترة الرواتب.', () async {
-      await _client.rpc('create_employee_payroll_period', params: {
-        'p_organization_id': _organizationId,
-        'p_period_start': start,
-        'p_period_end': end
-      });
+      await _client.rpc(
+        'create_employee_payroll_period',
+        params: {
+          'p_organization_id': _organizationId,
+          'p_period_start': start,
+          'p_period_end': end,
+        },
+      );
     });
   }
 
@@ -337,86 +368,121 @@ class _HrScreenState extends State<HrScreen> {
       return;
     }
     await _run('تم حفظ قيد الراتب.', () async {
-      await _client.rpc('upsert_employee_payroll_entry', params: {
-        'p_organization_id': _organizationId,
-        'p_period_id': period,
-        'p_membership_id': id,
-        'p_base_amount': base,
-        'p_additions': additions,
-        'p_deductions': deductions,
-        'p_currency': 'SAR',
-        'p_note': _text('note')
-      });
+      await _client.rpc(
+        'upsert_employee_payroll_entry',
+        params: {
+          'p_organization_id': _organizationId,
+          'p_period_id': period,
+          'p_membership_id': id,
+          'p_base_amount': base,
+          'p_additions': additions,
+          'p_deductions': deductions,
+          'p_currency': 'SAR',
+          'p_note': _text('note'),
+        },
+      );
     });
   }
 
-  Widget _field(String key, String label,
-          {String? hint, TextInputType? type, int lines = 1}) =>
-      Padding(
-          padding: const EdgeInsets.symmetric(vertical: 5),
-          child: TextField(
-              controller: field(key, ''),
-              keyboardType: type,
-              maxLines: lines,
-              textDirection: TextDirection.rtl,
-              decoration: InputDecoration(
-                  labelText: label,
-                  hintText: hint,
-                  border: const OutlineInputBorder(),
-                  isDense: true)));
+  Widget _field(
+    String key,
+    String label, {
+    String? hint,
+    TextInputType? type,
+    int lines = 1,
+  }) => Padding(
+    padding: const EdgeInsets.symmetric(vertical: 5),
+    child: TextField(
+      controller: field(key, ''),
+      keyboardType: type,
+      maxLines: lines,
+      textDirection: TextDirection.rtl,
+      decoration: InputDecoration(
+        labelText: label,
+        hintText: hint,
+        border: const OutlineInputBorder(),
+        isDense: true,
+      ),
+    ),
+  );
   Widget _action(String label, VoidCallback onTap) => SizedBox(
-      width: double.infinity,
-      child: FilledButton(
-          onPressed: _busy ? null : onTap,
-          child: _busy
-              ? const SizedBox(
-                  width: 18,
-                  height: 18,
-                  child: CircularProgressIndicator(strokeWidth: 2))
-              : Text(label)));
+    width: double.infinity,
+    child: FilledButton(
+      onPressed: _busy ? null : onTap,
+      child: _busy
+          ? const SizedBox(
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          : Text(label),
+    ),
+  );
   Widget _memberPicker() => DropdownButtonFormField<String>(
-      value: _memberId,
-      isExpanded: true,
-      decoration: const InputDecoration(
-          labelText: 'الموظف', border: OutlineInputBorder()),
-      items: _members
-          .map((m) => DropdownMenuItem(
-              value: m['id'].toString(),
-              child: Text(
-                  '${_value(m['display_name'])}${m['employee_no'] == null ? '' : ' · ${m['employee_no']}'}',
-                  textDirection: TextDirection.rtl)))
-          .toList(),
-      onChanged: _busy ? null : (v) => setState(() => _memberId = v));
+    value: _memberId,
+    isExpanded: true,
+    decoration: const InputDecoration(
+      labelText: 'الموظف',
+      border: OutlineInputBorder(),
+    ),
+    items: _members
+        .map(
+          (m) => DropdownMenuItem(
+            value: m['id'].toString(),
+            child: Text(
+              '${_value(m['display_name'])}${m['employee_no'] == null ? '' : ' · ${m['employee_no']}'}',
+              textDirection: TextDirection.rtl,
+            ),
+          ),
+        )
+        .toList(),
+    onChanged: _busy ? null : (v) => setState(() => _memberId = v),
+  );
   Widget _card(String title, List<Widget> children) => Card(
-      child: Padding(
-          padding: const EdgeInsets.all(14),
-          child:
-              Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            Text(title,
-                textAlign: TextAlign.right,
-                style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.navy)),
-            const SizedBox(height: 10),
-            ...children
-          ])));
+    child: Padding(
+      padding: const EdgeInsets.all(14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            title,
+            textAlign: TextAlign.right,
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: AppColors.navy,
+            ),
+          ),
+          const SizedBox(height: 10),
+          ...children,
+        ],
+      ),
+    ),
+  );
   Widget _entry(String title, String detail) => Card(
-      child: ListTile(
-          title: Text(title, textAlign: TextAlign.right),
-          subtitle: Text(detail,
-              textAlign: TextAlign.right, textDirection: TextDirection.rtl)));
+    child: ListTile(
+      title: Text(title, textAlign: TextAlign.right),
+      subtitle: Text(
+        detail,
+        textAlign: TextAlign.right,
+        textDirection: TextDirection.rtl,
+      ),
+    ),
+  );
   Widget _form() {
     if (!_canManage)
       return _card('عرض فقط', [
         const Text(
-            'لا تملك صلاحية employee_hr.manage. يمكنك الاطلاع على السجلات التي تسمح بها سياسات الوصول.',
-            textAlign: TextAlign.right)
+          'لا تملك صلاحية employee_hr.manage. يمكنك الاطلاع على السجلات التي تسمح بها سياسات الوصول.',
+          textAlign: TextAlign.right,
+        ),
       ]);
     if (_members.isEmpty)
       return _card('لا يوجد موظفون نشطون', [
-        const Text('تعذر تقديم نماذج الموارد البشرية دون عضو نشط في المؤسسة.',
-            textAlign: TextAlign.right)
+        const Text(
+          'تعذر تقديم نماذج الموارد البشرية دون عضو نشط في المؤسسة.',
+          textAlign: TextAlign.right,
+        ),
       ]);
     if (_tab == 0)
       return _card('إضافة عقد موظف', [
@@ -425,10 +491,13 @@ class _HrScreenState extends State<HrScreen> {
         _field('contractType', 'نوع العقد', hint: 'employment'),
         _field('startDate', 'تاريخ البداية', hint: 'YYYY-MM-DD'),
         _field('endDate', 'تاريخ النهاية (اختياري)', hint: 'YYYY-MM-DD'),
-        _field('salary', 'الراتب الأساسي (SAR)',
-            type: const TextInputType.numberWithOptions(decimal: true)),
+        _field(
+          'salary',
+          'الراتب الأساسي (SAR)',
+          type: const TextInputType.numberWithOptions(decimal: true),
+        ),
         _field('duties', 'المهام والمسؤوليات (كل مسؤولية في سطر)', lines: 3),
-        _action('حفظ العقد', _contract)
+        _action('حفظ العقد', _contract),
       ]);
     if (_tab == 1)
       return _card('جدول الدوام', [
@@ -439,18 +508,21 @@ class _HrScreenState extends State<HrScreen> {
         _field('startTime', 'بداية الدوام', hint: '08:00'),
         _field('endTime', 'نهاية الدوام', hint: '17:00'),
         _field('breakMinutes', 'دقائق الاستراحة', type: TextInputType.number),
-        _action('حفظ جدول الدوام', _schedule)
+        _action('حفظ جدول الدوام', _schedule),
       ]);
     if (_tab == 2)
       return _card('تسجيل حضور أو انصراف', [
         _memberPicker(),
         _field('workDate', 'تاريخ الدوام', hint: 'YYYY-MM-DD'),
-        _field('attendanceStatus', 'الحالة',
-            hint: 'present / absent / late / leave / holiday'),
+        _field(
+          'attendanceStatus',
+          'الحالة',
+          hint: 'present / absent / late / leave / holiday',
+        ),
         _field('checkIn', 'وقت الدخول (اختياري)', hint: '08:00'),
         _field('checkOut', 'وقت الخروج (اختياري)', hint: '17:00'),
         _field('note', 'ملاحظة', lines: 2),
-        _action('حفظ سجل الحضور', _recordAttendance)
+        _action('حفظ سجل الحضور', _recordAttendance),
       ]);
     return _card('إدارة الرواتب', [
       _field('periodStart', 'بداية الفترة', hint: 'YYYY-MM-DD'),
@@ -458,112 +530,161 @@ class _HrScreenState extends State<HrScreen> {
       _action('إنشاء فترة الرواتب', _period),
       const Divider(),
       DropdownButtonFormField<String>(
-          value: _periodId,
-          decoration: const InputDecoration(
-              labelText: 'فترة الرواتب', border: OutlineInputBorder()),
-          items: _periods
-              .map((p) => DropdownMenuItem(
-                  value: p['id'].toString(),
-                  child: Text(
-                      '${_value(p['period_start'])} إلى ${_value(p['period_end'])} · ${_value(p['status'])}',
-                      textDirection: TextDirection.rtl)))
-              .toList(),
-          onChanged: (v) => setState(() => _periodId = v)),
+        value: _periodId,
+        decoration: const InputDecoration(
+          labelText: 'فترة الرواتب',
+          border: OutlineInputBorder(),
+        ),
+        items: _periods
+            .map(
+              (p) => DropdownMenuItem(
+                value: p['id'].toString(),
+                child: Text(
+                  '${_value(p['period_start'])} إلى ${_value(p['period_end'])} · ${_value(p['status'])}',
+                  textDirection: TextDirection.rtl,
+                ),
+              ),
+            )
+            .toList(),
+        onChanged: (v) => setState(() => _periodId = v),
+      ),
       const SizedBox(height: 8),
       _memberPicker(),
-      _field('base', 'الراتب الأساسي (SAR)',
-          type: const TextInputType.numberWithOptions(decimal: true)),
-      _field('additions', 'الإضافات',
-          type: const TextInputType.numberWithOptions(decimal: true)),
-      _field('deductions', 'الاستقطاعات',
-          type: const TextInputType.numberWithOptions(decimal: true)),
+      _field(
+        'base',
+        'الراتب الأساسي (SAR)',
+        type: const TextInputType.numberWithOptions(decimal: true),
+      ),
+      _field(
+        'additions',
+        'الإضافات',
+        type: const TextInputType.numberWithOptions(decimal: true),
+      ),
+      _field(
+        'deductions',
+        'الاستقطاعات',
+        type: const TextInputType.numberWithOptions(decimal: true),
+      ),
       _field('note', 'ملاحظة', lines: 2),
-      _action('حفظ قيد الراتب', _payrollEntry)
+      _action('حفظ قيد الراتب', _payrollEntry),
     ]);
   }
 
   List<Widget> _list() {
     if (_tab == 0)
       return _contracts
-          .map((r) => _entry(
+          .map(
+            (r) => _entry(
               '${_value(r['contract_no'])} — ${_memberName(r['membership_id'])}',
-              '${_value(r['start_date'])} إلى ${_value(r['end_date'])} · ${_value(r['status'])} · ${_value(r['base_salary'])} ${_value(r['salary_currency'])}'))
+              '${_value(r['start_date'])} إلى ${_value(r['end_date'])} · ${_value(r['status'])} · ${_value(r['base_salary'])} ${_value(r['salary_currency'])}',
+            ),
+          )
           .toList();
     if (_tab == 1)
       return _schedules
-          .map((r) => _entry(
+          .map(
+            (r) => _entry(
               '${_value(r['name'])} — ${_memberName(r['membership_id'])}',
-              '${_value(r['start_time'])} إلى ${_value(r['end_time'])} · استراحة ${_value(r['break_minutes'])} دقيقة · ${_value(r['effective_from'])}'))
+              '${_value(r['start_time'])} إلى ${_value(r['end_time'])} · استراحة ${_value(r['break_minutes'])} دقيقة · ${_value(r['effective_from'])}',
+            ),
+          )
           .toList();
     if (_tab == 2)
       return _attendance
-          .map((r) => _entry(
+          .map(
+            (r) => _entry(
               '${_value(r['work_date'])} — ${_memberName(r['membership_id'])}',
-              '${_value(r['status'])} · دخول ${_value(r['check_in_at'])} · خروج ${_value(r['check_out_at'])} · ${_value(r['note'])}'))
+              '${_value(r['status'])} · دخول ${_value(r['check_in_at'])} · خروج ${_value(r['check_out_at'])} · ${_value(r['note'])}',
+            ),
+          )
           .toList();
     return _periods.map((r) {
       final entries = (r['entries'] as List? ?? []);
       return Card(
-          child: ExpansionTile(
-              title: Text(
-                  '${_value(r['period_start'])} إلى ${_value(r['period_end'])} · ${_value(r['status'])}',
-                  textAlign: TextAlign.right),
-              subtitle: Text('اضغط لاختيار الفترة · ${entries.length} قيود',
-                  textAlign: TextAlign.right),
-              onExpansionChanged: (_) =>
-                  setState(() => _periodId = r['id'].toString()),
-              children: entries
-                  .map<Widget>((e) => ListTile(
-                      title: Text(_memberName(e['membership_id']),
-                          textAlign: TextAlign.right),
-                      subtitle: Text(
-                          'صافي ${_value(e['net_amount'])} ${_value(e['currency'])}',
-                          textAlign: TextAlign.right)))
-                  .toList()));
+        child: ExpansionTile(
+          title: Text(
+            '${_value(r['period_start'])} إلى ${_value(r['period_end'])} · ${_value(r['status'])}',
+            textAlign: TextAlign.right,
+          ),
+          subtitle: Text(
+            'اضغط لاختيار الفترة · ${entries.length} قيود',
+            textAlign: TextAlign.right,
+          ),
+          onExpansionChanged: (_) =>
+              setState(() => _periodId = r['id'].toString()),
+          children: entries
+              .map<Widget>(
+                (e) => ListTile(
+                  title: Text(
+                    _memberName(e['membership_id']),
+                    textAlign: TextAlign.right,
+                  ),
+                  subtitle: Text(
+                    'صافي ${_value(e['net_amount'])} ${_value(e['currency'])}',
+                    textAlign: TextAlign.right,
+                  ),
+                ),
+              )
+              .toList(),
+        ),
+      );
     }).toList();
   }
 
   @override
   Widget build(BuildContext context) => AppShell(
-      title: 'الموارد البشرية',
-      subtitle: 'العقود والدوام والرواتب',
-      child: Directionality(
-          textDirection: TextDirection.rtl,
-          child: RefreshIndicator(
-              onRefresh: _load,
-              child: _loading
-                  ? const Center(child: CircularProgressIndicator())
-                  : ListView(padding: const EdgeInsets.all(12), children: [
-                      SingleChildScrollView(
-                          scrollDirection: Axis.horizontal,
-                          child: Row(
-                              children: List.generate(
-                                  _tabs.length,
-                                  (i) => Padding(
-                                      padding: const EdgeInsets.symmetric(
-                                          horizontal: 3),
-                                      child: ChoiceChip(
-                                          label: Text(_tabs[i]),
-                                          selected: _tab == i,
-                                          onSelected: (_) =>
-                                              setState(() => _tab = i)))))),
-                      if (_error != null)
-                        _card('تعذر إتمام العملية', [
-                          Text(_error!, textAlign: TextAlign.right),
-                          TextButton(
-                              onPressed: _load,
-                              child: const Text('إعادة المحاولة'))
-                        ]),
-                      if (_notice != null)
-                        _card('تمت العملية',
-                            [Text(_notice!, textAlign: TextAlign.right)]),
-                      _form(),
-                      if (_list().isEmpty)
-                        _card('لا توجد سجلات', [
-                          Text('لا توجد سجلات في قسم ${_tabs[_tab]}',
-                              textAlign: TextAlign.right)
-                        ])
-                      else
-                        ..._list()
-                    ]))));
+    title: 'الموارد البشرية',
+    subtitle: 'العقود والدوام والرواتب',
+    child: Directionality(
+      textDirection: TextDirection.rtl,
+      child: RefreshIndicator(
+        onRefresh: _load,
+        child: _loading
+            ? const Center(child: CircularProgressIndicator())
+            : ListView(
+                padding: const EdgeInsets.all(12),
+                children: [
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: List.generate(
+                        _tabs.length,
+                        (i) => Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 3),
+                          child: ChoiceChip(
+                            label: Text(_tabs[i]),
+                            selected: _tab == i,
+                            onSelected: (_) => setState(() => _tab = i),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  if (_error != null)
+                    _card('تعذر إتمام العملية', [
+                      Text(_error!, textAlign: TextAlign.right),
+                      TextButton(
+                        onPressed: _load,
+                        child: const Text('إعادة المحاولة'),
+                      ),
+                    ]),
+                  if (_notice != null)
+                    _card('تمت العملية', [
+                      Text(_notice!, textAlign: TextAlign.right),
+                    ]),
+                  _form(),
+                  if (_list().isEmpty)
+                    _card('لا توجد سجلات', [
+                      Text(
+                        'لا توجد سجلات في قسم ${_tabs[_tab]}',
+                        textAlign: TextAlign.right,
+                      ),
+                    ])
+                  else
+                    ..._list(),
+                ],
+              ),
+      ),
+    ),
+  );
 }

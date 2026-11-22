@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+
 import '../../core/theme.dart';
 import '../../shared/app_shell.dart';
 
@@ -25,7 +26,7 @@ class _ReportDesignerScreenState extends State<ReportDesignerScreen> {
     'admin_followup': 'المدير التنفيذي',
     'accountant': 'المحاسب',
     'warehouse_keeper': 'أمين المخازن',
-    'warehouse_worker': 'عمال التحميل'
+    'warehouse_worker': 'عمال التحميل',
   };
   static const _types = <String, String>{
     'short_text': 'نص قصير',
@@ -48,7 +49,7 @@ class _ReportDesignerScreenState extends State<ReportDesignerScreen> {
     'file': 'ملف أو مستند',
     'signature': 'توقيع أو إقرار',
     'calculated': 'حقل محسوب',
-    'decision_notes': 'ملاحظات وقرارات'
+    'decision_notes': 'ملاحظات وقرارات',
   };
   static const _columnTypes = <String, String>{
     'short_text': 'نص',
@@ -58,7 +59,7 @@ class _ReportDesignerScreenState extends State<ReportDesignerScreen> {
     'quantity': 'كمية',
     'money': 'مبلغ',
     'select': 'قائمة',
-    'boolean': 'نعم/لا'
+    'boolean': 'نعم/لا',
   };
 
   @override
@@ -80,8 +81,10 @@ class _ReportDesignerScreenState extends State<ReportDesignerScreen> {
     for (final row in memberships) {
       final orgId = row['organization_id']?.toString();
       if (orgId == null) continue;
-      final allowed = await _db.rpc('report_designer_allowed_for_org',
-          params: {'p_organization_id': orgId});
+      final allowed = await _db.rpc(
+        'report_designer_allowed_for_org',
+        params: {'p_organization_id': orgId},
+      );
       if (allowed == true) return orgId;
     }
     throw Exception('لا تملك صلاحية تصميم التقارير في مؤسسة نشطة.');
@@ -102,7 +105,8 @@ class _ReportDesignerScreenState extends State<ReportDesignerScreen> {
       final rows = await _db
           .from('report_form_templates')
           .select(
-              'id,code,title,description,role_code,is_active,created_by,updated_by,created_at,updated_at')
+            'id,code,title,description,role_code,is_active,created_by,updated_by,created_at,updated_at',
+          )
           .eq('organization_id', org)
           .eq('is_active', true)
           .order('title')
@@ -131,7 +135,7 @@ class _ReportDesignerScreenState extends State<ReportDesignerScreen> {
       'sort_order': i,
       'options': <String>[],
       'validation': <String, dynamic>{},
-      'config': <String, dynamic>{}
+      'config': <String, dynamic>{},
     };
   }
 
@@ -148,7 +152,8 @@ class _ReportDesignerScreenState extends State<ReportDesignerScreen> {
       final versions = await _db
           .from('report_form_versions')
           .select(
-              'id,template_id,version_no,status,report_required,approved_by,approved_at')
+            'id,template_id,version_no,status,report_required,approved_by,approved_at',
+          )
           .eq('template_id', template['id'])
           .order('version_no', ascending: false)
           .limit(1);
@@ -157,21 +162,25 @@ class _ReportDesignerScreenState extends State<ReportDesignerScreen> {
       final rows = await _db
           .from('report_form_version_fields')
           .select(
-              'field_key,label,description,field_type,is_required,repeatable,sort_order,options,validation,config')
+            'field_key,label,description,field_type,is_required,repeatable,sort_order,options,validation,config',
+          )
           .eq('version_id', version['id'])
           .order('sort_order')
           .limit(200);
       final fields = _maps(rows)
-          .map((f) => <String, dynamic>{
-                ...f,
-                'description': f['description'] ?? '',
-                'options': f['options'] is List
-                    ? List<String>.from(
-                        (f['options'] as List).map((x) => x.toString()))
-                    : <String>[],
-                'validation': _obj(f['validation']),
-                'config': _obj(f['config'])
-              })
+          .map(
+            (f) => <String, dynamic>{
+              ...f,
+              'description': f['description'] ?? '',
+              'options': f['options'] is List
+                  ? List<String>.from(
+                      (f['options'] as List).map((x) => x.toString()),
+                    )
+                  : <String>[],
+              'validation': _obj(f['validation']),
+              'config': _obj(f['config']),
+            },
+          )
           .toList();
       setState(() {
         _editing = true;
@@ -198,19 +207,19 @@ class _ReportDesignerScreenState extends State<ReportDesignerScreen> {
   }
 
   void _newTemplate() => setState(() {
-        _editing = true;
-        _templateId = null;
-        _versionId = null;
-        _status = 'draft';
-        _title = '';
-        _description = '';
-        _role = 'admin_followup';
-        _required = true;
-        _fields = [];
-        _selected = null;
-        _error = null;
-        _notice = null;
-      });
+    _editing = true;
+    _templateId = null;
+    _versionId = null;
+    _status = 'draft';
+    _title = '';
+    _description = '';
+    _role = 'admin_followup';
+    _required = true;
+    _fields = [];
+    _selected = null;
+    _error = null;
+    _notice = null;
+  });
   void _patchField(int i, Map<String, dynamic> patch) =>
       setState(() => _fields[i] = {..._fields[i], ...patch});
 
@@ -231,8 +240,9 @@ class _ReportDesignerScreenState extends State<ReportDesignerScreen> {
         return 'مفتاح الحقل «$key» غير صالح.';
       if (!keys.add(key)) return 'مفتاح الحقل «$key» مكرر.';
       if (!_types.containsKey(type)) return 'نوع الحقل غير مدعوم.';
-      final opts =
-          (f['options'] as List? ?? []).map((x) => x.toString()).toList();
+      final opts = (f['options'] as List? ?? [])
+          .map((x) => x.toString())
+          .toList();
       if ((type == 'select' || type == 'multiselect') &&
           (opts.isEmpty ||
               opts.any((x) => x.trim().isEmpty) ||
@@ -249,8 +259,9 @@ class _ReportDesignerScreenState extends State<ReportDesignerScreen> {
               !RegExp(r'^[a-z][a-z0-9_]{0,63}$').hasMatch(ck) ||
               !colKeys.add(ck))
             return 'تحقق من أسماء ومفاتيح الأعمدة في «$label». ';
-          final co =
-              (c['options'] as List? ?? []).map((x) => x.toString()).toList();
+          final co = (c['options'] as List? ?? [])
+              .map((x) => x.toString())
+              .toList();
           if (c['type'] == 'select' &&
               (co.isEmpty ||
                   co.any((x) => x.trim().isEmpty) ||
@@ -274,7 +285,7 @@ class _ReportDesignerScreenState extends State<ReportDesignerScreen> {
           'type': 'short_text',
           'required': false,
           'options': <String>[],
-          'validation': <String, dynamic>{}
+          'validation': <String, dynamic>{},
         };
       final c = _obj(value);
       final type = (c['type'] ?? c['field_type'] ?? 'short_text').toString();
@@ -287,7 +298,7 @@ class _ReportDesignerScreenState extends State<ReportDesignerScreen> {
         'options': c['options'] is List
             ? (c['options'] as List).map((x) => x.toString()).toList()
             : <String>[],
-        'validation': _obj(c['validation'])
+        'validation': _obj(c['validation']),
       };
     }).toList();
   }
@@ -319,19 +330,23 @@ class _ReportDesignerScreenState extends State<ReportDesignerScreen> {
           'sort_order': entry.key,
           'options': f['options'] ?? <String>[],
           'validation': f['validation'] ?? <String, dynamic>{},
-          'config': f['config'] ?? <String, dynamic>{}
+          'config': f['config'] ?? <String, dynamic>{},
         };
       }).toList();
-      final result = await _db.rpc('save_report_form_draft', params: {
-        'p_organization_id': org,
-        'p_template_id': _templateId,
-        'p_title': _title.trim(),
-        'p_description':
-            _description.trim().isEmpty ? null : _description.trim(),
-        'p_role_code': _role,
-        'p_fields': payload,
-        'p_report_required': _required
-      });
+      final result = await _db.rpc(
+        'save_report_form_draft',
+        params: {
+          'p_organization_id': org,
+          'p_template_id': _templateId,
+          'p_title': _title.trim(),
+          'p_description': _description.trim().isEmpty
+              ? null
+              : _description.trim(),
+          'p_role_code': _role,
+          'p_fields': payload,
+          'p_report_required': _required,
+        },
+      );
       if (result is! Map ||
           result['template_id'] == null ||
           result['version_id'] == null)
@@ -358,8 +373,10 @@ class _ReportDesignerScreenState extends State<ReportDesignerScreen> {
       _error = null;
     });
     try {
-      await _db
-          .rpc('approve_report_form_version', params: {'p_version_id': id});
+      await _db.rpc(
+        'approve_report_form_version',
+        params: {'p_version_id': id},
+      );
       setState(() {
         _status = 'published';
         _notice = 'تم اعتماد الإصدار؛ سيبقى محفوظًا كنسخة ثابتة.';
@@ -373,204 +390,272 @@ class _ReportDesignerScreenState extends State<ReportDesignerScreen> {
 
   @override
   Widget build(BuildContext context) => Directionality(
-      textDirection: TextDirection.rtl,
-      child: AppShell(
-          title: 'مصمم التقارير',
-          subtitle: 'مكتبة قوالب النماذج وإصداراتها',
-          child: _loading
-              ? const Center(child: CircularProgressIndicator())
-              : ListView(padding: const EdgeInsets.all(14), children: [
-                  if (_error != null) _messageBox(_error!, true),
-                  if (_notice != null) _messageBox(_notice!, false),
-                  if (_busy) const LinearProgressIndicator(),
-                  if (_editing) _editor() else _library(),
-                ])));
+    textDirection: TextDirection.rtl,
+    child: AppShell(
+      title: 'مصمم التقارير',
+      subtitle: 'مكتبة قوالب النماذج وإصداراتها',
+      child: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : ListView(
+              padding: const EdgeInsets.all(14),
+              children: [
+                if (_error != null) _messageBox(_error!, true),
+                if (_notice != null) _messageBox(_notice!, false),
+                if (_busy) const LinearProgressIndicator(),
+                if (_editing) _editor() else _library(),
+              ],
+            ),
+    ),
+  );
 
   Widget _messageBox(String text, bool error) => Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-          color: error ? const Color(0xfffff0ef) : const Color(0xffe8f5eb),
-          borderRadius: BorderRadius.circular(10)),
-      child: Text(text,
-          textAlign: TextAlign.right,
-          style:
-              TextStyle(color: error ? Colors.red.shade800 : AppColors.green)));
-  Widget _library() =>
-      Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        Row(children: [
+    margin: const EdgeInsets.only(bottom: 8),
+    padding: const EdgeInsets.all(10),
+    decoration: BoxDecoration(
+      color: error ? const Color(0xfffff0ef) : const Color(0xffe8f5eb),
+      borderRadius: BorderRadius.circular(10),
+    ),
+    child: Text(
+      text,
+      textAlign: TextAlign.right,
+      style: TextStyle(color: error ? Colors.red.shade800 : AppColors.green),
+    ),
+  );
+  Widget _library() => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      Row(
+        children: [
           Expanded(
-              child: Text('مكتبة التقارير',
-                  style: TextStyle(
-                      color: AppColors.navy,
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold))),
-          FilledButton.icon(
-              onPressed: _newTemplate,
-              icon: const Icon(Icons.add),
-              label: const Text('نموذج جديد'))
-        ]),
-        const SizedBox(height: 8),
-        if (_templates.isEmpty)
-          const Card(
-              child: Padding(
-                  padding: EdgeInsets.all(16),
-                  child: Text('لا توجد قوالب نشطة. أنشئ نموذجًا جديدًا للبدء.',
-                      textAlign: TextAlign.right))),
-        for (final t in _templates)
-          Card(
-              child: Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Text(t['title']?.toString() ?? '',
-                            style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                                color: AppColors.navy),
-                            textAlign: TextAlign.right),
-                        Text(
-                            '${_roles[t['role_code']] ?? t['role_code'] ?? ''}${t['updated_at'] == null ? '' : ' · ${t['updated_at']}'}',
-                            textAlign: TextAlign.right,
-                            style: const TextStyle(color: AppColors.muted)),
-                        if ((t['description']?.toString() ?? '').isNotEmpty)
-                          Text(t['description'].toString(),
-                              textAlign: TextAlign.right),
-                        Wrap(
-                            alignment: WrapAlignment.start,
-                            spacing: 8,
-                            children: [
-                              OutlinedButton(
-                                  onPressed: _busy ? null : () => _open(t),
-                                  child: const Text('تعديل / إصدار جديد')),
-                              OutlinedButton(
-                                  onPressed:
-                                      _busy ? null : () => _open(t, copy: true),
-                                  child: const Text('نسخ'))
-                            ])
-                      ]))),
-        TextButton.icon(
-            onPressed: _loadTemplates,
-            icon: const Icon(Icons.refresh),
-            label: const Text('تحديث المكتبة')),
-      ]);
-
-  Widget _editor() =>
-      Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        Row(children: [
-          IconButton(
-              onPressed: () => setState(() => _editing = false),
-              icon: const Icon(Icons.arrow_back)),
-          Expanded(
-              child: Text(_templateId == null ? 'نموذج جديد' : 'إصدار جديد',
-                  textAlign: TextAlign.right,
-                  style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 19,
-                      color: AppColors.navy))),
-          TextButton(
-              onPressed: () => setState(() => _editing = false),
-              child: const Text('المكتبة'))
-        ]),
-        Card(
-            child: Padding(
-                padding: const EdgeInsets.all(12),
-                child: Column(children: [
-                  TextField(
-                      textAlign: TextAlign.right,
-                      maxLength: 160,
-                      decoration:
-                          const InputDecoration(labelText: 'اسم النموذج'),
-                      controller: _controllerForTitle()),
-                  const SizedBox(height: 8),
-                  TextField(
-                      textAlign: TextAlign.right,
-                      maxLines: 3,
-                      decoration: const InputDecoration(
-                          labelText: 'الوصف وتعليمات الموظف'),
-                      controller: _controllerForDescription()),
-                  const SizedBox(height: 8),
-                  DropdownButtonFormField<String>(
-                      value:
-                          _roles.containsKey(_role) ? _role : 'admin_followup',
-                      decoration:
-                          const InputDecoration(labelText: 'الدور الوظيفي'),
-                      items: _roles.entries
-                          .map((e) => DropdownMenuItem(
-                              value: e.key, child: Text(e.value)))
-                          .toList(),
-                      onChanged: _templateId == null
-                          ? (v) => setState(() => _role = v ?? _role)
-                          : null),
-                  if (_templateId != null)
-                    const Text('دور القالب ثابت؛ أنشئ نسخة مستقلة لتغييره.',
-                        textAlign: TextAlign.right,
-                        style: TextStyle(color: AppColors.muted)),
-                  CheckboxListTile(
-                      contentPadding: EdgeInsets.zero,
-                      title: const Text('التقرير مطلوب عند التنفيذ',
-                          textAlign: TextAlign.right),
-                      value: _required,
-                      onChanged: (v) => setState(() => _required = v ?? false))
-                ]))),
-        Card(
-            child: Padding(
-                padding: const EdgeInsets.all(12),
-                child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Row(children: [
-                        Expanded(
-                            child: Text('الحقول (${_fields.length}/100)',
-                                style: const TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    color: AppColors.navy))),
-                        TextButton.icon(
-                            onPressed: _fields.length >= 100
-                                ? null
-                                : () {
-                                    final f = _newField(
-                                        _fields.length,
-                                        _fields
-                                            .map((x) =>
-                                                x['field_key'].toString())
-                                            .toSet());
-                                    setState(() {
-                                      _fields.add(f);
-                                      _selected = _fields.length - 1;
-                                    });
-                                  },
-                            icon: const Icon(Icons.add),
-                            label: const Text('إضافة'))
-                      ]),
-                      if (_fields.isEmpty)
-                        const Text('أضف حقلًا واحدًا على الأقل.',
-                            textAlign: TextAlign.right),
-                      for (var i = 0; i < _fields.length; i++) _fieldTile(i),
-                    ]))),
-        FilledButton.icon(
-            onPressed: _busy ? null : _save,
-            icon: const Icon(Icons.save),
-            label: Text(_busy ? 'جارٍ الحفظ…' : 'حفظ كمسودة')),
-        if (_versionId != null && _status == 'draft')
-          OutlinedButton.icon(
-              onPressed: _busy ? null : _approve,
-              icon: const Icon(Icons.verified_outlined),
-              label: const Text('اعتماد الإصدار')),
-        if (_status == 'published')
-          const Text('الإصدار معتمد وثابت ✓',
-              textAlign: TextAlign.center,
+            child: Text(
+              'مكتبة التقارير',
               style: TextStyle(
-                  color: AppColors.green, fontWeight: FontWeight.bold)),
-      ]);
+                color: AppColors.navy,
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+          FilledButton.icon(
+            onPressed: _newTemplate,
+            icon: const Icon(Icons.add),
+            label: const Text('نموذج جديد'),
+          ),
+        ],
+      ),
+      const SizedBox(height: 8),
+      if (_templates.isEmpty)
+        const Card(
+          child: Padding(
+            padding: EdgeInsets.all(16),
+            child: Text(
+              'لا توجد قوالب نشطة. أنشئ نموذجًا جديدًا للبدء.',
+              textAlign: TextAlign.right,
+            ),
+          ),
+        ),
+      for (final t in _templates)
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  t['title']?.toString() ?? '',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.navy,
+                  ),
+                  textAlign: TextAlign.right,
+                ),
+                Text(
+                  '${_roles[t['role_code']] ?? t['role_code'] ?? ''}${t['updated_at'] == null ? '' : ' · ${t['updated_at']}'}',
+                  textAlign: TextAlign.right,
+                  style: const TextStyle(color: AppColors.muted),
+                ),
+                if ((t['description']?.toString() ?? '').isNotEmpty)
+                  Text(t['description'].toString(), textAlign: TextAlign.right),
+                Wrap(
+                  alignment: WrapAlignment.start,
+                  spacing: 8,
+                  children: [
+                    OutlinedButton(
+                      onPressed: _busy ? null : () => _open(t),
+                      child: const Text('تعديل / إصدار جديد'),
+                    ),
+                    OutlinedButton(
+                      onPressed: _busy ? null : () => _open(t, copy: true),
+                      child: const Text('نسخ'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      TextButton.icon(
+        onPressed: _loadTemplates,
+        icon: const Icon(Icons.refresh),
+        label: const Text('تحديث المكتبة'),
+      ),
+    ],
+  );
+
+  Widget _editor() => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      Row(
+        children: [
+          IconButton(
+            onPressed: () => setState(() => _editing = false),
+            icon: const Icon(Icons.arrow_back),
+          ),
+          Expanded(
+            child: Text(
+              _templateId == null ? 'نموذج جديد' : 'إصدار جديد',
+              textAlign: TextAlign.right,
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 19,
+                color: AppColors.navy,
+              ),
+            ),
+          ),
+          TextButton(
+            onPressed: () => setState(() => _editing = false),
+            child: const Text('المكتبة'),
+          ),
+        ],
+      ),
+      Card(
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            children: [
+              TextField(
+                textAlign: TextAlign.right,
+                maxLength: 160,
+                decoration: const InputDecoration(labelText: 'اسم النموذج'),
+                controller: _controllerForTitle(),
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                textAlign: TextAlign.right,
+                maxLines: 3,
+                decoration: const InputDecoration(
+                  labelText: 'الوصف وتعليمات الموظف',
+                ),
+                controller: _controllerForDescription(),
+              ),
+              const SizedBox(height: 8),
+              DropdownButtonFormField<String>(
+                value: _roles.containsKey(_role) ? _role : 'admin_followup',
+                decoration: const InputDecoration(labelText: 'الدور الوظيفي'),
+                items: _roles.entries
+                    .map(
+                      (e) =>
+                          DropdownMenuItem(value: e.key, child: Text(e.value)),
+                    )
+                    .toList(),
+                onChanged: _templateId == null
+                    ? (v) => setState(() => _role = v ?? _role)
+                    : null,
+              ),
+              if (_templateId != null)
+                const Text(
+                  'دور القالب ثابت؛ أنشئ نسخة مستقلة لتغييره.',
+                  textAlign: TextAlign.right,
+                  style: TextStyle(color: AppColors.muted),
+                ),
+              CheckboxListTile(
+                contentPadding: EdgeInsets.zero,
+                title: const Text(
+                  'التقرير مطلوب عند التنفيذ',
+                  textAlign: TextAlign.right,
+                ),
+                value: _required,
+                onChanged: (v) => setState(() => _required = v ?? false),
+              ),
+            ],
+          ),
+        ),
+      ),
+      Card(
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'الحقول (${_fields.length}/100)',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.navy,
+                      ),
+                    ),
+                  ),
+                  TextButton.icon(
+                    onPressed: _fields.length >= 100
+                        ? null
+                        : () {
+                            final f = _newField(
+                              _fields.length,
+                              _fields
+                                  .map((x) => x['field_key'].toString())
+                                  .toSet(),
+                            );
+                            setState(() {
+                              _fields.add(f);
+                              _selected = _fields.length - 1;
+                            });
+                          },
+                    icon: const Icon(Icons.add),
+                    label: const Text('إضافة'),
+                  ),
+                ],
+              ),
+              if (_fields.isEmpty)
+                const Text(
+                  'أضف حقلًا واحدًا على الأقل.',
+                  textAlign: TextAlign.right,
+                ),
+              for (var i = 0; i < _fields.length; i++) _fieldTile(i),
+            ],
+          ),
+        ),
+      ),
+      FilledButton.icon(
+        onPressed: _busy ? null : _save,
+        icon: const Icon(Icons.save),
+        label: Text(_busy ? 'جارٍ الحفظ…' : 'حفظ كمسودة'),
+      ),
+      if (_versionId != null && _status == 'draft')
+        OutlinedButton.icon(
+          onPressed: _busy ? null : _approve,
+          icon: const Icon(Icons.verified_outlined),
+          label: const Text('اعتماد الإصدار'),
+        ),
+      if (_status == 'published')
+        const Text(
+          'الإصدار معتمد وثابت ✓',
+          textAlign: TextAlign.center,
+          style: TextStyle(color: AppColors.green, fontWeight: FontWeight.bold),
+        ),
+    ],
+  );
 
   final _titleController = TextEditingController(),
       _descriptionController = TextEditingController();
   TextEditingController _controllerForTitle() {
     if (_titleController.text != _title) {
       _titleController.value = TextEditingValue(
-          text: _title,
-          selection: TextSelection.collapsed(offset: _title.length));
+        text: _title,
+        selection: TextSelection.collapsed(offset: _title.length),
+      );
     }
     _titleController.removeListener(_syncTitle);
     _titleController.addListener(_syncTitle);
@@ -584,8 +669,9 @@ class _ReportDesignerScreenState extends State<ReportDesignerScreen> {
   TextEditingController _controllerForDescription() {
     if (_descriptionController.text != _description) {
       _descriptionController.value = TextEditingValue(
-          text: _description,
-          selection: TextSelection.collapsed(offset: _description.length));
+        text: _description,
+        selection: TextSelection.collapsed(offset: _description.length),
+      );
     }
     _descriptionController.removeListener(_syncDescription);
     _descriptionController.addListener(_syncDescription);
@@ -600,73 +686,86 @@ class _ReportDesignerScreenState extends State<ReportDesignerScreen> {
   Widget _fieldTile(int i) {
     final f = _fields[i], expanded = _selected == i;
     return Card(
-        color: expanded ? const Color(0xfff4f7f8) : Colors.white,
-        child: Padding(
-            padding: const EdgeInsets.all(10),
-            child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Row(children: [
-                    IconButton(
-                        tooltip: 'أعلى',
-                        onPressed: i == 0
-                            ? null
-                            : () => setState(() => _swap(i, i - 1)),
-                        icon: const Icon(Icons.keyboard_arrow_up)),
-                    IconButton(
-                        tooltip: 'أسفل',
-                        onPressed: i == _fields.length - 1
-                            ? null
-                            : () => setState(() => _swap(i, i + 1)),
-                        icon: const Icon(Icons.keyboard_arrow_down)),
-                    IconButton(
-                        tooltip: 'إزالة من المسودة',
-                        onPressed: () => setState(() {
-                              _fields.removeAt(i);
-                              _selected = _fields.isEmpty
-                                  ? null
-                                  : ((_selected ?? 0) >= _fields.length
-                                      ? _fields.length - 1
-                                      : _selected);
-                            }),
-                        icon: const Icon(Icons.remove_circle_outline,
-                            color: Colors.red)),
-                    Expanded(
-                        child: InkWell(
-                            onTap: () =>
-                                setState(() => _selected = expanded ? null : i),
-                            child: Text(
-                                '${f['label'].toString().isEmpty ? 'حقل ${i + 1}' : f['label']} · ${_types[f['field_type']] ?? f['field_type']}',
-                                textAlign: TextAlign.right,
-                                style: const TextStyle(
-                                    fontWeight: FontWeight.bold))))
-                  ]),
-                  if (expanded) ...[
-                    _textEditor(i, 'اسم الحقل', 'label'),
-                    _textEditor(i, 'تعليمات الحقل (اختياري)', 'description'),
-                    DropdownButtonFormField<String>(
-                        value: _types.containsKey(f['field_type'])
-                            ? f['field_type']
-                            : 'short_text',
-                        decoration:
-                            const InputDecoration(labelText: 'نوع الحقل'),
-                        items: _types.entries
-                            .map((e) => DropdownMenuItem(
-                                value: e.key, child: Text(e.value)))
-                            .toList(),
-                        onChanged: (v) => _patchField(i, {'field_type': v})),
-                    CheckboxListTile(
-                        contentPadding: EdgeInsets.zero,
-                        title:
-                            const Text('حقل مطلوب', textAlign: TextAlign.right),
-                        value: f['is_required'] == true,
-                        onChanged: (v) =>
-                            _patchField(i, {'is_required': v == true})),
-                    if (['select', 'multiselect'].contains(f['field_type']))
-                      _optionsEditor(i),
-                    if (f['field_type'] == 'table') _columnsEditor(i),
-                  ],
-                ])));
+      color: expanded ? const Color(0xfff4f7f8) : Colors.white,
+      child: Padding(
+        padding: const EdgeInsets.all(10),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                IconButton(
+                  tooltip: 'أعلى',
+                  onPressed: i == 0
+                      ? null
+                      : () => setState(() => _swap(i, i - 1)),
+                  icon: const Icon(Icons.keyboard_arrow_up),
+                ),
+                IconButton(
+                  tooltip: 'أسفل',
+                  onPressed: i == _fields.length - 1
+                      ? null
+                      : () => setState(() => _swap(i, i + 1)),
+                  icon: const Icon(Icons.keyboard_arrow_down),
+                ),
+                IconButton(
+                  tooltip: 'إزالة من المسودة',
+                  onPressed: () => setState(() {
+                    _fields.removeAt(i);
+                    _selected = _fields.isEmpty
+                        ? null
+                        : ((_selected ?? 0) >= _fields.length
+                              ? _fields.length - 1
+                              : _selected);
+                  }),
+                  icon: const Icon(
+                    Icons.remove_circle_outline,
+                    color: Colors.red,
+                  ),
+                ),
+                Expanded(
+                  child: InkWell(
+                    onTap: () =>
+                        setState(() => _selected = expanded ? null : i),
+                    child: Text(
+                      '${f['label'].toString().isEmpty ? 'حقل ${i + 1}' : f['label']} · ${_types[f['field_type']] ?? f['field_type']}',
+                      textAlign: TextAlign.right,
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            if (expanded) ...[
+              _textEditor(i, 'اسم الحقل', 'label'),
+              _textEditor(i, 'تعليمات الحقل (اختياري)', 'description'),
+              DropdownButtonFormField<String>(
+                value: _types.containsKey(f['field_type'])
+                    ? f['field_type']
+                    : 'short_text',
+                decoration: const InputDecoration(labelText: 'نوع الحقل'),
+                items: _types.entries
+                    .map(
+                      (e) =>
+                          DropdownMenuItem(value: e.key, child: Text(e.value)),
+                    )
+                    .toList(),
+                onChanged: (v) => _patchField(i, {'field_type': v}),
+              ),
+              CheckboxListTile(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('حقل مطلوب', textAlign: TextAlign.right),
+                value: f['is_required'] == true,
+                onChanged: (v) => _patchField(i, {'is_required': v == true}),
+              ),
+              if (['select', 'multiselect'].contains(f['field_type']))
+                _optionsEditor(i),
+              if (f['field_type'] == 'table') _columnsEditor(i),
+            ],
+          ],
+        ),
+      ),
+    );
   }
 
   void _swap(int a, int b) {
@@ -676,23 +775,28 @@ class _ReportDesignerScreenState extends State<ReportDesignerScreen> {
   }
 
   Widget _textEditor(int i, String label, String key) => Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: TextFormField(
-          initialValue: _fields[i][key]?.toString() ?? '',
-          textAlign: TextAlign.right,
-          maxLength: key == 'label' ? 200 : null,
-          decoration: InputDecoration(labelText: label),
-          onChanged: (v) => _patchField(i, {key: v})));
+    padding: const EdgeInsets.only(bottom: 8),
+    child: TextFormField(
+      initialValue: _fields[i][key]?.toString() ?? '',
+      textAlign: TextAlign.right,
+      maxLength: key == 'label' ? 200 : null,
+      decoration: InputDecoration(labelText: label),
+      onChanged: (v) => _patchField(i, {key: v}),
+    ),
+  );
   Widget _optionsEditor(int i) {
     final options = (_fields[i]['options'] as List? ?? [])
         .map((e) => e.toString())
         .toList();
-    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      const Text('خيارات القائمة', textAlign: TextAlign.right),
-      for (var j = 0; j < options.length; j++)
-        Row(children: [
-          Expanded(
-              child: TextFormField(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const Text('خيارات القائمة', textAlign: TextAlign.right),
+        for (var j = 0; j < options.length; j++)
+          Row(
+            children: [
+              Expanded(
+                child: TextFormField(
                   key: ValueKey('opt_${i}_${j}_${options[j]}'),
                   initialValue: options[j],
                   textAlign: TextAlign.right,
@@ -701,27 +805,34 @@ class _ReportDesignerScreenState extends State<ReportDesignerScreen> {
                     final n = [...options];
                     n[j] = v;
                     _patchField(i, {'options': n});
-                  })),
-          IconButton(
-              onPressed: () => _patchField(i, {
-                    'options': options
-                        .asMap()
-                        .entries
-                        .where((e) => e.key != j)
-                        .map((e) => e.value)
-                        .toList()
-                  }),
-              icon: const Icon(Icons.close))
-        ]),
-      Align(
+                  },
+                ),
+              ),
+              IconButton(
+                onPressed: () => _patchField(i, {
+                  'options': options
+                      .asMap()
+                      .entries
+                      .where((e) => e.key != j)
+                      .map((e) => e.value)
+                      .toList(),
+                }),
+                icon: const Icon(Icons.close),
+              ),
+            ],
+          ),
+        Align(
           alignment: Alignment.centerRight,
           child: TextButton.icon(
-              onPressed: () => _patchField(i, {
-                    'options': [...options, '']
-                  }),
-              icon: const Icon(Icons.add),
-              label: const Text('إضافة خيار')))
-    ]);
+            onPressed: () => _patchField(i, {
+              'options': [...options, ''],
+            }),
+            icon: const Icon(Icons.add),
+            label: const Text('إضافة خيار'),
+          ),
+        ),
+      ],
+    );
   }
 
   Widget _columnsEditor(int i) {
@@ -732,104 +843,125 @@ class _ReportDesignerScreenState extends State<ReportDesignerScreen> {
       final next = cols.map((c) => Map<String, dynamic>.from(c)).toList();
       next[j] = {...next[j], ...patch};
       _patchField(i, {
-        'config': {...config, 'columns': next}
+        'config': {...config, 'columns': next},
       });
     }
 
-    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      const Divider(),
-      const Text('أعمدة الجدول',
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const Divider(),
+        const Text(
+          'أعمدة الجدول',
           textAlign: TextAlign.right,
-          style: TextStyle(fontWeight: FontWeight.bold)),
-      for (var j = 0; j < cols.length; j++)
-        Card(
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
+        for (var j = 0; j < cols.length; j++)
+          Card(
             child: Padding(
-                padding: const EdgeInsets.all(8),
-                child: Column(children: [
+              padding: const EdgeInsets.all(8),
+              child: Column(
+                children: [
                   TextFormField(
-                      key: ValueKey('col_label_${i}_$j'),
-                      initialValue: cols[j]['label'].toString(),
-                      textAlign: TextAlign.right,
-                      decoration:
-                          const InputDecoration(labelText: 'اسم العمود'),
-                      onChanged: (v) => update(j, {'label': v})),
+                    key: ValueKey('col_label_${i}_$j'),
+                    initialValue: cols[j]['label'].toString(),
+                    textAlign: TextAlign.right,
+                    decoration: const InputDecoration(labelText: 'اسم العمود'),
+                    onChanged: (v) => update(j, {'label': v}),
+                  ),
                   TextFormField(
-                      key: ValueKey('col_key_${i}_$j'),
-                      initialValue: cols[j]['key'].toString(),
-                      textAlign: TextAlign.right,
-                      decoration:
-                          const InputDecoration(labelText: 'المفتاح (إنجليزي)'),
-                      onChanged: (v) => update(j, {'key': v})),
+                    key: ValueKey('col_key_${i}_$j'),
+                    initialValue: cols[j]['key'].toString(),
+                    textAlign: TextAlign.right,
+                    decoration: const InputDecoration(
+                      labelText: 'المفتاح (إنجليزي)',
+                    ),
+                    onChanged: (v) => update(j, {'key': v}),
+                  ),
                   DropdownButtonFormField<String>(
-                      value: _columnTypes.containsKey(cols[j]['type'])
-                          ? cols[j]['type']
-                          : 'short_text',
-                      decoration:
-                          const InputDecoration(labelText: 'نوع العمود'),
-                      items: _columnTypes.entries
-                          .map((e) => DropdownMenuItem(
-                              value: e.key, child: Text(e.value)))
-                          .toList(),
-                      onChanged: (v) => update(j, {'type': v})),
+                    value: _columnTypes.containsKey(cols[j]['type'])
+                        ? cols[j]['type']
+                        : 'short_text',
+                    decoration: const InputDecoration(labelText: 'نوع العمود'),
+                    items: _columnTypes.entries
+                        .map(
+                          (e) => DropdownMenuItem(
+                            value: e.key,
+                            child: Text(e.value),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (v) => update(j, {'type': v}),
+                  ),
                   CheckboxListTile(
-                      contentPadding: EdgeInsets.zero,
-                      title:
-                          const Text('عمود مطلوب', textAlign: TextAlign.right),
-                      value: cols[j]['required'] == true,
-                      onChanged: (v) => update(j, {'required': v == true})),
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('عمود مطلوب', textAlign: TextAlign.right),
+                    value: cols[j]['required'] == true,
+                    onChanged: (v) => update(j, {'required': v == true}),
+                  ),
                   if (cols[j]['type'] == 'select')
                     TextFormField(
-                        key: ValueKey('col_options_${i}_$j'),
-                        initialValue: (cols[j]['options'] as List).join('، '),
-                        textAlign: TextAlign.right,
-                        decoration: const InputDecoration(
-                            labelText: 'الخيارات مفصولة بـ ،'),
-                        onChanged: (v) => update(j, {
-                              'options': v
-                                  .split('،')
-                                  .map((x) => x.trim())
-                                  .where((x) => x.isNotEmpty)
-                                  .toList()
-                            })),
+                      key: ValueKey('col_options_${i}_$j'),
+                      initialValue: (cols[j]['options'] as List).join('، '),
+                      textAlign: TextAlign.right,
+                      decoration: const InputDecoration(
+                        labelText: 'الخيارات مفصولة بـ ،',
+                      ),
+                      onChanged: (v) => update(j, {
+                        'options': v
+                            .split('،')
+                            .map((x) => x.trim())
+                            .where((x) => x.isNotEmpty)
+                            .toList(),
+                      }),
+                    ),
                   Align(
-                      alignment: Alignment.centerRight,
-                      child: TextButton.icon(
-                          onPressed: () => _patchField(i, {
-                                'config': {
-                                  ...config,
-                                  'columns': cols
-                                      .asMap()
-                                      .entries
-                                      .where((e) => e.key != j)
-                                      .map((e) => e.value)
-                                      .toList()
-                                }
-                              }),
-                          icon: const Icon(Icons.delete_outline),
-                          label: const Text('إزالة العمود')))
-                ]))),
-      Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton.icon(
+                      onPressed: () => _patchField(i, {
+                        'config': {
+                          ...config,
+                          'columns': cols
+                              .asMap()
+                              .entries
+                              .where((e) => e.key != j)
+                              .map((e) => e.value)
+                              .toList(),
+                        },
+                      }),
+                      icon: const Icon(Icons.delete_outline),
+                      label: const Text('إزالة العمود'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        Align(
           alignment: Alignment.centerRight,
           child: TextButton.icon(
-              onPressed: () => _patchField(i, {
-                    'config': {
-                      ...config,
-                      'columns': [
-                        ...cols,
-                        {
-                          'key': 'column_${cols.length + 1}',
-                          'label': 'عمود ${cols.length + 1}',
-                          'type': 'short_text',
-                          'required': false,
-                          'options': <String>[],
-                          'validation': <String, dynamic>{}
-                        }
-                      ]
-                    }
-                  }),
-              icon: const Icon(Icons.add),
-              label: const Text('إضافة عمود')))
-    ]);
+            onPressed: () => _patchField(i, {
+              'config': {
+                ...config,
+                'columns': [
+                  ...cols,
+                  {
+                    'key': 'column_${cols.length + 1}',
+                    'label': 'عمود ${cols.length + 1}',
+                    'type': 'short_text',
+                    'required': false,
+                    'options': <String>[],
+                    'validation': <String, dynamic>{},
+                  },
+                ],
+              },
+            }),
+            icon: const Icon(Icons.add),
+            label: const Text('إضافة عمود'),
+          ),
+        ),
+      ],
+    );
   }
 
   @override
