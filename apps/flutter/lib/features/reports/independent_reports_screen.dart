@@ -793,24 +793,26 @@ class _IndependentReportsScreenState extends State<IndependentReportsScreen> {
           field.type == 'attachment' ||
           field.type == 'file' ||
           field.type == 'multi_image';
-      final result = await FilePicker.pickFiles(
-        type: field.type == 'image' || field.type == 'multi_image'
-            ? FileType.image
-            : FileType.any,
-        allowMultiple: allowMultiple,
-        withData: true,
-      );
-      if (result == null) return;
+      final pickerType = field.type == 'image' || field.type == 'multi_image'
+          ? FileType.image
+          : FileType.any;
+      final files = allowMultiple
+          ? await FilePicker.pickFiles(type: pickerType)
+          : [
+              if (await FilePicker.pickFile(type: pickerType) case final file?)
+                file,
+            ];
+      if (files.isEmpty) return;
       final max = field.type == 'image' ? 1 : 5;
-      if (existing.length + result.files.length > max)
+      if (existing.length + files.length > max)
         throw Exception('الحد الأقصى $max مرفقات لهذا الحقل.');
       final next = [...existing];
-      for (final file in result.files) {
-        if (file.bytes == null ||
-            file.size <= 0 ||
-            file.size > 2 * 1024 * 1024) {
+      for (final file in files) {
+        final size = await file.length() ?? 0;
+        if (size <= 0 || size > 2 * 1024 * 1024) {
           throw Exception('حجم المرفق يجب ألا يتجاوز 2 ميجابايت.');
         }
+        final bytes = await file.readAsBytes();
         final mime = lookupMimeType(file.name) ?? 'application/octet-stream';
         if ((field.type == 'image' || field.type == 'multi_image') &&
             !mime.startsWith('image/')) {
@@ -819,8 +821,8 @@ class _IndependentReportsScreenState extends State<IndependentReportsScreen> {
         next.add({
           'name': file.name,
           'mimeType': mime,
-          'size': file.size,
-          'contentBase64': base64Encode(file.bytes!),
+          'size': size,
+          'contentBase64': base64Encode(bytes),
         });
       }
       setState(() => controller.text = jsonEncode(next));

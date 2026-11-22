@@ -764,26 +764,29 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
     if (_saving || ctl == null) return;
     try {
       final multi = type == 'multi_image';
-      final result = await FilePicker.pickFiles(
-        type: multi ? FileType.image : FileType.any,
-        allowMultiple: multi || type == 'file' || type == 'attachment',
-        withData: true,
-      );
-      if (result == null) return;
+      final allowMultiple = multi || type == 'file' || type == 'attachment';
+      final pickerType = multi ? FileType.image : FileType.any;
+      final files = allowMultiple
+          ? await FilePicker.pickFiles(type: pickerType)
+          : [
+              if (await FilePicker.pickFile(type: pickerType) case final file?)
+                file,
+            ];
+      if (files.isEmpty) return;
       final db = Supabase.instance.client, user = db.auth.currentUser;
       if (user == null) throw Exception('سجّل الدخول مجددًا.');
       final current = _attachmentList(ctl);
-      if (current.length + result.files.length > 20 ||
-          (type == 'image' && current.length + result.files.length > 1))
+      if (current.length + files.length > 20 ||
+          (type == 'image' && current.length + files.length > 1))
         throw Exception('الحد 20 مرفقًا ويسمح بصورة واحدة لهذا الحقل.');
-      for (final file in result.files) {
-        if (file.size <= 0 || file.size > 20 * 1024 * 1024)
+      for (final file in files) {
+        final size = await file.length() ?? 0;
+        if (size <= 0 || size > 20 * 1024 * 1024)
           throw Exception('الحد الأعلى لكل ملف 20 ميجابايت.');
         final mime = lookupMimeType(file.name) ?? 'application/octet-stream';
         if ((multi || type == 'image') && !mime.startsWith('image/'))
           throw Exception('اختر ملف صورة.');
-        final bytes = file.bytes;
-        if (bytes == null) throw Exception('تعذرت قراءة الملف.');
+        final bytes = await file.readAsBytes();
         final safe = file.name.replaceAll(RegExp(r'[^a-zA-Z0-9._-]'), '_');
         final path =
             '${widget.taskId}/${DateTime.now().microsecondsSinceEpoch}-${math.Random.secure().nextInt(1 << 32)}-$safe';
@@ -804,7 +807,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                 'file_name': file.name,
                 'storage_path': path,
                 'mime_type': mime,
-                'size_bytes': file.size,
+                'size_bytes': size,
               })
               .select('id')
               .single();
@@ -813,7 +816,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
             'path': path,
             'name': file.name,
             'mimeType': mime,
-            'size': file.size,
+            'size': size,
           });
         } catch (_) {
           await db.storage.from('task-attachments').remove([path]);
@@ -1123,17 +1126,12 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
 
   Future<void> _uploadEvidence(String stepId) async {
     try {
-      final result = await FilePicker.pickFiles(
-        type: FileType.any,
-        allowMultiple: false,
-        withData: true,
-      );
-      if (result == null || result.files.isEmpty) return;
-      final file = result.files.single;
-      if (file.size <= 0 || file.size > 20 * 1024 * 1024)
+      final file = await FilePicker.pickFile(type: FileType.any);
+      if (file == null) return;
+      final size = await file.length() ?? 0;
+      if (size <= 0 || size > 20 * 1024 * 1024)
         throw Exception('الحد الأعلى لحجم المرفق 20 ميجابايت.');
-      final bytes = file.bytes;
-      if (bytes == null) throw Exception('تعذرت قراءة الملف المحدد.');
+      final bytes = await file.readAsBytes();
       final db = Supabase.instance.client;
       final user = db.auth.currentUser;
       if (user == null) throw Exception('سجّل الدخول مجددًا.');
@@ -1165,7 +1163,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
               'file_name': file.name,
               'storage_path': path,
               'mime_type': mime,
-              'size_bytes': file.size,
+              'size_bytes': size,
             })
             .select('id')
             .single();
