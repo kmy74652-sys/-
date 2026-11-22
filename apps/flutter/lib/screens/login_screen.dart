@@ -1,3 +1,6 @@
+import 'dart:async';
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -50,7 +53,7 @@ class _LoginScreenState extends State<LoginScreen> {
           'employeeNo': _employeeNumberController.text.trim(),
           'code': code,
         },
-      );
+      ).timeout(const Duration(seconds: 25));
 
       final payload = result.data;
       if (result.status != 200 || payload is! Map ||
@@ -62,7 +65,21 @@ class _LoginScreenState extends State<LoginScreen> {
       await client.auth.setSession(payload['refresh_token'] as String);
       if (!mounted) return;
       _showMessage('تم تسجيل الدخول بنجاح.');
-    } on FunctionException catch (error) {
+    } on TimeoutException catch (error, stackTrace) {
+      debugPrint('Login request timed out: ${error.runtimeType}');
+      debugPrintStack(stackTrace: stackTrace);
+      if (mounted) _showMessage('استغرق الاتصال وقتاً طويلاً. تحقق من الإنترنت ثم حاول مجدداً.');
+    } on SocketException catch (error, stackTrace) {
+      debugPrint('Login network failure: ${error.runtimeType}');
+      debugPrintStack(stackTrace: stackTrace);
+      if (mounted) _showMessage('تعذر الوصول إلى الخادم. تحقق من اتصال الإنترنت وحاول مجدداً.');
+    } on HttpException catch (error, stackTrace) {
+      debugPrint('Login HTTP failure: ${error.runtimeType}');
+      debugPrintStack(stackTrace: stackTrace);
+      if (mounted) _showMessage('حدث خلل أثناء الاتصال بخدمة الدخول. حاول مجدداً بعد قليل.');
+    } on FunctionException catch (error, stackTrace) {
+      debugPrint('Login Edge Function failure: status=${error.status}, reason=${error.reasonPhrase}');
+      debugPrintStack(stackTrace: stackTrace);
       if (mounted) {
         final status = error.status;
         final details = error.details;
@@ -75,10 +92,14 @@ class _LoginScreenState extends State<LoginScreen> {
                     : 'تعذر تسجيل الدخول. تحقق من الاتصال وحاول مجدداً.';
         _showMessage(message);
       }
-    } on AuthException catch (error) {
-      if (mounted) _showMessage(error.message);
-    } catch (_) {
-      if (mounted) _showMessage('تعذر تسجيل الدخول. تحقق من الاتصال وحاول مجدداً.');
+    } on AuthException catch (error, stackTrace) {
+      debugPrint('Login Supabase Auth failure: status=${error.statusCode}, code=${error.code}');
+      debugPrintStack(stackTrace: stackTrace);
+      if (mounted) _showMessage(_friendlyAuthError(error.code ?? error.statusCode ?? 'auth_error'));
+    } catch (error, stackTrace) {
+      debugPrint('Unexpected login failure: ${error.runtimeType}');
+      debugPrintStack(stackTrace: stackTrace);
+      if (mounted) _showMessage('حدث خطأ غير متوقع أثناء تسجيل الدخول. حاول مجدداً، وإذا تكرر أرسل للإدارة رمز التشخيص من سجل التطبيق.');
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
