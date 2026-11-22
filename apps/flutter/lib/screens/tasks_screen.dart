@@ -45,14 +45,20 @@ class _TasksScreenState extends State<TasksScreen> {
     try {
       final user = _db.auth.currentUser;
       if (user == null) throw Exception('not_authenticated');
-      final baseQuery = _db.from('tasks')
-          .select('id,title,description,assigned_to,branch_id,due_at,starts_at,priority,status,report_flow,task_instructions,created_at')
-          .eq('organization_id', _organizationId)
-          .isFilter('deleted_at', null)
-          .order('due_at');
       final rows = _canReadAll
-          ? await baseQuery.limit(300)
-          : await baseQuery.eq('assigned_to', user.id).limit(300);
+          ? await _db.from('tasks')
+              .select('id,title,description,assigned_to,branch_id,due_at,starts_at,priority,status,report_flow,task_instructions,created_at')
+              .eq('organization_id', _organizationId)
+              .isFilter('deleted_at', null)
+              .order('due_at')
+              .limit(300)
+          : await _db.from('tasks')
+              .select('id,title,description,assigned_to,branch_id,due_at,starts_at,priority,status,report_flow,task_instructions,created_at')
+              .eq('organization_id', _organizationId)
+              .eq('assigned_to', user.id)
+              .isFilter('deleted_at', null)
+              .order('due_at')
+              .limit(300);
       if (!mounted) return;
       setState(() => _tasks = List<Map<String, dynamic>>.from(rows));
     } catch (error) {
