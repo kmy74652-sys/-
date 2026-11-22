@@ -869,8 +869,7 @@ class _TaskDesignerScreenState extends State<TaskDesignerScreen> {
                   contentPadding: EdgeInsets.zero,
                   leading: const Icon(Icons.event),
                   title: const Text('موعد التسليم'),
-                  subtitle: Text(_date(_dueAt.toIso8601String()) + ' · ' +
-                    '${_dueAt.hour.toString().padLeft(2, '0')}:${_dueAt.minute.toString().padLeft(2, '0')}'),
+                  subtitle: Text('${_date(_dueAt.toIso8601String())} · ${_dueAt.hour.toString().padLeft(2, '0')}:${_dueAt.minute.toString().padLeft(2, '0')}'),
                   trailing: const Icon(Icons.edit_calendar_outlined),
                   onTap: _chooseDueAt,
                 ),
