@@ -65,6 +65,14 @@ jobs:
       - name: Flutter doctor
         run: flutter doctor -v
 
+      - name: Cache Dart pub packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.pub-cache
+          key: pub-${{ runner.os }}-flutter-${{ env.FLUTTER_VERSION }}-${{ hashFiles('apps/flutter/pubspec.lock') }}
+          restore-keys: |
+            pub-${{ runner.os }}-flutter-${{ env.FLUTTER_VERSION }}-
+
       - name: Install dependencies
         run: flutter pub get
 
@@ -104,6 +112,14 @@ jobs:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: stable
           cache: true
+
+      - name: Cache Dart pub packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.pub-cache
+          key: pub-${{ runner.os }}-flutter-${{ env.FLUTTER_VERSION }}-${{ hashFiles('apps/flutter/pubspec.lock') }}
+          restore-keys: |
+            pub-${{ runner.os }}-flutter-${{ env.FLUTTER_VERSION }}-
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
@@ -155,6 +171,14 @@ jobs:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: stable
           cache: true
+
+      - name: Cache Dart pub packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.pub-cache
+          key: pub-${{ runner.os }}-flutter-${{ env.FLUTTER_VERSION }}-${{ hashFiles('apps/flutter/pubspec.lock') }}
+          restore-keys: |
+            pub-${{ runner.os }}-flutter-${{ env.FLUTTER_VERSION }}-
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
