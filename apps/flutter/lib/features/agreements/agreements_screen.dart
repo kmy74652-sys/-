@@ -43,20 +43,6 @@ class _AgreementsScreenState extends State<AgreementsScreen> {
     _load();
   }
 
-  @override
-  void dispose() {
-    for (final controller in _notes.values) {
-      controller.dispose();
-    }
-    _no.dispose();
-    _title.dispose();
-    _from.dispose();
-    _to.dispose();
-    _terms.dispose();
-    _duties.dispose();
-    super.dispose();
-  }
-
   Future<void> _load() async {
     if (mounted)
       setState(() {
