@@ -599,8 +599,6 @@ class _TaskDesignerScreenState extends State<TaskDesignerScreen> {
   final List<Map<String, dynamic>> _fields = [];
   String _role = 'accountant';
   bool _busy = false;
-  String? _error;
-
   SupabaseClient get _db => Supabase.instance.client;
   String get _org => widget.profile['institutionId'] as String? ?? '';
 
@@ -713,7 +711,6 @@ class _TaskDesignerScreenState extends State<TaskDesignerScreen> {
       if (!mounted) return;
       _title.clear();
       _description.clear();
-      _instructions.clear();
       setState(() => _fields.clear());
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
         content: Text('تم حفظ نموذج التقرير كمسودة. أُرسل إلى شاشة اعتماد صاحب المؤسسة، ولن يُستخدم في مهام الموظفين قبل اعتماده.'),
@@ -723,24 +720,6 @@ class _TaskDesignerScreenState extends State<TaskDesignerScreen> {
     } finally {
       if (mounted) setState(() => _busy = false);
     }
-  }
-
-  Future<void> _chooseDueAt() async {
-    final date = await showDatePicker(
-      context: context,
-      initialDate: _dueAt.isAfter(DateTime.now()) ? _dueAt : DateTime.now().add(const Duration(days: 1)),
-      firstDate: DateTime.now(),
-      lastDate: DateTime.now().add(const Duration(days: 365)),
-      helpText: 'حدد موعد تسليم المهمة',
-    );
-    if (date == null || !mounted) return;
-    final time = await showTimePicker(
-      context: context,
-      initialTime: TimeOfDay.fromDateTime(_dueAt),
-      helpText: 'حدد وقت التسليم',
-    );
-    if (time == null || !mounted) return;
-    setState(() => _dueAt = DateTime(date.year, date.month, date.day, time.hour, time.minute));
   }
 
   @override
@@ -781,7 +760,6 @@ class _TaskDesignerScreenState extends State<TaskDesignerScreen> {
               ),
             ),
           )),
-          if (_error != null) _InfoCard(text: _error!),
           const SizedBox(height: 18),
           FilledButton(
             onPressed: _busy ? null : _saveAndAssign,
