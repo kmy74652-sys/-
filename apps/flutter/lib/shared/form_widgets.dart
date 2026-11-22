@@ -42,10 +42,43 @@ class ChoiceChipsField<T> extends StatelessWidget {
   @override Widget build(BuildContext context) => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(label, style: const TextStyle(color: AppColors.muted, fontSize: 12.5, fontWeight: FontWeight.w700)), const SizedBox(height: 6), Wrap(spacing: 8, children: [for (final option in options) ChoiceChip(label: Text(option.$2), selected: option.$1 == value, onSelected: (_) => onChanged(option.$1))])]);
 }
 
-Future<bool?> showFormSheet(BuildContext context, {required String title, required String confirmLabel, required List<Widget> Function(BuildContext, StateSetter) builder, required bool Function(StateSetter) onConfirm}) => showModalBottomSheet<bool>(
-  context: context, isScrollControlled: true, useSafeArea: true, backgroundColor: const Color(0xFFF5F7FD), shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(22))),
-  builder: (sheet) => Directionality(textDirection: TextDirection.rtl, child: StatefulBuilder(builder: (ctx, set) => Padding(padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(ctx).bottom), child: FractionallySizedBox(heightFactor: .94, child: Column(children: [
-    Padding(padding: const EdgeInsets.fromLTRB(18, 14, 8, 8), child: Row(children: [Expanded(child: Text(title, style: const TextStyle(color: AppColors.navy, fontSize: 20, fontWeight: FontWeight.w900))), IconButton(onPressed: () => Navigator.pop(sheet, false), icon: const Icon(Icons.close))])),
-    const Divider(height: 1), Expanded(child: ListView(padding: const EdgeInsets.fromLTRB(14, 14, 14, 8), keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag, children: builder(ctx, set))),
-    Container(padding: const EdgeInsets.fromLTRB(14, 10, 14, 12), decoration: const BoxDecoration(color: Colors.white, border: Border(top: BorderSide(color: AppColors.border))), child: Row(children: [Expanded(child: OutlinedButton(style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)), onPressed: () => Navigator.pop(sheet, false), child: const Text('إلغاء'))), const SizedBox(width: 10), Expanded(flex: 2, child: FilledButton(style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(48)), onPressed: () { if (onConfirm(set)) Navigator.pop(sheet, true); }, child: Text(confirmLabel))) ]))
-  ])))));
+Future<bool?> showFormSheet(
+  BuildContext context, {
+  required String title,
+  required String confirmLabel,
+  required List<Widget> Function(BuildContext, StateSetter) builder,
+  required bool Function(StateSetter) onConfirm,
+}) => showModalBottomSheet<bool>(
+  context: context,
+  isScrollControlled: true,
+  useSafeArea: true,
+  backgroundColor: const Color(0xFFF5F7FD),
+  shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(22))),
+  builder: (sheet) => Directionality(
+    textDirection: TextDirection.rtl,
+    child: StatefulBuilder(
+      builder: (ctx, set) => Padding(
+        padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(ctx).bottom),
+        child: FractionallySizedBox(
+          heightFactor: .94,
+          child: Column(
+            children: [
+              Padding(padding: const EdgeInsets.fromLTRB(18, 14, 8, 8), child: Row(children: [Expanded(child: Text(title, style: const TextStyle(color: AppColors.navy, fontSize: 20, fontWeight: FontWeight.w900))), IconButton(onPressed: () => Navigator.pop(sheet, false), icon: const Icon(Icons.close))])),
+              const Divider(height: 1),
+              Expanded(child: ListView(padding: const EdgeInsets.fromLTRB(14, 14, 14, 8), keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag, children: builder(ctx, set))),
+              Container(
+                padding: const EdgeInsets.fromLTRB(14, 10, 14, 12),
+                decoration: const BoxDecoration(color: Colors.white, border: Border(top: BorderSide(color: AppColors.border))),
+                child: Row(children: [
+                  Expanded(child: OutlinedButton(style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)), onPressed: () => Navigator.pop(sheet, false), child: const Text('إلغاء'))),
+                  const SizedBox(width: 10),
+                  Expanded(flex: 2, child: FilledButton(style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(48)), onPressed: () { if (onConfirm(set)) Navigator.pop(sheet, true); }, child: Text(confirmLabel))),
+                ]),
+              ),
+            ],
+          ),
+        ),
+      ),
+    ),
+  ),
+);
