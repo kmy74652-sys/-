@@ -16,7 +16,7 @@ Future<void> main() async {
       supabaseUrl.startsWith('https://') && supabasePublishableKey.isNotEmpty;
 
   if (hasSupabaseConfig) {
-    await Supabase.initialize(url: supabaseUrl, anonKey: supabaseAnonKey);
+    await Supabase.initialize(url: supabaseUrl, publishableKey: supabasePublishableKey);
   }
 
   runApp(AlshaeriApp(isSupabaseConfigured: hasSupabaseConfig));
