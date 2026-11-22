@@ -135,9 +135,12 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
         run: |
-          flutter build apk --release \
-            --dart-define=SUPABASE_URL="$SUPABASE_URL" \
-            --dart-define=SUPABASE_ANON_KEY="$SUPABASE_ANON_KEY"
+          args=()
+          if [ -n "$SUPABASE_URL" ] && [ -n "$SUPABASE_ANON_KEY" ]; then
+            args+=("--dart-define=SUPABASE_URL=$SUPABASE_URL")
+            args+=("--dart-define=SUPABASE_ANON_KEY=$SUPABASE_ANON_KEY")
+          fi
+          flutter build apk --release "${args[@]}"
 
       - name: Upload release APK
         uses: actions/upload-artifact@v4
@@ -194,9 +197,12 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
         run: |
-          flutter build appbundle --release \
-            --dart-define=SUPABASE_URL="$SUPABASE_URL" \
-            --dart-define=SUPABASE_ANON_KEY="$SUPABASE_ANON_KEY"
+          args=()
+          if [ -n "$SUPABASE_URL" ] && [ -n "$SUPABASE_ANON_KEY" ]; then
+            args+=("--dart-define=SUPABASE_URL=$SUPABASE_URL")
+            args+=("--dart-define=SUPABASE_ANON_KEY=$SUPABASE_ANON_KEY")
+          fi
+          flutter build appbundle --release "${args[@]}"
 
       - name: Upload release App Bundle
         uses: actions/upload-artifact@v4
