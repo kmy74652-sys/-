@@ -1,0 +1,90 @@
+name: Flutter Integration Tests
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  FLUTTER_VERSION: '3.50.1'
+  JAVA_VERSION: '17'
+
+jobs:
+  auth-flow:
+    name: Auth flow on Android Emulator
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: apps/flutter
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+          cache: gradle
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools platforms;android-35 build-tools;35.0.0
+          accept-android-sdk-licenses: true
+
+      - name: Cache Dart pub packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.pub-cache
+          key: pub-${{ runner.os }}-flutter-${{ env.FLUTTER_VERSION }}-${{ hashFiles('apps/flutter/pubspec.lock') }}
+          restore-keys: |
+            pub-${{ runner.os }}-flutter-${{ env.FLUTTER_VERSION }}-
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Validate integration secrets
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          TEST_EMPLOYEE_NO: ${{ secrets.TEST_EMPLOYEE_NO }}
+          TEST_EMPLOYEE_CODE: ${{ secrets.TEST_EMPLOYEE_CODE }}
+        run: |
+          missing=0
+          for name in SUPABASE_URL SUPABASE_ANON_KEY TEST_EMPLOYEE_NO TEST_EMPLOYEE_CODE; do
+            if [ -z "${!name}" ]; then
+              echo "Missing required repository secret: $name"
+              missing=1
+            fi
+          done
+          if [ "$missing" -ne 0 ]; then
+            exit 1
+          fi
+
+      - name: Run Auth integration test
+        uses: reactivecircus/android-emulator-runner@v2
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          TEST_EMPLOYEE_NO: ${{ secrets.TEST_EMPLOYEE_NO }}
+          TEST_EMPLOYEE_CODE: ${{ secrets.TEST_EMPLOYEE_CODE }}
+        with:
+          api-level: 35
+          arch: x86_64
+          profile: pixel_2
+          script: >-
+            cd apps/flutter && flutter test integration_test/auth_flow_test.dart
+            -d emulator-5554
+            --dart-define=SUPABASE_URL="$SUPABASE_URL"
+            --dart-define=SUPABASE_ANON_KEY="$SUPABASE_ANON_KEY"
+            --dart-define=TEST_EMPLOYEE_NO="$TEST_EMPLOYEE_NO"
+            --dart-define=TEST_EMPLOYEE_CODE="$TEST_EMPLOYEE_CODE"

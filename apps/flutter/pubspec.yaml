@@ -1,7 +1,7 @@
 name: alshaeri_mobile
 description: تطبيق الشاعري — إصدار Flutter للهاتف.
 publish_to: "none"
-version: 0.1.0+1
+version: 0.1.0+5
 environment:
   sdk: '>=3.3.0 <4.0.0'
 dependencies:
@@ -23,6 +23,8 @@ dependencies:
   url_launcher: ^6.3.1
 dev_dependencies:
   flutter_test:
+    sdk: flutter
+  integration_test:
     sdk: flutter
   flutter_lints: ^5.0.0
 flutter:
