@@ -1037,7 +1037,8 @@ class _TaskPublicationReviewScreenState extends State<TaskPublicationReviewScree
                         final fields = (snapshot['report_fields'] as List? ?? [])
                             .map((e) => Map<String, dynamic>.from(e as Map)).toList();
                         final steps = (snapshot['steps'] as List? ?? []);
-                        final branch = _branches.where((b) => b['id'].toString() == request['branch_id']?.toString()).firstOrNull;
+                        final branchMatches = _branches.where((b) => b['id'].toString() == request['branch_id']?.toString()).toList();
+                        final branch = branchMatches.isEmpty ? null : branchMatches.first;
                         final branchName = request['branch_id'] == null ? 'جميع الفروع' : branch?['name']?.toString() ?? 'فرع غير معروف';
                         return Card(
                           elevation: 0,
