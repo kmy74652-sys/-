@@ -613,6 +613,9 @@ class _TaskDesignerScreenState extends State<TaskDesignerScreen> {
     final labelController = TextEditingController();
     final keyController = TextEditingController();
     final optionsController = TextEditingController();
+    final columnsController = TextEditingController(text: 'item|البيان|short_text\nquantity|الكمية|quantity');
+    final minRowsController = TextEditingController(text: '0');
+    final maxRowsController = TextEditingController(text: '100');
     String type = 'text';
     bool required = false;
     final result = await showDialog<Map<String, dynamic>>(
@@ -641,7 +644,36 @@ class _TaskDesignerScreenState extends State<TaskDesignerScreen> {
                 onChanged: (value) => refresh(() => type = value ?? 'text'),
               ),
               if (type == 'select' || type == 'multiselect')
-                TextField(controller: optionsController, decoration: const InputDecoration(labelText: 'الخيارات مفصولة بفاصلة')),
+                TextField(
+                  controller: optionsController,
+                  decoration: const InputDecoration(labelText: 'الخيارات مفصولة بفاصلة'),
+                ),
+              if (type == 'table') ...[
+                const SizedBox(height: 10),
+                TextField(
+                  controller: columnsController,
+                  minLines: 3,
+                  maxLines: 6,
+                  decoration: const InputDecoration(
+                    labelText: 'أعمدة الجدول (سطر لكل عمود)',
+                    hintText: 'item|البيان|short_text\nquantity|الكمية|quantity\nprice|السعر|money',
+                    helperText: 'الصيغة: مفتاح بالإنجليزية | اسم العمود | النوع',
+                  ),
+                ),
+                Row(children: [
+                  Expanded(child: TextField(
+                    controller: minRowsController,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(labelText: 'أقل عدد صفوف'),
+                  )),
+                  const SizedBox(width: 10),
+                  Expanded(child: TextField(
+                    controller: maxRowsController,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(labelText: 'أقصى عدد صفوف'),
+                  )),
+                ]),
+              ],
               CheckboxListTile(
                 value: required,
                 contentPadding: EdgeInsets.zero,
@@ -657,15 +689,49 @@ class _TaskDesignerScreenState extends State<TaskDesignerScreen> {
                 final label = labelController.text.trim();
                 final key = keyController.text.trim().toLowerCase();
                 if (label.isEmpty || !RegExp(r'^[a-z][a-z0-9_]{0,63}$').hasMatch(key)) return;
+                final options = (type == 'select' || type == 'multiselect')
+                    ? optionsController.text.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList()
+                    : <String>[];
+                if ((type == 'select' || type == 'multiselect') && options.isEmpty) return;
+
+                var config = <String, dynamic>{};
+                if (type == 'table') {
+                  final columns = <Map<String, dynamic>>[];
+                  for (final line in columnsController.text.split('\n')) {
+                    if (line.trim().isEmpty) continue;
+                    final parts = line.split('|').map((part) => part.trim()).toList();
+                    if (parts.length != 3 ||
+                        !RegExp(r'^[a-z][a-z0-9_]{0,63}$').hasMatch(parts[0]) ||
+                        parts[1].isEmpty ||
+                        !['short_text','long_text','integer','quantity','money','select','boolean'].contains(parts[2])) {
+                      return;
+                    }
+                    columns.add({
+                      'key': parts[0],
+                      'label': parts[1],
+                      'type': parts[2],
+                      'required': false,
+                      if (parts[2] == 'select') 'options': ['نعم', 'لا'],
+                    });
+                  }
+                  final minRows = int.tryParse(minRowsController.text.trim());
+                  final maxRows = int.tryParse(maxRowsController.text.trim());
+                  if (columns.isEmpty || minRows == null || maxRows == null ||
+                      minRows < 0 || maxRows < 1 || minRows > maxRows || maxRows > 500) return;
+                  if (columns.map((column) => column['key']).toSet().length != columns.length) return;
+                  config = {'columns': columns, 'min_rows': minRows, 'max_rows': maxRows};
+                }
+
                 Navigator.pop(dialogContext, {
-                  'field_key': key, 'label': label, 'field_type': type,
-                  'is_required': required, 'options': (type == 'select' || type == 'multiselect')
-                      ? optionsController.text.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList()
-                      : <String>[],
-                  'description': '', 'repeatable': false, 'validation': <String, dynamic>{},
-                  'config': type == 'table'
-                      ? {'columns': [{'key': 'item', 'label': 'البيان', 'type': 'short_text', 'required': true}, {'key': 'quantity', 'label': 'الكمية', 'type': 'quantity'}], 'min_rows': 0, 'max_rows': 100}
-                      : <String, dynamic>{},
+                  'field_key': key,
+                  'label': label,
+                  'field_type': type,
+                  'is_required': required,
+                  'options': options,
+                  'description': '',
+                  'repeatable': false,
+                  'validation': <String, dynamic>{},
+                  'config': config,
                 });
               },
               child: const Text('إضافة'),
@@ -677,7 +743,16 @@ class _TaskDesignerScreenState extends State<TaskDesignerScreen> {
     labelController.dispose();
     keyController.dispose();
     optionsController.dispose();
-    if (result != null && mounted) setState(() => _fields.add(result));
+    columnsController.dispose();
+    minRowsController.dispose();
+    maxRowsController.dispose();
+    if (result != null && mounted) {
+      if (_fields.any((field) => field['field_key'] == result['field_key'])) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('مفتاح الحقل مستخدم مسبقاً.')));
+        return;
+      }
+      setState(() => _fields.add(result));
+    }
   }
 
   Future<void> _saveAndAssign() async {
