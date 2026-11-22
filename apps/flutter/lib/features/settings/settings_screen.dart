@@ -6,6 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/theme.dart';
 import '../../shared/app_shell.dart';
+import '../../shared/organization_branding.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -496,6 +497,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           'p_logo_url': logoUrl,
         },
       );
+      OrganizationBrandingStore.instance.invalidate();
       if (mounted) {
         setState(() {
           _logoUrl = logoUrl;

@@ -5,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../core/notifications_repository.dart';
 import '../core/notifications_runtime.dart';
 import '../core/theme.dart';
+import 'organization_branding.dart';
 
 class AppShell extends StatefulWidget {
   const AppShell({
@@ -331,7 +332,7 @@ class _ShellTab {
   final IconData icon;
 }
 
-class _BrandHeader extends StatelessWidget {
+class _BrandHeader extends StatefulWidget {
   const _BrandHeader({
     required this.unreadCount,
     required this.onAccount,
@@ -342,137 +343,100 @@ class _BrandHeader extends StatelessWidget {
   final VoidCallback onAccount;
   final VoidCallback onNotifications;
 
+  @override
+  State<_BrandHeader> createState() => _BrandHeaderState();
+}
+
+class _BrandHeaderState extends State<_BrandHeader> {
+  late Future<OrganizationBranding> _branding;
   static const _navy = Color(0xFF0B3458);
   static const _gold = Color(0xFFDBA62A);
 
   @override
+  void initState() {
+    super.initState();
+    _branding = OrganizationBrandingStore.instance.forSession();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final compact = MediaQuery.sizeOf(context).width < 370;
-    return Container(
-      width: double.infinity,
-      padding: EdgeInsets.symmetric(horizontal: compact ? 10 : 14, vertical: 8),
-      decoration: const BoxDecoration(color: Colors.white),
-      child: Row(
-        children: [
-          Image.asset(
-            'assets/images/alshaeri-official-logo.png',
-            width: compact ? 50 : 58,
-            height: compact ? 58 : 66,
-            fit: BoxFit.contain,
-            semanticLabel: 'الشعار الرسمي لمؤسسة الشاعري',
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'مانجمنت',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: _navy,
-                    fontSize: compact ? 18 : 21,
-                    height: 1.15,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                const Text(
-                  'مؤسسة الشاعري للتجارة العامة',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: _navy,
-                    fontSize: 12,
-                    height: 1.2,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 3),
-                Row(
+    return FutureBuilder<OrganizationBranding>(
+      future: _branding,
+      builder: (context, snapshot) {
+        final branding = snapshot.data ?? OrganizationBranding.fallback;
+        return Container(
+          width: double.infinity,
+          padding: EdgeInsets.symmetric(horizontal: compact ? 10 : 14, vertical: 8),
+          decoration: const BoxDecoration(color: Colors.white),
+          child: Row(
+            children: [
+              _BrandLogo(url: branding.logoUrl, width: compact ? 50 : 58, height: compact ? 58 : 66),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Container(width: 14, height: 1.2, color: _gold),
-                    const SizedBox(width: 5),
-                    const Flexible(
-                      child: Text(
-                        'معاً .. نحو إدارة أفضل',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: Color(0xFF9A6814),
-                          fontSize: 10,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 5),
-                    Container(width: 14, height: 1.2, color: _gold),
+                    Text('مانجمنت', maxLines: 1, overflow: TextOverflow.ellipsis,
+                      style: TextStyle(color: _navy, fontSize: compact ? 18 : 21, height: 1.15, fontWeight: FontWeight.w900)),
+                    const SizedBox(height: 2),
+                    Text(branding.name, maxLines: 1, overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(color: _navy, fontSize: 12, height: 1.2, fontWeight: FontWeight.w700)),
+                    const SizedBox(height: 3),
+                    Row(children: [
+                      Container(width: 14, height: 1.2, color: _gold),
+                      const SizedBox(width: 5),
+                      Flexible(child: Text(branding.tagline, maxLines: 1, overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(color: Color(0xFF9A6814), fontSize: 10, fontWeight: FontWeight.w800))),
+                      const SizedBox(width: 5),
+                      Container(width: 14, height: 1.2, color: _gold),
+                    ]),
                   ],
                 ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 8),
-          IconButton(
-            tooltip: 'تبديل الحساب: تسجيل الخروج',
-            onPressed: onAccount,
-            style: IconButton.styleFrom(
-              fixedSize: const Size(42, 42),
-              backgroundColor: const Color(0xFFF4F8FB),
-              foregroundColor: _navy,
-              side: const BorderSide(color: Color(0xFFD5E0EA)),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
               ),
-            ),
-            icon: const Icon(Icons.account_circle_outlined, size: 23),
-          ),
-          const SizedBox(width: 6),
-          IconButton(
-            tooltip: 'التنبيهات',
-            onPressed: onNotifications,
-            style: IconButton.styleFrom(
-              fixedSize: const Size(42, 42),
-              backgroundColor: _navy,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
+              const SizedBox(width: 8),
+              IconButton(
+                tooltip: 'تبديل الحساب: تسجيل الخروج',
+                onPressed: widget.onAccount,
+                style: IconButton.styleFrom(fixedSize: const Size(42, 42), backgroundColor: const Color(0xFFF4F8FB), foregroundColor: _navy, side: const BorderSide(color: Color(0xFFD5E0EA)), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+                icon: const Icon(Icons.account_circle_outlined, size: 23),
               ),
-            ),
-            icon: Stack(
-              clipBehavior: Clip.none,
-              children: [
-                const Icon(Icons.notifications_none, size: 24),
-                if (unreadCount > 0)
-                  Positioned(
-                    top: -8,
-                    left: -9,
-                    child: Container(
-                      constraints: const BoxConstraints(minWidth: 17),
-                      padding: const EdgeInsets.symmetric(horizontal: 4),
-                      decoration: BoxDecoration(
-                        color: _gold,
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Text(
-                        unreadCount > 99 ? '99+' : '$unreadCount',
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(
-                          color: _navy,
-                          fontSize: 10,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                    ),
-                  ),
-              ],
-            ),
+              const SizedBox(width: 6),
+              IconButton(
+                tooltip: 'التنبيهات',
+                onPressed: widget.onNotifications,
+                style: IconButton.styleFrom(fixedSize: const Size(42, 42), backgroundColor: _navy, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+                icon: Stack(clipBehavior: Clip.none, children: [
+                  const Icon(Icons.notifications_none, size: 24),
+                  if (widget.unreadCount > 0) Positioned(top: -8, left: -9, child: Container(
+                    constraints: const BoxConstraints(minWidth: 17),
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    decoration: BoxDecoration(color: _gold, borderRadius: BorderRadius.circular(10)),
+                    child: Text(widget.unreadCount > 99 ? '99+' : '${widget.unreadCount}', textAlign: TextAlign.center,
+                      style: const TextStyle(color: _navy, fontSize: 10, fontWeight: FontWeight.w900)),
+                  )),
+                ]),
+              ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
+  }
+}
+
+class _BrandLogo extends StatelessWidget {
+  const _BrandLogo({required this.url, required this.width, required this.height});
+  final String? url;
+  final double width;
+  final double height;
+
+  @override
+  Widget build(BuildContext context) {
+    final fallback = Image.asset('assets/images/alshaeri-official-logo.png', width: width, height: height, fit: BoxFit.contain, semanticLabel: 'شعار المؤسسة');
+    if (url == null) return fallback;
+    return Image.network(url!, width: width, height: height, fit: BoxFit.contain, semanticLabel: 'شعار المؤسسة', errorBuilder: (_, __, ___) => fallback);
   }
 }
 

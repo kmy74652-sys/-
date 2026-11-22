@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/deep_link_controller.dart';
 import '../../core/theme.dart';
+import '../../shared/organization_branding.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -16,6 +19,19 @@ class _LoginScreenState extends State<LoginScreen> {
   final _code = TextEditingController();
   bool _busy = false;
   String? _error;
+  OrganizationBranding _branding = OrganizationBranding.fallback;
+  Timer? _brandingTimer;
+
+  void _queueBranding(String value) {
+    _brandingTimer?.cancel();
+    _brandingTimer = Timer(const Duration(milliseconds: 350), () async {
+      final branding = await OrganizationBrandingStore.instance
+          .forEmployeeNumber(value);
+      if (mounted && value == _employee.text.trim()) {
+        setState(() => _branding = branding);
+      }
+    });
+  }
   Future<void> _login() async {
     final employeeNo = _employee.text.trim();
     final code = _code.text;
@@ -87,6 +103,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   void dispose() {
+    _brandingTimer?.cancel();
     _employee.dispose();
     _code.dispose();
     super.dispose();
@@ -106,11 +123,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Image.asset(
-                      'assets/images/alshaeri-official-logo.png',
-                      height: 110,
-                      fit: BoxFit.contain,
-                    ),
+                    _LoginBrandLogo(branding: _branding),
                     const SizedBox(height: 8),
                     const Text(
                       'بوابة العمل والتواصل الإداري',
@@ -148,6 +161,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       enabled: !_busy,
                       textAlign: TextAlign.right,
                       textInputAction: TextInputAction.next,
+                      onChanged: _queueBranding,
                       decoration: const InputDecoration(
                         labelText: 'اسم الموظف',
                       ),
@@ -195,4 +209,26 @@ class _LoginScreenState extends State<LoginScreen> {
 class _LoginFailure implements Exception {
   const _LoginFailure(this.message);
   final String message;
+}
+
+class _LoginBrandLogo extends StatelessWidget {
+  const _LoginBrandLogo({required this.branding});
+  final OrganizationBranding branding;
+
+  @override
+  Widget build(BuildContext context) {
+    final fallback = Image.asset(
+      'assets/images/alshaeri-official-logo.png',
+      height: 110,
+      fit: BoxFit.contain,
+    );
+    final url = branding.logoUrl;
+    if (url == null) return fallback;
+    return Image.network(
+      url,
+      height: 110,
+      fit: BoxFit.contain,
+      errorBuilder: (_, __, ___) => fallback,
+    );
+  }
 }
