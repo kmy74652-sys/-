@@ -464,7 +464,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
             }.contains(mimeType)) {
           throw Exception('نوع صورة الشعار غير مدعوم.');
         }
-        final path = '$_organizationId/logo';
+        // مسار جديد لكل نسخة يمنع عرض الصورة القديمة من CDN
+        // ولا يعتمد على صلاحية update في Storage عند الاستبدال.
+        final path =
+            '$_organizationId/logo_${DateTime.now().microsecondsSinceEpoch}';
         uploadingLogo = true;
         await _db.storage
             .from('organization-branding')
@@ -473,8 +476,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
               _pendingLogoBytes!,
               fileOptions: FileOptions(
                 contentType: mimeType,
-                cacheControl: '3600',
-                upsert: true,
+                cacheControl: 'no-cache',
+                upsert: false,
               ),
             );
         uploadingLogo = false;
@@ -597,6 +600,35 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             textAlign: TextAlign.right,
                             style: TextStyle(fontWeight: FontWeight.bold),
                           ),
+                          const SizedBox(height: 12),
+                          Container(
+                            height: 150,
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: AppColors.canvas,
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(color: AppColors.border),
+                            ),
+                            child: _pendingLogoBytes != null
+                                ? Image.memory(
+                                    _pendingLogoBytes!,
+                                    fit: BoxFit.contain,
+                                  )
+                                : (_logoUrl != null && _logoUrl!.isNotEmpty
+                                      ? Image.network(
+                                          _logoUrl!,
+                                          fit: BoxFit.contain,
+                                          errorBuilder: (_, __, ___) => const Icon(
+                                            Icons.business_outlined,
+                                            size: 64,
+                                          ),
+                                        )
+                                      : const Icon(
+                                          Icons.business_outlined,
+                                          size: 64,
+                                        )),
+                          ),
+                          const SizedBox(height: 12),
                           TextField(
                             controller: _brandName,
                             decoration: const InputDecoration(
@@ -609,22 +641,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               labelText: 'العبارة التعريفية',
                             ),
                           ),
-                          if (_pendingLogoBytes != null)
-                            Image.memory(
-                              _pendingLogoBytes!,
-                              height: 120,
-                              fit: BoxFit.contain,
-                            )
-                          else if (_logoUrl != null && _logoUrl!.isNotEmpty)
-                            Image.network(
-                              _logoUrl!,
-                              height: 120,
-                              fit: BoxFit.contain,
-                              errorBuilder: (_, __, ___) => const Text(
-                                'تعذر عرض الشعار الحالي.',
-                                textAlign: TextAlign.right,
-                              ),
-                            ),
                           OutlinedButton.icon(
                             onPressed: _brandBusy ? null : _pickLogo,
                             icon: const Icon(Icons.image_outlined),

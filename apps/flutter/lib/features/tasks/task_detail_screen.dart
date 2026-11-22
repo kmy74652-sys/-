@@ -51,21 +51,28 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
     if (mounted) setState(() => _busy = true);
     try {
       final db = Supabase.instance.client;
-      final results = await Future.wait([
-        db
-            .from('tasks')
-            .select(
-              'id,title,description,due_at,priority,status,task_instructions,proof_required,proof_instructions,report_flow',
-            )
-            .eq('id', widget.taskId)
-            .single(),
-        db
-            .from('task_report_fields')
-            .select(
-              'id,label,field_key,field_type,is_required,options,sort_order',
-            )
-            .eq('task_id', widget.taskId)
-            .order('sort_order'),
+      final task = await db
+          .from('tasks')
+          .select(
+            'id,title,description,due_at,priority,status,task_instructions,proof_required,proof_instructions,report_flow',
+          )
+          .eq('id', widget.taskId)
+          .single();
+      _task = Map<String, dynamic>.from(task as Map);
+      final fieldsFuture = _task!['report_flow'] == 'multi_form'
+          ? Future.value(const <Map<String, dynamic>>[])
+          : db
+                .from('task_report_fields')
+                .select(
+                  'id,label,field_key,field_type,is_required,options,sort_order',
+                )
+                .eq('task_id', widget.taskId)
+                .order('sort_order')
+                .then(
+                  (rows) => List<Map<String, dynamic>>.from(rows as List),
+                );
+      final results = await Future.wait<dynamic>([
+        fieldsFuture,
         db
             .from('task_execution_steps')
             .select(
@@ -74,9 +81,8 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
             .eq('task_id', widget.taskId)
             .order('sort_order'),
       ]);
-      _task = Map<String, dynamic>.from(results[0] as Map);
-      _fields = List<Map<String, dynamic>>.from(results[1] as List);
-      _steps = List<Map<String, dynamic>>.from(results[2] as List);
+      _fields = List<Map<String, dynamic>>.from(results[0] as List);
+      _steps = List<Map<String, dynamic>>.from(results[1] as List);
       _forms = [];
       if (_task!['report_flow'] == 'multi_form') {
         final snapshots = await db
