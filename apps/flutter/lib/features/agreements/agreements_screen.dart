@@ -144,9 +144,12 @@ class _AgreementsScreenState extends State<AgreementsScreen> {
         _profile = p;
         _rows = rows;
         _members = members;
-        _membershipId ??= members.isEmpty
-            ? null
-            : members.first['id'].toString();
+        if (_membershipId == null ||
+            !members.any((m) => m['id'].toString() == _membershipId)) {
+          _membershipId = members.isEmpty
+              ? null
+              : members.first['id'].toString();
+        }
       });
     } catch (e) {
       if (mounted)
