@@ -2,9 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../core/notifications_repository.dart';
 import '../core/theme.dart';
 
-class AppShell extends StatelessWidget {
+class AppShell extends StatefulWidget {
   const AppShell({
     super.key,
     required this.title,
@@ -15,6 +16,47 @@ class AppShell extends StatelessWidget {
   final String title;
   final String? subtitle;
   final Widget child;
+
+  @override
+  State<AppShell> createState() => _AppShellState();
+}
+
+class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
+  int _unreadCount = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _refreshUnreadCount();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _refreshUnreadCount();
+  }
+
+  Future<void> _refreshUnreadCount() async {
+    final uid = Supabase.instance.client.auth.currentUser?.id;
+    if (uid == null) return;
+    try {
+      final items = await NotificationsRepository.load(uid: uid);
+      if (mounted) {
+        setState(() => _unreadCount = items.where((item) => item.isUnread).length);
+      }
+    } catch (_) {
+      final cached = await NotificationsRepository.loadCached(uid);
+      if (mounted && cached != null) {
+        setState(() => _unreadCount = cached.where((item) => item.isUnread).length);
+      }
+    }
+  }
 
   static const _tabs = <_ShellTab>[
     _ShellTab('/', 'الرئيسية', Icons.home_outlined),
@@ -44,19 +86,23 @@ class AppShell extends StatelessWidget {
   }
 
   Future<void> _showNotifications(BuildContext context) async {
-    List<Map<String, dynamic>> notifications = <Map<String, dynamic>>[];
+    List<AppNotification> notifications = <AppNotification>[];
     var failed = false;
+    final uid = Supabase.instance.client.auth.currentUser?.id;
     try {
-      final result = await Supabase.instance.client
-          .from('notifications')
-          .select('id,task_id,title,body,severity,read_at,created_at')
-          .order('created_at', ascending: false)
-          .limit(50);
-      notifications = (result as List)
-          .map((row) => Map<String, dynamic>.from(row as Map))
-          .toList();
+      if (uid == null) {
+        failed = true;
+      } else {
+        notifications = await NotificationsRepository.load(uid: uid);
+      }
     } catch (_) {
-      failed = true;
+      if (uid != null) {
+        notifications = await NotificationsRepository.loadCached(uid) ?? [];
+      }
+      failed = notifications.isEmpty;
+    }
+    if (mounted) {
+      setState(() => _unreadCount = notifications.where((item) => item.isUnread).length);
     }
     if (!context.mounted) return;
     await showModalBottomSheet<void>(
@@ -115,7 +161,7 @@ class AppShell extends StatelessWidget {
                         separatorBuilder: (_, __) => const Divider(height: 1),
                         itemBuilder: (context, index) {
                           final item = notifications[index];
-                          final isUnread = item['read_at'] == null;
+                          final isUnread = item.isUnread;
                           return ListTile(
                             contentPadding: const EdgeInsets.symmetric(
                               horizontal: 4,
@@ -130,35 +176,36 @@ class AppShell extends StatelessWidget {
                                   : AppColors.muted,
                             ),
                             title: Text(
-                              '${item['title'] ?? 'تنبيه'}',
+                              item.title,
                               style: TextStyle(
                                 fontWeight: isUnread
                                     ? FontWeight.w800
                                     : FontWeight.w600,
                               ),
                             ),
-                            subtitle: item['body'] == null
+                            subtitle: item.body == null
                                 ? null
                                 : Text(
-                                    '${item['body']}',
+                                    item.body!,
                                     maxLines: 3,
                                     overflow: TextOverflow.ellipsis,
                                   ),
-                            trailing: item['severity'] == null
+                            trailing: item.severity == null
                                 ? null
                                 : Text(
-                                    '${item['severity']}',
+                                    item.severity!,
                                     style: const TextStyle(
                                       fontSize: 11,
                                       color: AppColors.muted,
                                     ),
                                   ),
-                            onTap: item['task_id'] == null
+                            onTap: item.taskId == null
                                 ? null
                                 : () {
-                                    final taskId = item['task_id'].toString();
+                                    final taskId = item.taskId!;
                                     Navigator.pop(sheetContext);
                                     if (taskId.isNotEmpty) {
+                                      NotificationsRepository.markTaskOpened(taskId);
                                       context.go('/tasks/$taskId');
                                     }
                                   },
@@ -189,15 +236,16 @@ class AppShell extends StatelessWidget {
               child: Column(
                 children: [
                   _BrandHeader(
-                    title: title,
-                    subtitle: subtitle,
+                    title: widget.title,
+                    subtitle: widget.subtitle,
+                    unreadCount: _unreadCount,
                     onAccount: () => _signOut(context),
                     onNotifications: () => _showNotifications(context),
                   ),
                   Expanded(
                     child: Padding(
                       padding: const EdgeInsets.fromLTRB(12, 12, 12, 20),
-                      child: child,
+                      child: widget.child,
                     ),
                   ),
                 ],
@@ -245,11 +293,13 @@ class _BrandHeader extends StatelessWidget {
   const _BrandHeader({
     required this.title,
     this.subtitle,
+    required this.unreadCount,
     required this.onAccount,
     required this.onNotifications,
   });
   final String title;
   final String? subtitle;
+  final int unreadCount;
   final VoidCallback onAccount;
   final VoidCallback onNotifications;
 
@@ -383,7 +433,34 @@ class _BrandHeader extends StatelessWidget {
                 borderRadius: BorderRadius.circular(12),
               ),
             ),
-            icon: const Icon(Icons.notifications_none, size: 24),
+            icon: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                const Icon(Icons.notifications_none, size: 24),
+                if (unreadCount > 0)
+                  Positioned(
+                    top: -8,
+                    right: -9,
+                    child: Container(
+                      constraints: const BoxConstraints(minWidth: 17),
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFDBA62A),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(
+                        unreadCount > 99 ? '99+' : '$unreadCount',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          color: Color(0xFF0B3458),
+                          fontSize: 10,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
           ),
         ],
       ),
