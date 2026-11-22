@@ -10,10 +10,10 @@
 من هذا المجلد:
 ```bash
 flutter pub get
-flutter run --dart-define=SUPABASE_URL=https://YOUR_PROJECT.supabase.co --dart-define=SUPABASE_ANON_KEY=YOUR_ANON_KEY
+flutter run --dart-define=SUPABASE_URL=https://YOUR_PROJECT.supabase.co --dart-define=SUPABASE_PUBLISHABLE_KEY=YOUR_ANON_KEY
 ```
 
-لا تضع مفاتيح Supabase داخل ملفات المصدر أو Git. استخدم مفتاح anon/public فقط في تطبيق الهاتف، ولا تستخدم service-role key مطلقاً.
+لا تضع مفاتيح Supabase داخل ملفات المصدر أو Git. استخدم مفتاح publishable فقط في تطبيق الهاتف، ولا تستخدم service-role key مطلقاً.
 
 إذا لم تُمرر متغيرات الاتصال، يعرض التطبيق شاشة توضح أن إعداد الاتصال مطلوب ولا يحاول تسجيل الدخول.
 
