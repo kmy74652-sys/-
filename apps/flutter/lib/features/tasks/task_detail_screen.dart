@@ -1135,18 +1135,18 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
     try {
       selectedFile = await FilePicker.pickFile(type: FileType.any);
       if (selectedFile == null) return;
-      final size = await selectedFile!.length() ?? 0;
+      final size = await selectedFile.length() ?? 0;
       if (size <= 0 || size > 20 * 1024 * 1024)
         throw Exception('الحد الأعلى لحجم المرفق 20 ميجابايت.');
-      selectedBytes = await selectedFile!.readAsBytes();
+      selectedBytes = await selectedFile.readAsBytes();
       final db = Supabase.instance.client;
       final user = db.auth.currentUser;
       if (user == null) throw Exception('سجّل الدخول مجددًا.');
       ownerUid = user.id;
-      final safeName = selectedFile!.name.replaceAll(RegExp(r'[^a-zA-Z0-9._-]'), '_');
+      final safeName = selectedFile.name.replaceAll(RegExp(r'[^a-zA-Z0-9._-]'), '_');
       storagePath =
           '${widget.taskId}/${DateTime.now().microsecondsSinceEpoch}-$safeName';
-      mime = switch (selectedFile!.extension?.toLowerCase()) {
+      mime = switch (selectedFile.extension?.toLowerCase()) {
         'pdf' => 'application/pdf',
         'png' => 'image/png',
         'jpg' || 'jpeg' => 'image/jpeg',
@@ -1157,8 +1157,8 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
       await db.storage
           .from('task-attachments')
           .uploadBinary(
-            storagePath!,
-            selectedBytes!,
+            storagePath,
+            selectedBytes,
             fileOptions: FileOptions(contentType: mime, upsert: false),
           );
       try {
@@ -1168,7 +1168,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
               'task_id': widget.taskId,
               'execution_step_id': stepId,
               'uploaded_by': user.id,
-              'file_name': selectedFile!.name,
+              'file_name': selectedFile.name,
               'storage_path': storagePath,
               'mime_type': mime,
               'size_bytes': size,
@@ -1178,7 +1178,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
         _evidenceIds.putIfAbsent(stepId, () => []).add('${metadata['id']}');
         if (mounted) setState(() {});
       } catch (_) {
-        await db.storage.from('task-attachments').remove([storagePath!]);
+        await db.storage.from('task-attachments').remove([storagePath]);
         rethrow;
       }
     } catch (error) {
@@ -1189,9 +1189,9 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
           await OfflineQueue.isNetworkError(error)) {
         try {
           final localPath = await OfflineAttachmentStore.save(
-            ownerUid: ownerUid!,
-            attachmentId: storagePath!.split('/').last,
-            bytes: selectedBytes!,
+            ownerUid: ownerUid,
+            attachmentId: storagePath.split('/').last,
+            bytes: selectedBytes,
           );
           await OfflineQueue.enqueue(OfflineQueueKind.attachment, {
             'taskId': widget.taskId,
@@ -1199,9 +1199,9 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
             'idempotencyKey': 'evidence:$storagePath',
             'localPath': localPath,
             'storagePath': storagePath,
-            'fileName': selectedFile!.name,
+            'fileName': selectedFile.name,
             'mimeType': mime,
-            'size': selectedBytes!.length,
+            'size': selectedBytes.length,
           });
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
