@@ -108,4 +108,12 @@ class NotificationsRepository {
       // فتح المهمة لا يفشل بسبب تعذر تسجيل حالة الفتح.
     }
   }
+
+  static Future<bool> markRead(String notificationId) async {
+    final result = await Supabase.instance.client.rpc(
+      'mark_notification_read',
+      params: {'p_notification_id': notificationId},
+    );
+    return result == true;
+  }
 }
