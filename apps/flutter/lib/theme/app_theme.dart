@@ -18,7 +18,6 @@ abstract final class AppTheme {
       useMaterial3: true,
       colorScheme: scheme,
       scaffoldBackgroundColor: background,
-      fontFamily: 'Cairo',
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: background,
