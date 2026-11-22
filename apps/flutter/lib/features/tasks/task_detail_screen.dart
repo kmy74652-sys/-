@@ -1183,6 +1183,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
       }
     } catch (error) {
       if (ownerUid != null &&
+          selectedFile != null &&
           selectedBytes != null &&
           storagePath != null &&
           mime != null &&
