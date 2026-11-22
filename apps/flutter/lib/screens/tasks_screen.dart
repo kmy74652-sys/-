@@ -786,6 +786,7 @@ class _TaskPublicationReviewScreenState extends State<TaskPublicationReviewScree
   String? _error;
   String _busyId = '';
   List<Map<String, dynamic>> _drafts = [];
+  List<Map<String, dynamic>> _approved = [];
 
   SupabaseClient get _db => Supabase.instance.client;
   String get _org => widget.profile['institutionId'] as String? ?? '';
@@ -800,14 +801,14 @@ class _TaskPublicationReviewScreenState extends State<TaskPublicationReviewScree
     setState(() { _loading = true; _error = null; });
     try {
       final rows = await _db.from('report_form_versions')
-          .select('id,template_id,version_no,status,created_at,report_required,report_form_templates!inner(title,role_code,organization_id),report_form_version_fields(field_key,label,field_type,is_required,sort_order,options,config)')
+          .select('id,template_id,version_no,status,created_at,report_required,report_form_templates!inner(title,description,role_code,organization_id),report_form_version_fields(field_key,label,field_type,is_required,sort_order,options,config)')
           .eq('report_form_templates.organization_id', _org)
-          .eq('status', 'draft')
-          .order('created_at')
-          .limit(100);
-      final drafts = List<Map<String, dynamic>>.from(rows);
-      for (final draft in drafts) {
-        final rawFields = draft['report_form_version_fields'];
+          .inFilter('status', ['draft', 'published'])
+          .order('created_at', ascending: false)
+          .limit(200);
+      final allVersions = List<Map<String, dynamic>>.from(rows);
+      for (final version in allVersions) {
+        final rawFields = version['report_form_version_fields'];
         if (rawFields is List) {
           rawFields.sort((a, b) {
             final aa = a is Map ? int.tryParse(a['sort_order']?.toString() ?? '') ?? 0 : 0;
@@ -817,7 +818,10 @@ class _TaskPublicationReviewScreenState extends State<TaskPublicationReviewScree
         }
       }
       if (!mounted) return;
-      setState(() => _drafts = drafts);
+      setState(() {
+        _drafts = allVersions.where((v) => v['status'] == 'draft').toList();
+        _approved = allVersions.where((v) => v['status'] == 'published').toList();
+      });
     } catch (error) {
       if (mounted) setState(() => _error = _friendlyError(error));
     } finally {
@@ -856,6 +860,187 @@ class _TaskPublicationReviewScreenState extends State<TaskPublicationReviewScree
     }
   }
 
+  Future<void> _assign(Map<String, dynamic> version) async {
+    final template = (version['report_form_templates'] as Map?)?.cast<String, dynamic>() ?? {};
+    final roleCode = template['role_code']?.toString() ?? '';
+    final title = template['title']?.toString() ?? 'مهمة جديدة';
+    if (roleCode.isEmpty) return;
+
+    setState(() => _busyId = version['id'].toString());
+    try {
+      final results = await Future.wait([
+        _db.from('branches').select('id,name')
+            .eq('organization_id', _org).eq('is_active', true).order('name'),
+        _db.from('organization_memberships')
+            .select('id,user_id,display_name,employee_no,role_assignments!inner(role_code,branch_id)')
+            .eq('organization_id', _org)
+            .eq('is_active', true)
+            .eq('role_assignments.role_code', roleCode)
+            .not('user_id', 'is', null)
+            .order('display_name'),
+      ]);
+      final branches = List<Map<String, dynamic>>.from(results[0] as List);
+      final employees = List<Map<String, dynamic>>.from(results[1] as List);
+      if (!mounted) return;
+      if (branches.isEmpty || employees.isEmpty) {
+        throw Exception('no_employee_for_role_branch');
+      }
+
+      String selectedBranch = branches.first['id'].toString();
+      String? selectedEmployee;
+      String priority = 'normal';
+      DateTime dueAt = DateTime.now().add(const Duration(days: 1));
+      dueAt = DateTime(dueAt.year, dueAt.month, dueAt.day, 17);
+
+      List<Map<String, dynamic>> employeesForBranch(String branchId) {
+        return employees.where((employee) {
+          final raw = employee['role_assignments'];
+          final assignments = raw is List ? raw : raw is Map ? [raw] : const [];
+          return assignments.any((assignment) =>
+              assignment is Map &&
+              assignment['role_code'] == roleCode &&
+              assignment['branch_id']?.toString() == branchId);
+        }).toList();
+      }
+
+      final initialEmployees = employeesForBranch(selectedBranch);
+      selectedEmployee = initialEmployees.isEmpty ? null : initialEmployees.first['user_id']?.toString();
+
+      final choice = await showDialog<Map<String, dynamic>>(
+        context: context,
+        builder: (dialogContext) => StatefulBuilder(
+          builder: (dialogContext, refresh) {
+            final eligible = employeesForBranch(selectedBranch);
+            if (selectedEmployee != null &&
+                !eligible.any((employee) => employee['user_id']?.toString() == selectedEmployee)) {
+              selectedEmployee = eligible.isEmpty ? null : eligible.first['user_id']?.toString();
+            }
+            return AlertDialog(
+              title: const Text('إسناد المهمة إلى موظف'),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(title, style: const TextStyle(fontWeight: FontWeight.w800)),
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<String>(
+                      value: selectedBranch,
+                      decoration: const InputDecoration(labelText: 'الفرع'),
+                      items: branches.map((branch) => DropdownMenuItem(
+                        value: branch['id'].toString(),
+                        child: Text(branch['name'].toString()),
+                      )).toList(),
+                      onChanged: (value) => refresh(() {
+                        selectedBranch = value ?? selectedBranch;
+                        final next = employeesForBranch(selectedBranch);
+                        selectedEmployee = next.isEmpty ? null : next.first['user_id']?.toString();
+                      }),
+                    ),
+                    const SizedBox(height: 10),
+                    DropdownButtonFormField<String>(
+                      value: selectedEmployee,
+                      decoration: const InputDecoration(labelText: 'الموظف'),
+                      items: eligible.map((employee) => DropdownMenuItem(
+                        value: employee['user_id'].toString(),
+                        child: Text('${employee['display_name']} · ${employee['employee_no'] ?? '—'}'),
+                      )).toList(),
+                      onChanged: eligible.isEmpty ? null : (value) => refresh(() => selectedEmployee = value),
+                    ),
+                    const SizedBox(height: 10),
+                    DropdownButtonFormField<String>(
+                      value: priority,
+                      decoration: const InputDecoration(labelText: 'الأولوية'),
+                      items: const [
+                        DropdownMenuItem(value: 'normal', child: Text('عادية')),
+                        DropdownMenuItem(value: 'important', child: Text('مهمة')),
+                        DropdownMenuItem(value: 'urgent', child: Text('عاجلة')),
+                        DropdownMenuItem(value: 'critical', child: Text('حرجة')),
+                      ],
+                      onChanged: (value) => refresh(() => priority = value ?? 'normal'),
+                    ),
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text('موعد التسليم'),
+                      subtitle: Text('${_date(dueAt.toIso8601String())} · ${dueAt.hour.toString().padLeft(2, '0')}:00'),
+                      trailing: const Icon(Icons.calendar_month),
+                      onTap: () async {
+                        final picked = await showDatePicker(
+                          context: dialogContext,
+                          initialDate: dueAt,
+                          firstDate: DateTime.now(),
+                          lastDate: DateTime.now().add(const Duration(days: 365)),
+                        );
+                        if (picked != null) refresh(() {
+                          dueAt = DateTime(picked.year, picked.month, picked.day, 17);
+                        });
+                      },
+                    ),
+                    if (eligible.isEmpty)
+                      const Padding(
+                        padding: EdgeInsets.only(top: 8),
+                        child: Text('لا يوجد موظف بهذا التصنيف في الفرع المحدد.'),
+                      ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('إلغاء')),
+                FilledButton(
+                  onPressed: selectedEmployee == null ? null : () => Navigator.pop(dialogContext, {
+                    'branch_id': selectedBranch,
+                    'assigned_to': selectedEmployee,
+                    'priority': priority,
+                    'due_at': dueAt.toUtc().toIso8601String(),
+                  }),
+                  child: const Text('إنشاء المهمة وإسنادها'),
+                ),
+              ],
+            );
+          },
+        ),
+      );
+      if (choice == null || !mounted) return;
+
+      final description = template['description']?.toString() ?? '';
+      final taskTemplateId = await _db.rpc('save_task_designer_template', params: {
+        'p_organization_id': _org,
+        'p_template_id': null,
+        'p_payload': {
+          'title': title,
+          'description': description,
+          'role_code': roleCode,
+          'task_type': 'operational',
+          'default_priority': choice['priority'],
+          'is_active': true,
+          'steps': <Map<String, dynamic>>[],
+          'report_forms': [
+            {'version_id': version['id'].toString(), 'sort_order': 0, 'required': true},
+          ],
+        },
+      });
+      await _db.rpc('assign_task_from_template', params: {
+        'p_organization_id': _org,
+        'p_template_id': taskTemplateId,
+        'p_assigned_to': choice['assigned_to'],
+        'p_branch_id': choice['branch_id'],
+        'p_starts_at': DateTime.now().toUtc().toIso8601String(),
+        'p_due_at': choice['due_at'],
+        'p_priority': choice['priority'],
+        'p_instructions': description,
+        'p_report_overrides': <Map<String, dynamic>>[],
+      });
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('تم إنشاء المهمة وإسنادها. نموذج التقرير محفوظ داخل المهمة بنفس حقوله وترتيبه.'),
+      ));
+      await _load();
+    } catch (error) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(_friendlyError(error))));
+    } finally {
+      if (mounted) setState(() => _busyId = '');
+    }
+  }
+
   String _role(String? code) => _roleNames[code] ?? code ?? 'غير محدد';
 
   @override
@@ -863,58 +1048,73 @@ class _TaskPublicationReviewScreenState extends State<TaskPublicationReviewScree
     textDirection: TextDirection.rtl,
     child: Scaffold(
       appBar: AppBar(
-        title: const Text('اعتماد نماذج التقارير'),
+        title: const Text('اعتماد نماذج التقارير وإسناد المهام'),
         actions: [IconButton(onPressed: _load, icon: const Icon(Icons.refresh))],
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _error != null
               ? _ErrorState(message: _error!, onRetry: _load)
-              : _drafts.isEmpty
-                  ? const Center(child: Text('لا توجد نماذج تقارير بانتظار اعتماد صاحب المؤسسة.'))
-                  : ListView.separated(
-                      padding: const EdgeInsets.all(16),
-                      itemCount: _drafts.length,
-                      separatorBuilder: (_, __) => const SizedBox(height: 12),
-                      itemBuilder: (context, index) {
-                        final draft = _drafts[index];
-                        final id = draft['id'].toString();
-                        final template = (draft['report_form_templates'] as Map?)?.cast<String, dynamic>() ?? {};
-                        final fields = (draft['report_form_version_fields'] as List? ?? [])
-                            .whereType<Map>().map((field) => Map<String, dynamic>.from(field)).toList();
-                        return Card(
-                          elevation: 0,
-                          child: Padding(
-                            padding: const EdgeInsets.all(16),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                Text(template['title']?.toString() ?? 'نموذج تقرير',
-                                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
-                                const SizedBox(height: 6),
-                                Text('الدور المستهدف: ${_role(template['role_code']?.toString())}'),
-                                Text('الإصدار: ${draft['version_no']} · الحقول: ${fields.length}'),
-                                const Divider(height: 22),
-                                const Text('الحقول التي ستظهر للموظف', style: TextStyle(fontWeight: FontWeight.w800)),
-                                ...fields.map((field) => Padding(
-                                  padding: const EdgeInsets.only(top: 7),
-                                  child: Row(children: [
-                                    Expanded(child: Text(field['label']?.toString() ?? field['field_key']?.toString() ?? 'حقل')),
-                                    Text('${field['field_type'] ?? 'text'} · ${field['is_required'] == true ? 'إلزامي' : 'اختياري'}',
-                                        style: TextStyle(color: Colors.blueGrey.shade600, fontSize: 11)),
-                                  ]),
-                                )),
-                                const SizedBox(height: 14),
-                                FilledButton(
-                                  onPressed: _busyId.isEmpty ? () => _approve(draft) : null,
-                                  child: Text(_busyId == id ? 'جارٍ الاعتماد...' : 'اعتماد نموذج التقرير'),
-                                ),
-                              ],
-                            ),
+              : ListView(
+                  padding: const EdgeInsets.all(16),
+                  children: [
+                    const Text('نماذج بانتظار اعتماد عبدالرحمن',
+                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
+                    const SizedBox(height: 8),
+                    if (_drafts.isEmpty) const _InfoCard(text: 'لا توجد نماذج جديدة بانتظار الاعتماد.'),
+                    ..._drafts.map((draft) {
+                      final id = draft['id'].toString();
+                      final template = (draft['report_form_templates'] as Map?)?.cast<String, dynamic>() ?? {};
+                      final fields = (draft['report_form_version_fields'] as List? ?? [])
+                          .whereType<Map>().map((field) => Map<String, dynamic>.from(field)).toList();
+                      return Card(
+                        elevation: 0,
+                        child: Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              Text(template['title']?.toString() ?? 'نموذج تقرير',
+                                  style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
+                              Text('التصنيف: ${_role(template['role_code']?.toString())} · الحقول: ${fields.length}'),
+                              const Divider(height: 18),
+                              ...fields.map((field) => Padding(
+                                padding: const EdgeInsets.only(top: 5),
+                                child: Text('• ${field['label']} — ${field['field_type']} · ${field['is_required'] == true ? 'إلزامي' : 'اختياري'}'),
+                              )),
+                              const SizedBox(height: 12),
+                              FilledButton(
+                                onPressed: _busyId.isEmpty ? () => _approve(draft) : null,
+                                child: Text(_busyId == id ? 'جارٍ الاعتماد...' : 'اعتماد نموذج التقرير'),
+                              ),
+                            ],
                           ),
-                        );
-                      },
-                    ),
+                        ),
+                      );
+                    }),
+                    const Divider(height: 32),
+                    const Text('نماذج معتمدة وجاهزة للإسناد',
+                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
+                    const SizedBox(height: 8),
+                    if (_approved.isEmpty) const _InfoCard(text: 'بعد اعتماد نموذج تقرير سيظهر هنا لتحديد الفرع والموظف وموعد التسليم.'),
+                    ..._approved.map((version) {
+                      final id = version['id'].toString();
+                      final template = (version['report_form_templates'] as Map?)?.cast<String, dynamic>() ?? {};
+                      final fields = (version['report_form_version_fields'] as List? ?? []).length;
+                      return Card(
+                        elevation: 0,
+                        child: ListTile(
+                          contentPadding: const EdgeInsets.all(16),
+                          title: Text(template['title']?.toString() ?? 'نموذج تقرير',
+                              style: const TextStyle(fontWeight: FontWeight.w800)),
+                          subtitle: Text('التصنيف: ${_role(template['role_code']?.toString())} · الإصدار ${version['version_no']} · ${fields} حقول'),
+                          trailing: const Icon(Icons.assignment_ind_outlined),
+                          onTap: _busyId.isEmpty ? () => _assign(version) : null,
+                        ),
+                      );
+                    }),
+                  ],
+                ),
     ),
   );
 }
