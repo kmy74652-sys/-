@@ -20,6 +20,7 @@ flutter run --dart-define=SUPABASE_URL=https://YOUR_PROJECT.supabase.co --dart-d
 ## الحالة
 - أساس Flutter وMaterial 3.
 - واجهة عربية RTL وتسجيل دخول برقم الموظف وكلمة المرور.
-- ربط Supabase Auth عند توفير إعدادات الاتصال.
+- تسجيل الدخول برقم الموظف وكلمة المرور عبر Edge Function الحالية `employee-code-auth` ثم إنشاء جلسة Supabase.
+- تحميل ملف الموظف والدور عبر RPC الحالية `mobile_my_profile` بعد تسجيل الدخول.
+- فحوص Flutter الآلية موجودة في GitHub Actions؛ لم يُنفذ بناء APK أو اختبار جهاز فعلي بعد.
 - لم يتم تغيير مخطط Supabase أو بيانات الإنتاج.
-- ربط رقم الموظف بهوية Supabase وأدوار المؤسسة يحتاج مطابقة دقيقة مع المخطط الحالي قبل تفعيله.
