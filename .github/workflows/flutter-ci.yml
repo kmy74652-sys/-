@@ -74,7 +74,8 @@ jobs:
         run: dart format --output=none lib test
 
       - name: Static analysis
-        run: flutter analyze
+        # لا تفشل المهمة بسبب ملاحظات lint/deprecation؛ الأخطاء والتحذيرات تبقى حاجبة.
+        run: flutter analyze --no-fatal-infos
 
       - name: Unit and widget tests
         run: flutter test --reporter expanded
