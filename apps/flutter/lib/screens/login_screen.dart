@@ -34,6 +34,11 @@ class _LoginScreenState extends State<LoginScreen> {
       _showMessage('الاتصال بقاعدة البيانات غير مُعدّ بعد.');
       return;
     }
+    final code = _passwordController.text;
+    if (code.length < 8 || code.length > 64 || code.contains(RegExp(r'\\s'))) {
+      _showMessage('يجب أن تتكون كلمة المرور من 8 إلى 64 محرفاً دون مسافات.');
+      return;
+    }
 
     setState(() => _isLoading = true);
     try {
@@ -43,31 +48,31 @@ class _LoginScreenState extends State<LoginScreen> {
         body: {
           'action': 'login',
           'employeeNo': _employeeNumberController.text.trim(),
-          'code': _passwordController.text,
+          'code': code,
         },
       );
 
       final payload = result.data;
-      if (result.status != 200 || payload is! Map) {
-        _showMessage('تعذر التحقق من بيانات الدخول.');
+      if (result.status != 200 || payload is! Map ||
+          payload['access_token'] is! String || payload['refresh_token'] is! String) {
+        _showMessage('لم تُرجع خدمة الدخول جلسة صالحة. تحقق من إعداد Supabase.');
         return;
       }
 
-      final refreshToken = payload['refresh_token'];
-      if (refreshToken is! String || refreshToken.isEmpty) {
-        _showMessage('استجابة تسجيل الدخول غير مكتملة.');
-        return;
-      }
-
-      await client.auth.setSession(refreshToken);
+      await client.auth.setSession(payload['refresh_token'] as String);
       if (!mounted) return;
       _showMessage('تم تسجيل الدخول بنجاح.');
     } on FunctionException catch (error) {
       if (mounted) {
+        final status = error.status;
         final details = error.details;
-        final message = details is Map && details['error'] is String
-            ? _friendlyAuthError(details['error'] as String)
-            : 'تعذر تسجيل الدخول. تحقق من الرقم وكلمة المرور.';
+        final message = status == 429
+            ? 'محاولات كثيرة. انتظر قليلاً ثم حاول مجدداً.'
+            : status == 401
+                ? 'رقم الموظف أو كلمة المرور غير صحيحة.'
+                : details is Map && details['error'] is String
+                    ? _friendlyAuthError(details['error'] as String)
+                    : 'تعذر تسجيل الدخول. تحقق من الاتصال وحاول مجدداً.';
         _showMessage(message);
       }
     } on AuthException catch (error) {
