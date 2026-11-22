@@ -20,8 +20,16 @@ subprojects {
 }
 
 subprojects {
-    afterEvaluate {
-        extensions.findByType<com.android.build.gradle.LibraryExtension>()?.compileSdk = 36
+    plugins.withId("com.android.library") {
+        extensions.configure<com.android.build.gradle.LibraryExtension> {
+            compileSdk = 36
+        }
+    }
+}
+
+gradle.projectsEvaluated {
+    subprojects.forEach { project ->
+        project.extensions.findByType<com.android.build.gradle.LibraryExtension>()?.compileSdk = 36
     }
 }
 
