@@ -596,16 +596,8 @@ class TaskDesignerScreen extends StatefulWidget {
 class _TaskDesignerScreenState extends State<TaskDesignerScreen> {
   final _title = TextEditingController();
   final _description = TextEditingController();
-  final _instructions = TextEditingController();
   final List<Map<String, dynamic>> _fields = [];
-  List<Map<String, dynamic>> _categories = [];
-  List<Map<String, dynamic>> _templates = [];
-  List<Map<String, dynamic>> _branches = [];
   String _role = 'accountant';
-  String _priority = 'normal';
-  String? _categoryId;
-  String? _branchId;
-  DateTime _dueAt = DateTime.now().add(const Duration(days: 1));
   bool _busy = false;
   String? _error;
 
@@ -613,43 +605,10 @@ class _TaskDesignerScreenState extends State<TaskDesignerScreen> {
   String get _org => widget.profile['institutionId'] as String? ?? '';
 
   @override
-  void initState() {
-    super.initState();
-    _load();
-  }
-
-  @override
   void dispose() {
     _title.dispose();
     _description.dispose();
-    _instructions.dispose();
     super.dispose();
-  }
-
-  Future<void> _load() async {
-    setState(() { _busy = true; _error = null; });
-    try {
-      final categories = await _db.from('task_categories')
-          .select('id,code,title,is_main,parent_id')
-          .eq('organization_id', _org).eq('active', true).eq('is_main', true)
-          .order('title');
-      final templates = await _db.from('task_templates')
-          .select('id,title,role_code,default_priority,is_active,version')
-          .eq('organization_id', _org).order('updated_at', ascending: false).limit(100);
-      final branches = await _db.from('branches')
-          .select('id,name').eq('organization_id', _org).eq('is_active', true).order('name');
-      if (!mounted) return;
-      setState(() {
-        _categories = List<Map<String, dynamic>>.from(categories);
-        _templates = List<Map<String, dynamic>>.from(templates);
-        _branches = List<Map<String, dynamic>>.from(branches);
-        _categoryId ??= _categories.isEmpty ? null : _categories.first['id'].toString();
-      });
-    } catch (error) {
-      if (mounted) setState(() => _error = _friendlyError(error));
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
   }
 
   Future<void> _addField() async {
@@ -788,103 +747,50 @@ class _TaskDesignerScreenState extends State<TaskDesignerScreen> {
   Widget build(BuildContext context) => Directionality(
     textDirection: TextDirection.rtl,
     child: Scaffold(
-      appBar: AppBar(title: const Text('مصمم المهام')),
-      body: _busy && _templates.isEmpty
-          ? const Center(child: CircularProgressIndicator())
-          : ListView(
-              padding: const EdgeInsets.all(16),
-              children: [
-                if (_error != null) _InfoCard(text: _error!),
-                const Text('إنشاء مهمة جديدة', style: TextStyle(fontSize: 19, fontWeight: FontWeight.w800)),
-                const SizedBox(height: 12),
-                TextField(controller: _title, decoration: const InputDecoration(labelText: 'عنوان المهمة')),
-                const SizedBox(height: 10),
-                TextField(controller: _description, decoration: const InputDecoration(labelText: 'وصف مختصر')),
-                const SizedBox(height: 10),
-                TextField(controller: _instructions, minLines: 2, maxLines: 4, decoration: const InputDecoration(labelText: 'تعليمات التنفيذ')),
-                const SizedBox(height: 10),
-                DropdownButtonFormField<String>(
-                  value: _role,
-                  decoration: const InputDecoration(labelText: 'التصنيف الوظيفي المستهدف'),
-                  items: _roleNames.entries.map((e) => DropdownMenuItem(value: e.key, child: Text(e.value))).toList(),
-                  onChanged: (value) => setState(() => _role = value ?? _role),
-                ),
-                const SizedBox(height: 10),
-                DropdownButtonFormField<String>(
-                  value: _priority,
-                  decoration: const InputDecoration(labelText: 'الأولوية'),
-                  items: const [
-                    DropdownMenuItem(value: 'normal', child: Text('عادية')),
-                    DropdownMenuItem(value: 'important', child: Text('مهمة')),
-                    DropdownMenuItem(value: 'urgent', child: Text('عاجلة')),
-                    DropdownMenuItem(value: 'critical', child: Text('حرجة')),
-                  ],
-                  onChanged: (value) => setState(() => _priority = value ?? 'normal'),
-                ),
-                const SizedBox(height: 10),
-                DropdownButtonFormField<String>(
-                  value: _categoryId,
-                  decoration: const InputDecoration(labelText: 'تصنيف المهمة'),
-                  items: _categories.map((category) => DropdownMenuItem(
-                    value: category['id'].toString(), child: Text(category['title'].toString()),
-                  )).toList(),
-                  onChanged: (value) => setState(() => _categoryId = value),
-                ),
-                const SizedBox(height: 10),
-                DropdownButtonFormField<String?>(
-                  value: _branchId,
-                  decoration: const InputDecoration(labelText: 'الفرع المستهدف'),
-                  items: [
-                    const DropdownMenuItem<String?>(value: null, child: Text('جميع الفروع')),
-                    ..._branches.map((branch) => DropdownMenuItem<String?>(
-                      value: branch['id'].toString(), child: Text(branch['name'].toString()),
-                    )),
-                  ],
-                  onChanged: (value) => setState(() => _branchId = value),
-                ),
-                const SizedBox(height: 8),
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.event),
-                  title: const Text('موعد التسليم'),
-                  subtitle: Text('${_date(_dueAt.toIso8601String())} · ${_dueAt.hour.toString().padLeft(2, '0')}:${_dueAt.minute.toString().padLeft(2, '0')}'),
-                  trailing: const Icon(Icons.edit_calendar_outlined),
-                  onTap: _chooseDueAt,
-                ),
-                const SizedBox(height: 18),
-                Row(children: [
-                  const Expanded(child: Text('حقول تقرير الموظف', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800))),
-                  OutlinedButton.icon(onPressed: _addField, icon: const Icon(Icons.add), label: const Text('إضافة حقل')),
-                ]),
-                if (_fields.isEmpty) const _InfoCard(text: 'أضف حقول التقرير. ستظهر للموظف بنفس ترتيبها عند فتح المهمة.'),
-                ..._fields.asMap().entries.map((entry) => Card(
-                  elevation: 0,
-                  child: ListTile(
-                    title: Text(entry.value['label'].toString(), style: const TextStyle(fontWeight: FontWeight.w700)),
-                    subtitle: Text('${entry.value['field_type']} · ${entry.value['is_required'] == true ? 'إلزامي' : 'اختياري'}'),
-                    trailing: IconButton(
-                      onPressed: () => setState(() => _fields.removeAt(entry.key)),
-                      icon: const Icon(Icons.delete_outline),
-                    ),
-                  ),
-                )),
-                const SizedBox(height: 18),
-                FilledButton(
-                  onPressed: _busy ? null : _saveAndAssign,
-                  child: _busy ? const CircularProgressIndicator(color: Colors.white) : const Text('حفظ القالب وإسناد المهمة'),
-                ),
-                const Divider(height: 36),
-                const Text('قوالب المهام المحفوظة', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
-                ..._templates.map((template) => Card(
-                  elevation: 0,
-                  child: ListTile(
-                    title: Text(template['title'].toString()),
-                    subtitle: Text('${_roleNames[template['role_code']] ?? template['role_code']} · الإصدار ${template['version']}'),
-                    trailing: Icon(template['is_active'] == true ? Icons.check_circle_outline : Icons.pause_circle_outline),
-                  ),
-                )),
-              ],
+      appBar: AppBar(title: const Text('مصمم نماذج التقارير')),
+      body: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          const _InfoCard(text: 'أنشئ نموذج التقرير وحدد حقوله وترتيبها. بعد الحفظ يراجعه عبدالرحمن ويعتمده، ثم نربطه بمهمة ونحدد الفرع والموظف وموعد التسليم في خطوة الإسناد.'),
+          const SizedBox(height: 12),
+          TextField(controller: _title, decoration: const InputDecoration(labelText: 'عنوان نموذج التقرير')),
+          const SizedBox(height: 10),
+          TextField(controller: _description, minLines: 2, maxLines: 4,
+              decoration: const InputDecoration(labelText: 'وصف النموذج')),
+          const SizedBox(height: 10),
+          DropdownButtonFormField<String>(
+            value: _role,
+            decoration: const InputDecoration(labelText: 'التصنيف الوظيفي الذي سيستخدم النموذج'),
+            items: _roleNames.entries.map((e) => DropdownMenuItem(value: e.key, child: Text(e.value))).toList(),
+            onChanged: _busy ? null : (value) => setState(() => _role = value ?? _role),
+          ),
+          const SizedBox(height: 18),
+          Row(children: [
+            const Expanded(child: Text('حقول تقرير الموظف', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800))),
+            OutlinedButton.icon(onPressed: _busy ? null : _addField, icon: const Icon(Icons.add), label: const Text('إضافة حقل')),
+          ]),
+          if (_fields.isEmpty) const _InfoCard(text: 'أضف حقول التقرير. ستظهر للموظف بنفس ترتيبها وأنواعها بعد ربط النموذج بمهمة.'),
+          ..._fields.asMap().entries.map((entry) => Card(
+            elevation: 0,
+            child: ListTile(
+              title: Text(entry.value['label'].toString(), style: const TextStyle(fontWeight: FontWeight.w700)),
+              subtitle: Text('${entry.value['field_type']} · ${entry.value['is_required'] == true ? 'إلزامي' : 'اختياري'}'),
+              trailing: IconButton(
+                onPressed: _busy ? null : () => setState(() => _fields.removeAt(entry.key)),
+                icon: const Icon(Icons.delete_outline),
+              ),
             ),
+          )),
+          if (_error != null) _InfoCard(text: _error!),
+          const SizedBox(height: 18),
+          FilledButton(
+            onPressed: _busy ? null : _saveAndAssign,
+            child: _busy
+                ? const CircularProgressIndicator(color: Colors.white)
+                : const Text('حفظ نموذج التقرير وإرساله للاعتماد'),
+          ),
+        ],
+      ),
     ),
   );
 }
