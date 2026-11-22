@@ -37,20 +37,58 @@ class _LoginScreenState extends State<LoginScreen> {
 
     setState(() => _isLoading = true);
     try {
-      // ملاحظة: رقم الموظف لا يُحوّل إلى بريد افتراضي.
-      // سيتم ربطه بمخطط هوية المؤسسة بعد التحقق من إعدادات Auth الحالية.
-      await Supabase.instance.client.auth.signInWithPassword(
-        email: _employeeNumberController.text.trim(),
-        password: _passwordController.text,
+      final client = Supabase.instance.client;
+      final result = await client.functions.invoke(
+        'employee-code-auth',
+        body: {
+          'action': 'login',
+          'employeeNo': _employeeNumberController.text.trim(),
+          'code': _passwordController.text,
+        },
       );
+
+      final payload = result.data;
+      if (result.status != 200 || payload is! Map) {
+        _showMessage('تعذر التحقق من بيانات الدخول.');
+        return;
+      }
+
+      final refreshToken = payload['refresh_token'];
+      if (refreshToken is! String || refreshToken.isEmpty) {
+        _showMessage('استجابة تسجيل الدخول غير مكتملة.');
+        return;
+      }
+
+      await client.auth.setSession(refreshToken);
       if (!mounted) return;
-      _showMessage('تم تسجيل الدخول. يجري تجهيز ملف الموظف.');
+      _showMessage('تم تسجيل الدخول بنجاح.');
+    } on FunctionException catch (error) {
+      if (mounted) {
+        final details = error.details;
+        final message = details is Map && details['error'] is String
+            ? _friendlyAuthError(details['error'] as String)
+            : 'تعذر تسجيل الدخول. تحقق من الرقم وكلمة المرور.';
+        _showMessage(message);
+      }
     } on AuthException catch (error) {
       if (mounted) _showMessage(error.message);
     } catch (_) {
       if (mounted) _showMessage('تعذر تسجيل الدخول. تحقق من الاتصال وحاول مجدداً.');
     } finally {
       if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  String _friendlyAuthError(String code) {
+    switch (code) {
+      case 'invalid_credentials':
+        return 'رقم الموظف أو كلمة المرور غير صحيحة.';
+      case 'too_many_attempts':
+        return 'محاولات كثيرة. انتظر قليلاً ثم حاول مجدداً.';
+      case 'database_update_required':
+        return 'خدمة الحسابات تحتاج إلى تحديث من الإدارة.';
+      default:
+        return 'تعذر تسجيل الدخول حالياً. حاول مجدداً.';
     }
   }
 
@@ -122,7 +160,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       const SizedBox(height: 18),
                       TextFormField(
                         controller: _employeeNumberController,
-                        keyboardType: TextInputType.emailAddress,
+                        keyboardType: TextInputType.number,
                         textInputAction: TextInputAction.next,
                         decoration: const InputDecoration(
                           labelText: 'رقم الموظف',
@@ -174,7 +212,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       const SizedBox(height: 18),
                       if (!widget.isSupabaseConfigured)
                         const Text(
-                          'نسخة تأسيسية: يلزم إعداد اتصال Supabase قبل تفعيل تسجيل الدخول.',
+                          'يلزم إعداد اتصال Supabase قبل تفعيل تسجيل الدخول.',
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             color: Colors.deepOrange,
