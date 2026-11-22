@@ -115,6 +115,7 @@ export default function TasksScreen() {
   const reportsOnly = firstSearchParam(routeParams.view) === 'reports';
   const [tasks, setTasks] = useState<Task[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [canExecute, setCanExecute] = useState(false);
   const [canReview, setCanReview] = useState(false);
   const [canManage, setCanManage] = useState(false);
   const [canManageReports, setCanManageReports] = useState(false);
@@ -186,14 +187,16 @@ export default function TasksScreen() {
       setEmployeeRoleCode(identity.employee.roles[0]?.code ?? 'accountant');
       setEmployeeBranchId(identity.employee.branches.find((branch) => branch.isDefault)?.id ?? identity.employee.branches[0]?.id ?? null);
       const permissions = new Set(identity.employee.permissions);
-      if (!permissions.has('tasks.execute') && !permissions.has('tasks.manage')) throw new Error('permission_denied');
+      if (!permissions.has('tasks.execute') && !permissions.has('tasks.manage') && !permissions.has('tasks.review')) throw new Error('permission_denied');
       const canReviewNow = permissions.has('tasks.review');
       const canManageNow = permissions.has('tasks.manage');
+      const canExecuteNow = permissions.has('tasks.execute');
       const cacheKey = `${identity.userId}:${identity.employee.institutionId}`;
       const cachedTasks = readSessionCache<Task[]>('employee-tasks', cacheKey);
       const cachedNotifications = readSessionCache<Notification[]>('employee-notifications', cacheKey);
       setCanReview(canReviewNow);
       setCanManage(canManageNow);
+      setCanExecute(canExecuteNow);
       setCanManageReports(permissions.has('report_forms.manage'));
       if (cachedTasks) {
         applyTaskRows(cachedTasks);
@@ -224,10 +227,10 @@ export default function TasksScreen() {
   useEffect(() => { void load(); }, [load]);
   useEffect(() => {
     if (!currentUserId) return;
-    setScreenMode(requestedMode === 'all' && (canManage || canReview) ? 'all' : 'mine');
+    setScreenMode(requestedMode === 'all' && (canManage || canReview) ? 'all' : canExecute ? 'mine' : 'all');
     setStatusFilter(requestedStatus);
     setBranchFilter(requestedBranchId);
-  }, [canManage, canReview, currentUserId, requestedBranchId, requestedMode, requestedStatus]);
+  }, [canExecute, canManage, canReview, currentUserId, requestedBranchId, requestedMode, requestedStatus]);
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (state) => {
       if (state === 'active') void load();
@@ -463,6 +466,7 @@ export default function TasksScreen() {
     const date = new Date(value);
     return Number.isNaN(date.getTime()) ? 'غير محدد' : new Intl.DateTimeFormat('ar-SA', { dateStyle: 'medium', timeStyle: 'short' }).format(date);
   };
+  const canExecuteTask = (task: Task) => canExecute && task.assignee_employee_id === currentUserId;
   const filteredTasks = tasks.filter((task) => {
     const hasPendingFormReview = task.report_forms.some((form) => form.status === 'submitted');
     const hasReport = task.report_forms.length > 0 || task.report_schema.length > 0;
@@ -471,9 +475,9 @@ export default function TasksScreen() {
     const hasApprovedReport = task.report_forms.some((form) => form.status === 'approved') || (!task.report_forms.length && task.status === 'approved');
     const reportStatusMatches = reportStatusFilter === 'all' || (reportStatusFilter === 'ready' && hasReadyReport) || (reportStatusFilter === 'uploaded' && hasUploadedReport) || (reportStatusFilter === 'approved' && hasApprovedReport);
     const modeMatches = reportsOnly
-      ? task.assignee_employee_id === currentUserId
+      ? canExecuteTask(task)
       : screenMode === 'mine'
-        ? task.assignee_employee_id === currentUserId
+        ? canExecuteTask(task)
         : screenMode === 'review'
           ? canReview && (task.status === 'submitted' || hasPendingFormReview)
           : canManage || canReview;
@@ -507,7 +511,7 @@ export default function TasksScreen() {
           <View style={styles.newTaskNoticeActions}><Pressable style={styles.newTaskOpenButton} onPress={() => { setInAppNotification(null); setStatusFilter('all'); }}><Text style={styles.newTaskOpenText}>فتح المهمة</Text></Pressable><Pressable accessibilityLabel="إخفاء تنبيه المهمة الجديدة" style={styles.newTaskDismissButton} onPress={() => setInAppNotification(null)}><Text style={styles.newTaskDismissText}>إخفاء</Text></Pressable></View>
         </View>}
         {!loading && !reportsOnly && <View style={styles.employeeIntro}><Text style={styles.employeeIntroTitle}>مساحة تنفيذك اليومية</Text><Text style={styles.employeeIntroText}>اقرأ التكليف، ابدأ التنفيذ، ثم عبّئ التقرير المطلوب وأرسله للمسؤول للمراجعة.</Text></View>}
-        {!loading && <View style={styles.workTabs}><Pressable accessibilityRole="tab" accessibilityState={{ selected: !reportsOnly }} style={[styles.workTab, !reportsOnly && styles.workTabSelected]} onPress={() => router.replace({ pathname: '/tasks', params: { mode: 'mine' } })}><Text style={[styles.workTabText, !reportsOnly && styles.workTabTextSelected]}>المهام</Text></Pressable><Pressable accessibilityRole="tab" accessibilityState={{ selected: reportsOnly }} style={[styles.workTab, reportsOnly && styles.workTabSelected]} onPress={() => router.replace({ pathname: '/tasks', params: { view: 'reports', mode: 'mine' } })}><Text style={[styles.workTabText, reportsOnly && styles.workTabTextSelected]}>إعداد التقارير</Text></Pressable></View>}
+        {!loading && <View style={styles.workTabs}><Pressable accessibilityRole="tab" accessibilityState={{ selected: !reportsOnly }} style={[styles.workTab, !reportsOnly && styles.workTabSelected]} onPress={() => router.replace({ pathname: '/tasks', params: { mode: 'mine' } })}><Text style={[styles.workTabText, !reportsOnly && styles.workTabTextSelected]}>المهام</Text></Pressable>{canExecute && <Pressable accessibilityRole="tab" accessibilityState={{ selected: reportsOnly }} style={[styles.workTab, reportsOnly && styles.workTabSelected]} onPress={() => router.replace({ pathname: '/tasks', params: { view: 'reports', mode: 'mine' } })}><Text style={[styles.workTabText, reportsOnly && styles.workTabTextSelected]}>إعداد التقارير</Text></Pressable>}</View>}
         {!loading && reportsOnly && <><View style={styles.reportUploadHeader}><Text style={styles.reportUploadTitle}>تقارير المهام</Text><Text style={styles.reportUploadSubtitle}>التقارير التي صممتها الإدارة وربطتها بالمهام. افتح الحقول، عبئها، ثم أرسل التقرير للمراجعة.</Text></View><View style={styles.reportStatusTabs}>{([['all', 'الكل'], ['ready', 'جاهز للرفع'], ['uploaded', 'تم الرفع'], ['approved', 'معتمد']] as const).map(([value, label]) => <Pressable key={value} accessibilityRole="button" accessibilityState={{ selected: reportStatusFilter === value }} style={[styles.reportStatusTab, reportStatusFilter === value && styles.reportStatusTabSelected]} onPress={() => setReportStatusFilter(value)}><Text style={reportStatusFilter === value ? styles.reportStatusTabTextSelected : styles.reportStatusTabText}>{label}</Text></Pressable>)}</View></>}
         {!loading && !reportsOnly && <View style={styles.summaryRow}><View style={styles.summaryCard}><Text style={styles.summaryValue}>{employeeSummary.pending}</Text><Text style={styles.summaryLabel}>جديدة</Text></View><View style={styles.summaryCard}><Text style={styles.summaryValue}>{employeeSummary.active}</Text><Text style={styles.summaryLabel}>قيد التنفيذ</Text></View><View style={styles.summaryCard}><Text style={styles.summaryValue}>{employeeSummary.submitted}</Text><Text style={styles.summaryLabel}>بانتظار المراجعة</Text></View></View>}
         {!loading && reportsOnly && <View style={styles.independentReportSection}><View style={styles.reportUploadHeader}><Text style={styles.reportUploadTitle}>تقارير مصمم التقارير</Text><Text style={styles.reportUploadSubtitle}>النماذج التي اعتمدتها الإدارة من مصمم التقارير. تعبئتها مستقلة عن المهام وتُرسل مرة واحدة للمراجعة.</Text></View><EmployeeDynamicReportsPanel branchId={employeeBranchId} canManageReports={canManageReports && canManage} /><View style={styles.reportUploadHeader}><Text style={styles.reportUploadTitle}>التقارير اليومية من الإدارة</Text><Text style={styles.reportUploadSubtitle}>تقرير مستقل عن المهام، يصل حسب الدور والفرع ويُرسل مرة واحدة للمراجعة.</Text></View><EmployeeRoleReportPanel roleCode={employeeRoleCode} branchId={employeeBranchId} employeeName={employeeName} /></View>}
@@ -517,7 +521,7 @@ export default function TasksScreen() {
             ['mine', 'مهامي'],
             ['review', 'مراجعة التقارير'],
             ['all', 'متابعة جميع المهام'],
-          ] as const).filter(([mode]) => mode === 'mine' || (mode === 'review' ? canReview : canManage || canReview)).map(([mode, label]) => <Pressable key={mode} accessibilityRole="button" accessibilityState={{ selected: screenMode === mode }} style={[styles.modeTab, screenMode === mode && styles.modeTabSelected]} onPress={() => { setScreenMode(mode); setStatusFilter('all'); setPositionFilter('all'); }}><Text style={[styles.modeTabText, screenMode === mode && styles.modeTabTextSelected]}>{label}</Text></Pressable>)}
+          ] as const).filter(([mode]) => mode === 'mine' ? canExecute : (mode === 'review' ? canReview : canManage || canReview)).map(([mode, label]) => <Pressable key={mode} accessibilityRole="button" accessibilityState={{ selected: screenMode === mode }} style={[styles.modeTab, screenMode === mode && styles.modeTabSelected]} onPress={() => { setScreenMode(mode); setStatusFilter('all'); setPositionFilter('all'); }}><Text style={[styles.modeTabText, screenMode === mode && styles.modeTabTextSelected]}>{label}</Text></Pressable>)}
         </View>}
 
         {!loading && !reportsOnly && screenMode !== 'mine' && !!branchFilter && <View style={styles.activeFilter}><Text style={styles.meta}>الفرع المحدد: {tasks.find((task) => task.branch_id === branchFilter)?.branch_name ?? 'الفرع المحدد'}</Text><Pressable accessibilityRole="button" onPress={() => setBranchFilter('')} style={styles.clearFilterButton}><Text style={styles.clearFilterText}>مسح الفرع</Text></Pressable></View>}
@@ -541,7 +545,9 @@ export default function TasksScreen() {
           </ScrollView>
         </>}
 
-        {!loading && filteredTasks.map((task) => (
+        {!loading && filteredTasks.map((task) => {
+          const executionTask = canExecuteTask(task);
+          return (
           <CompactExpandableCard key={task.id} title={task.title} subtitle={`${task.branch_name || 'كل الفروع'} · ${priorityLabels[task.priority]}`} status={reportsOnly ? 'إعداد التقارير' : statusLabels[task.status]}>
             {reportsOnly && <View style={styles.reportWorkspace}>
               {!!task.report_forms.length && task.report_forms.map((form) => {
@@ -568,28 +574,28 @@ export default function TasksScreen() {
             <Text style={styles.deliveryStatus}>حالة الوصول: {deliveryLabels[task.delivery_status]}</Text>
             {task.proof_required && <Text style={styles.proof}>{task.proof_instructions || 'يتطلب إرفاق دليل إنجاز.'}</Text>}
             {(!!task.task_instructions || !!task.execution_steps.length) && <Text style={styles.cardSectionLabel}>2 · نفّذ المهمة</Text>}
-            {!!task.task_instructions && <View style={styles.timeline}><Text style={styles.fieldLabel}>تعليمات التنفيذ</Text><Text style={styles.body}>{task.task_instructions}</Text></View>}
-            {!!task.execution_steps.length && <View style={styles.timeline}><Text style={styles.fieldLabel}>خطوات التنفيذ</Text>{task.execution_steps.map((step,index)=><View key={step.id} style={styles.stepCard}>
+            {executionTask && !!task.task_instructions && <View style={styles.timeline}><Text style={styles.fieldLabel}>تعليمات التنفيذ</Text><Text style={styles.body}>{task.task_instructions}</Text></View>}
+            {executionTask && !!task.execution_steps.length && <View style={styles.timeline}><Text style={styles.fieldLabel}>خطوات التنفيذ</Text>{task.execution_steps.map((step,index)=><View key={step.id} style={styles.stepCard}>
               <Text style={styles.fieldLabel}>{index+1}. {step.title}{step.required?' · إلزامية':' · اختيارية'}{step.completed?' · مكتملة':''}</Text>
               {!!step.instructions && <Text style={styles.body}>{step.instructions}</Text>}
               {step.evidence_required && <Text style={styles.proof}>{step.evidence_instructions || 'أرفق إثباتًا قبل إكمال هذه الخطوة.'}</Text>}
               {!step.completed && step.evidence_required && <><Pressable style={styles.secondaryButton} onPress={()=>void chooseStepEvidence(task,step.id)}><Text style={styles.secondaryText}>{stepAttachments[task.id]?.[step.id]?.name ?? 'اختيار إثبات للخطوة'}</Text></Pressable>{!!stepAttachments[task.id]?.[step.id] && <Text style={styles.meta}>المرفق جاهز: {stepAttachments[task.id][step.id].name}</Text>}</>}
               {!step.completed && <Pressable disabled={busyTask===task.id || (step.evidence_required&&!stepAttachments[task.id]?.[step.id])} style={[styles.primaryButton,{opacity:step.evidence_required&&!stepAttachments[task.id]?.[step.id]?0.5:1}]} onPress={()=>void mutate(task,()=>completeTaskExecutionStep(step.id,stepAttachments[task.id]?.[step.id]?[stepAttachments[task.id][step.id].id]:[]),'تم تسجيل إكمال الخطوة.') }><Text style={styles.primaryText}>إكمال الخطوة</Text></Pressable>}
             </View>)}</View>}
-            {!!task.report_forms.length || !!task.report_schema.length ? <View style={styles.reportSeparationNotice}><Text style={styles.reportSeparationTitle}>التقرير في تبويب إعداد التقارير</Text><Text style={styles.reportSeparationText}>تنفيذ المهمة وإكمال خطواتها هنا فقط. افتح تبويب «إعداد التقارير» لتعبئة التقرير وإرساله.</Text></View> : null}
+            {executionTask && (!!task.report_forms.length || !!task.report_schema.length) ? <View style={styles.reportSeparationNotice}><Text style={styles.reportSeparationTitle}>التقرير في تبويب إعداد التقارير</Text><Text style={styles.reportSeparationText}>تنفيذ المهمة وإكمال خطواتها هنا فقط. افتح تبويب «إعداد التقارير» لتعبئة التقرير وإرساله.</Text></View> : null}
             <Pressable style={styles.secondaryButton} onPress={() => void showTimeline(task)}><Text style={styles.secondaryText}>عرض السجل الزمني</Text></Pressable>
             {!!timeline[task.id]?.length && <View style={styles.timeline}>{timeline[task.id].map((entry) => <Text key={entry.id} style={styles.meta}>{formatDate(entry.created_at)} · {entry.status} · {entry.actor_name}{entry.note ? ` — ${entry.note}` : ''}</Text>)}</View>}
             </>}
 
 
-            {!reportsOnly && <View style={styles.actions}><Text style={styles.cardSectionLabel}>الإجراء التالي</Text>
-              {['pending', 'rejected'].includes(task.status) && (
+            {!reportsOnly && <View style={styles.actions}>{executionTask && <Text style={styles.cardSectionLabel}>الإجراء التالي</Text>}
+              {executionTask && ['pending', 'rejected'].includes(task.status) && (
                 <Pressable disabled={busyTask === task.id} style={styles.primaryButton} onPress={() => void mutate(task, () => updateTaskStatus(task.id, 'in_progress'), 'تم تسجيل بدء تنفيذ المهمة.')}>
                   <Text style={styles.primaryText}>بدء التنفيذ</Text>
                 </Pressable>
               )}
-              {!!task.report_forms.length || !!task.report_schema.length ? <Pressable style={styles.secondaryButton} onPress={() => router.replace({ pathname: '/tasks', params: { view: 'reports', mode: 'mine' } })}><Text style={styles.secondaryText}>فتح تبويب التقارير</Text></Pressable> : null}
-              {task.status === 'in_progress' && !task.report_schema?.length && !task.report_forms.length && (
+              {executionTask && (!!task.report_forms.length || !!task.report_schema.length) ? <Pressable style={styles.secondaryButton} onPress={() => router.replace({ pathname: '/tasks', params: { view: 'reports', mode: 'mine' } })}><Text style={styles.secondaryText}>فتح تبويب التقارير</Text></Pressable> : null}
+              {executionTask && task.status === 'in_progress' && !task.report_schema?.length && !task.report_forms.length && (
                 <Pressable disabled={busyTask === task.id} style={styles.primaryButton} onPress={() => void mutate(task, () => submitTaskReport(task.id, {}), 'أرسلت المهمة للمراجعة.')}>
                   <Text style={styles.primaryText}>إرسال للمراجعة</Text>
                 </Pressable>
@@ -603,7 +609,8 @@ export default function TasksScreen() {
               )}
             </View>}
           </CompactExpandableCard>
-        ))}
+          );
+        })}
         {!loading && reportsOnly && filteredTasks.length === 0 && <View style={styles.emptyReportBox}><Text style={styles.empty}>لا توجد تقارير مرتبطة بالمهام حاليًا.</Text></View>}
         {!loading && !reportsOnly && !error && filteredTasks.length === 0 && <Text style={styles.empty}>{tasks.length ? 'لا توجد مهام تطابق البحث أو الفلتر.' : 'لا توجد مهام ظاهرة لهذا الحساب.'}</Text>}
 
