@@ -43,6 +43,20 @@ class _AgreementsScreenState extends State<AgreementsScreen> {
     _load();
   }
 
+  @override
+  void dispose() {
+    for (final controller in _notes.values) {
+      controller.dispose();
+    }
+    _no.dispose();
+    _title.dispose();
+    _from.dispose();
+    _to.dispose();
+    _terms.dispose();
+    _duties.dispose();
+    super.dispose();
+  }
+
   Future<void> _load() async {
     if (mounted)
       setState(() {
@@ -144,9 +158,12 @@ class _AgreementsScreenState extends State<AgreementsScreen> {
         _profile = p;
         _rows = rows;
         _members = members;
-        _membershipId ??= members.isEmpty
-            ? null
-            : members.first['id'].toString();
+        if (_membershipId == null ||
+            !members.any((m) => m['id'].toString() == _membershipId)) {
+          _membershipId = members.isEmpty
+              ? null
+              : members.first['id'].toString();
+        }
       });
     } catch (e) {
       if (mounted)
