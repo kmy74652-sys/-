@@ -35,7 +35,7 @@ class _LoginScreenState extends State<LoginScreen> {
       return;
     }
     final code = _passwordController.text;
-    if (code.length < 8 || code.length > 64 || code.contains(RegExp(r'\\s'))) {
+    if (code.length < 8 || code.length > 64 || code.contains(RegExp(r'\s'))) {
       _showMessage('يجب أن تتكون كلمة المرور من 8 إلى 64 محرفاً دون مسافات.');
       return;
     }
