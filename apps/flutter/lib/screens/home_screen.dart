@@ -150,8 +150,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   const SizedBox(height: 10),
                   _ModuleAction(
                     icon: Icons.fact_check_outlined,
-                    title: 'اعتماد ونشر المهام',
-                    description: 'مراجعة نماذج التقارير واعتمادها قبل ربطها بالمهام.',
+                    title: 'اعتماد نماذج التقارير',
+                    description: 'مراجعة النماذج التي أنشأها مسؤول المتابعة واعتمادها قبل إسناد المهام للموظفين.',
                     onTap: () => Navigator.of(context).push(MaterialPageRoute(
                       builder: (_) => TaskPublicationReviewScreen(profile: profile),
                     )),
