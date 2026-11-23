@@ -22,7 +22,6 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
   Map<String, Map<String, dynamic>> _reportByTask = {};
   Map<String, Map<String, dynamic>> _draftByTask = {};
   String _taskFilter = 'all', _reportFilter = 'all';
-  bool _unifiedOnly = false;
 
   @override
   void initState() {
@@ -236,7 +235,7 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
   }
 
   List<Map<String, dynamic>> get _visibleTasks => _tasks.where((task) {
-    if (_unifiedOnly && !_isUnifiedTask(task)) return false;
+    if (_isUnifiedTask(task)) return false;
     final rawTaskStatus = _s(task['status']);
     final taskMatches = _taskFilter == 'all' ||
         (_taskFilter == 'pending' && ['pending', 'new'].contains(rawTaskStatus)) ||
@@ -624,25 +623,11 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
                           _filterChip(value: 'بدون تقرير', label: 'بدون تقرير', group: 'report', onSelected: () => _reportFilter = 'بدون تقرير'),
                         ],
                       ),
-                      const SizedBox(height: 12),
-                      const Text('مصدر المهمة', textAlign: TextAlign.right, style: TextStyle(fontWeight: FontWeight.bold)),
-                      const SizedBox(height: 6),
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: FilterChip(
-                          selected: _unifiedOnly,
-                          avatar: const Icon(Icons.table_chart_outlined, size: 18),
-                          label: const Text('الجدول الموحد المرسل'),
-                          onSelected: (value) => setState(() => _unifiedOnly = value),
-                        ),
-                      ),
                     ],
                   ),
                 ),
                 SectionCard(
-                  title: _unifiedOnly
-                      ? 'الجدول الموحد المرسل (${_visibleTasks.length})'
-                      : 'المهام والجداول المرسلة (${_visibleTasks.length} من ${_tasks.length})',
+                    title: 'المهام المرسلة (${_visibleTasks.length} من ${_tasks.where((task) => !_isUnifiedTask(task)).length})',
                   child: _visibleTasks.isEmpty
                       ? const Text('لا توجد مهام مطابقة للفلاتر المحددة.', textAlign: TextAlign.right)
                       : Column(
@@ -679,15 +664,6 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
                                           maxLines: 2,
                                           overflow: TextOverflow.ellipsis,
                                           textAlign: TextAlign.right,
-                                        ),
-                                      if (_isUnifiedTask(t))
-                                        Text(
-                                          'الصف محفوظ في الجدول الموحد · اضغط للتعديل',
-                                          textAlign: TextAlign.right,
-                                          style: TextStyle(
-                                            color: Colors.blueGrey.shade700,
-                                            fontWeight: FontWeight.w600,
-                                          ),
                                         ),
                                     ],
                                   ),

@@ -21,6 +21,8 @@ class _UnifiedTaskTableScreenState extends State<UnifiedTaskTableScreen> {
   List<UnifiedEmployeeOption> _employees = const [];
   List<String> _branches = const [];
   List<UnifiedReportOption> _reports = const [];
+  List<Map<String, dynamic>> _sentTasks = const [];
+  bool _sentLoading = false;
 
   @override
   void initState() {
@@ -143,6 +145,7 @@ class _UnifiedTaskTableScreenState extends State<UnifiedTaskTableScreen> {
         _reports = reports;
         _loading = false;
       });
+      await _loadSentTasks();
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -151,6 +154,125 @@ class _UnifiedTaskTableScreenState extends State<UnifiedTaskTableScreen> {
       });
     }
   }
+
+  Future<void> _loadSentTasks() async {
+    final organization = _organizationId;
+    if (organization == null || organization.isEmpty) return;
+    if (mounted) setState(() => _sentLoading = true);
+    try {
+      final rows = await _db
+          .from('tasks')
+          .select('id,title,description,due_at,status,assigned_to,branch_id')
+          .eq('organization_id', organization)
+          .isFilter('deleted_at', null)
+          .order('due_at')
+          .limit(1000);
+      final sent = (rows as List)
+          .whereType<Map>()
+          .map((row) => Map<String, dynamic>.from(row))
+          .where((row) => '${row['description'] ?? ''}'.contains('الوقت المحدد:'))
+          .toList();
+      if (mounted) setState(() => _sentTasks = sent);
+    } finally {
+      if (mounted) setState(() => _sentLoading = false);
+    }
+  }
+
+  Future<void> _editSentTask(Map<String, dynamic> task) async {
+    final title = TextEditingController(text: '${task['title'] ?? ''}');
+    final description = TextEditingController(text: '${task['description'] ?? ''}');
+    final due = TextEditingController(text: '${task['due_at'] ?? ''}');
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('تعديل صف الجدول الموحد', textAlign: TextAlign.right),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(controller: title, textAlign: TextAlign.right, decoration: const InputDecoration(labelText: 'المهمة')),
+            TextField(controller: description, textAlign: TextAlign.right, maxLines: 6, decoration: const InputDecoration(labelText: 'بيانات الصف والمخرج والملاحظات')),
+            TextField(controller: due, textAlign: TextAlign.right, decoration: const InputDecoration(labelText: 'الموعد بصيغة ISO')),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('إلغاء')),
+          FilledButton(onPressed: () => Navigator.pop(dialogContext, true), child: const Text('حفظ')),
+        ],
+      ),
+    );
+    if (ok == true && mounted) {
+      try {
+        await _db.rpc('admin_update_task', params: {
+          'p_organization_id': _organizationId,
+          'p_task_id': task['id'],
+          'p_title': title.text.trim(),
+          'p_description': description.text.trim(),
+          'p_due_at': due.text.trim().isEmpty ? null : due.text.trim(),
+        });
+        await _loadSentTasks();
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم حفظ تعديل الجدول الموحد.')));
+      } catch (e) {
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('تعذر الحفظ: $e')));
+      }
+    }
+    title.dispose();
+    description.dispose();
+    due.dispose();
+  }
+
+  Future<void> _deleteSentTask(Map<String, dynamic> task) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('حذف صف الجدول الموحد؟', textAlign: TextAlign.right),
+        content: Text('سيتم حذف «${task['title'] ?? 'المهمة'}» من الجدول الموحد.', textAlign: TextAlign.right),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('إلغاء')),
+          FilledButton(onPressed: () => Navigator.pop(dialogContext, true), child: const Text('حذف')),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    await _db.rpc('admin_delete_task', params: {'p_organization_id': _organizationId, 'p_task_id': task['id']});
+    await _loadSentTasks();
+  }
+
+  Widget _sentTasksSection() => Card(
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                'الجداول الموحدة المرسلة (${_sentTasks.length})',
+                textAlign: TextAlign.right,
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 17),
+              ),
+              const SizedBox(height: 8),
+              if (_sentLoading)
+                const Center(child: CircularProgressIndicator())
+              else if (_sentTasks.isEmpty)
+                const Text('لا توجد جداول موحدة مرسلة.', textAlign: TextAlign.right)
+              else
+                for (final task in _sentTasks)
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: Text('${task['title'] ?? 'مهمة'}', textAlign: TextAlign.right),
+                    subtitle: Text(
+                      '${task['status'] ?? 'جديدة'} · ${task['due_at'] ?? 'غير محدد'}',
+                      textAlign: TextAlign.right,
+                    ),
+                    trailing: Wrap(
+                      children: [
+                        IconButton(onPressed: () => _editSentTask(task), icon: const Icon(Icons.edit_outlined)),
+                        IconButton(onPressed: () => _deleteSentTask(task), icon: const Icon(Icons.delete_outline, color: Colors.red)),
+                      ],
+                    ),
+                  ),
+            ],
+          ),
+        ),
+      );
 
   String? _defaultBranch(Map<String, dynamic> profile) {
     final branches = profile['branches'];
@@ -290,6 +412,8 @@ class _UnifiedTaskTableScreenState extends State<UnifiedTaskTableScreen> {
                 : ListView(
                     padding: const EdgeInsets.all(12),
                     children: [
+                      _sentTasksSection(),
+                      const SizedBox(height: 12),
                       Align(
                         alignment: Alignment.centerRight,
                         child: TextButton.icon(
