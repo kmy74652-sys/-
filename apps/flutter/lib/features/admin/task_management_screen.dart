@@ -78,12 +78,12 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
         _db
             .from('tasks')
             .select(
-              'id,title,description,branch_id,assigned_to,due_at,priority,status,report_required,report_flow,deleted_at',
+              'id,title,description,branch_id,assigned_to,due_at,priority,status,report_required,report_flow,updated_at,deleted_at',
             )
             .eq('organization_id', org)
             .isFilter('deleted_at', null)
             .order('due_at')
-            .limit(300),
+            .limit(1000),
         _db
             .from('branches')
             .select('id,name,code')
@@ -627,6 +627,26 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
                                           fontWeight: FontWeight.w700,
                                         ),
                                       ),
+                                      Text(
+                                        'الموعد: ${_s(t['due_at'], 'غير محدد')}',
+                                        textAlign: TextAlign.right,
+                                      ),
+                                      if (_s(t['description']).trim().isNotEmpty)
+                                        Text(
+                                          _s(t['description']).split('\n').take(2).join(' · '),
+                                          maxLines: 2,
+                                          overflow: TextOverflow.ellipsis,
+                                          textAlign: TextAlign.right,
+                                        ),
+                                      if (_isUnifiedTask(t))
+                                        Text(
+                                          'الصف محفوظ في الجدول الموحد · اضغط للتعديل',
+                                          textAlign: TextAlign.right,
+                                          style: TextStyle(
+                                            color: Colors.blueGrey.shade700,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
                                     ],
                                   ),
                                   leading: CircleAvatar(
@@ -637,14 +657,10 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
                                     ),
                                   ),
                                   isThreeLine: true,
-                                  trailing: PopupMenuButton<String>(
-                                    onSelected: (_) => _saveTask(existing: t),
-                                    itemBuilder: (_) => const [
-                                      PopupMenuItem(
-                                        value: 'edit',
-                                        child: Text('تعديل'),
-                                      ),
-                                    ],
+                                  trailing: IconButton(
+                                    tooltip: 'تعديل المهمة أو صف الجدول',
+                                    onPressed: _busy ? null : () => _saveTask(existing: t),
+                                    icon: const Icon(Icons.edit_outlined),
                                   ),
                                   onTap: () => _message(
                                     'حالة التقرير: ${_reportStatus(t)}',
