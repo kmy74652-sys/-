@@ -29,7 +29,7 @@ class _AppCustomizerScreenState extends State<AppCustomizerScreen>
   @override
   void initState() {
     super.initState();
-    _tabs = TabController(length: 5, vsync: this);
+    _tabs = TabController(length: 4, vsync: this);
     _loadPermission();
   }
 
@@ -81,7 +81,6 @@ class _AppCustomizerScreenState extends State<AppCustomizerScreen>
                             Tab(text: 'الترتيب والإظهار'),
                             Tab(text: 'المظهر والألوان'),
                             Tab(text: 'تخصيص الجدول الموحد'),
-                            Tab(text: 'المعاينة والحفظ'),
                           ],
                         ),
                       ),
@@ -93,7 +92,6 @@ class _AppCustomizerScreenState extends State<AppCustomizerScreen>
                             _layoutTab(),
                             _themeTab(),
                             _unifiedTableTab(),
-                            _storageTab(),
                           ],
                         ),
                       ),
@@ -269,7 +267,37 @@ class _AppCustomizerScreenState extends State<AppCustomizerScreen>
             SwitchListTile(title: const Text('إظهار الحالة ووقت الإرسال'), value: _store.postSendShowStatus, onChanged: (v) => setState(() => _store.setPostSend(showStatus: v))),
             SwitchListTile(title: const Text('إظهار أزرار التفاصيل والطباعة'), value: _store.postSendShowActions, onChanged: (v) => setState(() => _store.setPostSend(showActions: v))),
           ])),
-          Row(children: [Expanded(child: FilledButton.icon(onPressed: _saveUnified, icon: const Icon(Icons.save), label: const Text('حفظ تطبيق الجدول'))), const SizedBox(width: 8), Expanded(child: OutlinedButton.icon(onPressed: () => setState(() => _store.resetUnified()), icon: const Icon(Icons.restore), label: const Text('استعادة الافتراضي')))]),
+          SectionCard(
+            title: 'المعاينة المباشرة داخل نفس التبويب',
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const Text(
+                  'غيّر الإعدادات أعلاه وشاهد شكل الجدول مباشرة على الهاتف أو الجهاز اللوحي.',
+                  textAlign: TextAlign.right,
+                ),
+                const SizedBox(height: 10),
+                _previewControls(),
+                const SizedBox(height: 12),
+                _devicePreview(),
+              ],
+            ),
+          ),
+          Row(children: [Expanded(child: FilledButton.icon(onPressed: _saveUnified, icon: const Icon(Icons.save), label: const Text('حفظ وتطبيق الجدول'))), const SizedBox(width: 8), Expanded(child: OutlinedButton.icon(onPressed: () => setState(() => _store.resetUnified()), icon: const Icon(Icons.restore), label: const Text('استعادة الافتراضي')))]),
+          const SizedBox(height: 8),
+          OutlinedButton.icon(onPressed: _export, icon: const Icon(Icons.file_upload_outlined), label: const Text('تصدير الإعدادات JSON')),
+          OutlinedButton.icon(onPressed: _import, icon: const Icon(Icons.file_download_outlined), label: const Text('استيراد الإعدادات JSON')),
+        ],
+      );
+
+  Widget _previewControls() => Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: [
+          ChoiceChip(label: const Text('هاتف'), selected: _previewDevice == 'phone', onSelected: (_) => setState(() => _previewDevice = 'phone')),
+          ChoiceChip(label: const Text('جهاز لوحي'), selected: _previewDevice == 'tablet', onSelected: (_) => setState(() => _previewDevice = 'tablet')),
+          ChoiceChip(label: const Text('عمودي'), selected: !_previewLandscape, onSelected: (_) => setState(() => _previewLandscape = false)),
+          ChoiceChip(label: const Text('أفقي'), selected: _previewLandscape, onSelected: (_) => setState(() => _previewLandscape = true)),
         ],
       );
 
