@@ -34,6 +34,7 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
   final _exceptionRows = <_UnifiedRow>[];
   bool _expanded = true;
   bool _sending = false;
+  bool _sent = false;
   String _workType = 'دوام كامل';
   String _days = 'الأحد - الخميس';
   String _exception = 'الجمعة';
@@ -133,7 +134,7 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
             Row(
               textDirection: TextDirection.rtl,
               children: [
-                Expanded(child: FilledButton.icon(onPressed: _sending ? null : _submit, icon: _sending ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.send_outlined), label: Text(_sending ? 'جارٍ الإرسال...' : 'حفظ الجدول وإرساله'))),
+                Expanded(child: FilledButton.icon(onPressed: _sending || _sent ? null : _submit, icon: _sending ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)) : Icon(_sent ? Icons.check_circle_outline : Icons.send_outlined), label: Text(_sending ? 'جارٍ الإرسال...' : _sent ? 'تم الإرسال' : 'حفظ الجدول وإرساله'))),
                 const SizedBox(width: 8),
                 Expanded(child: OutlinedButton.icon(onPressed: _exportPdf, icon: const Icon(Icons.picture_as_pdf_outlined), label: const Text('تصدير PDF'))),
               ],
@@ -381,6 +382,10 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
 
   Future<void> _submit() async {
     final messenger = ScaffoldMessenger.of(context);
+    if (_sent) {
+      messenger.showSnackBar(const SnackBar(content: Text('تم إرسال هذا الجدول مسبقًا. افتح شاشة الجدول من جديد لإرسال جدول مستقل.', textAlign: TextAlign.right)));
+      return;
+    }
     final tasks = _rows
         .where((row) => row.task.text.trim().isNotEmpty)
         .map((row) => UnifiedTaskRowData(
@@ -433,6 +438,7 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
         reportTemplateId: _reportTemplateId,
         reportVersionId: _reportVersionId,
       ));
+      if (mounted) setState(() => _sent = true);
       if (mounted) messenger.showSnackBar(const SnackBar(content: Text('تم إنشاء المهام وإرسالها للموظف بنجاح.', textAlign: TextAlign.right)));
     } catch (error) {
       if (mounted) messenger.showSnackBar(SnackBar(content: Text('تعذر إرسال الجدول: $error', textAlign: TextAlign.right)));
