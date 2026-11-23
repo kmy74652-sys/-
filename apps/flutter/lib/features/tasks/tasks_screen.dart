@@ -32,6 +32,7 @@ class _TasksScreenState extends State<TasksScreen>
   int _failedCount = 0;
   bool _queueBusy = false;
   String _view = 'tasks';
+  String _ledgerOrder = 'latest';
 
   static const Map<String, String> _statusLabels = {
     'pending': 'جديدة',
@@ -587,15 +588,25 @@ class _TasksScreenState extends State<TasksScreen>
 
   Widget _taskLedger(List<Map<String, dynamic>> tasks) {
     final ordered = [...tasks]
-      ..sort((a, b) => '${b['updated_at'] ?? b['due_at'] ?? ''}'.compareTo(
-        '${a['updated_at'] ?? a['due_at'] ?? ''}',
-      ));
+      ..sort((a, b) {
+        final left = '${a['updated_at'] ?? a['due_at'] ?? a['created_at'] ?? ''}';
+        final right = '${b['updated_at'] ?? b['due_at'] ?? b['created_at'] ?? ''}';
+        return _ledgerOrder == 'oldest' ? left.compareTo(right) : right.compareTo(left);
+      });
     if (ordered.isEmpty) {
       return const Padding(
         padding: EdgeInsets.all(28),
         child: Center(child: Text('لا توجد سجلات في كشف المهام المطابق للبحث والمرشحات.')),
       );
     }
+    final completed = ordered.where((task) => {'approved', 'completed'}.contains(_normalizedStatus(task))).length;
+    final submitted = ordered.where((task) => _reportByTask['${task['id']}']?['status'] == 'submitted').length;
+    final pending = ordered.length - completed;
+    final late = ordered.where((task) {
+      final status = _normalizedStatus(task);
+      final due = DateTime.tryParse('${task['due_at'] ?? ''}');
+      return status != 'approved' && due != null && due.isBefore(DateTime.now());
+    }).length;
     return Card(
       color: const Color(0xFFF8FBFA),
       shape: RoundedRectangleBorder(
@@ -621,20 +632,83 @@ class _TasksScreenState extends State<TasksScreen>
               style: TextStyle(color: AppColors.muted, fontSize: 12),
             ),
           ),
-          for (final task in ordered)
-            ListTile(
-              onTap: () => context.push('/tasks/${task['id']}'),
-              leading: const Icon(Icons.receipt_long_outlined, color: AppColors.green),
-              title: Text('${task['title'] ?? 'مهمة'}', textAlign: TextAlign.right),
-              subtitle: Text(
-                'التاريخ: ${task['updated_at'] ?? task['due_at'] ?? 'غير محدد'}\n'
-                'الحالة: ${_statusLabels[_normalizedStatus(task)] ?? task['status'] ?? 'جديدة'} · '
-                'التقرير: ${_reportStatusLabel(_reportByTask['${task['id']}']?['status'])}',
-                textAlign: TextAlign.right,
-              ),
-              trailing: const Icon(Icons.chevron_left),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 4, 12, 8),
+            child: Wrap(
+              textDirection: TextDirection.rtl,
+              spacing: 6,
+              runSpacing: 6,
+              children: [
+                _ledgerSummaryChip('الإجمالي', ordered.length, Icons.receipt_long_outlined),
+                _ledgerSummaryChip('مكتملة', completed, Icons.verified_outlined),
+                _ledgerSummaryChip('بانتظار المراجعة', submitted, Icons.fact_check_outlined),
+                _ledgerSummaryChip('غير مكتملة', pending, Icons.pending_actions_outlined),
+                _ledgerSummaryChip('متأخرة', late, Icons.schedule_outlined),
+              ],
             ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+            child: DropdownButtonFormField<String>(
+              value: _ledgerOrder,
+              isExpanded: true,
+              decoration: const InputDecoration(labelText: 'ترتيب الكشف', isDense: true),
+              items: const [
+                DropdownMenuItem(value: 'latest', child: Text('الأحدث تحديثًا أولًا')),
+                DropdownMenuItem(value: 'oldest', child: Text('الأقدم أولًا')),
+              ],
+              onChanged: (value) {
+                if (value != null) setState(() => _ledgerOrder = value);
+              },
+            ),
+          ),
+          for (final task in ordered)
+            _ledgerEntry(task),
         ],
+      ),
+    );
+  }
+
+  Widget _ledgerSummaryChip(String label, int count, IconData icon) => Chip(
+    avatar: Icon(icon, size: 16, color: AppColors.green),
+    label: Text('$label: $count'),
+    visualDensity: VisualDensity.compact,
+  );
+
+  Widget _ledgerEntry(Map<String, dynamic> task) {
+    final report = _reportByTask['${task['id']}'];
+    final status = _normalizedStatus(task);
+    final date = '${task['updated_at'] ?? task['due_at'] ?? task['created_at'] ?? 'غير محدد'}';
+    return InkWell(
+      onTap: () => context.push('/tasks/${task['id']}'),
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: const Color(0xFFD8E4E0)),
+        ),
+        child: Row(
+          textDirection: TextDirection.rtl,
+          children: [
+            const Icon(Icons.receipt_long_outlined, color: AppColors.green),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text('${task['title'] ?? 'مهمة'}', textAlign: TextAlign.right, style: const TextStyle(fontWeight: FontWeight.w800, color: AppColors.navy)),
+                  const SizedBox(height: 3),
+                  Text('التاريخ: $date', textAlign: TextAlign.right, style: const TextStyle(fontSize: 12, color: AppColors.muted)),
+                  Text('المهمة: ${_statusLabels[status] ?? task['status'] ?? 'جديدة'} · التقرير: ${_reportStatusLabel(report?['status'])}', textAlign: TextAlign.right, style: const TextStyle(fontSize: 12)),
+                ],
+              ),
+            ),
+            const SizedBox(width: 6),
+            const Icon(Icons.chevron_left),
+          ],
+        ),
       ),
     );
   }
