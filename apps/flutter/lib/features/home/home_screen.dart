@@ -298,7 +298,8 @@ class _HomeScreenState extends State<HomeScreen> {
         client.from('organization_memberships').select('user_id,display_name').eq('organization_id', organizationId).eq('is_active', true).order('display_name').limit(500),
         client.from('branches').select('name').eq('organization_id', organizationId).eq('is_active', true).order('name').limit(200),
         client.from('report_form_templates').select('id,title,role_code').eq('organization_id', organizationId).eq('is_active', true).order('title').limit(200),
-        client.from('report_form_versions').select('id,template_id,status,approved_by,approved_at,report_required').eq('status', 'published').limit(500),
+        client.from('report_form_versions').select('id,template_id,status,version_no,approved_by,approved_at,report_required').eq('status', 'published').limit(500),
+        client.from('report_form_version_fields').select('version_id,is_required').limit(2000),
       ]);
       if (!mounted) return;
       final employees = (results[0] as List).whereType<Map>().map((row) => UnifiedEmployeeOption(name: (row['display_name'] ?? '').toString(), userId: (row['user_id'] ?? '').toString())).where((item) => item.name.isNotEmpty && item.userId.isNotEmpty).toList();
@@ -307,10 +308,35 @@ class _HomeScreenState extends State<HomeScreen> {
         _unifiedBranches = (results[1] as List).whereType<Map>().map((row) => (row['name'] ?? '').toString()).where((name) => name.isNotEmpty).toList();
         final templates = (results[2] as List).whereType<Map>().toList();
         final versions = (results[3] as List).whereType<Map>().where((row) => row['approved_by'] != null && row['approved_at'] != null).toList();
-        _unifiedReports = versions.map((version) {
+        final fieldsByVersion = <String, List<Map<String, dynamic>>>{};
+        for (final row in (results[4] as List).whereType<Map>()) {
+          final id = row['version_id']?.toString();
+          if (id == null || id.isEmpty) continue;
+          fieldsByVersion.putIfAbsent(id, () => <Map<String, dynamic>>[]).add(Map<String, dynamic>.from(row));
+        }
+        final latestByTemplate = <String, Map<String, dynamic>>{};
+        for (final version in versions) {
+          final templateId = version['template_id']?.toString();
+          if (templateId == null) continue;
+          final current = latestByTemplate[templateId];
+          final number = int.tryParse('${version['version_no'] ?? 0}') ?? 0;
+          final currentNumber = int.tryParse('${current?['version_no'] ?? 0}') ?? 0;
+          if (current == null || number > currentNumber) latestByTemplate[templateId] = Map<String, dynamic>.from(version);
+        }
+        _unifiedReports = latestByTemplate.values.map((version) {
           final matches = templates.where((row) => row['id']?.toString() == version['template_id']?.toString()).toList();
           final template = matches.isEmpty ? null : matches.first;
-          return template == null ? null : UnifiedReportOption(templateId: template['id'].toString(), versionId: version['id'].toString(), title: '${template['title']} · إصدار معتمد');
+          final fields = fieldsByVersion[version['id']?.toString()] ?? const <Map<String, dynamic>>[];
+          final required = fields.where((field) => field['is_required'] == true).length;
+          return template == null ? null : UnifiedReportOption(
+            templateId: template['id'].toString(),
+            versionId: version['id'].toString(),
+            title: template['title'].toString(),
+            roleCode: (template['role_code'] ?? '').toString(),
+            versionNumber: '${version['version_no'] ?? '—'}',
+            fieldCount: fields.length,
+            requiredFieldCount: required,
+          );
         }).whereType<UnifiedReportOption>().toList();
       });
     } catch (_) {
@@ -599,7 +625,7 @@ class _HomeScreenState extends State<HomeScreen> {
           if (draft.purpose.isNotEmpty) 'الهدف من الوظيفة: ${draft.purpose}',
           'الوقت المحدد: ${row.time.isEmpty ? 'غير محدد' : row.time}',
           if (row.output.isNotEmpty) 'المخرج المطلوب: ${row.output}',
-          if (draft.dailyReport.isNotEmpty) 'التقرير اليومي المطلوب: ${draft.dailyReport}',
+          if (draft.reportNotes.isNotEmpty) 'ملاحظات وتعليمات إضافية: ${draft.reportNotes}',
           if (draft.responsibilities.isNotEmpty) 'المسؤوليات: ${draft.responsibilities.join('، ')}',
           if (draft.authorities.isNotEmpty) 'الصلاحيات: ${draft.authorities.join('، ')}',
           if (draft.instructions.isNotEmpty) 'التعليمات: ${draft.instructions.join('، ')}',

@@ -86,7 +86,7 @@ class _TasksScreenState extends State<TasksScreen>
         final page = await client
             .from('tasks')
             .select(
-              'id,title,description,due_at,priority,status,assigned_at,received_at,opened_at,created_at,updated_at',
+              'id,title,description,due_at,priority,status,report_required,report_form_snapshot_id,assigned_at,received_at,opened_at,created_at,updated_at',
             )
             .isFilter('deleted_at', null)
             .order('due_at')
@@ -575,7 +575,7 @@ class _TasksScreenState extends State<TasksScreen>
             if (value('مؤشرات الأداء') != '—')
               Text('مؤشرات الأداء: ${value('مؤشرات الأداء')}', textAlign: TextAlign.right),
             Text(
-              'التقرير اليومي: ${firstDescription.contains('التقرير اليومي المطلوب:') ? 'مطلوب عبر النموذج المعتمد أو الوصف' : 'غير محدد'}',
+              'التقرير اليومي: ${task['report_required'] == true ? 'نموذج جاهز مطلوب' : 'غير محدد'}',
               textAlign: TextAlign.right,
               style: const TextStyle(color: AppColors.muted),
             ),

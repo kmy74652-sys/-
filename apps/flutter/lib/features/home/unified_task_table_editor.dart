@@ -19,7 +19,7 @@ class UnifiedTaskTableEditor extends StatefulWidget {
 
 class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
   final _purpose = TextEditingController();
-  final _dailyReport = TextEditingController();
+  final _reportNotes = TextEditingController();
   final _employee = TextEditingController();
   final _role = TextEditingController();
   final _branch = TextEditingController();
@@ -44,7 +44,7 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
   @override
   void dispose() {
     _purpose.dispose();
-    _dailyReport.dispose();
+    _reportNotes.dispose();
     _employee.dispose();
     _role.dispose();
     _branch.dispose();
@@ -58,6 +58,16 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
     for (final row in _rows) row.dispose();
     for (final row in _exceptionRows) row.dispose();
     super.dispose();
+  }
+
+  @override
+  void didUpdateWidget(covariant UnifiedTaskTableEditor oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.reports != widget.reports && _reportVersionId == null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _suggestReportForRole(_role.text);
+      });
+    }
   }
 
   void _loadTemplate(String value) {
@@ -134,7 +144,7 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
             const SizedBox(height: 10),
             _kpiTable(),
             const SizedBox(height: 10),
-            _section('التقرير اليومي المطلوب', TextField(controller: _dailyReport, textAlign: TextAlign.right, maxLines: 3, decoration: const InputDecoration(hintText: 'حدد البنود التي يرفعها الموظف في نهاية الدوام'))),
+            _section('ملاحظات وتعليمات للإدارة أو الموظف', TextField(controller: _reportNotes, textAlign: TextAlign.right, maxLines: 3, decoration: const InputDecoration(hintText: 'تعليمات إضافية اختيارية؛ نموذج التقرير يحدده القالب المعتمد'))),
             const SizedBox(height: 12),
             _approvalStatus(),
             const SizedBox(height: 12),
@@ -177,7 +187,10 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
           isExpanded: true,
           decoration: const InputDecoration(labelText: 'الموظف أو المجموعة', isDense: true),
           items: widget.employees.map((item) => DropdownMenuItem(value: item.name, child: Text(item.name, overflow: TextOverflow.ellipsis))).toList(),
-          onChanged: (value) => setState(() => _employee.text = value ?? ''),
+          onChanged: (value) {
+            setState(() => _employee.text = value ?? '');
+            _suggestReportForRole(_role.text);
+          },
         );
 
   Widget _roleField() => DropdownButtonFormField<String>(
@@ -185,7 +198,11 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
     isExpanded: true,
     decoration: const InputDecoration(labelText: 'المسمى الوظيفي', isDense: true),
     items: const ['المحاسب', 'أمين مخزن', 'عامل تحميل', 'المدير التنفيذي', 'صاحب المؤسسة'].map((value) => DropdownMenuItem(value: value, child: Text(value, overflow: TextOverflow.ellipsis))).toList(),
-    onChanged: (value) => setState(() => _role.text = value ?? ''),
+    onChanged: (value) {
+      if (value == null) return;
+      setState(() => _role.text = value);
+      _suggestReportForRole(value);
+    },
   );
 
   Widget _branchField() => widget.branches.isEmpty
@@ -198,18 +215,95 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
           onChanged: (value) => setState(() => _branch.text = value ?? ''),
         );
 
-  Widget _reportSelector() => _section('قالب التقرير اليومي', widget.reports.isEmpty
-      ? const Text('لا توجد قوالب تقارير معتمدة متاحة لهذا الحساب.', textAlign: TextAlign.right)
-      : DropdownButtonFormField<String>(
-          value: widget.reports.any((item) => item.versionId == _reportVersionId) ? _reportVersionId : null,
-          isExpanded: true,
-          decoration: const InputDecoration(labelText: 'اختر قالب التقرير المعتمد', isDense: true),
-          items: widget.reports.map((item) => DropdownMenuItem(value: item.versionId, child: Text(item.title, overflow: TextOverflow.ellipsis))).toList(),
-          onChanged: (value) {
-            final item = widget.reports.firstWhere((item) => item.versionId == value);
-            setState(() { _reportVersionId = value; _reportTemplateId = item.templateId; });
-          },
-        ));
+  UnifiedReportOption? get _selectedReport {
+    for (final item in widget.reports) {
+      if (item.versionId == _reportVersionId) return item;
+    }
+    return null;
+  }
+
+  void _suggestReportForRole(String role) {
+    if (widget.reports.isEmpty || role.trim().isEmpty) return;
+    final roleMap = <String, String>{
+      'المحاسب': 'accountant',
+      'أمين المخزن': 'warehouse_keeper',
+      'أمين مخزن': 'warehouse_keeper',
+      'عامل تحميل': 'warehouse_worker',
+      'المدير التنفيذي': 'admin_followup',
+      'صاحب المؤسسة': 'owner',
+    };
+    final code = roleMap[role.trim()] ?? role.trim();
+    final matches = widget.reports.where((item) => item.roleCode == code).toList();
+    final match = matches.isEmpty ? null : matches.first;
+    if (match == null || _reportVersionId == match.versionId) return;
+    setState(() {
+      _reportVersionId = match.versionId;
+      _reportTemplateId = match.templateId;
+    });
+  }
+
+  Widget _reportSelector() {
+    final selected = _selectedReport;
+    return _section(
+      'قالب التقرير اليومي',
+      Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (widget.reports.isEmpty)
+            const Text('لا توجد قوالب تقارير منشورة ومعتمدة متاحة لهذا الحساب.', textAlign: TextAlign.right)
+          else
+            DropdownButtonFormField<String>(
+              value: selected?.versionId,
+              isExpanded: true,
+              decoration: const InputDecoration(labelText: 'اختر قالب التقرير المعتمد', isDense: true),
+              items: widget.reports.map((item) => DropdownMenuItem(value: item.versionId, child: Text(item.title, overflow: TextOverflow.ellipsis))).toList(),
+              onChanged: (value) {
+                if (value == null) return;
+                final item = widget.reports.firstWhere((item) => item.versionId == value);
+                setState(() { _reportVersionId = value; _reportTemplateId = item.templateId; });
+              },
+            ),
+          if (selected != null) ...[
+            const SizedBox(height: 10),
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(color: const Color(0xFFEAF4F0), borderRadius: BorderRadius.circular(10), border: Border.all(color: const Color(0xFFB8CEC5))),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(selected.title, textAlign: TextAlign.right, style: const TextStyle(fontWeight: FontWeight.w900, color: AppColors.navy)),
+                  const SizedBox(height: 5),
+                  Text('الإصدار ${selected.versionNumber} · ${selected.fieldCount} حقول · ${selected.requiredFieldCount} إلزامية', textAlign: TextAlign.right),
+                  const SizedBox(height: 5),
+                  const Text('سيظهر هذا النموذج جاهزًا للموظف عند فتح المهمة، ولا يمكنه تعديل بنيته.', textAlign: TextAlign.right, style: TextStyle(fontSize: 12)),
+                  Align(alignment: Alignment.centerRight, child: TextButton.icon(onPressed: _previewSelectedReport, icon: const Icon(Icons.preview_outlined), label: const Text('معاينة التقرير'))),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  void _previewSelectedReport() {
+    final selected = _selectedReport;
+    if (selected == null) return;
+    showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(selected.title, textAlign: TextAlign.right),
+        content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Text('الإصدار ${selected.versionNumber}', textAlign: TextAlign.right),
+          Text('عدد الحقول: ${selected.fieldCount}', textAlign: TextAlign.right),
+          Text('الحقول الإلزامية: ${selected.requiredFieldCount}', textAlign: TextAlign.right),
+          const SizedBox(height: 12),
+          const Text('سيعبئ الموظف هذا النموذج ويحفظ مسودته أو يرسله للإدارة. إعداد الحقول وترتيبها وإلزاميتها من اختصاص الإدارة فقط.', textAlign: TextAlign.right),
+        ]),
+        actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('إغلاق'))],
+      ),
+    );
+  }
 
   Widget _workHours() => _section('ساعات الدوام الرسمية', Wrap(textDirection: TextDirection.rtl, spacing: 8, runSpacing: 8, children: [
     _drop('نوع الدوام', _workType, ['دوام كامل', 'دوام جزئي', 'مناوبة'], (v) => setState(() => _workType = v)),
@@ -332,8 +426,8 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
       messenger.showSnackBar(const SnackBar(content: Text('أضف مهمة زمنية واحدة على الأقل قبل الإرسال.', textAlign: TextAlign.right)));
       return;
     }
-    if (_dailyReport.text.trim().isNotEmpty && _reportVersionId == null) {
-      messenger.showSnackBar(const SnackBar(content: Text('لا يمكن إرسال التقرير اليومي دون قالب تقرير معتمد متاح ومختار.', textAlign: TextAlign.right)));
+    if (_reportVersionId == null) {
+      messenger.showSnackBar(const SnackBar(content: Text('اختر قالب التقرير اليومي المنشور والمعتمد قبل الإرسال.', textAlign: TextAlign.right)));
       return;
     }
     setState(() => _sending = true);
@@ -344,7 +438,7 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
         branch: _branch.text.trim(),
         startDate: _startDate.text.trim(),
         purpose: _purpose.text.trim(),
-        dailyReport: _dailyReport.text.trim(),
+        reportNotes: _reportNotes.text.trim(),
         rows: tasks,
         responsibilities: _responsibilities.map((v) => v.text.trim()).where((v) => v.isNotEmpty).toList(),
         authorities: _authorities.map((v) => v.text.trim()).where((v) => v.isNotEmpty).toList(),
@@ -425,8 +519,11 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
             _pdfHeading('مؤشرات تقييم الأداء'),
             _pdfKpiTable(),
             pw.SizedBox(height: 12),
-            _pdfHeading('التقرير اليومي المطلوب'),
-            pw.Text(_dailyReport.text.trim().isEmpty ? '—' : _dailyReport.text.trim(), textDirection: pw.TextDirection.rtl),
+            _pdfHeading('قالب التقرير اليومي'),
+            pw.Text(_selectedReport == null ? '—' : '${_selectedReport!.title} · الإصدار ${_selectedReport!.versionNumber} · ${_selectedReport!.fieldCount} حقول (${_selectedReport!.requiredFieldCount} إلزامية)', textDirection: pw.TextDirection.rtl),
+            pw.SizedBox(height: 6),
+            _pdfHeading('ملاحظات وتعليمات إضافية'),
+            pw.Text(_reportNotes.text.trim().isEmpty ? '—' : _reportNotes.text.trim(), textDirection: pw.TextDirection.rtl),
             pw.SizedBox(height: 20),
             pw.Table(
               border: pw.TableBorder.all(color: PdfColor.fromHex('#B8CEC5')),
@@ -502,7 +599,7 @@ class UnifiedTaskTableDraft {
     required this.branch,
     required this.startDate,
     required this.purpose,
-    required this.dailyReport,
+    required this.reportNotes,
     required this.rows,
     required this.responsibilities,
     required this.authorities,
@@ -514,7 +611,7 @@ class UnifiedTaskTableDraft {
     this.reportTemplateId,
     this.reportVersionId,
   });
-  final String employee, role, branch, startDate, purpose, dailyReport;
+  final String employee, role, branch, startDate, purpose, reportNotes;
   final String workType, workDays, weeklyException;
   final List<UnifiedTaskRowData> rows;
   final List<String> responsibilities, authorities, instructions, kpis;
@@ -532,6 +629,7 @@ class UnifiedEmployeeOption {
 }
 
 class UnifiedReportOption {
-  const UnifiedReportOption({required this.templateId, required this.versionId, required this.title});
-  final String templateId, versionId, title;
+  const UnifiedReportOption({required this.templateId, required this.versionId, required this.title, required this.roleCode, required this.versionNumber, required this.fieldCount, required this.requiredFieldCount});
+  final String templateId, versionId, title, roleCode, versionNumber;
+  final int fieldCount, requiredFieldCount;
 }
