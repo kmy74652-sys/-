@@ -570,31 +570,6 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
     }
   }
 
-  Future<void> _delete(Map<String, dynamic> task) async {
-    final yes = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('حذف المهمة'),
-        content: const Text('سيتم تنفيذ الحذف الآمن/الأرشفة مع الحفاظ على سجل النشاط.'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('إلغاء')),
-          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('متابعة')),
-        ],
-      ),
-    );
-    if (yes != true) return;
-    setState(() => _busy = true);
-    try {
-      await _db.rpc('admin_delete_task', params: {'p_organization_id': _orgId, 'p_task_id': task['id']});
-      _message('تمت أرشفة المهمة وحجبها من القوائم.');
-      await _load();
-    } catch (e) {
-      _message('تعذر حذف المهمة: $e');
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
-  }
-
   Future<void> _review(Map<String, dynamic> row, bool approve) async {
     try {
       final count = await _db.rpc(
