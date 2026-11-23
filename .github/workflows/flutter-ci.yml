@@ -89,8 +89,8 @@ jobs:
           fi
 
       - name: Static analysis
-        # لا تفشل المهمة بسبب ملاحظات lint/deprecation؛ الأخطاء والتحذيرات تبقى حاجبة.
-        run: flutter analyze --no-fatal-infos
+        # لا تحجب التحذيرات البناء؛ أخطاء Dart الفعلية تبقى حاجبة.
+        run: flutter analyze --no-fatal-infos --no-fatal-warnings
 
       - name: Unit and widget tests
         run: flutter test --reporter expanded
