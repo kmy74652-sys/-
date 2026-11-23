@@ -305,6 +305,13 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
         responsibilities: _responsibilities.map((v) => v.text.trim()).where((v) => v.isNotEmpty).toList(),
         authorities: _authorities.map((v) => v.text.trim()).where((v) => v.isNotEmpty).toList(),
         instructions: _instructions.map((v) => v.text.trim()).where((v) => v.isNotEmpty).toList(),
+        workType: _workType,
+        workDays: _days,
+        weeklyException: _exception,
+        kpis: _kpis
+            .where((row) => row.any((controller) => controller.text.trim().isNotEmpty))
+            .map((row) => '${row[0].text.trim()}: ${row[1].text.trim()}')
+            .toList(),
         reportTemplateId: _reportTemplateId,
         reportVersionId: _reportVersionId,
       ));
@@ -456,12 +463,17 @@ class UnifiedTaskTableDraft {
     required this.responsibilities,
     required this.authorities,
     required this.instructions,
+    required this.workType,
+    required this.workDays,
+    required this.weeklyException,
+    required this.kpis,
     this.reportTemplateId,
     this.reportVersionId,
   });
   final String employee, role, branch, startDate, purpose, dailyReport;
+  final String workType, workDays, weeklyException;
   final List<UnifiedTaskRowData> rows;
-  final List<String> responsibilities, authorities, instructions;
+  final List<String> responsibilities, authorities, instructions, kpis;
   final String? reportTemplateId, reportVersionId;
 }
 

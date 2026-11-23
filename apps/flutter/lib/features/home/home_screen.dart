@@ -595,6 +595,7 @@ class _HomeScreenState extends State<HomeScreen> {
           'المسمى الوظيفي: ${draft.role}',
           if (draft.branch.isNotEmpty) 'الفرع: ${draft.branch}',
           if (draft.startDate.isNotEmpty) 'تاريخ بدء التطبيق: ${draft.startDate}',
+          'ساعات الدوام: ${draft.workType} · ${draft.workDays} · الاستثناء الأسبوعي: ${draft.weeklyException}',
           if (draft.purpose.isNotEmpty) 'الهدف من الوظيفة: ${draft.purpose}',
           'الوقت المحدد: ${row.time.isEmpty ? 'غير محدد' : row.time}',
           if (row.output.isNotEmpty) 'المخرج المطلوب: ${row.output}',
@@ -602,6 +603,7 @@ class _HomeScreenState extends State<HomeScreen> {
           if (draft.responsibilities.isNotEmpty) 'المسؤوليات: ${draft.responsibilities.join('، ')}',
           if (draft.authorities.isNotEmpty) 'الصلاحيات: ${draft.authorities.join('، ')}',
           if (draft.instructions.isNotEmpty) 'التعليمات: ${draft.instructions.join('، ')}',
+          if (draft.kpis.isNotEmpty) 'مؤشرات الأداء: ${draft.kpis.join('؛ ')}',
         ].join('\n');
         await client.rpc('create_task_with_report_form', params: {
           'p_organization_id': organizationId,

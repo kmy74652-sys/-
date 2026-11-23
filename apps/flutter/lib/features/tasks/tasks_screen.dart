@@ -496,6 +496,9 @@ class _TasksScreenState extends State<TasksScreen>
               textAlign: TextAlign.right,
             ),
             Text('بداية التطبيق: ${value('تاريخ بدء التطبيق')}', textAlign: TextAlign.right),
+            Text('ساعات الدوام: ${value('ساعات الدوام')}', textAlign: TextAlign.right),
+            if (value('الهدف من الوظيفة') != '—')
+              Text('الهدف: ${value('الهدف من الوظيفة')}', textAlign: TextAlign.right),
             const SizedBox(height: 8),
             SingleChildScrollView(
               scrollDirection: Axis.horizontal,
@@ -527,6 +530,12 @@ class _TasksScreenState extends State<TasksScreen>
               ),
             ),
             const SizedBox(height: 6),
+            if (value('المسؤوليات') != '—')
+              Text('المسؤوليات: ${value('المسؤوليات')}', textAlign: TextAlign.right),
+            if (value('الصلاحيات') != '—')
+              Text('الصلاحيات: ${value('الصلاحيات')}', textAlign: TextAlign.right),
+            if (value('مؤشرات الأداء') != '—')
+              Text('مؤشرات الأداء: ${value('مؤشرات الأداء')}', textAlign: TextAlign.right),
             Text(
               'التقرير اليومي: ${firstDescription.contains('التقرير اليومي المطلوب:') ? 'مطلوب عبر النموذج المعتمد أو الوصف' : 'غير محدد'}',
               textAlign: TextAlign.right,
