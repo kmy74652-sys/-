@@ -99,17 +99,20 @@ class _TasksScreenState extends State<TasksScreen>
         _reportByTask.clear();
         if (rows.isNotEmpty) {
           final ids = rows.map((row) => '${row['id']}').toList();
-          final reports = await client
-              .from('task_reports')
-              .select('id,task_id,status,submitted_at,reviewed_at,review_note')
-              .inFilter('task_id', ids)
-              .order('submitted_at', ascending: false)
-              .limit(500);
-          for (final report in (reports as List).whereType<Map>()) {
-            final taskId = '${report['task_id'] ?? ''}';
-            if (taskId.isNotEmpty && !_reportByTask.containsKey(taskId)) {
-              _reportByTask[taskId] = Map<String, dynamic>.from(report);
+          for (var reportOffset = 0; ; reportOffset += 500) {
+            final reports = await client
+                .from('task_reports')
+                .select('id,task_id,status,submitted_at,reviewed_at,review_note')
+                .inFilter('task_id', ids)
+                .order('submitted_at', ascending: false)
+                .range(reportOffset, reportOffset + 499);
+            for (final report in (reports as List).whereType<Map>()) {
+              final taskId = '${report['task_id'] ?? ''}';
+              if (taskId.isNotEmpty && !_reportByTask.containsKey(taskId)) {
+                _reportByTask[taskId] = Map<String, dynamic>.from(report);
+              }
             }
+            if (reports.length < 500) break;
           }
         }
       _showingCachedTasks = false;
