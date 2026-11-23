@@ -96,8 +96,8 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
             .from('report_form_versions')
             .select('id,template_id,version_no,status,approved_by,approved_at')
             .eq('status', 'published')
-            .not('approved_by', 'is', null)
-            .not('approved_at', 'is', null)
+            .filter('approved_by', 'not.is', 'null')
+            .filter('approved_at', 'not.is', 'null')
             .order('version_no', ascending: false)
             .limit(500),
         _db
