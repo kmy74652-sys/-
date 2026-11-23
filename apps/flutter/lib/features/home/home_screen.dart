@@ -433,7 +433,9 @@ class _HomeScreenState extends State<HomeScreen> {
     ),
     child: InkWell(
       borderRadius: BorderRadius.circular(15),
-      onTap: _allowed('tasks') ? () => context.go('/tasks') : null,
+      onTap: _allowed('tasks')
+          ? () => context.go(_manageTasks ? '/admin/tasks' : '/tasks')
+          : null,
       child: SizedBox(
         height: compact ? 116 : 126,
         child: Padding(
