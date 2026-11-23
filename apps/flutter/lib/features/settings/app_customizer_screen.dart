@@ -20,6 +20,8 @@ class _AppCustomizerScreenState extends State<AppCustomizerScreen>
   final _store = AppCustomizer.instance;
   bool _loading = true;
   bool _allowed = false;
+  String _previewDevice = 'phone';
+  bool _previewLandscape = false;
   late final TabController _tabs;
   final Map<String, TextEditingController> _controllers = {};
 
@@ -376,24 +378,36 @@ class _AppCustomizerScreenState extends State<AppCustomizerScreen>
           _intro('المعاينة والحفظ والنسخ الاحتياطي', 'التغييرات المؤقتة تظهر مباشرة، والحفظ يجعلها دائمة بعد إغلاق التطبيق.'),
           SectionCard(
             title: 'معاينة',
-            child: AnimatedBuilder(
-              animation: _store,
-              builder: (_, __) => Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Color(_store.backgroundColor),
-                  borderRadius: BorderRadius.circular(_store.radius),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
+            child: Column(
+              children: [
+                Wrap(
+                  spacing: 8,
                   children: [
-                    Text(_store.label('appName'), style: TextStyle(fontSize: _store.fontSize == 'large' ? 24 : 19, fontWeight: FontWeight.bold, color: Color(_store.primaryColor))),
-                    Text(_store.label('organizationName')),
-                    const SizedBox(height: 12),
-                    FilledButton(onPressed: null, child: Text(_store.label('unifiedTable'))),
+                    ChoiceChip(
+                      label: const Text('هاتف'),
+                      selected: _previewDevice == 'phone',
+                      onSelected: (_) => setState(() => _previewDevice = 'phone'),
+                    ),
+                    ChoiceChip(
+                      label: const Text('جهاز لوحي'),
+                      selected: _previewDevice == 'tablet',
+                      onSelected: (_) => setState(() => _previewDevice = 'tablet'),
+                    ),
+                    ChoiceChip(
+                      label: const Text('عمودي'),
+                      selected: !_previewLandscape,
+                      onSelected: (_) => setState(() => _previewLandscape = false),
+                    ),
+                    ChoiceChip(
+                      label: const Text('أفقي'),
+                      selected: _previewLandscape,
+                      onSelected: (_) => setState(() => _previewLandscape = true),
+                    ),
                   ],
                 ),
-              ),
+                const SizedBox(height: 12),
+                _devicePreview(),
+              ],
             ),
           ),
           FilledButton.icon(
@@ -417,6 +431,74 @@ class _AppCustomizerScreenState extends State<AppCustomizerScreen>
             label: const Text('إعادة ضبط المصنع', style: TextStyle(color: Colors.red)),
           ),
         ],
+      );
+
+  Widget _devicePreview() => AnimatedBuilder(
+        animation: _store,
+        builder: (_, __) {
+          final portraitWidth = _previewDevice == 'phone' ? 230.0 : 390.0;
+          final portraitHeight = _previewDevice == 'phone' ? 430.0 : 500.0;
+          final width = _previewLandscape ? portraitHeight : portraitWidth;
+          final height = _previewLandscape ? portraitWidth : portraitHeight;
+          return Center(
+            child: Container(
+              width: width,
+              height: height,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.black,
+                borderRadius: BorderRadius.circular(_previewDevice == 'phone' ? 28 : 18),
+                boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 12)],
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(_previewDevice == 'phone' ? 20 : 12),
+                child: Material(
+                  color: Color(_store.backgroundColor),
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.all(12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Text(
+                          _store.label('appName'),
+                          textAlign: TextAlign.right,
+                          style: TextStyle(
+                            fontSize: _store.fontSize == 'large' ? 20 : 16,
+                            fontWeight: FontWeight.bold,
+                            color: Color(_store.primaryColor),
+                          ),
+                        ),
+                        Text(_store.label('organizationName'), textAlign: TextAlign.right),
+                        const Divider(),
+                        ..._store.fieldOrder.map(
+                          (key) => Padding(
+                            padding: EdgeInsets.only(bottom: _store.fieldSpacing),
+                            child: TextField(
+                              readOnly: true,
+                              maxLines: key == 'description' ? 2 : 1,
+                              decoration: InputDecoration(
+                                labelText: _fieldName(key),
+                                filled: _store.fieldStyle == 'filled',
+                                fillColor: Color(_store.fieldFillColor),
+                                border: _store.fieldStyle == 'plain'
+                                    ? InputBorder.none
+                                    : _store.fieldStyle == 'underlined'
+                                        ? const UnderlineInputBorder()
+                                        : OutlineInputBorder(
+                                            borderRadius: BorderRadius.circular(_store.fieldRadius),
+                                          ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          );
+        },
       );
 
   Widget _intro(String title, String subtitle) => Padding(
