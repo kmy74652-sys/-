@@ -22,7 +22,6 @@ class _AppCustomizerScreenState extends State<AppCustomizerScreen>
   bool _allowed = false;
   String _previewDevice = 'phone';
   bool _previewLandscape = false;
-  String _previewMode = 'unified';
   late final TabController _tabs;
   final Map<String, TextEditingController> _controllers = {};
 
@@ -479,77 +478,6 @@ class _AppCustomizerScreenState extends State<AppCustomizerScreen>
         onPressed: () => setState(() => _store.setTheme(primary: primary, accent: accent)),
       );
 
-  Widget _storageTab() => ListView(
-        padding: const EdgeInsets.all(12),
-        children: [
-          _intro('المعاينة والحفظ والنسخ الاحتياطي', 'التغييرات المؤقتة تظهر مباشرة، والحفظ يجعلها دائمة بعد إغلاق التطبيق.'),
-          SectionCard(
-            title: 'معاينة',
-            child: Column(
-              children: [
-                Wrap(
-                  spacing: 8,
-                  children: [
-                    ChoiceChip(
-                      label: const Text('الجدول الموحد'),
-                      selected: _previewMode == 'unified',
-                      onSelected: (_) => setState(() => _previewMode = 'unified'),
-                    ),
-                    ChoiceChip(
-                      label: const Text('حقول عامة'),
-                      selected: _previewMode == 'generic',
-                      onSelected: (_) => setState(() => _previewMode = 'generic'),
-                    ),
-                    ChoiceChip(
-                      label: const Text('هاتف'),
-                      selected: _previewDevice == 'phone',
-                      onSelected: (_) => setState(() => _previewDevice = 'phone'),
-                    ),
-                    ChoiceChip(
-                      label: const Text('جهاز لوحي'),
-                      selected: _previewDevice == 'tablet',
-                      onSelected: (_) => setState(() => _previewDevice = 'tablet'),
-                    ),
-                    ChoiceChip(
-                      label: const Text('عمودي'),
-                      selected: !_previewLandscape,
-                      onSelected: (_) => setState(() => _previewLandscape = false),
-                    ),
-                    ChoiceChip(
-                      label: const Text('أفقي'),
-                      selected: _previewLandscape,
-                      onSelected: (_) => setState(() => _previewLandscape = true),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                _devicePreview(),
-              ],
-            ),
-          ),
-          FilledButton.icon(
-            onPressed: _save,
-            icon: const Icon(Icons.save_outlined),
-            label: const Text('حفظ وتطبيق التغييرات'),
-          ),
-          OutlinedButton.icon(
-            onPressed: _export,
-            icon: const Icon(Icons.file_upload_outlined),
-            label: const Text('تصدير الإعدادات JSON'),
-          ),
-          OutlinedButton.icon(
-            onPressed: _import,
-            icon: const Icon(Icons.file_download_outlined),
-            label: const Text('استيراد الإعدادات JSON'),
-          ),
-          TextButton.icon(
-            onPressed: _reset,
-            icon: const Icon(Icons.restore, color: Colors.red),
-            label: const Text('إعادة ضبط المصنع', style: TextStyle(color: Colors.red)),
-          ),
-        ],
-      );
-
   Widget _devicePreview() => AnimatedBuilder(
         animation: _store,
         builder: (_, __) {
@@ -587,28 +515,7 @@ class _AppCustomizerScreenState extends State<AppCustomizerScreen>
                         ),
                         Text(_store.label('organizationName'), textAlign: TextAlign.right),
                         const Divider(),
-                        if (_previewMode == 'unified') _unifiedPreviewContent()
-                        else ..._store.fieldOrder.map(
-                          (key) => Padding(
-                            padding: EdgeInsets.only(bottom: _store.fieldSpacing),
-                            child: TextField(
-                              readOnly: true,
-                              maxLines: key == 'description' ? 2 : 1,
-                              decoration: InputDecoration(
-                                labelText: _fieldName(key),
-                                filled: _store.fieldStyle == 'filled',
-                                fillColor: Color(_store.fieldFillColor),
-                                border: _store.fieldStyle == 'plain'
-                                    ? InputBorder.none
-                                    : _store.fieldStyle == 'underlined'
-                                        ? const UnderlineInputBorder()
-                                        : OutlineInputBorder(
-                                            borderRadius: BorderRadius.circular(_store.fieldRadius),
-                                          ),
-                              ),
-                            ),
-                          ),
-                        ),
+                        _unifiedPreviewContent(),
                       ],
                     ),
                   ),
