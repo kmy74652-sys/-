@@ -789,6 +789,11 @@ class _ReportDesignerScreenState extends State<ReportDesignerScreen> {
         ),
       ),
       _preview(),
+      OutlinedButton.icon(
+        onPressed: _showFullPreview,
+        icon: const Icon(Icons.fullscreen_outlined),
+        label: const Text('معاينة التقرير بشكل كامل'),
+      ),
       FilledButton.icon(
         onPressed: _busy ? null : _save,
         icon: const Icon(Icons.save),
@@ -1053,6 +1058,56 @@ class _ReportDesignerScreenState extends State<ReportDesignerScreen> {
     icon: Icon(icon),
     label: Text(label),
   );
+
+  Future<void> _showFullPreview() async {
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: AlertDialog(
+          title: Row(
+            children: [
+              const Icon(Icons.preview_outlined, color: AppColors.navy),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  _title.trim().isEmpty ? 'معاينة التقرير' : _title.trim(),
+                  textAlign: TextAlign.right,
+                ),
+              ),
+            ],
+          ),
+          content: SizedBox(
+            width: 620,
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  if (_description.trim().isNotEmpty) ...[
+                    Text(_description.trim(), textAlign: TextAlign.right),
+                    const Divider(height: 24),
+                  ],
+                  _preview(),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'هذه معاينة توضيحية؛ لن يتم حفظ أي قيمة أو رفع ملف من هذه الشاشة.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: AppColors.muted, fontSize: 12),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('إغلاق المعاينة'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
   void _swap(int a, int b) {
     final item = _fields.removeAt(a);
