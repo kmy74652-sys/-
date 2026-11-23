@@ -326,19 +326,15 @@ class _UnifiedTaskTableScreenState extends State<UnifiedTaskTableScreen> {
                 SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
                   child: DataTable(
-                    columns: const [
-                      DataColumn(label: Text('الوقت')),
-                      DataColumn(label: Text('المهمة')),
-                      DataColumn(label: Text('المخرج')),
-                      DataColumn(label: Text('إجراء')),
+                    columns: [
+                      ..._sentColumnOrder.map((key) => DataColumn(label: Text(customizer.unifiedLabel(key)))),
+                      const DataColumn(label: Text('إجراء')),
                     ],
                     rows: group
                         .expand(_tableRowsForTask)
                         .map(
                           (row) => DataRow(cells: [
-                            DataCell(Text('${row['time']}')),
-                            DataCell(Text('${row['title']}')),
-                            DataCell(Text('${row['output']}')),
+                            ..._sentColumnOrder.map((key) => DataCell(Text(_sentValue(row, key), textAlign: _sentTextAlign(key)))),
                             DataCell(Row(mainAxisSize: MainAxisSize.min, children: [
                               if (customizer.postSendShowActions) ...[
                                 IconButton(
@@ -361,6 +357,23 @@ class _UnifiedTaskTableScreenState extends State<UnifiedTaskTableScreen> {
         ),
       ),
     );
+  }
+
+  List<String> get _sentColumnOrder {
+    final keys = ['time', 'task', 'output'];
+    keys.sort((a, b) {
+      final la = AppCustomizer.instance.unifiedFieldLayout(a);
+      final lb = AppCustomizer.instance.unifiedFieldLayout(b);
+      final row = ((la['row'] as num?)?.toInt() ?? 0).compareTo((lb['row'] as num?)?.toInt() ?? 0);
+      return row != 0 ? row : ((la['column'] as num?)?.toInt() ?? 0).compareTo((lb['column'] as num?)?.toInt() ?? 0);
+    });
+    return keys.where(AppCustomizer.instance.isUnifiedFieldVisible).toList();
+  }
+
+  String _sentValue(Map<String, dynamic> row, String key) => key == 'time' ? '${row['time']}' : key == 'task' ? '${row['title']}' : '${row['output']}';
+  TextAlign _sentTextAlign(String key) {
+    final align = '${AppCustomizer.instance.unifiedFieldLayout(key)['align'] ?? 'right'}';
+    return align == 'left' ? TextAlign.left : align == 'center' ? TextAlign.center : TextAlign.right;
   }
 
   String? _defaultBranch(Map<String, dynamic> profile) {

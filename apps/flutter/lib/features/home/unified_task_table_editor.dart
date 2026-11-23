@@ -151,13 +151,13 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
     ],
   );
 
-  Widget _employeeCard() => _section(AppCustomizer.instance.unifiedLabel('employee'), Column(children: [
-    if (AppCustomizer.instance.isUnifiedFieldVisible('employeeField') || AppCustomizer.instance.isUnifiedFieldVisible('roleField'))
-      Row(children: [if (AppCustomizer.instance.isUnifiedFieldVisible('employeeField')) Expanded(child: _employeeField()), if (AppCustomizer.instance.isUnifiedFieldVisible('employeeField') && AppCustomizer.instance.isUnifiedFieldVisible('roleField')) const SizedBox(width: 8), if (AppCustomizer.instance.isUnifiedFieldVisible('roleField')) Expanded(child: _roleField())]),
-    if (AppCustomizer.instance.isUnifiedFieldVisible('employeeField') || AppCustomizer.instance.isUnifiedFieldVisible('roleField')) const SizedBox(height: 8),
-    if (AppCustomizer.instance.isUnifiedFieldVisible('branchField') || AppCustomizer.instance.isUnifiedFieldVisible('startDate'))
-      Row(children: [if (AppCustomizer.instance.isUnifiedFieldVisible('branchField')) Expanded(child: _branchField()), if (AppCustomizer.instance.isUnifiedFieldVisible('branchField') && AppCustomizer.instance.isUnifiedFieldVisible('startDate')) const SizedBox(width: 8), if (AppCustomizer.instance.isUnifiedFieldVisible('startDate')) Expanded(child: _input(_startDate, AppCustomizer.instance.unifiedLabel('startDate')))]),
-  ]));
+  Widget _employeeCard() => _section(AppCustomizer.instance.unifiedLabel('employee'), LayoutBuilder(builder: (context, constraints) {
+    final fields = <String, Widget>{'employeeField': _employeeField(), 'roleField': _roleField(), 'branchField': _branchField(), 'startDate': _input(_startDate, AppCustomizer.instance.unifiedLabel('startDate'))};
+    final keys = fields.keys.where(AppCustomizer.instance.isUnifiedFieldVisible).toList()..sort((a, b) { final la = AppCustomizer.instance.unifiedFieldLayout(a), lb = AppCustomizer.instance.unifiedFieldLayout(b); final row = ((la['row'] as num?)?.toInt() ?? 0).compareTo((lb['row'] as num?)?.toInt() ?? 0); return row != 0 ? row : ((la['column'] as num?)?.toInt() ?? 0).compareTo((lb['column'] as num?)?.toInt() ?? 0); });
+    return Wrap(textDirection: TextDirection.rtl, spacing: AppCustomizer.instance.unifiedSpacing, runSpacing: AppCustomizer.instance.unifiedSpacing, children: keys.map((key) { final layout = AppCustomizer.instance.unifiedFieldLayout(key); final span = '${layout['span'] ?? 'half'}'; final width = span == 'full' ? constraints.maxWidth : span == 'third' ? (constraints.maxWidth - AppCustomizer.instance.unifiedSpacing * 2) / 3 : (constraints.maxWidth - AppCustomizer.instance.unifiedSpacing) / 2; return SizedBox(width: width, child: Align(alignment: _alignment('${layout['align'] ?? 'right'}'), child: fields[key])); }).toList());
+  }));
+
+  Alignment _alignment(String value) => value == 'left' ? Alignment.centerLeft : value == 'center' ? Alignment.center : Alignment.centerRight;
 
   Widget _employeeField() => widget.employees.isEmpty
       ? _input(_employee, AppCustomizer.instance.unifiedLabel('employeeField'))
@@ -305,7 +305,12 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
       if (AppCustomizer.instance.isUnifiedFieldVisible('time')) 'time',
       if (AppCustomizer.instance.isUnifiedFieldVisible('task')) 'task',
       if (AppCustomizer.instance.isUnifiedFieldVisible('output')) 'output',
-    ];
+    ]..sort((a, b) {
+      final la = AppCustomizer.instance.unifiedFieldLayout(a);
+      final lb = AppCustomizer.instance.unifiedFieldLayout(b);
+      final row = ((la['row'] as num?)?.toInt() ?? 0).compareTo((lb['row'] as num?)?.toInt() ?? 0);
+      return row != 0 ? row : ((la['column'] as num?)?.toInt() ?? 0).compareTo((lb['column'] as num?)?.toInt() ?? 0);
+    });
     return _section(
       title,
       SingleChildScrollView(
@@ -317,9 +322,7 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
             final i = entry.key;
             final row = entry.value;
             return DataRow(cells: [
-              if (visible.contains('time')) DataCell(SizedBox(width: 75, child: TextField(controller: row.time, textAlign: TextAlign.right, decoration: const InputDecoration(isDense: true)))),
-              if (visible.contains('task')) DataCell(SizedBox(width: 220, child: TextField(controller: row.task, textAlign: TextAlign.right, decoration: const InputDecoration(isDense: true)))),
-              if (visible.contains('output')) DataCell(SizedBox(width: 180, child: TextField(controller: row.output, textAlign: TextAlign.right, decoration: const InputDecoration(isDense: true)))),
+              for (final key in visible) DataCell(SizedBox(width: _scheduleFieldWidth(key), child: TextField(controller: _scheduleController(key, row), textAlign: _textAlign(key), decoration: const InputDecoration(isDense: true)))),
               DataCell(Row(children: [
                 IconButton(onPressed: () => setState(() => source.insert(i + 1, _UnifiedRow('', '', ''))), icon: const Icon(Icons.add, size: 19)),
                 IconButton(onPressed: source.isEmpty ? null : () { final removed = source.removeAt(i); removed.dispose(); setState(() {}); }, icon: const Icon(Icons.delete_outline, size: 19)),
@@ -329,6 +332,16 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
         ),
       ),
     );
+  }
+
+  TextEditingController _scheduleController(String key, _UnifiedRow row) => key == 'time' ? row.time : key == 'task' ? row.task : row.output;
+  TextAlign _textAlign(String key) {
+    final align = '${AppCustomizer.instance.unifiedFieldLayout(key)['align'] ?? 'right'}';
+    return align == 'left' ? TextAlign.left : align == 'center' ? TextAlign.center : TextAlign.right;
+  }
+  double _scheduleFieldWidth(String key) {
+    final span = '${AppCustomizer.instance.unifiedFieldLayout(key)['span'] ?? 'half'}';
+    return span == 'full' ? 300 : span == 'third' ? 110 : key == 'time' ? 150 : 220;
   }
 
   Widget _editableList(String title, List<TextEditingController> list) => _section(title, Column(children: [for (var i = 0; i < list.length; i++) Row(children: [Expanded(child: TextField(controller: list[i], textAlign: TextAlign.right, decoration: InputDecoration(isDense: true, hintText: 'أضف بندًا'))), IconButton(onPressed: () => _removeTextRow(list, i), icon: const Icon(Icons.delete_outline))]), Align(alignment: Alignment.centerRight, child: TextButton.icon(onPressed: () => _addTextRow(list), icon: const Icon(Icons.add), label: const Text('إضافة بند')))]));

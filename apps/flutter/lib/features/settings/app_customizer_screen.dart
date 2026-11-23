@@ -242,6 +242,9 @@ class _AppCustomizerScreenState extends State<AppCustomizerScreen>
             for (final key in ['employeeField', 'roleField', 'branchField', 'startDate', 'time', 'task', 'output'])
               SwitchListTile(title: Text(_store.unifiedLabel(key), textAlign: TextAlign.right), value: _store.isUnifiedFieldVisible(key), onChanged: (v) => setState(() => _store.setUnifiedFieldVisibility(key, v))),
           ])),
+          SectionCard(title: 'موقع الحقول واتجاهها داخل الصف', child: Column(children: [
+            for (final key in ['employeeField', 'roleField', 'branchField', 'startDate', 'time', 'task', 'output']) _fieldPlacementEditor(key),
+          ])),
           SectionCard(title: 'التسميات والنصوص الإرشادية', child: Column(children: [
             for (final key in ['screenTitle', 'screenSubtitle', 'sent', 'back', 'employee', 'purpose', 'purposeHint', 'hours', 'daily', 'exception', 'report', 'lists', 'kpi', 'notes', 'approval', 'time', 'task', 'output', 'employeeField', 'roleField', 'branchField', 'startDate'])
               Padding(padding: const EdgeInsets.only(bottom: 8), child: TextField(controller: _unifiedController(key), textDirection: TextDirection.rtl, decoration: InputDecoration(labelText: UnifiedTableCustomization.defaults[key] ?? key, suffixIcon: IconButton(icon: const Icon(Icons.restore), onPressed: () => setState(() => _unifiedController(key).text = UnifiedTableCustomization.defaults[key] ?? key)))),
@@ -270,6 +273,17 @@ class _AppCustomizerScreenState extends State<AppCustomizerScreen>
       );
 
   Widget _slider(String title, double value, double min, double max, ValueChanged<double> onChanged) => Row(children: [SizedBox(width: 150, child: Text(title, textAlign: TextAlign.right)), Expanded(child: Slider(value: value.clamp(min, max).toDouble(), min: min, max: max, onChanged: onChanged))]);
+
+  Widget _fieldPlacementEditor(String key) {
+    final layout = _store.unifiedFieldLayout(key);
+    final span = '${layout['span'] ?? 'half'}';
+    final align = '${layout['align'] ?? 'right'}';
+    return Column(children: [
+      Row(children: [Expanded(child: Text(_store.unifiedLabel(key), textAlign: TextAlign.right)), IconButton(tooltip: 'يسار', icon: const Icon(Icons.arrow_back), onPressed: () => setState(() => _store.moveUnifiedField(key, dx: -1))), IconButton(tooltip: 'يمين', icon: const Icon(Icons.arrow_forward), onPressed: () => setState(() => _store.moveUnifiedField(key, dx: 1))), IconButton(tooltip: 'أعلى', icon: const Icon(Icons.arrow_upward), onPressed: () => setState(() => _store.moveUnifiedField(key, dy: -1))), IconButton(tooltip: 'أسفل', icon: const Icon(Icons.arrow_downward), onPressed: () => setState(() => _store.moveUnifiedField(key, dy: 1)))]),
+      Row(children: [Expanded(child: DropdownButtonFormField<String>(value: span, decoration: const InputDecoration(labelText: 'العرض'), items: const [DropdownMenuItem(value: 'full', child: Text('كامل')), DropdownMenuItem(value: 'half', child: Text('نصف')), DropdownMenuItem(value: 'third', child: Text('ثلث'))], onChanged: (v) => setState(() => _store.setUnifiedFieldLayout(key, span: v)))), const SizedBox(width: 8), Expanded(child: DropdownButtonFormField<String>(value: align, decoration: const InputDecoration(labelText: 'المحاذاة'), items: const [DropdownMenuItem(value: 'right', child: Text('يمين')), DropdownMenuItem(value: 'center', child: Text('وسط')), DropdownMenuItem(value: 'left', child: Text('يسار'))], onChanged: (v) => setState(() => _store.setUnifiedFieldLayout(key, align: v))))]),
+      const Divider(),
+    ]);
+  }
 
   Future<void> _saveUnified() async {
     for (final key in UnifiedTableCustomization.defaults.keys) {
