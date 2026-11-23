@@ -382,6 +382,7 @@ class _TasksScreenState extends State<TasksScreen>
                         ),
                       ],
                     ),
+                    if (visibleTasks.isNotEmpty) _officialTableCard(visibleTasks),
                     if (_tasks.isEmpty)
                       const Padding(
                         padding: EdgeInsets.only(top: 72),
@@ -462,4 +463,78 @@ class _TasksScreenState extends State<TasksScreen>
             ),
     ),
   );
+
+  Widget _officialTableCard(List<Map<String, dynamic>> tasks) {
+    final firstDescription = '${tasks.first['description'] ?? ''}';
+    String value(String label) {
+      final line = firstDescription.split('\n').firstWhere(
+        (item) => item.startsWith('$label:'),
+        orElse: () => '',
+      );
+      return line.isEmpty ? '—' : line.substring(label.length + 1).trim();
+    }
+    return Card(
+      color: const Color(0xFFF8FBFA),
+      margin: const EdgeInsets.only(bottom: 10),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+        side: const BorderSide(color: Color(0xFFD8E4E0)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Text(
+              'مؤسسة الشاعري للتجارة العامة · الجدول الرسمي',
+              textAlign: TextAlign.right,
+              style: TextStyle(fontWeight: FontWeight.w900, color: AppColors.navy),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'المسمى الوظيفي: ${value('المسمى الوظيفي')} · الفرع: ${value('الفرع')}',
+              textAlign: TextAlign.right,
+            ),
+            Text('بداية التطبيق: ${value('تاريخ بدء التطبيق')}', textAlign: TextAlign.right),
+            const SizedBox(height: 8),
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: DataTable(
+                columnSpacing: 18,
+                columns: const [
+                  DataColumn(label: Text('الوقت')),
+                  DataColumn(label: Text('المهمة والمسؤولية')),
+                  DataColumn(label: Text('المخرج المطلوب')),
+                  DataColumn(label: Text('الحالة')),
+                ],
+                rows: tasks.map((task) {
+                  final description = '${task['description'] ?? ''}';
+                  final timeLine = description.split('\n').firstWhere(
+                    (line) => line.startsWith('الوقت المحدد:'),
+                    orElse: () => 'الوقت المحدد: —',
+                  );
+                  final outputLine = description.split('\n').firstWhere(
+                    (line) => line.startsWith('المخرج المطلوب:'),
+                    orElse: () => 'المخرج المطلوب: —',
+                  );
+                  return DataRow(cells: [
+                    DataCell(Text(timeLine.replaceFirst('الوقت المحدد:', '').trim())),
+                    DataCell(Text('${task['title'] ?? 'مهمة'}')),
+                    DataCell(Text(outputLine.replaceFirst('المخرج المطلوب:', '').trim())),
+                    DataCell(Text(_statusLabels[_normalizedStatus(task)] ?? 'جديدة')),
+                  ]);
+                }).toList(),
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'التقرير اليومي: ${firstDescription.contains('التقرير اليومي المطلوب:') ? 'مطلوب عبر النموذج المعتمد أو الوصف' : 'غير محدد'}',
+              textAlign: TextAlign.right,
+              style: const TextStyle(color: AppColors.muted),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }

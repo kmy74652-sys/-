@@ -31,6 +31,7 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
     [TextEditingController(), TextEditingController()],
   ];
   final _rows = <_UnifiedRow>[_UnifiedRow('08:00', '', '')];
+  final _exceptionRows = <_UnifiedRow>[];
   bool _expanded = true;
   bool _sending = false;
   String _template = 'فارغ';
@@ -55,6 +56,7 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
       for (final controller in row) controller.dispose();
     }
     for (final row in _rows) row.dispose();
+    for (final row in _exceptionRows) row.dispose();
     super.dispose();
   }
 
@@ -118,9 +120,9 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
             const SizedBox(height: 10),
             _workHours(),
             const SizedBox(height: 10),
-            _scheduleTable('الجدول الزمني اليومي'),
+            _scheduleTable('الجدول الزمني اليومي', _rows),
             const SizedBox(height: 10),
-            _scheduleTable('العمل الاستثنائي ($_exception)'),
+            _scheduleTable('العمل الاستثنائي ($_exception)', _exceptionRows),
             const SizedBox(height: 10),
             _reportSelector(),
             const SizedBox(height: 10),
@@ -157,7 +159,8 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
     children: [
       SizedBox(width: 190, child: DropdownButtonFormField<String>(value: _template, decoration: const InputDecoration(labelText: 'تحميل من قالب جاهز'), items: const ['فارغ', 'محاسب', 'أمين مخزن', 'عامل تحميل وترتيب', 'مبيعات وحسابات', 'مهام مشتركة'].map((value) => DropdownMenuItem(value: value, child: Text(value))).toList(), onChanged: (value) { if (value != null) _loadTemplate(value); })),
       OutlinedButton.icon(onPressed: () => _loadTemplate(_template == 'فارغ' ? 'مهام مشتركة' : 'فارغ'), icon: const Icon(Icons.content_copy_outlined), label: const Text('نسخ من موظف سابق')),
-      IconButton(onPressed: () => setState(() => _rows.add(_UnifiedRow('', '', ''))), icon: const Icon(Icons.add_box_outlined), tooltip: 'إضافة صف'),
+      IconButton(onPressed: () => setState(() => _rows.add(_UnifiedRow('', '', ''))), icon: const Icon(Icons.add_box_outlined), tooltip: 'إضافة صف يومي'),
+      IconButton(onPressed: () => setState(() => _exceptionRows.add(_UnifiedRow('', '', ''))), icon: const Icon(Icons.event_available_outlined), tooltip: 'إضافة صف استثنائي'),
     ],
   );
 
@@ -217,8 +220,7 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
     const SizedBox(width: 110, child: TextField(textAlign: TextAlign.center, decoration: InputDecoration(labelText: 'الفترة الثانية', hintText: '13:00 - 17:00'))),
   ]));
 
-  Widget _scheduleTable(String title) => _section(title, SingleChildScrollView(scrollDirection: Axis.horizontal, child: DataTable(columnSpacing: 18, columns: const [DataColumn(label: Text('الوقت')), DataColumn(label: Text('المهمة المحددة والمسؤولية')), DataColumn(label: Text('المخرج المطلوب')), DataColumn(label: Text('إجراء'))], rows: _rows.asMap().entries.map((entry) { final i = entry.key; final row = entry.value; return DataRow(cells: [DataCell(SizedBox(width: 75, child: TextField(controller: row.time, textAlign: TextAlign.right, decoration: const InputDecoration(isDense: true)))), DataCell(SizedBox(width: 220, child: TextField(controller: row.task, textAlign: TextAlign.right, decoration: const InputDecoration(isDense: true)))), DataCell(SizedBox(width: 180, child: TextField(controller: row.output, textAlign: TextAlign.right, decoration: const InputDecoration(isDense: true)))), DataCell(Row(children: [IconButton(onPressed: () => setState(() => _rows.insert(i + 1, _UnifiedRow('', '', ''))), icon: const Icon(Icons.add, size: 19)), IconButton(onPressed: _rows.length == 1 ? null : () { final removed = _rows.removeAt(i); removed.dispose(); setState(() {}); }, icon: const Icon(Icons.delete_outline, size: 19))]))]); }).toList()));
-  Widget _scheduleTable(String title) {
+  Widget _scheduleTable(String title, List<_UnifiedRow> source) {
     return _section(
       title,
       SingleChildScrollView(
@@ -231,7 +233,7 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
             DataColumn(label: Text('المخرج المطلوب')),
             DataColumn(label: Text('إجراء')),
           ],
-          rows: _rows.asMap().entries.map((entry) {
+          rows: source.asMap().entries.map((entry) {
             final i = entry.key;
             final row = entry.value;
             return DataRow(cells: [
@@ -239,8 +241,8 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
               DataCell(SizedBox(width: 220, child: TextField(controller: row.task, textAlign: TextAlign.right, decoration: const InputDecoration(isDense: true)))),
               DataCell(SizedBox(width: 180, child: TextField(controller: row.output, textAlign: TextAlign.right, decoration: const InputDecoration(isDense: true)))),
               DataCell(Row(children: [
-                IconButton(onPressed: () => setState(() => _rows.insert(i + 1, _UnifiedRow('', '', ''))), icon: const Icon(Icons.add, size: 19)),
-                IconButton(onPressed: _rows.length == 1 ? null : () { final removed = _rows.removeAt(i); removed.dispose(); setState(() {}); }, icon: const Icon(Icons.delete_outline, size: 19)),
+                IconButton(onPressed: () => setState(() => source.insert(i + 1, _UnifiedRow('', '', ''))), icon: const Icon(Icons.add, size: 19)),
+                IconButton(onPressed: source.isEmpty ? null : () { final removed = source.removeAt(i); removed.dispose(); setState(() {}); }, icon: const Icon(Icons.delete_outline, size: 19)),
               ])),
             ]);
           }).toList(),
@@ -269,6 +271,15 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
               output: row.output.text.trim(),
             ))
         .toList();
+    final exceptionTasks = _exceptionRows
+        .where((row) => row.task.text.trim().isNotEmpty)
+        .map((row) => UnifiedTaskRowData(
+              time: '${_exception}: ${row.time.text.trim()}',
+              task: row.task.text.trim(),
+              output: row.output.text.trim(),
+            ))
+        .toList();
+    tasks.addAll(exceptionTasks);
     if (_employee.text.trim().isEmpty || _role.text.trim().isEmpty) {
       messenger.showSnackBar(const SnackBar(content: Text('اختر الموظف واكتب المسمى الوظيفي قبل الإرسال.', textAlign: TextAlign.right)));
       return;
@@ -277,8 +288,8 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
       messenger.showSnackBar(const SnackBar(content: Text('أضف مهمة زمنية واحدة على الأقل قبل الإرسال.', textAlign: TextAlign.right)));
       return;
     }
-    if (_dailyReport.text.trim().isNotEmpty && widget.reports.isNotEmpty && _reportVersionId == null) {
-      messenger.showSnackBar(const SnackBar(content: Text('اختر قالب التقرير المعتمد قبل إرسال التقرير اليومي.', textAlign: TextAlign.right)));
+    if (_dailyReport.text.trim().isNotEmpty && _reportVersionId == null) {
+      messenger.showSnackBar(const SnackBar(content: Text('لا يمكن إرسال التقرير اليومي دون قالب تقرير معتمد متاح ومختار.', textAlign: TextAlign.right)));
       return;
     }
     setState(() => _sending = true);
@@ -445,6 +456,8 @@ class UnifiedTaskTableDraft {
     required this.responsibilities,
     required this.authorities,
     required this.instructions,
+    this.reportTemplateId,
+    this.reportVersionId,
   });
   final String employee, role, branch, startDate, purpose, dailyReport;
   final List<UnifiedTaskRowData> rows;

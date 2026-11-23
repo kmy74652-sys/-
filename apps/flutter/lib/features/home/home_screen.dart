@@ -592,6 +592,9 @@ class _HomeScreenState extends State<HomeScreen> {
       if (userId == null || userId.isEmpty) continue;
       for (final row in draft.rows) {
         final description = [
+          'المسمى الوظيفي: ${draft.role}',
+          if (draft.branch.isNotEmpty) 'الفرع: ${draft.branch}',
+          if (draft.startDate.isNotEmpty) 'تاريخ بدء التطبيق: ${draft.startDate}',
           if (draft.purpose.isNotEmpty) 'الهدف من الوظيفة: ${draft.purpose}',
           'الوقت المحدد: ${row.time.isEmpty ? 'غير محدد' : row.time}',
           if (row.output.isNotEmpty) 'المخرج المطلوب: ${row.output}',
