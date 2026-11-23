@@ -24,6 +24,9 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
   final _role = TextEditingController();
   final _branch = TextEditingController();
   final _startDate = TextEditingController();
+  final _firstPeriod = TextEditingController();
+  final _breakPeriod = TextEditingController();
+  final _secondPeriod = TextEditingController();
   final _responsibilities = <TextEditingController>[TextEditingController()];
   final _authorities = <TextEditingController>[TextEditingController()];
   final _instructions = <TextEditingController>[TextEditingController()];
@@ -49,6 +52,9 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
     _role.dispose();
     _branch.dispose();
     _startDate.dispose();
+    _firstPeriod.dispose();
+    _breakPeriod.dispose();
+    _secondPeriod.dispose();
     for (final list in [_responsibilities, _authorities, _instructions]) {
       for (final controller in list) controller.dispose();
     }
@@ -297,9 +303,9 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
     _drop('نوع الدوام', _workType, ['دوام كامل', 'دوام جزئي', 'مناوبة'], (v) => setState(() => _workType = v)),
     _drop('الأيام', _days, ['الأحد - الخميس', 'السبت - الخميس', 'حسب المناوبة'], (v) => setState(() => _days = v)),
     _drop('الاستثناء الأسبوعي', _exception, ['الجمعة', 'الأحد', 'لا يوجد'], (v) => setState(() => _exception = v)),
-    const SizedBox(width: 110, child: TextField(textAlign: TextAlign.center, decoration: InputDecoration(labelText: 'الفترة الأولى', hintText: '08:00 - 12:00'))),
-    const SizedBox(width: 110, child: TextField(textAlign: TextAlign.center, decoration: InputDecoration(labelText: 'الاستراحة', hintText: '12:00 - 13:00'))),
-    const SizedBox(width: 110, child: TextField(textAlign: TextAlign.center, decoration: InputDecoration(labelText: 'الفترة الثانية', hintText: '13:00 - 17:00'))),
+    SizedBox(width: 110, child: TextField(controller: _firstPeriod, textAlign: TextAlign.center, decoration: const InputDecoration(labelText: 'الفترة الأولى', hintText: '08:00 - 12:00'))),
+    SizedBox(width: 110, child: TextField(controller: _breakPeriod, textAlign: TextAlign.center, decoration: const InputDecoration(labelText: 'الاستراحة', hintText: '12:00 - 13:00'))),
+    SizedBox(width: 110, child: TextField(controller: _secondPeriod, textAlign: TextAlign.center, decoration: const InputDecoration(labelText: 'الفترة الثانية', hintText: '13:00 - 17:00'))),
   ]));
 
   Widget _scheduleTable(String title, List<_UnifiedRow> source) {
@@ -448,6 +454,9 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
         workType: _workType,
         workDays: _days,
         weeklyException: _exception,
+        firstPeriod: _firstPeriod.text.trim(),
+        breakPeriod: _breakPeriod.text.trim(),
+        secondPeriod: _secondPeriod.text.trim(),
         kpis: _kpis
             .where((row) => row.any((controller) => controller.text.trim().isNotEmpty))
             .map((row) => '${row[0].text.trim()}: ${row[1].text.trim()}')
@@ -517,7 +526,7 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
             pw.Text(_purpose.text.trim().isEmpty ? '—' : _purpose.text.trim(), textDirection: pw.TextDirection.rtl),
             pw.SizedBox(height: 10),
             _pdfHeading('ساعات الدوام والاستثناء الأسبوعي'),
-            pw.Text('نوع الدوام: $_workType   |   الأيام: $_days   |   الاستثناء: $_exception', textDirection: pw.TextDirection.rtl),
+            pw.Text('نوع الدوام: $_workType   |   الأيام: $_days   |   الفترة الأولى: ${_firstPeriod.text.trim().isEmpty ? '—' : _firstPeriod.text.trim()}   |   الاستراحة: ${_breakPeriod.text.trim().isEmpty ? '—' : _breakPeriod.text.trim()}   |   الفترة الثانية: ${_secondPeriod.text.trim().isEmpty ? '—' : _secondPeriod.text.trim()}   |   الاستثناء: $_exception', textDirection: pw.TextDirection.rtl),
             pw.SizedBox(height: 12),
             _pdfHeading('الجدول الزمني اليومي'),
             _pdfScheduleTable(rows),
@@ -665,13 +674,16 @@ class UnifiedTaskTableDraft {
     required this.workType,
     required this.workDays,
     required this.weeklyException,
+    required this.firstPeriod,
+    required this.breakPeriod,
+    required this.secondPeriod,
     required this.kpis,
     this.reportTemplateId,
     this.reportVersionId,
   });
   final String employee, employeeUserId, role, branch, startDate, purpose, reportNotes;
   final String? branchId;
-  final String workType, workDays, weeklyException;
+  final String workType, workDays, weeklyException, firstPeriod, breakPeriod, secondPeriod;
   final List<UnifiedTaskRowData> rows;
   final List<String> responsibilities, authorities, instructions, kpis;
   final String? reportTemplateId, reportVersionId;

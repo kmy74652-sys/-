@@ -417,10 +417,11 @@ class _UnifiedTaskTableScreenState extends State<UnifiedTaskTableScreen> {
       if (_successfulDispatches.contains(dispatchKey)) continue;
       final description = [
         'الجدول الموحد: ${draft.role}',
+        'المسمى الوظيفي: ${draft.role}',
         if (draft.branch.isNotEmpty) 'الفرع: ${draft.branch}',
         if (draft.startDate.isNotEmpty)
           'تاريخ بدء التطبيق: ${draft.startDate}',
-        'ساعات الدوام: ${draft.workType} · ${draft.workDays} · الاستثناء الأسبوعي: ${draft.weeklyException}',
+        'ساعات الدوام: ${draft.workType} · ${draft.workDays} · الفترة الأولى: ${draft.firstPeriod.isEmpty ? '—' : draft.firstPeriod} · الاستراحة: ${draft.breakPeriod.isEmpty ? '—' : draft.breakPeriod} · الفترة الثانية: ${draft.secondPeriod.isEmpty ? '—' : draft.secondPeriod} · الاستثناء الأسبوعي: ${draft.weeklyException}',
         if (draft.purpose.isNotEmpty) 'الهدف من الوظيفة: ${draft.purpose}',
         'الوقت المحدد: ${draft.rows.first.time.isEmpty ? 'غير محدد' : draft.rows.first.time}',
         for (final row in draft.rows)

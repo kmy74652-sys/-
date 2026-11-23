@@ -452,53 +452,6 @@ class _TasksScreenState extends State<TasksScreen>
                           ],
                         ),
                       )
-                    else
-                      ...visibleTasks.map(
-                        (task) => Card(
-                          child: ListTile(
-                            onTap: () => context.push('/tasks/${task['id']}'),
-                            contentPadding: const EdgeInsets.all(14),
-                            title: Text(
-                              '${task['title'] ?? 'مهمة'}',
-                              textAlign: TextAlign.right,
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w800,
-                                color: AppColors.navy,
-                              ),
-                            ),
-                            subtitle: Padding(
-                              padding: const EdgeInsets.only(top: 8),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.end,
-                                children: [
-                                  if ((task['description'] ?? '')
-                                      .toString()
-                                      .isNotEmpty)
-                                    Text(
-                                      '${task['description']}',
-                                      textAlign: TextAlign.right,
-                                      maxLines: 2,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  Text(
-                                    'الحالة: ${_statusLabels[_normalizedStatus(task)] ?? task['status'] ?? 'جديدة'} · الأولوية: ${_priorityLabels['${task['priority'] ?? 'normal'}'] ?? task['priority'] ?? 'عادية'}',
-                                    textAlign: TextAlign.right,
-                                    style: const TextStyle(
-                                      color: AppColors.muted,
-                                    ),
-                                  ),
-                                  if (task['due_at'] != null)
-                                    Text(
-                                      'الاستحقاق: ${task['due_at']}',
-                                      textAlign: TextAlign.right,
-                                    ),
-                                ],
-                              ),
-                            ),
-                            trailing: const Icon(Icons.assignment_outlined),
-                          ),
-                        ),
-                      ),
                   ],
                 );
               },
@@ -514,6 +467,58 @@ class _TasksScreenState extends State<TasksScreen>
         orElse: () => '',
       );
       return line.isEmpty ? '—' : line.substring(label.length + 1).trim();
+    }
+    final workHours = value('ساعات الدوام')
+        .split('·')
+        .map((item) => item.trim())
+        .toList();
+    String workHour(int index) => index < workHours.length ? workHours[index] : '—';
+    final legacyWorkHours = workHours.length < 6 ||
+        !workHour(2).startsWith('الفترة الأولى:');
+    final firstPeriod = legacyWorkHours
+        ? '—'
+        : workHour(2).replaceFirst('الفترة الأولى:', '').trim();
+    final breakPeriod = legacyWorkHours
+        ? '—'
+        : workHour(3).replaceFirst('الاستراحة:', '').trim();
+    final secondPeriod = legacyWorkHours
+        ? '—'
+        : workHour(4).replaceFirst('الفترة الثانية:', '').trim();
+    final weeklyException = legacyWorkHours
+        ? workHour(2).replaceFirst('الاستثناء الأسبوعي:', '').trim()
+        : workHour(5).replaceFirst('الاستثناء الأسبوعي:', '').trim();
+    final officialRows = <Map<String, String>>[];
+    final rowPattern = RegExp(
+      r'(?m)^صف الجدول:\s*(.*?)\s*\|\s*(.*?)\s*\|\s*(.*?)\s*$',
+    );
+    for (final task in tasks) {
+      final description = '${task['description'] ?? ''}';
+      final matches = rowPattern.allMatches(description).toList();
+      if (matches.isEmpty) {
+        final timeLine = description.split('\n').firstWhere(
+          (line) => line.startsWith('الوقت المحدد:'),
+          orElse: () => 'الوقت المحدد: —',
+        );
+        final outputLine = description.split('\n').firstWhere(
+          (line) => line.startsWith('المخرج المطلوب:'),
+          orElse: () => 'المخرج المطلوب: —',
+        );
+        officialRows.add({
+          'time': timeLine.replaceFirst('الوقت المحدد:', '').trim(),
+          'title': '${task['title'] ?? 'مهمة'}',
+          'output': outputLine.replaceFirst('المخرج المطلوب:', '').trim(),
+          'status': _statusLabels[_normalizedStatus(task)] ?? 'جديدة',
+        });
+      } else {
+        for (final match in matches) {
+          officialRows.add({
+            'time': match.group(1)?.trim() ?? 'غير محدد',
+            'title': match.group(2)?.trim() ?? '—',
+            'output': match.group(3)?.trim() ?? '—',
+            'status': _statusLabels[_normalizedStatus(task)] ?? 'جديدة',
+          });
+        }
+      }
     }
     return Card(
       color: const Color(0xFFF8FBFA),
@@ -538,7 +543,33 @@ class _TasksScreenState extends State<TasksScreen>
               textAlign: TextAlign.right,
             ),
             Text('بداية التطبيق: ${value('تاريخ بدء التطبيق')}', textAlign: TextAlign.right),
-            Text('ساعات الدوام: ${value('ساعات الدوام')}', textAlign: TextAlign.right),
+            if (workHours.isNotEmpty && workHours.first != '—') ...[
+              const SizedBox(height: 8),
+              const Text('ساعات الدوام والاستثناء الأسبوعي', textAlign: TextAlign.right, style: TextStyle(fontWeight: FontWeight.w800, color: AppColors.navy)),
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: DataTable(
+                  columns: const [
+                    DataColumn(label: Text('نوع الدوام')),
+                    DataColumn(label: Text('الأيام')),
+                    DataColumn(label: Text('الفترة الأولى')),
+                    DataColumn(label: Text('الاستراحة')),
+                    DataColumn(label: Text('الفترة الثانية')),
+                    DataColumn(label: Text('الاستثناء الأسبوعي')),
+                  ],
+                  rows: [
+                    DataRow(cells: [
+                      DataCell(Text(workHour(0))),
+                      DataCell(Text(workHour(1))),
+                      DataCell(Text(firstPeriod)),
+                      DataCell(Text(breakPeriod)),
+                      DataCell(Text(secondPeriod)),
+                      DataCell(Text(weeklyException)),
+                    ]),
+                  ],
+                ),
+              ),
+            ],
             if (value('الهدف من الوظيفة') != '—')
               Text('الهدف: ${value('الهدف من الوظيفة')}', textAlign: TextAlign.right),
             const SizedBox(height: 8),
@@ -552,23 +583,14 @@ class _TasksScreenState extends State<TasksScreen>
                   DataColumn(label: Text('المخرج المطلوب')),
                   DataColumn(label: Text('الحالة')),
                 ],
-                rows: tasks.map((task) {
-                  final description = '${task['description'] ?? ''}';
-                  final timeLine = description.split('\n').firstWhere(
-                    (line) => line.startsWith('الوقت المحدد:'),
-                    orElse: () => 'الوقت المحدد: —',
-                  );
-                  final outputLine = description.split('\n').firstWhere(
-                    (line) => line.startsWith('المخرج المطلوب:'),
-                    orElse: () => 'المخرج المطلوب: —',
-                  );
-                  return DataRow(cells: [
-                    DataCell(Text(timeLine.replaceFirst('الوقت المحدد:', '').trim())),
-                    DataCell(Text('${task['title'] ?? 'مهمة'}')),
-                    DataCell(Text(outputLine.replaceFirst('المخرج المطلوب:', '').trim())),
-                    DataCell(Text(_statusLabels[_normalizedStatus(task)] ?? 'جديدة')),
-                  ]);
-                }).toList(),
+                rows: officialRows
+                    .map((row) => DataRow(cells: [
+                          DataCell(Text(row['time'] ?? '—')),
+                          DataCell(Text(row['title'] ?? '—')),
+                          DataCell(Text(row['output'] ?? '—')),
+                          DataCell(Text(row['status'] ?? 'جديدة')),
+                        ]))
+                    .toList(),
               ),
             ),
             const SizedBox(height: 6),
