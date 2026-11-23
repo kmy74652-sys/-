@@ -377,10 +377,14 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: LinearProgressIndicator(),
               ),
             _metricGrid(),
-            const SizedBox(height: 14),
-            _unifiedTaskTableSection(),
-            const SizedBox(height: 14),
-            for (final group in _groups) _moduleGroup(group.$1, group.$2),
+            for (final group in _groups) ...[
+              const SizedBox(height: 14),
+              _moduleGroup(group.$1, group.$2),
+              if (group.$1 == 'العمل والمتابعة') ...[
+                const SizedBox(height: 10),
+                _unifiedTaskTableSection(),
+              ],
+            ],
           ],
         ],
       ),
