@@ -7,8 +7,10 @@ import 'package:printing/printing.dart';
 import '../../core/theme.dart';
 
 class UnifiedTaskTableEditor extends StatefulWidget {
-  const UnifiedTaskTableEditor({super.key, required this.onSend});
+  const UnifiedTaskTableEditor({super.key, required this.onSend, this.employees = const [], this.branches = const []});
   final Future<void> Function(UnifiedTaskTableDraft draft) onSend;
+  final List<UnifiedEmployeeOption> employees;
+  final List<String> branches;
 
   @override
   State<UnifiedTaskTableEditor> createState() => _UnifiedTaskTableEditorState();
@@ -155,10 +157,38 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
   );
 
   Widget _employeeCard() => _section('بيانات الموظف والاعتماد', Column(children: [
-    Row(children: [Expanded(child: _input(_employee, 'الموظف أو مهام مشتركة')), const SizedBox(width: 8), Expanded(child: _input(_role, 'المسمى الوظيفي'))]),
+    Row(children: [Expanded(child: _employeeField()), const SizedBox(width: 8), Expanded(child: _roleField())]),
     const SizedBox(height: 8),
-    Row(children: [Expanded(child: _input(_branch, 'الفرع')), const SizedBox(width: 8), Expanded(child: _input(_startDate, 'تاريخ بدء التطبيق'))]),
+    Row(children: [Expanded(child: _branchField()), const SizedBox(width: 8), Expanded(child: _input(_startDate, 'تاريخ بدء التطبيق'))]),
   ]));
+
+  Widget _employeeField() => widget.employees.isEmpty
+      ? _input(_employee, 'الموظف أو مهام مشتركة')
+      : DropdownButtonFormField<String>(
+          value: widget.employees.any((item) => item.name == _employee.text) ? _employee.text : null,
+          isExpanded: true,
+          decoration: const InputDecoration(labelText: 'الموظف أو المجموعة', isDense: true),
+          items: widget.employees.map((item) => DropdownMenuItem(value: item.name, child: Text(item.name, overflow: TextOverflow.ellipsis))).toList(),
+          onChanged: (value) => setState(() => _employee.text = value ?? ''),
+        );
+
+  Widget _roleField() => DropdownButtonFormField<String>(
+    value: const ['المحاسب', 'أمين مخزن', 'عامل تحميل', 'المدير التنفيذي', 'صاحب المؤسسة'].contains(_role.text) ? _role.text : null,
+    isExpanded: true,
+    decoration: const InputDecoration(labelText: 'المسمى الوظيفي', isDense: true),
+    items: const ['المحاسب', 'أمين مخزن', 'عامل تحميل', 'المدير التنفيذي', 'صاحب المؤسسة'].map((value) => DropdownMenuItem(value: value, child: Text(value, overflow: TextOverflow.ellipsis))).toList(),
+    onChanged: (value) => setState(() => _role.text = value ?? ''),
+  );
+
+  Widget _branchField() => widget.branches.isEmpty
+      ? _input(_branch, 'الفرع')
+      : DropdownButtonFormField<String>(
+          value: widget.branches.contains(_branch.text) ? _branch.text : null,
+          isExpanded: true,
+          decoration: const InputDecoration(labelText: 'الفرع', isDense: true),
+          items: widget.branches.map((value) => DropdownMenuItem(value: value, child: Text(value, overflow: TextOverflow.ellipsis))).toList(),
+          onChanged: (value) => setState(() => _branch.text = value ?? ''),
+        );
 
   Widget _workHours() => _section('ساعات الدوام الرسمية', Wrap(textDirection: TextDirection.rtl, spacing: 8, runSpacing: 8, children: [
     _drop('نوع الدوام', _workType, ['دوام كامل', 'دوام جزئي', 'مناوبة'], (v) => setState(() => _workType = v)),
@@ -400,4 +430,9 @@ class UnifiedTaskTableDraft {
 class UnifiedTaskRowData {
   const UnifiedTaskRowData({required this.time, required this.task, required this.output});
   final String time, task, output;
+}
+
+class UnifiedEmployeeOption {
+  const UnifiedEmployeeOption({required this.name, required this.userId});
+  final String name, userId;
 }

@@ -21,6 +21,8 @@ class _HomeScreenState extends State<HomeScreen> {
   Set<String> _roles = {};
   String? _organizationId;
   String? _defaultBranchId;
+  List<UnifiedEmployeeOption> _unifiedEmployees = const [];
+  List<String> _unifiedBranches = const [];
   int _request = 0;
 
   static const _groups = <(String, List<_Module>)>[
@@ -268,6 +270,7 @@ class _HomeScreenState extends State<HomeScreen> {
         _defaultBranchId = branch;
       });
 
+      if (organization != null) await _loadUnifiedOptions(organization);
       final summary = await _loadSummary(
         client,
         organization,
@@ -284,6 +287,24 @@ class _HomeScreenState extends State<HomeScreen> {
         setState(() => _error = e.toString().replaceFirst('Exception: ', ''));
     } finally {
       if (ticket == _request && mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _loadUnifiedOptions(String organizationId) async {
+    try {
+      final client = Supabase.instance.client;
+      final results = await Future.wait<dynamic>([
+        client.from('organization_memberships').select('user_id,display_name').eq('organization_id', organizationId).eq('is_active', true).order('display_name').limit(500),
+        client.from('branches').select('name').eq('organization_id', organizationId).eq('is_active', true).order('name').limit(200),
+      ]);
+      if (!mounted) return;
+      final employees = (results[0] as List).whereType<Map>().map((row) => UnifiedEmployeeOption(name: (row['display_name'] ?? '').toString(), userId: (row['user_id'] ?? '').toString())).where((item) => item.name.isNotEmpty && item.userId.isNotEmpty).toList();
+      setState(() {
+        _unifiedEmployees = [const UnifiedEmployeeOption(name: 'مهام مشتركة', userId: ''), ...employees];
+        _unifiedBranches = (results[1] as List).whereType<Map>().map((row) => (row['name'] ?? '').toString()).where((name) => name.isNotEmpty).toList();
+      });
+    } catch (_) {
+      // Manual entry remains available when optional lists are unavailable.
     }
   }
 
@@ -450,7 +471,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _unifiedTaskTableSection() {
     final manager = _allowed('tasks') && _manageTasks;
     if (manager) {
-      return UnifiedTaskTableEditor(onSend: _sendUnifiedTable);
+      return UnifiedTaskTableEditor(onSend: _sendUnifiedTable, employees: _unifiedEmployees, branches: _unifiedBranches);
     }
     return SectionCard(
       title: 'الجدول الموحد لإنشاء المهام',
