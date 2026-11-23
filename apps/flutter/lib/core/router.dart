@@ -86,7 +86,7 @@ void initializeRouter() {
       ),
       GoRoute(
         path: '/reports/daily',
-        builder: (context, state) => const IndependentReportsScreen(),
+        redirect: (context, state) => '/reports/independent',
       ),
       GoRoute(
         path: '/reports/independent',

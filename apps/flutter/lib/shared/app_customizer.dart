@@ -9,6 +9,7 @@ class AppCustomizer extends ChangeNotifier {
 
   static const _storageKey = 'alshaeri_app_customizer_v1';
   bool _loaded = false;
+  Future<void>? _loadFuture;
   Map<String, String> labels = {};
   Map<String, bool> visibility = {};
   List<Map<String, dynamic>> customCards = [];
@@ -45,20 +46,24 @@ class AppCustomizer extends ChangeNotifier {
     'lateTasks': 'مهام متأخرة',
   };
 
-  Future<void> load() async {
-    if (_loaded) return;
-    _loaded = true;
+  Future<void> load() {
+    if (_loaded) return Future<void>.value();
+    return _loadFuture ??= _loadOnce();
+  }
+
+  Future<void> _loadOnce() async {
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getString(_storageKey);
     if (raw != null && raw.isNotEmpty) {
       try {
         _apply(Map<String, dynamic>.from(jsonDecode(raw) as Map));
       } catch (_) {
-        reset(notify: false);
+        await reset(notify: false);
       }
     } else {
-      reset(notify: false);
+      await reset(notify: false);
     }
+    _loaded = true;
     notifyListeners();
   }
 
@@ -94,7 +99,6 @@ class AppCustomizer extends ChangeNotifier {
 
   void moveCard(int oldIndex, int newIndex) {
     if (oldIndex < 0 || oldIndex >= customCards.length) return;
-    if (newIndex > oldIndex) newIndex--;
     newIndex = newIndex.clamp(0, customCards.length - 1).toInt();
     final item = customCards.removeAt(oldIndex);
     customCards.insert(newIndex, item);
@@ -113,7 +117,6 @@ class AppCustomizer extends ChangeNotifier {
 
   void moveField(int oldIndex, int newIndex) {
     if (oldIndex < 0 || oldIndex >= fieldOrder.length) return;
-    if (newIndex > oldIndex) newIndex--;
     newIndex = newIndex.clamp(0, fieldOrder.length - 1).toInt();
     final field = fieldOrder.removeAt(oldIndex);
     fieldOrder.insert(newIndex, field);
@@ -188,7 +191,9 @@ class AppCustomizer extends ChangeNotifier {
         .map((item) => '$item')
         .where((item) => {'title', 'description', 'status', 'date', 'attachment'}.contains(item))
         .toList();
-    if (importedOrder.length == 5) fieldOrder = importedOrder;
+    if (importedOrder.length == 5 && importedOrder.toSet().length == 5) {
+      fieldOrder = importedOrder;
+    }
     fieldStyle = '${value['fieldStyle'] ?? fieldStyle}';
     fieldFillColor = _int(value['fieldFillColor'], fieldFillColor);
     fieldRadius = (value['fieldRadius'] is num

@@ -10,7 +10,7 @@ class UnifiedTaskTableEditor extends StatefulWidget {
   const UnifiedTaskTableEditor({super.key, required this.onSend, this.employees = const [], this.branches = const [], this.reports = const []});
   final Future<void> Function(UnifiedTaskTableDraft draft) onSend;
   final List<UnifiedEmployeeOption> employees;
-  final List<String> branches;
+  final List<UnifiedBranchOption> branches;
   final List<UnifiedReportOption> reports;
 
   @override
@@ -189,10 +189,17 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
   Widget _branchField() => widget.branches.isEmpty
       ? _input(_branch, 'الفرع')
       : DropdownButtonFormField<String>(
-          value: widget.branches.contains(_branch.text) ? _branch.text : null,
+          value: widget.branches.any((item) => item.name == _branch.text)
+              ? _branch.text
+              : null,
           isExpanded: true,
           decoration: const InputDecoration(labelText: 'الفرع', isDense: true),
-          items: widget.branches.map((value) => DropdownMenuItem(value: value, child: Text(value, overflow: TextOverflow.ellipsis))).toList(),
+          items: widget.branches
+              .map((item) => DropdownMenuItem(
+                    value: item.name,
+                    child: Text(item.name, overflow: TextOverflow.ellipsis),
+                  ))
+              .toList(),
           onChanged: (value) => setState(() => _branch.text = value ?? ''),
         );
 
@@ -419,8 +426,18 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
     try {
       await widget.onSend(UnifiedTaskTableDraft(
         employee: _employee.text.trim(),
+        employeeUserId: widget.employees
+            .where((item) => item.name == _employee.text.trim())
+            .map((item) => item.userId)
+            .firstWhere((id) => id.isNotEmpty, orElse: () => ''),
         role: _role.text.trim(),
         branch: _branch.text.trim(),
+        branchId: widget.branches
+            .where((item) => item.name == _branch.text.trim())
+            .map((item) => item.id)
+            .where((id) => id.isNotEmpty)
+            .cast<String?>()
+            .firstWhere((id) => true, orElse: () => null),
         startDate: _startDate.text.trim(),
         purpose: _purpose.text.trim(),
         reportNotes: _reportNotes.text.trim(),
@@ -455,7 +472,7 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
       final document = pw.Document(
         theme: pw.ThemeData.withFont(base: font, bold: font),
       );
-      final rows = _rows
+      final rows = [..._rows, ..._exceptionRows]
           .map((row) => [row.time.text.trim(), row.task.text.trim(), row.output.text.trim(), 'جديدة'])
           .toList();
       final listSection = (String title, List<TextEditingController> values) => pw.Column(
@@ -581,8 +598,10 @@ class _UnifiedRow {
 class UnifiedTaskTableDraft {
   const UnifiedTaskTableDraft({
     required this.employee,
+    required this.employeeUserId,
     required this.role,
     required this.branch,
+    required this.branchId,
     required this.startDate,
     required this.purpose,
     required this.reportNotes,
@@ -597,7 +616,8 @@ class UnifiedTaskTableDraft {
     this.reportTemplateId,
     this.reportVersionId,
   });
-  final String employee, role, branch, startDate, purpose, reportNotes;
+  final String employee, employeeUserId, role, branch, startDate, purpose, reportNotes;
+  final String? branchId;
   final String workType, workDays, weeklyException;
   final List<UnifiedTaskRowData> rows;
   final List<String> responsibilities, authorities, instructions, kpis;
@@ -612,6 +632,12 @@ class UnifiedTaskRowData {
 class UnifiedEmployeeOption {
   const UnifiedEmployeeOption({required this.name, required this.userId});
   final String name, userId;
+}
+
+class UnifiedBranchOption {
+  const UnifiedBranchOption({required this.id, required this.name});
+  final String id;
+  final String name;
 }
 
 class UnifiedReportOption {

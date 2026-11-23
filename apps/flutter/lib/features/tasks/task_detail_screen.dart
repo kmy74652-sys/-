@@ -54,8 +54,12 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
     'in_progress': 'قيد التنفيذ',
     'on_hold': 'متوقفة مؤقتًا',
     'submitted': 'بانتظار المراجعة',
+    'report_submitted': 'التقرير بانتظار المراجعة',
     'completed': 'مكتملة',
+    'completed_approved': 'مكتملة ومعتمدة',
     'approved': 'معتمدة',
+    'needs_revision': 'تحتاج إلى تعديل',
+    'returned': 'معادة للموظف',
   }['$value'] ?? 'غير محددة';
 
   String _priorityLabel(Object? value) => const {
@@ -338,6 +342,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
     final key = '${field['key'] ?? ''}';
     final raw = _formInputs[_formInputKey(snapshotId, key)]?.text.trim() ?? '';
     final type = '${field['type'] ?? ''}';
+    if (type == 'calculated') return _calculatedValue(field, snapshotId);
     if (raw.isEmpty) return null;
     if ([
       'table',
@@ -373,6 +378,34 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
           ? false
           : null;
     return raw;
+  }
+
+  num? _calculatedValue(Map<String, dynamic> field, String snapshotId) {
+    final formula = '${_obj(field['config'])['formula'] ?? ''}';
+    try {
+      final sum = RegExp(r'^sum_rows\(([a-z][a-z0-9_]*)\.([a-z][a-z0-9_]*)\)$')
+          .firstMatch(formula);
+      if (sum != null) {
+        final rows = _rows(
+          _formInputs[_formInputKey(snapshotId, sum.group(1)!)]?.text ?? '[]',
+        );
+        return rows.fold<num>(
+          0,
+          (total, row) => total + (num.tryParse('${row[sum.group(2)] ?? ''}') ?? 0),
+        );
+      }
+      var expression = formula;
+      for (final match in RegExp(r'\{([a-z][a-z0-9_]*)\}').allMatches(formula)) {
+        final value = num.tryParse(
+          _formInputs[_formInputKey(snapshotId, match.group(1)!)]?.text ?? '',
+        );
+        if (value == null) return null;
+        expression = expression.replaceAll(match.group(0)!, '$value');
+      }
+      return _arithmetic(expression);
+    } catch (_) {
+      return null;
+    }
   }
 
   Map<String, dynamic> _obj(dynamic v) =>
@@ -1637,7 +1670,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                 runSpacing: 8,
                 alignment: WrapAlignment.center,
                 children: [
-                  if (['pending', 'new', 'received'].contains(_task?['status']))
+                  if (['pending', 'new', 'received', 'needs_revision', 'returned'].contains(_task?['status']))
                     FilledButton(
                       onPressed: _saving ? null : () => _status('in_progress'),
                       child: const Text('بدء التنفيذ'),

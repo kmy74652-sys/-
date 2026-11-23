@@ -165,6 +165,24 @@ class _ReportsScreenState extends State<ReportsScreen> {
               .order('report_date', ascending: false)
               .limit(200);
           _submissionRows = _maps(submissions);
+          try {
+            final dynamicRows = _maps(await _client
+                .from('employee_dynamic_reports')
+                .select('id,template_id,version_id,employee_user_id,role_code,branch_id,report_date,values,status,review_note,submitted_at')
+                .eq('organization_id', organizationId)
+                .order('submitted_at', ascending: false)
+                .limit(200));
+            _submissionRows.addAll(dynamicRows.map((row) => {
+                  ...row,
+                  '_source': 'dynamic',
+                  'form_id': row['template_id'],
+                  'employee_name': _employeeNames[row['employee_user_id']?.toString()] ?? 'موظف',
+                  'branch_name': 'غير محدد',
+                  'answers': row['values'],
+                }));
+          } catch (_) {
+            // لا نمنع عرض مسار report_submissions إذا كانت بنية المسار الديناميكي غير منشورة.
+          }
           _submissionFieldLabels = {};
           try {
             final formIds = _submissionRows
@@ -1019,6 +1037,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
   }
 
   Widget _submissionCard(Map<String, dynamic> row) {
+    if (row['_source'] == 'dynamic') return _dynamicSubmissionCard(row);
     final status = row['status']?.toString() ?? 'غير معروف';
     final id = row['id']?.toString() ?? '';
     final formValue = row['form'];
@@ -1160,6 +1179,41 @@ class _ReportsScreenState extends State<ReportsScreen> {
                 textAlign: TextAlign.right,
               ),
             ),
+        ],
+      ),
+    );
+  }
+
+  Widget _dynamicSubmissionCard(Map<String, dynamic> row) {
+    final answers = row['answers'];
+    return Card(
+      child: ExpansionTile(
+        title: const Text(
+          'تقرير ديناميكي مرتبط بالقالب',
+          textAlign: TextAlign.right,
+          style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.navy),
+        ),
+        subtitle: Text(
+          'الموظف: ${row['employee_name'] ?? 'غير محدد'} · الدور: ${row['role_code'] ?? 'غير محدد'}\nالتاريخ: ${row['report_date'] ?? 'غير محدد'} · ${_statusLabel(row['status']?.toString() ?? 'غير معروف')}',
+          textAlign: TextAlign.right,
+        ),
+        children: [
+          if (answers is Map)
+            for (final entry in answers.entries)
+              ListTile(
+                title: Text(_submissionFieldLabel(row, entry.key), textAlign: TextAlign.right),
+                leading: Text(entry.key.toString(), textDirection: TextDirection.ltr, style: const TextStyle(color: Colors.black45, fontSize: 11)),
+                subtitle: Text(_displayValue(entry.value), textAlign: TextAlign.right),
+              ),
+          if (answers is! Map || answers.isEmpty)
+            const Padding(
+              padding: EdgeInsets.all(12),
+              child: Text('لا توجد إجابات قابلة للعرض.', textAlign: TextAlign.right),
+            ),
+          const Padding(
+            padding: EdgeInsets.all(12),
+            child: Text('هذا التقرير محفوظ عبر المسار الديناميكي ويظهر هنا للقراءة. إجراءات المراجعة الحالية مرتبطة بمسار report_submissions فقط.', textAlign: TextAlign.right),
+          ),
         ],
       ),
     );

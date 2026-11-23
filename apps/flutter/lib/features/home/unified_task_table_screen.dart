@@ -19,10 +19,12 @@ class _UnifiedTaskTableScreenState extends State<UnifiedTaskTableScreen> {
   String? _organizationId;
   String? _defaultBranchId;
   List<UnifiedEmployeeOption> _employees = const [];
-  List<String> _branches = const [];
+  List<UnifiedBranchOption> _branches = const [];
   List<UnifiedReportOption> _reports = const [];
   List<Map<String, dynamic>> _sentTasks = const [];
   bool _sentLoading = false;
+  bool _sentMutationBusy = false;
+  final Set<String> _successfulDispatches = <String>{};
 
   @override
   void initState() {
@@ -47,6 +49,11 @@ class _UnifiedTaskTableScreenState extends State<UnifiedTaskTableScreen> {
       if (organization == null || organization.isEmpty) {
         throw Exception('تعذر تحديد المؤسسة المرتبطة بالحساب.');
       }
+      final permissions = profile['permissions'];
+      final allowed = permissions is List && permissions.map((e) => e.toString()).any(
+            (permission) => permission == 'tasks.manage' || permission == 'tasks.review',
+          );
+      if (!allowed) throw Exception('هذا القسم متاح لصلاحيات إدارة المهام فقط.');
       _organizationId = organization;
       _defaultBranchId = _defaultBranch(profile);
       final results = await Future.wait<dynamic>([
@@ -59,7 +66,7 @@ class _UnifiedTaskTableScreenState extends State<UnifiedTaskTableScreen> {
             .limit(500),
         _db
             .from('branches')
-            .select('name')
+            .select('id,name')
             .eq('organization_id', organization)
             .eq('is_active', true)
             .order('name')
@@ -139,8 +146,11 @@ class _UnifiedTaskTableScreenState extends State<UnifiedTaskTableScreen> {
         ];
         _branches = (results[1] as List)
             .whereType<Map>()
-            .map((row) => (row['name'] ?? '').toString())
-            .where((name) => name.isNotEmpty)
+            .map((row) => UnifiedBranchOption(
+                  id: (row['id'] ?? '').toString(),
+                  name: (row['name'] ?? '').toString(),
+                ))
+            .where((branch) => branch.id.isNotEmpty && branch.name.isNotEmpty)
             .toList();
         _reports = reports;
         _loading = false;
@@ -179,6 +189,7 @@ class _UnifiedTaskTableScreenState extends State<UnifiedTaskTableScreen> {
   }
 
   Future<void> _editSentTask(Map<String, dynamic> task) async {
+    if (_sentMutationBusy) return;
     final title = TextEditingController(text: '${task['title'] ?? ''}');
     final description = TextEditingController(text: '${task['description'] ?? ''}');
     final due = TextEditingController(text: '${task['due_at'] ?? ''}');
@@ -201,6 +212,7 @@ class _UnifiedTaskTableScreenState extends State<UnifiedTaskTableScreen> {
       ),
     );
     if (ok == true && mounted) {
+      setState(() => _sentMutationBusy = true);
       try {
         await _db.rpc('admin_update_task', params: {
           'p_organization_id': _organizationId,
@@ -213,6 +225,8 @@ class _UnifiedTaskTableScreenState extends State<UnifiedTaskTableScreen> {
         if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم حفظ تعديل الجدول الموحد.')));
       } catch (e) {
         if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('تعذر الحفظ: $e')));
+      } finally {
+        if (mounted) setState(() => _sentMutationBusy = false);
       }
     }
     title.dispose();
@@ -221,6 +235,7 @@ class _UnifiedTaskTableScreenState extends State<UnifiedTaskTableScreen> {
   }
 
   Future<void> _deleteSentTask(Map<String, dynamic> task) async {
+    if (_sentMutationBusy) return;
     final ok = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
@@ -233,8 +248,15 @@ class _UnifiedTaskTableScreenState extends State<UnifiedTaskTableScreen> {
       ),
     );
     if (ok != true) return;
-    await _db.rpc('admin_delete_task', params: {'p_organization_id': _organizationId, 'p_task_id': task['id']});
-    await _loadSentTasks();
+    setState(() => _sentMutationBusy = true);
+    try {
+      await _db.rpc('admin_delete_task', params: {'p_organization_id': _organizationId, 'p_task_id': task['id']});
+      await _loadSentTasks();
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('تعذر الحذف: $e')));
+    } finally {
+      if (mounted) setState(() => _sentMutationBusy = false);
+    }
   }
 
   Widget _sentTasksSection() => Card(
@@ -264,8 +286,8 @@ class _UnifiedTaskTableScreenState extends State<UnifiedTaskTableScreen> {
                     ),
                     trailing: Wrap(
                       children: [
-                        IconButton(onPressed: () => _editSentTask(task), icon: const Icon(Icons.edit_outlined)),
-                        IconButton(onPressed: () => _deleteSentTask(task), icon: const Icon(Icons.delete_outline, color: Colors.red)),
+                        IconButton(onPressed: _sentMutationBusy ? null : () => _editSentTask(task), icon: const Icon(Icons.edit_outlined)),
+                        IconButton(onPressed: _sentMutationBusy ? null : () => _deleteSentTask(task), icon: const Icon(Icons.delete_outline, color: Colors.red)),
                       ],
                     ),
                   ),
@@ -300,13 +322,9 @@ class _UnifiedTaskTableScreenState extends State<UnifiedTaskTableScreen> {
         .whereType<Map>()
         .map((row) => Map<String, dynamic>.from(row))
         .toList();
-    final requested = draft.employee.trim();
-    final selected = requested == 'مهام مشتركة'
+    final selected = draft.employeeUserId.isEmpty
         ? members
-        : members
-            .where((row) =>
-                (row['display_name'] ?? '').toString().trim() == requested)
-            .toList();
+        : members.where((row) => row['user_id']?.toString() == draft.employeeUserId).toList();
     if (selected.isEmpty) throw Exception('لم يتم العثور على الموظف المحدد.');
     const roleMap = <String, String>{
       'صاحب المؤسسة': 'owner',
@@ -328,27 +346,15 @@ class _UnifiedTaskTableScreenState extends State<UnifiedTaskTableScreen> {
     if (!validRoles.contains(roleCode)) {
       throw Exception('المسمى الوظيفي غير معروف.');
     }
-    var branchId = _defaultBranchId;
-    if (draft.branch.trim().isNotEmpty) {
-      final branches = (await _db
-              .from('branches')
-              .select('id,name')
-              .eq('organization_id', organizationId)
-              .eq('is_active', true)
-              .limit(200) as List)
-          .whereType<Map>();
-      for (final row in branches) {
-        if ((row['name'] ?? '').toString().trim() == draft.branch.trim()) {
-          branchId = row['id']?.toString();
-        }
-      }
-    }
+    final branchId = draft.branchId ?? _defaultBranchId;
     final due = DateTime.tryParse(draft.startDate)?.toUtc() ??
         DateTime.now().toUtc().add(const Duration(days: 1));
     for (final member in selected) {
       final userId = member['user_id']?.toString();
       if (userId == null || userId.isEmpty) continue;
       for (final row in draft.rows) {
+        final dispatchKey = '${userId}:${row.time}:${row.task}:${row.output}';
+        if (_successfulDispatches.contains(dispatchKey)) continue;
         final description = [
           'المسمى الوظيفي: ${draft.role}',
           if (draft.branch.isNotEmpty) 'الفرع: ${draft.branch}',
@@ -384,6 +390,7 @@ class _UnifiedTaskTableScreenState extends State<UnifiedTaskTableScreen> {
           'p_report_required':
               draft.reportTemplateId != null && draft.reportVersionId != null,
         });
+        _successfulDispatches.add(dispatchKey);
       }
     }
   }

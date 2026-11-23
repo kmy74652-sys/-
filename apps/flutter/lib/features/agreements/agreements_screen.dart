@@ -260,10 +260,10 @@ class _AgreementsScreenState extends State<AgreementsScreen> {
           : 'تم تسجيل رفض الاتفاقية وإبلاغ الإدارة.',
       () async {
         await _db.rpc(
-          'approve_employee_agreement',
+          'respond_employee_agreement',
           params: {
-            'p_agreement_id': id,
-            'p_decision': decision == 'accepted' ? 'approved' : 'rejected',
+            'p_version_id': versionId,
+            'p_response': decision,
             'p_note': note.isEmpty ? null : note,
           },
         );

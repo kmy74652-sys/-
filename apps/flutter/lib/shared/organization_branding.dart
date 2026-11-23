@@ -23,9 +23,13 @@ class OrganizationBrandingStore {
   static final instance = OrganizationBrandingStore._();
   final _client = Supabase.instance.client;
   OrganizationBranding? _authenticated;
+  String? _authenticatedUserId;
 
   Future<OrganizationBranding> forSession() async {
-    if (_authenticated != null) return _authenticated!;
+    final userId = _client.auth.currentUser?.id;
+    if (_authenticated != null && _authenticatedUserId == userId) {
+      return _authenticated!;
+    }
     try {
       final profile = await _client.rpc('mobile_my_profile');
       final employee = profile is Map ? profile['employee'] : null;
@@ -49,6 +53,7 @@ class OrganizationBrandingStore {
       final branding = settings['branding'] is Map
           ? Map<String, dynamic>.from(settings['branding'] as Map)
           : <String, dynamic>{};
+      _authenticatedUserId = userId;
       return _authenticated = OrganizationBranding(
         name: '${row?['name'] ?? OrganizationBranding.fallback.name}',
         tagline: '${branding['tagline'] ?? OrganizationBranding.fallback.tagline}',
@@ -77,7 +82,10 @@ class OrganizationBrandingStore {
     }
   }
 
-  void invalidate() => _authenticated = null;
+  void invalidate() {
+    _authenticated = null;
+    _authenticatedUserId = null;
+  }
 
   String? _clean(dynamic value) {
     final text = value?.toString().trim() ?? '';

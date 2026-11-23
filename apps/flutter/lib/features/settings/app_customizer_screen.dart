@@ -560,6 +560,9 @@ class _AppCustomizerScreenState extends State<AppCustomizerScreen>
     try {
       final bytes = await File(files.first.path!).readAsBytes();
       await _store.importJson(utf8.decode(bytes));
+      for (final entry in _controllers.entries) {
+        entry.value.text = _store.label(entry.key);
+      }
       if (mounted) setState(() {});
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم استيراد الإعدادات.')));
     } catch (_) {

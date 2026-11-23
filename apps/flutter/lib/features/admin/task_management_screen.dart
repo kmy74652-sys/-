@@ -73,6 +73,21 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
             )
           : '';
       if (org.isEmpty) throw Exception('تعذر تحديد المؤسسة الحالية.');
+      final permissions = employee is Map ? employee['permissions'] : null;
+      final allowed = permissions is List && permissions.map((e) => e.toString()).any(
+            (permission) => permission == 'tasks.manage' || permission == 'tasks.review',
+          );
+      if (!allowed) {
+        if (mounted) {
+          setState(() {
+            _orgId = org;
+            _tasks = [];
+            _error = 'هذا القسم متاح لصلاحيات إدارة المهام فقط.';
+            _loading = false;
+          });
+        }
+        return;
+      }
       final results = await Future.wait<dynamic>([
         _db
             .from('tasks')

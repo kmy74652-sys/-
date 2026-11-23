@@ -228,7 +228,7 @@ class _HrScreenState extends State<HrScreen> {
           'p_start_date': start,
           'p_end_date': end.isEmpty ? null : end,
           'p_base_salary': salary,
-          'p_currency': 'SAR',
+          'p_currency': 'YER',
           'p_pay_frequency': 'monthly',
           'p_duties': _text('duties')
               .split('\n')
@@ -281,6 +281,17 @@ class _HrScreenState extends State<HrScreen> {
   }
 
   bool _time(String v) => RegExp(r'^([01]\d|2[0-3]):[0-5]\d$').hasMatch(v);
+  String _adenUtc(String date, String time) {
+    final parts = time.split(':');
+    final local = DateTime.utc(
+      int.parse(date.substring(0, 4)),
+      int.parse(date.substring(5, 7)),
+      int.parse(date.substring(8, 10)),
+      int.parse(parts[0]),
+      int.parse(parts[1]),
+    );
+    return local.subtract(const Duration(hours: 3)).toIso8601String();
+  }
   int? _timeMinutes(String v) {
     if (!_time(v)) return null;
     final parts = v.split(':');
@@ -322,10 +333,10 @@ class _HrScreenState extends State<HrScreen> {
           'p_status': status,
           'p_check_in_at': ci.isEmpty
               ? null
-              : DateTime.parse('${date}T$ci:00').toUtc().toIso8601String(),
+              : _adenUtc(date, ci),
           'p_check_out_at': co.isEmpty
               ? null
-              : DateTime.parse('${date}T$co:00').toUtc().toIso8601String(),
+              : _adenUtc(date, co),
           'p_note': _text('note'),
         },
       );
@@ -377,7 +388,7 @@ class _HrScreenState extends State<HrScreen> {
           'p_base_amount': base,
           'p_additions': additions,
           'p_deductions': deductions,
-          'p_currency': 'SAR',
+          'p_currency': 'YER',
           'p_note': _text('note'),
         },
       );
@@ -493,7 +504,7 @@ class _HrScreenState extends State<HrScreen> {
         _field('endDate', 'تاريخ النهاية (اختياري)', hint: 'YYYY-MM-DD'),
         _field(
           'salary',
-          'الراتب الأساسي (SAR)',
+          'الراتب الأساسي (YER)',
           type: const TextInputType.numberWithOptions(decimal: true),
         ),
         _field('duties', 'المهام والمسؤوليات (كل مسؤولية في سطر)', lines: 3),
@@ -552,7 +563,7 @@ class _HrScreenState extends State<HrScreen> {
       _memberPicker(),
       _field(
         'base',
-        'الراتب الأساسي (SAR)',
+        'الراتب الأساسي (YER)',
         type: const TextInputType.numberWithOptions(decimal: true),
       ),
       _field(

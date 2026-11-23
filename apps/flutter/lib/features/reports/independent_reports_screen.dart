@@ -68,11 +68,22 @@ class _IndependentReportsScreenState extends State<IndependentReportsScreen> {
           'لا يوجد فرع افتراضي مرتبط بحسابك. اطلب من الإدارة تحديد فرعك.',
         );
       final rawForms = await _client.rpc('list_my_dynamic_report_forms');
-      _forms = (rawForms is List ? rawForms : const [])
+      final formRows = (rawForms is List ? rawForms : const [])
           .whereType<Map>()
-          .map((row) => _ReportForm.fromMap(Map<String, dynamic>.from(row)))
+          .map((row) => Map<String, dynamic>.from(row))
           .toList();
-      _submissions = {};
+      _forms = formRows.map(_ReportForm.fromMap).toList();
+      _submissions = {
+        for (final row in formRows)
+          if (row['status'] != null)
+            row['template_id'].toString(): {
+              'template_id': row['template_id'],
+              'version_id': row['version_id'],
+              'status': row['status'],
+              'review_note': row['review_note'],
+              'answers': row['values'] is Map ? row['values'] : <String, dynamic>{},
+            },
+      };
       if (_forms.isNotEmpty) {
         final ids = _forms.map((form) => form.id).toList();
         final rows = await _client
@@ -85,9 +96,11 @@ class _IndependentReportsScreenState extends State<IndependentReportsScreen> {
             .eq('report_date', _today)
             .inFilter('form_id', ids);
         for (final row in (rows as List).whereType<Map>()) {
-          _submissions[row['form_id'].toString()] = Map<String, dynamic>.from(
-            row,
-          );
+          final formId = row['form_id'].toString();
+          final existing = _submissions[formId];
+          if (existing == null || existing['status'] == 'draft') {
+            _submissions[formId] = Map<String, dynamic>.from(row);
+          }
         }
       }
       for (final form in _forms) {
@@ -163,7 +176,15 @@ class _IndependentReportsScreenState extends State<IndependentReportsScreen> {
     });
     try {
       final current = _submissions[form.id];
-      if (current == null) {
+      if (submit && form.versionId != null) {
+        await _client.rpc('submit_my_dynamic_report', params: {
+          'p_template_id': form.id,
+          'p_version_id': form.versionId,
+          'p_report_date': _today,
+          'p_values': answers,
+          'p_branch_id': _branchId,
+        });
+      } else if (current == null) {
         await _client.from('report_submissions').insert({
           'form_id': form.id,
           'employee_id': _client.auth.currentUser!.id,
@@ -919,17 +940,20 @@ class _ReportForm {
     required this.id,
     required this.title,
     required this.description,
+    required this.versionId,
     required this.fields,
   });
   final String id;
   final String title;
   final String description;
+  final String? versionId;
   final List<_ReportField> fields;
 
   factory _ReportForm.fromMap(Map<String, dynamic> map) => _ReportForm(
     id: map['template_id'].toString(),
     title: (map['title'] ?? 'نموذج تقرير').toString(),
     description: (map['description'] ?? '').toString(),
+    versionId: map['version_id']?.toString(),
     fields: (map['fields'] is List ? map['fields'] as List : const [])
         .whereType<Map>()
         .map((field) => _ReportField.fromMap(Map<String, dynamic>.from(field)))
