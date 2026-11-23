@@ -655,7 +655,7 @@ class _TasksScreenState extends State<TasksScreen>
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
             child: DropdownButtonFormField<String>(
-              initialValue: _ledgerOrder,
+              value: _ledgerOrder,
               isExpanded: true,
               decoration: const InputDecoration(labelText: 'ترتيب الكشف', isDense: true),
               items: const [
