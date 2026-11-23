@@ -218,3 +218,45 @@ jobs:
           path: apps/flutter/build/app/outputs/bundle/release/*.aab
           if-no-files-found: error
           retention-days: 14
+
+  publish-latest-download:
+    name: Publish stable APK download link
+    if: github.ref == 'refs/heads/feat/hr-agreements-parity'
+    needs: [build-apk, build-appbundle]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - name: Download APK artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: alshaeri-flutter-release-apk-${{ github.sha }}
+          path: publish/apk
+
+      - name: Download AAB artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: alshaeri-flutter-release-aab-${{ github.sha }}
+          path: publish/aab
+
+      - name: Normalize release filenames
+        run: |
+          set -e
+          apk="$(find publish/apk -type f -name '*.apk' | head -n 1)"
+          aab="$(find publish/aab -type f -name '*.aab' | head -n 1)"
+          test -n "$apk" && test -n "$aab"
+          cp "$apk" publish/alshaeri-latest.apk
+          cp "$aab" publish/alshaeri-latest.aab
+
+      - name: Publish stable release assets
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: Alshaeri latest build
+          prerelease: true
+          make_latest: false
+          generate_release_notes: false
+          overwrite_files: true
+          files: |
+            publish/alshaeri-latest.apk
+            publish/alshaeri-latest.aab
