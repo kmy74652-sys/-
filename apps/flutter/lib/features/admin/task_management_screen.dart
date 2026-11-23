@@ -19,6 +19,7 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
       _branches = [],
       _employees = [],
       _templates = [],
+      _reportTemplates = [],
       _requests = [];
 
   @override
@@ -82,6 +83,21 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
             .order('title')
             .limit(300),
         _db
+            .from('report_form_templates')
+            .select('id,title,role_code,is_active')
+            .eq('organization_id', org)
+            .eq('is_active', true)
+            .order('title')
+            .limit(200),
+        _db
+            .from('report_form_versions')
+            .select('id,template_id,version_no,status,approved_by,approved_at')
+            .eq('status', 'published')
+            .not('approved_by', 'is', null)
+            .not('approved_at', 'is', null)
+            .order('version_no', ascending: false)
+            .limit(500),
+        _db
             .from('task_publication_requests')
             .select(
               'id,template_id,template_version,role_code,branch_id,due_at,status,requested_at,review_note,published_count',
@@ -98,7 +114,19 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
         _branches = _rows(results[1]);
         _employees = _rows(results[2]);
         _templates = _rows(results[3]);
-        _requests = _rows(results[4]);
+        final versions = _rows(results[5]);
+        _reportTemplates = _rows(results[4]).map((template) {
+          final version = versions.firstWhere(
+            (v) => _s(v['template_id']) == _s(template['id']),
+            orElse: () => <String, dynamic>{},
+          );
+          return {
+            ...template,
+            'version_id': version['id'],
+            'version_no': version['version_no'],
+          };
+        }).where((template) => _s(template['version_id']).isNotEmpty).toList();
+        _requests = _rows(results[6]);
       });
     } catch (e) {
       if (mounted)
@@ -154,6 +182,8 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
     String? role = 'admin_followup';
     String? assignee = _s(existing?['assigned_to']).isEmpty ? null : _s(existing?['assigned_to']);
     String? templateId;
+    String? reportTemplateId;
+    String? reportVersionId;
     bool reportRequired = false;
     var validationError = '';
 
@@ -250,29 +280,78 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
                 items: [const DropdownMenuItem<String>(value: null, child: Text('إنشاء مباشر')), ..._templates.map((t) => DropdownMenuItem(value: _s(t['id']), child: Text('${_s(t['title'])} · ${_s(t['role_code'])}')))],
                 onChanged: (v) => set(() {
                   templateId = v;
-                  if (v == null) reportRequired = false;
+                  reportTemplateId = null;
+                  reportVersionId = null;
+                  reportRequired = false;
                 }),
               ),
               DropdownButtonFormField<String>(
                 value: role, isExpanded: true, decoration: formDecoration('الدور الوظيفي'),
                 items: const [DropdownMenuItem(value: 'owner', child: Text('صاحب المؤسسة')), DropdownMenuItem(value: 'admin_followup', child: Text('المدير التنفيذي')), DropdownMenuItem(value: 'accountant', child: Text('المحاسب')), DropdownMenuItem(value: 'warehouse_keeper', child: Text('أمين المخازن')), DropdownMenuItem(value: 'warehouse_worker', child: Text('عمال التحميل'))],
-                onChanged: (v) => set(() => role = v),
+                onChanged: (v) => set(() {
+                  role = v;
+                  if (reportTemplateId != null &&
+                      !_reportTemplates.any(
+                        (r) => _s(r['id']) == reportTemplateId && _s(r['role_code']) == v,
+                      )) {
+                    reportTemplateId = null;
+                    reportVersionId = null;
+                    reportRequired = false;
+                  }
+                }),
               ),
               DropdownButtonFormField<String>(
                 value: assignee, isExpanded: true, decoration: formDecoration('الموظف المسؤول *', hint: 'اختر الموظف المكلف'),
                 items: [const DropdownMenuItem<String>(value: null, child: Text('اختر موظفًا')), ..._employees.map((e) => DropdownMenuItem(value: _s(e['user_id']), child: Text(_s(e['display_name'], _s(e['employee_no'])))))],
                 onChanged: (v) => set(() => assignee = v),
               ),
+              DropdownButtonFormField<String>(
+                value: reportTemplateId,
+                isExpanded: true,
+                decoration: formDecoration(
+                  'قالب التقرير',
+                  hint: templateId == null
+                      ? 'اختياري — يعبئه الموظف بعد تنفيذ المهمة'
+                      : 'التقرير يأتي من قالب المهمة المحدد',
+                ),
+                items: [
+                  const DropdownMenuItem<String>(
+                    value: null,
+                    child: Text('بدون تقرير'),
+                  ),
+                  ..._reportTemplates
+                      .where((r) => _s(r['role_code']) == role)
+                      .map(
+                        (r) => DropdownMenuItem(
+                          value: _s(r['id']),
+                          child: Text(
+                            '${_s(r['title'])} · الإصدار ${_s(r['version_no'])}',
+                          ),
+                        ),
+                      ),
+                ],
+                onChanged: templateId != null
+                    ? null
+                    : (v) => set(() {
+                  reportTemplateId = v;
+                  final selected = _reportTemplates.cast<Map<String, dynamic>?>().firstWhere(
+                    (r) => _s(r?['id']) == v,
+                    orElse: () => null,
+                  );
+                  reportVersionId = selected == null ? null : _s(selected['version_id']);
+                  reportRequired = v != null;
+                }),
+              ),
               SwitchListTile(
                 contentPadding: EdgeInsets.zero,
                 title: const Text('إرفاق تقرير عند الإنجاز'),
                 subtitle: Text(
-                  templateId == null
-                      ? 'اختر قالب مهمة يحتوي على حقول تقرير أولًا.'
+                  reportTemplateId == null
+                      ? 'اختر قالب تقرير معتمد ليظهر للموظف بعد التنفيذ.'
                       : 'يطلب من الموظف تعبئة التقرير قبل التسليم',
                 ),
                 value: reportRequired,
-                onChanged: templateId == null
+                onChanged: reportTemplateId == null
                     ? null
                     : (v) => set(() {
                         reportRequired = v;
@@ -286,7 +365,7 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
       onConfirm: (set) {
         if (title.text.trim().length < 2) { set(() => validationError = 'اكتب عنوان المهمة أولاً.'); return false; }
         if (existing == null && (assignee == null || role == null)) { set(() => validationError = 'اختر الدور والموظف المسؤول قبل إنشاء المهمة.'); return false; }
-        if (existing == null && reportRequired && templateId == null) { set(() => validationError = 'لا يمكن طلب تقرير دون قالب تقرير وحقول معتمدة. اختر قالب مهمة أولًا.'); return false; }
+        if (existing == null && reportRequired && (reportTemplateId == null || reportVersionId == null)) { set(() => validationError = 'اختر قالب تقرير معتمدًا قبل إرسال المهمة.'); return false; }
         return true;
       },
     );
@@ -310,7 +389,7 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
       } else if (templateId != null) {
         await _db.rpc('assign_task_from_template', params: {'p_organization_id': _orgId, 'p_template_id': templateId, 'p_assigned_to': assignee, 'p_branch_id': branchId, 'p_starts_at': DateTime.now().toUtc().toIso8601String(), 'p_due_at': dueIso, 'p_priority': priority, 'p_instructions': descriptionText.isEmpty ? null : descriptionText, 'p_report_overrides': <dynamic>[], 'p_idempotency_key': 'flutter-template:$templateId:$assignee:$dueIso'});
       } else {
-        await _db.rpc('create_task_with_report_form', params: {'p_organization_id': _orgId, 'p_title': title.text.trim(), 'p_description': descriptionText.isEmpty ? null : descriptionText, 'p_due_at': dueIso, 'p_priority': priority, 'p_branch_id': branchId, 'p_role_code': role, 'p_template_id': null, 'p_assigned_to': assignee, 'p_report_template_id': null, 'p_report_version_id': null, 'p_report_required': reportRequired});
+        await _db.rpc('create_task_with_report_form', params: {'p_organization_id': _orgId, 'p_title': title.text.trim(), 'p_description': descriptionText.isEmpty ? null : descriptionText, 'p_due_at': dueIso, 'p_priority': priority, 'p_branch_id': branchId, 'p_role_code': role, 'p_template_id': null, 'p_assigned_to': assignee, 'p_report_template_id': reportTemplateId, 'p_report_version_id': reportVersionId, 'p_report_required': reportRequired});
       }
       _message(existing == null ? 'تم إنشاء المهمة وإرسالها للموظف.' : 'تم حفظ تعديلات المهمة.');
       await _load();
