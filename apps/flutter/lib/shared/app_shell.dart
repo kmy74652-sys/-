@@ -13,11 +13,13 @@ class AppShell extends StatefulWidget {
     required this.title,
     required this.child,
     this.subtitle,
+    this.onBeforeNavigate,
   });
 
   final String title;
   final String? subtitle;
   final Widget child;
+  final Future<bool> Function()? onBeforeNavigate;
 
   @override
   State<AppShell> createState() => _AppShellState();
@@ -258,6 +260,13 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     );
   }
 
+  Future<void> _navigate(String route) async {
+    final current = GoRouterState.of(context).uri.path;
+    if (route == current) return;
+    final allowed = await widget.onBeforeNavigate?.call() ?? true;
+    if (allowed && mounted) context.go(route);
+  }
+
   @override
   Widget build(BuildContext context) {
     final path = GoRouterState.of(context).uri.path;
@@ -283,7 +292,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
                     subtitle: widget.subtitle,
                     onBack: _backRoute(path) == null
                         ? null
-                        : () => context.go(_backRoute(path)!),
+                        : () => _navigate(_backRoute(path)!),
                   ),
                   Expanded(
                     child: Padding(
@@ -312,7 +321,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
                       child: _BottomTab(
                         tab: _tabs[i],
                         selected: selected == i,
-                        onTap: () => context.go(_tabs[i].route),
+                        onTap: () => _navigate(_tabs[i].route),
                       ),
                     ),
                 ],

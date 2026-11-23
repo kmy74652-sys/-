@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/theme.dart';
@@ -12,7 +13,11 @@ class ReportDesignerScreen extends StatefulWidget {
 
 class _ReportDesignerScreenState extends State<ReportDesignerScreen> {
   final _db = Supabase.instance.client;
-  bool _busy = false, _loading = true, _required = true, _editing = false;
+  bool _busy = false,
+      _loading = true,
+      _required = true,
+      _editing = false,
+      _dirty = false;
   String? _error, _notice, _templateId, _versionId, _orgId;
   String _status = 'draft',
       _title = '',
@@ -217,6 +222,7 @@ class _ReportDesignerScreenState extends State<ReportDesignerScreen> {
         _notice = copy
             ? 'نسخة مستقلة؛ القالب الأصلي لم يتغير.'
             : 'تحرير إصدار جديد انطلاقًا من الإصدار ${version['version_no']}.';
+        _dirty = false;
       });
     } catch (e) {
       setState(() => _error = _message(e));
@@ -238,9 +244,49 @@ class _ReportDesignerScreenState extends State<ReportDesignerScreen> {
     _selected = null;
     _error = null;
     _notice = null;
+    _dirty = true;
   });
-  void _patchField(int i, Map<String, dynamic> patch) =>
-      setState(() => _fields[i] = {..._fields[i], ...patch});
+  void _patchField(int i, Map<String, dynamic> patch) => setState(() {
+        _fields[i] = {..._fields[i], ...patch};
+        _dirty = true;
+      });
+
+  Future<bool> _confirmExit() async {
+    if (!_dirty) return true;
+    final leave = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: AlertDialog(
+          title: const Text('تغييرات غير محفوظة'),
+          content: const Text(
+            'لديك تغييرات غير محفوظة في مصمم التقارير. هل تريد الخروج دون حفظ؟',
+            textAlign: TextAlign.right,
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('البقاء'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('الخروج دون حفظ'),
+            ),
+          ],
+        ),
+      ),
+    );
+    return leave == true;
+  }
+
+  Future<void> _leaveEditor() async {
+    if (await _confirmExit() && mounted) {
+      setState(() {
+        _editing = false;
+        _dirty = false;
+      });
+    }
+  }
 
   String? _validate() {
     if (_title.trim().length < 2 || _title.trim().length > 160)
@@ -374,6 +420,7 @@ class _ReportDesignerScreenState extends State<ReportDesignerScreen> {
         _templateId = result['template_id'].toString();
         _versionId = result['version_id'].toString();
         _status = 'draft';
+        _dirty = false;
         _notice = 'حُفظ إصدار مسودة جديد. اعتمده صاحب المؤسسة قبل استخدامه.';
       });
       await _loadTemplates();
@@ -398,6 +445,7 @@ class _ReportDesignerScreenState extends State<ReportDesignerScreen> {
       );
       setState(() {
         _status = 'published';
+        _dirty = false;
         _notice = 'تم اعتماد الإصدار؛ سيبقى محفوظًا كنسخة ثابتة.';
       });
     } catch (e) {
@@ -527,22 +575,30 @@ class _ReportDesignerScreenState extends State<ReportDesignerScreen> {
   }
 
   @override
-  Widget build(BuildContext context) => Directionality(
-    textDirection: TextDirection.rtl,
-    child: AppShell(
-      title: 'مصمم التقارير',
-      subtitle: 'مكتبة قوالب النماذج وإصداراتها',
-      child: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : ListView(
-              padding: const EdgeInsets.all(14),
-              children: [
-                if (_error != null) _messageBox(_error!, true),
-                if (_notice != null) _messageBox(_notice!, false),
-                if (_busy) const LinearProgressIndicator(),
-                if (_editing) _editor() else _library(),
-              ],
-            ),
+  Widget build(BuildContext context) => PopScope(
+    canPop: !_dirty,
+    onPopInvoked: (didPop) async {
+      if (didPop || !_dirty) return;
+      if (await _confirmExit() && mounted) context.pop();
+    },
+    child: Directionality(
+      textDirection: TextDirection.rtl,
+      child: AppShell(
+        title: 'مصمم التقارير',
+        subtitle: 'مكتبة قوالب النماذج وإصداراتها',
+        onBeforeNavigate: _confirmExit,
+        child: _loading
+            ? const Center(child: CircularProgressIndicator())
+            : ListView(
+                padding: const EdgeInsets.all(14),
+                children: [
+                  if (_error != null) _messageBox(_error!, true),
+                  if (_notice != null) _messageBox(_notice!, false),
+                  if (_busy) const LinearProgressIndicator(),
+                  if (_editing) _editor() else _library(),
+                ],
+              ),
+      ),
     ),
   );
 
@@ -646,7 +702,7 @@ class _ReportDesignerScreenState extends State<ReportDesignerScreen> {
       Row(
         children: [
           IconButton(
-            onPressed: () => setState(() => _editing = false),
+            onPressed: _leaveEditor,
             icon: const Icon(Icons.arrow_back),
           ),
           Expanded(
@@ -661,7 +717,7 @@ class _ReportDesignerScreenState extends State<ReportDesignerScreen> {
             ),
           ),
           TextButton(
-            onPressed: () => setState(() => _editing = false),
+            onPressed: _leaveEditor,
             child: const Text('المكتبة'),
           ),
         ],
@@ -697,7 +753,10 @@ class _ReportDesignerScreenState extends State<ReportDesignerScreen> {
                     )
                     .toList(),
                 onChanged: _templateId == null
-                    ? (v) => setState(() => _role = v ?? _role)
+                    ? (v) => setState(() {
+                        _role = v ?? _role;
+                        _dirty = true;
+                      })
                     : null,
               ),
               if (_templateId != null)
@@ -713,7 +772,10 @@ class _ReportDesignerScreenState extends State<ReportDesignerScreen> {
                   textAlign: TextAlign.right,
                 ),
                 value: _required,
-                onChanged: (v) => setState(() => _required = v ?? false),
+                onChanged: (v) => setState(() {
+                  _required = v ?? false;
+                  _dirty = true;
+                }),
               ),
             ],
           ),
@@ -749,6 +811,7 @@ class _ReportDesignerScreenState extends State<ReportDesignerScreen> {
                             setState(() {
                               _fields.add(f);
                               _selected = _fields.length - 1;
+                              _dirty = true;
                             });
                           },
                     icon: const Icon(Icons.add),
@@ -772,6 +835,7 @@ class _ReportDesignerScreenState extends State<ReportDesignerScreen> {
                       if (newIndex > oldIndex) newIndex -= 1;
                       final field = _fields.removeAt(oldIndex);
                       _fields.insert(newIndex, field);
+                      _dirty = true;
                       if (_selected == oldIndex) {
                         _selected = newIndex;
                       } else if (_selected != null) {
@@ -839,7 +903,10 @@ class _ReportDesignerScreenState extends State<ReportDesignerScreen> {
   }
 
   void _syncTitle() {
-    if (_title != _titleController.text) _title = _titleController.text;
+    if (_title != _titleController.text) {
+      _title = _titleController.text;
+      _dirty = true;
+    }
   }
 
   TextEditingController _controllerForDescription() {
@@ -855,8 +922,10 @@ class _ReportDesignerScreenState extends State<ReportDesignerScreen> {
   }
 
   void _syncDescription() {
-    if (_description != _descriptionController.text)
+    if (_description != _descriptionController.text) {
       _description = _descriptionController.text;
+      _dirty = true;
+    }
   }
 
   Widget _fieldTile(int i) {
@@ -888,6 +957,7 @@ class _ReportDesignerScreenState extends State<ReportDesignerScreen> {
                   tooltip: 'إزالة من المسودة',
                   onPressed: () => setState(() {
                     _fields.removeAt(i);
+                    _dirty = true;
                     _selected = _fields.isEmpty
                         ? null
                         : ((_selected ?? 0) >= _fields.length
@@ -1117,6 +1187,7 @@ class _ReportDesignerScreenState extends State<ReportDesignerScreen> {
     final item = _fields.removeAt(a);
     _fields.insert(b, item);
     _selected = b;
+    _dirty = true;
   }
 
   Widget _textEditor(int i, String label, String key) => Padding(
