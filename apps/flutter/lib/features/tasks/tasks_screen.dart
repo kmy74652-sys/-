@@ -21,6 +21,7 @@ class _TasksScreenState extends State<TasksScreen>
   bool _loading = true;
   String? _error;
   List<Map<String, dynamic>> _tasks = [];
+  final Map<String, Map<String, dynamic>> _reportByTask = {};
   bool _showingCachedTasks = false;
   final TextEditingController _searchController = TextEditingController();
   String _search = '';
@@ -30,6 +31,7 @@ class _TasksScreenState extends State<TasksScreen>
   int _pendingCount = 0;
   int _failedCount = 0;
   bool _queueBusy = false;
+  String _view = 'tasks';
 
   static const Map<String, String> _statusLabels = {
     'pending': 'جديدة',
@@ -84,7 +86,7 @@ class _TasksScreenState extends State<TasksScreen>
         final page = await client
             .from('tasks')
             .select(
-              'id,title,description,due_at,priority,status,assigned_at,received_at,opened_at',
+              'id,title,description,due_at,priority,status,assigned_at,received_at,opened_at,created_at,updated_at',
             )
             .isFilter('deleted_at', null)
             .order('due_at')
@@ -92,7 +94,23 @@ class _TasksScreenState extends State<TasksScreen>
         rows.addAll(List<Map<String, dynamic>>.from(page));
         if (page.length < 500) break;
       }
-      _tasks = rows;
+        _tasks = rows;
+        _reportByTask.clear();
+        if (rows.isNotEmpty) {
+          final ids = rows.map((row) => '${row['id']}').toList();
+          final reports = await client
+              .from('task_reports')
+              .select('id,task_id,status,submitted_at,reviewed_at,review_note')
+              .inFilter('task_id', ids)
+              .order('submitted_at', ascending: false)
+              .limit(500);
+          for (final report in (reports as List).whereType<Map>()) {
+            final taskId = '${report['task_id'] ?? ''}';
+            if (taskId.isNotEmpty && !_reportByTask.containsKey(taskId)) {
+              _reportByTask[taskId] = Map<String, dynamic>.from(report);
+            }
+          }
+        }
       _showingCachedTasks = false;
       if (uid != null) {
         await TaskCache.save(uid, rows);
@@ -305,6 +323,23 @@ class _TasksScreenState extends State<TasksScreen>
                       onChanged: (value) => setState(() => _search = value),
                     ),
                     const SizedBox(height: 8),
+                    Row(
+                      textDirection: TextDirection.rtl,
+                      children: [
+                        ChoiceChip(
+                          label: const Text('المهام الحالية'),
+                          selected: _view == 'tasks',
+                          onSelected: (_) => setState(() => _view = 'tasks'),
+                        ),
+                        const SizedBox(width: 8),
+                        ChoiceChip(
+                          label: const Text('كشف المهام'),
+                          selected: _view == 'ledger',
+                          onSelected: (_) => setState(() => _view = 'ledger'),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
                     const Align(
                       alignment: Alignment.centerRight,
                       child: Text(
@@ -382,7 +417,10 @@ class _TasksScreenState extends State<TasksScreen>
                         ),
                       ],
                     ),
-                    if (visibleTasks.isNotEmpty) _officialTableCard(visibleTasks),
+                    if (_view == 'ledger')
+                      _taskLedger(visibleTasks)
+                    else if (visibleTasks.isNotEmpty)
+                      _officialTableCard(visibleTasks),
                     if (_tasks.isEmpty)
                       const Padding(
                         padding: EdgeInsets.only(top: 72),
@@ -546,4 +584,65 @@ class _TasksScreenState extends State<TasksScreen>
       ),
     );
   }
+
+  Widget _taskLedger(List<Map<String, dynamic>> tasks) {
+    final ordered = [...tasks]
+      ..sort((a, b) => '${b['updated_at'] ?? b['due_at'] ?? ''}'.compareTo(
+        '${a['updated_at'] ?? a['due_at'] ?? ''}',
+      ));
+    if (ordered.isEmpty) {
+      return const Padding(
+        padding: EdgeInsets.all(28),
+        child: Center(child: Text('لا توجد سجلات في كشف المهام المطابق للبحث والمرشحات.')),
+      );
+    }
+    return Card(
+      color: const Color(0xFFF8FBFA),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+        side: const BorderSide(color: Color(0xFFD8E4E0)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Padding(
+            padding: EdgeInsets.fromLTRB(12, 12, 12, 4),
+            child: Text(
+              'كشف المهام · سجل محفوظ ومرتب',
+              textAlign: TextAlign.right,
+              style: TextStyle(fontWeight: FontWeight.w900, color: AppColors.navy),
+            ),
+          ),
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+            child: Text(
+              'يشمل المهام التي أُنجزت والتقارير المرتبطة بها للرجوع والمراجعة.',
+              textAlign: TextAlign.right,
+              style: TextStyle(color: AppColors.muted, fontSize: 12),
+            ),
+          ),
+          for (final task in ordered)
+            ListTile(
+              onTap: () => context.push('/tasks/${task['id']}'),
+              leading: const Icon(Icons.receipt_long_outlined, color: AppColors.green),
+              title: Text('${task['title'] ?? 'مهمة'}', textAlign: TextAlign.right),
+              subtitle: Text(
+                'التاريخ: ${task['updated_at'] ?? task['due_at'] ?? 'غير محدد'}\n'
+                'الحالة: ${_statusLabels[_normalizedStatus(task)] ?? task['status'] ?? 'جديدة'} · '
+                'التقرير: ${_reportStatusLabel(_reportByTask['${task['id']}']?['status'])}',
+                textAlign: TextAlign.right,
+              ),
+              trailing: const Icon(Icons.chevron_left),
+            ),
+        ],
+      ),
+    );
+  }
+
+  String _reportStatusLabel(Object? status) => switch ('$status') {
+    'submitted' => 'مرفوع للمراجعة',
+    'approved' => 'معتمد',
+    'returned' => 'معاد للاستكمال',
+    _ => 'غير مرفوع',
+  };
 }
