@@ -45,8 +45,18 @@ class AppCustomizer extends ChangeNotifier {
     } else {
       try { _apply(Map<String, dynamic>.from(jsonDecode(raw) as Map)); } catch (_) { _resetValues(); }
     }
+    _repairUnifiedVisibility();
     _loaded = true;
     notifyListeners();
+  }
+
+  void _repairUnifiedVisibility() {
+    if (unifiedSectionOrder.where(isUnifiedVisible).isEmpty) {
+      unifiedVisibility = {'employee': true};
+    }
+    if (unifiedFieldVisibility.values.every((visible) => !visible)) {
+      unifiedFieldVisibility = {'employeeField': true, 'roleField': true};
+    }
   }
 
   String label(String key) => labels[key] ?? defaults[key] ?? key;
