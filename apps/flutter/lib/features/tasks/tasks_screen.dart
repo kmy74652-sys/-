@@ -579,7 +579,7 @@ class _TasksScreenState extends State<TasksScreen>
             if (value('مؤشرات الأداء') != '—')
               Text('مؤشرات الأداء: ${value('مؤشرات الأداء')}', textAlign: TextAlign.right),
             Text(
-              'التقرير اليومي: ${task['report_required'] == true ? 'نموذج جاهز مطلوب' : 'غير محدد'}',
+              'التقرير اليومي: ${tasks.any((task) => task['report_required'] == true) ? 'نموذج جاهز مطلوب' : 'غير محدد'}',
               textAlign: TextAlign.right,
               style: const TextStyle(color: AppColors.muted),
             ),
