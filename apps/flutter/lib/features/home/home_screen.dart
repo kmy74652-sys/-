@@ -23,6 +23,7 @@ class _HomeScreenState extends State<HomeScreen> {
   String? _defaultBranchId;
   List<UnifiedEmployeeOption> _unifiedEmployees = const [];
   List<String> _unifiedBranches = const [];
+  List<UnifiedReportOption> _unifiedReports = const [];
   int _request = 0;
 
   static const _groups = <(String, List<_Module>)>[
@@ -296,12 +297,21 @@ class _HomeScreenState extends State<HomeScreen> {
       final results = await Future.wait<dynamic>([
         client.from('organization_memberships').select('user_id,display_name').eq('organization_id', organizationId).eq('is_active', true).order('display_name').limit(500),
         client.from('branches').select('name').eq('organization_id', organizationId).eq('is_active', true).order('name').limit(200),
+        client.from('report_form_templates').select('id,title,role_code').eq('organization_id', organizationId).eq('is_active', true).order('title').limit(200),
+        client.from('report_form_versions').select('id,template_id,status,approved_by,approved_at,report_required').eq('status', 'published').limit(500),
       ]);
       if (!mounted) return;
       final employees = (results[0] as List).whereType<Map>().map((row) => UnifiedEmployeeOption(name: (row['display_name'] ?? '').toString(), userId: (row['user_id'] ?? '').toString())).where((item) => item.name.isNotEmpty && item.userId.isNotEmpty).toList();
       setState(() {
         _unifiedEmployees = [const UnifiedEmployeeOption(name: 'مهام مشتركة', userId: ''), ...employees];
         _unifiedBranches = (results[1] as List).whereType<Map>().map((row) => (row['name'] ?? '').toString()).where((name) => name.isNotEmpty).toList();
+        final templates = (results[2] as List).whereType<Map>().toList();
+        final versions = (results[3] as List).whereType<Map>().where((row) => row['approved_by'] != null && row['approved_at'] != null).toList();
+        _unifiedReports = versions.map((version) {
+          final matches = templates.where((row) => row['id']?.toString() == version['template_id']?.toString()).toList();
+          final template = matches.isEmpty ? null : matches.first;
+          return template == null ? null : UnifiedReportOption(templateId: template['id'].toString(), versionId: version['id'].toString(), title: '${template['title']} · إصدار معتمد');
+        }).whereType<UnifiedReportOption>().toList();
       });
     } catch (_) {
       // Manual entry remains available when optional lists are unavailable.
@@ -471,7 +481,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _unifiedTaskTableSection() {
     final manager = _allowed('tasks') && _manageTasks;
     if (manager) {
-      return UnifiedTaskTableEditor(onSend: _sendUnifiedTable, employees: _unifiedEmployees, branches: _unifiedBranches);
+      return UnifiedTaskTableEditor(onSend: _sendUnifiedTable, employees: _unifiedEmployees, branches: _unifiedBranches, reports: _unifiedReports);
     }
     return SectionCard(
       title: 'الجدول الموحد لإنشاء المهام',
@@ -600,9 +610,9 @@ class _HomeScreenState extends State<HomeScreen> {
           'p_role_code': roleCode,
           'p_template_id': null,
           'p_assigned_to': userId,
-          'p_report_template_id': null,
-          'p_report_version_id': null,
-          'p_report_required': false,
+          'p_report_template_id': draft.reportTemplateId,
+          'p_report_version_id': draft.reportVersionId,
+          'p_report_required': draft.reportTemplateId != null && draft.reportVersionId != null,
         });
       }
     }

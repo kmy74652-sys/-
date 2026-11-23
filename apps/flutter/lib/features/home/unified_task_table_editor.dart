@@ -7,10 +7,11 @@ import 'package:printing/printing.dart';
 import '../../core/theme.dart';
 
 class UnifiedTaskTableEditor extends StatefulWidget {
-  const UnifiedTaskTableEditor({super.key, required this.onSend, this.employees = const [], this.branches = const []});
+  const UnifiedTaskTableEditor({super.key, required this.onSend, this.employees = const [], this.branches = const [], this.reports = const []});
   final Future<void> Function(UnifiedTaskTableDraft draft) onSend;
   final List<UnifiedEmployeeOption> employees;
   final List<String> branches;
+  final List<UnifiedReportOption> reports;
 
   @override
   State<UnifiedTaskTableEditor> createState() => _UnifiedTaskTableEditorState();
@@ -36,6 +37,8 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
   String _workType = 'دوام كامل';
   String _days = 'الأحد - الخميس';
   String _exception = 'الجمعة';
+  String? _reportVersionId;
+  String? _reportTemplateId;
 
   @override
   void dispose() {
@@ -119,6 +122,8 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
             const SizedBox(height: 10),
             _scheduleTable('العمل الاستثنائي ($_exception)'),
             const SizedBox(height: 10),
+            _reportSelector(),
+            const SizedBox(height: 10),
             _editableList('المسؤوليات الأساسية', _responsibilities),
             const SizedBox(height: 10),
             _editableList('الصلاحيات وحدود المسؤولية', _authorities),
@@ -190,6 +195,19 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
           onChanged: (value) => setState(() => _branch.text = value ?? ''),
         );
 
+  Widget _reportSelector() => _section('قالب التقرير اليومي', widget.reports.isEmpty
+      ? const Text('لا توجد قوالب تقارير معتمدة متاحة لهذا الحساب.', textAlign: TextAlign.right)
+      : DropdownButtonFormField<String>(
+          value: widget.reports.any((item) => item.versionId == _reportVersionId) ? _reportVersionId : null,
+          isExpanded: true,
+          decoration: const InputDecoration(labelText: 'اختر قالب التقرير المعتمد', isDense: true),
+          items: widget.reports.map((item) => DropdownMenuItem(value: item.versionId, child: Text(item.title, overflow: TextOverflow.ellipsis))).toList(),
+          onChanged: (value) {
+            final item = widget.reports.firstWhere((item) => item.versionId == value);
+            setState(() { _reportVersionId = value; _reportTemplateId = item.templateId; });
+          },
+        ));
+
   Widget _workHours() => _section('ساعات الدوام الرسمية', Wrap(textDirection: TextDirection.rtl, spacing: 8, runSpacing: 8, children: [
     _drop('نوع الدوام', _workType, ['دوام كامل', 'دوام جزئي', 'مناوبة'], (v) => setState(() => _workType = v)),
     _drop('الأيام', _days, ['الأحد - الخميس', 'السبت - الخميس', 'حسب المناوبة'], (v) => setState(() => _days = v)),
@@ -259,6 +277,10 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
       messenger.showSnackBar(const SnackBar(content: Text('أضف مهمة زمنية واحدة على الأقل قبل الإرسال.', textAlign: TextAlign.right)));
       return;
     }
+    if (_dailyReport.text.trim().isNotEmpty && widget.reports.isNotEmpty && _reportVersionId == null) {
+      messenger.showSnackBar(const SnackBar(content: Text('اختر قالب التقرير المعتمد قبل إرسال التقرير اليومي.', textAlign: TextAlign.right)));
+      return;
+    }
     setState(() => _sending = true);
     try {
       await widget.onSend(UnifiedTaskTableDraft(
@@ -272,6 +294,8 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
         responsibilities: _responsibilities.map((v) => v.text.trim()).where((v) => v.isNotEmpty).toList(),
         authorities: _authorities.map((v) => v.text.trim()).where((v) => v.isNotEmpty).toList(),
         instructions: _instructions.map((v) => v.text.trim()).where((v) => v.isNotEmpty).toList(),
+        reportTemplateId: _reportTemplateId,
+        reportVersionId: _reportVersionId,
       ));
       if (mounted) messenger.showSnackBar(const SnackBar(content: Text('تم إنشاء المهام وإرسالها للموظف بنجاح.', textAlign: TextAlign.right)));
     } catch (error) {
@@ -425,6 +449,7 @@ class UnifiedTaskTableDraft {
   final String employee, role, branch, startDate, purpose, dailyReport;
   final List<UnifiedTaskRowData> rows;
   final List<String> responsibilities, authorities, instructions;
+  final String? reportTemplateId, reportVersionId;
 }
 
 class UnifiedTaskRowData {
@@ -435,4 +460,9 @@ class UnifiedTaskRowData {
 class UnifiedEmployeeOption {
   const UnifiedEmployeeOption({required this.name, required this.userId});
   final String name, userId;
+}
+
+class UnifiedReportOption {
+  const UnifiedReportOption({required this.templateId, required this.versionId, required this.title});
+  final String templateId, versionId, title;
 }
