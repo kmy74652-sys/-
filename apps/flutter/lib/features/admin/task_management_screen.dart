@@ -22,6 +22,7 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
       _reportTemplates = [],
       _requests = [];
   Map<String, Map<String, dynamic>> _reportByTask = {};
+  Map<String, Map<String, dynamic>> _draftByTask = {};
   String _taskFilter = 'all', _reportFilter = 'all';
 
   @override
@@ -120,15 +121,29 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
                 .inFilter('task_id', taskIds)
                 .order('updated_at', ascending: false)
                 .limit(500));
+      final draftRows = taskIds.isEmpty
+          ? <Map<String, dynamic>>[]
+          : _rows(await _db
+                .from('task_report_drafts')
+                .select('task_id,updated_at')
+                .inFilter('task_id', taskIds)
+                .order('updated_at', ascending: false)
+                .limit(500));
       final reports = <String, Map<String, dynamic>>{};
       for (final report in reportRows) {
         final taskId = _s(report['task_id']);
         if (taskId.isNotEmpty && !reports.containsKey(taskId)) reports[taskId] = report;
       }
+      final drafts = <String, Map<String, dynamic>>{};
+      for (final draft in draftRows) {
+        final taskId = _s(draft['task_id']);
+        if (taskId.isNotEmpty && !drafts.containsKey(taskId)) drafts[taskId] = draft;
+      }
       setState(() {
         _orgId = org;
         _tasks = taskRows;
         _reportByTask = reports;
+        _draftByTask = drafts;
         _branches = _rows(results[1]);
         _employees = _rows(results[2]);
         _templates = _rows(results[3]);
@@ -195,6 +210,7 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
     if (reportStatus == 'approved') return 'معتمد';
     if (reportStatus == 'submitted') return 'مرسل للمراجعة';
     if (reportStatus == 'returned' || _s(task['status']) == 'needs_revision') return 'يحتاج تعديل';
+    if (_draftByTask.containsKey(_s(task['id']))) return 'مسودة';
     if (task['report_required'] == true || task['report_flow'] == 'multi_form') return 'لم يبدأ';
     return 'بدون تقرير';
   }
@@ -202,6 +218,7 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
   Color _reportStatusColor(String value) => const {
     'معتمد': Colors.green,
     'مرسل للمراجعة': Colors.orange,
+    'مسودة': Colors.indigo,
     'يحتاج تعديل': Colors.red,
     'لم يبدأ': Colors.blueGrey,
     'بدون تقرير': Colors.grey,
@@ -608,7 +625,7 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
   @override
   Widget build(BuildContext context) => AppShell(
     title: 'إدارة المهام',
-    subtitle: 'الإنشاء والتعديل والحذف الآمن وطلبات النشر',
+    subtitle: 'الإنشاء والتعديل والمتابعة وطلبات النشر',
     child: _loading
         ? const Center(child: CircularProgressIndicator())
         : RefreshIndicator(
@@ -669,6 +686,7 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
                           _filterChip(value: 'all', label: 'الكل', group: 'report', onSelected: () => _reportFilter = 'all'),
                           _filterChip(value: 'لم يبدأ', label: 'لم يبدأ', group: 'report', onSelected: () => _reportFilter = 'لم يبدأ'),
                           _filterChip(value: 'مرسل للمراجعة', label: 'مرسل للمراجعة', group: 'report', onSelected: () => _reportFilter = 'مرسل للمراجعة'),
+                          _filterChip(value: 'مسودة', label: 'مسودة', group: 'report', onSelected: () => _reportFilter = 'مسودة'),
                           _filterChip(value: 'يحتاج تعديل', label: 'يحتاج تعديل', group: 'report', onSelected: () => _reportFilter = 'يحتاج تعديل'),
                           _filterChip(value: 'معتمد', label: 'معتمد', group: 'report', onSelected: () => _reportFilter = 'معتمد'),
                           _filterChip(value: 'بدون تقرير', label: 'بدون تقرير', group: 'report', onSelected: () => _reportFilter = 'بدون تقرير'),
@@ -716,17 +734,11 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
                                   ),
                                   isThreeLine: true,
                                   trailing: PopupMenuButton<String>(
-                                    onSelected: (v) => v == 'edit'
-                                        ? _saveTask(existing: t)
-                                        : _delete(t),
+                                    onSelected: (_) => _saveTask(existing: t),
                                     itemBuilder: (_) => const [
                                       PopupMenuItem(
                                         value: 'edit',
                                         child: Text('تعديل'),
-                                      ),
-                                      PopupMenuItem(
-                                        value: 'delete',
-                                        child: Text('حذف آمن'),
                                       ),
                                     ],
                                   ),
