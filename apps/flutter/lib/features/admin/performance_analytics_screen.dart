@@ -18,6 +18,9 @@ class _PerformanceAnalyticsScreenState
   String? _error;
   String _search = '';
   String _sort = 'completion';
+  String? _employeeFilter;
+  DateTime? _fromDate, _toDate;
+  Map<String, String> _employeeOptions = {};
   List<_Employee> _employees = [];
   List<_Branch> _branches = [];
   _Delivery _delivery = _Delivery();
@@ -130,9 +133,11 @@ class _PerformanceAnalyticsScreenState
         if (status.isNotEmpty) reportStatusCounts[status] = (reportStatusCounts[status] ?? 0) + 1;
       }
       final byUser = <String, _Employee>{};
+      final employeeOptions = <String, String>{};
       for (final member in members) {
         final userId = _str(member['user_id']);
         if (userId.isEmpty) continue;
+        employeeOptions[userId] = _str(member['display_name'], 'موظف');
         final assignment = primary[userId];
         final role = _str(assignment?['role_code'], 'accountant');
         final branchId = _str(assignment?['branch_id']);
@@ -150,6 +155,22 @@ class _PerformanceAnalyticsScreenState
       }
       final overallDelivery = _Delivery();
       for (final task in tasks) {
+        final assignedTo = _str(task['assigned_to']);
+        final dueDate = DateTime.tryParse(_str(task['due_at']))?.toLocal();
+        final taskDay = dueDate == null
+            ? null
+            : DateTime(dueDate.year, dueDate.month, dueDate.day);
+        final from = _fromDate == null
+            ? null
+            : DateTime(_fromDate!.year, _fromDate!.month, _fromDate!.day);
+        final to = _toDate == null
+            ? null
+            : DateTime(_toDate!.year, _toDate!.month, _toDate!.day);
+        if (_employeeFilter != null && assignedTo != _employeeFilter) continue;
+        if ((from != null || to != null) && taskDay == null) continue;
+        if (taskDay != null &&
+            ((from != null && taskDay.isBefore(from)) ||
+                (to != null && taskDay.isAfter(to)))) continue;
         final employee = byUser[_str(task['assigned_to'])];
         if (employee == null) continue;
         final status = _str(task['status']);
@@ -208,6 +229,7 @@ class _PerformanceAnalyticsScreenState
           ..sort((a, b) => b.rate.compareTo(a.rate));
         _delivery = overallDelivery;
         _reportStatusCounts = reportStatusCounts;
+        _employeeOptions = employeeOptions;
       });
     } catch (error) {
       if (mounted) setState(() => _error = _errorMessage(error));
@@ -308,6 +330,8 @@ class _PerformanceAnalyticsScreenState
                       _error!,
                       onRetry: _load,
                     ),
+                  _ledgerFilters(),
+                  const SizedBox(height: 10),
                   _overviewCard(),
                   const SizedBox(height: 10),
                   _reportStatusCard(),
@@ -322,6 +346,103 @@ class _PerformanceAnalyticsScreenState
       ),
     ),
   );
+
+  Widget _ledgerFilters() => SectionCard(
+    title: 'كشف المهام حسب الموظف والفترة',
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const Text(
+          'اختر موظفًا وفترة زمنية لقراءة ما أُنجز وما لم يُنجز.',
+          textAlign: TextAlign.right,
+        ),
+        const SizedBox(height: 10),
+        DropdownButtonFormField<String>(
+          value: _employeeOptions.containsKey(_employeeFilter)
+              ? _employeeFilter
+              : null,
+          isExpanded: true,
+          decoration: const InputDecoration(
+            labelText: 'الموظف',
+            hintText: 'كل الموظفين',
+            border: OutlineInputBorder(),
+          ),
+          items: [
+            const DropdownMenuItem<String>(
+              value: null,
+              child: Text('كل الموظفين'),
+            ),
+            ..._employeeOptions.entries.map(
+              (entry) => DropdownMenuItem<String>(
+                value: entry.key,
+                child: Text(entry.value),
+              ),
+            ),
+          ],
+          onChanged: (value) {
+            setState(() => _employeeFilter = value);
+            _load();
+          },
+        ),
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            Expanded(child: _dateButton('من تاريخ', _fromDate, true)),
+            const SizedBox(width: 8),
+            Expanded(child: _dateButton('إلى تاريخ', _toDate, false)),
+          ],
+        ),
+        if (_fromDate != null || _toDate != null || _employeeFilter != null)
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton.icon(
+              onPressed: () {
+                setState(() {
+                  _fromDate = null;
+                  _toDate = null;
+                  _employeeFilter = null;
+                });
+                _load();
+              },
+              icon: const Icon(Icons.clear),
+              label: const Text('مسح كشف الفترة والموظف'),
+            ),
+          ),
+      ],
+    ),
+  );
+
+  Widget _dateButton(String label, DateTime? value, bool isFrom) =>
+      OutlinedButton.icon(
+        onPressed: () async {
+          final picked = await showDatePicker(
+            context: context,
+            initialDate: value ?? DateTime.now(),
+            firstDate: DateTime(2020),
+            lastDate: DateTime(2100),
+            helpText: label,
+            cancelText: 'إلغاء',
+            confirmText: 'اختيار',
+          );
+          if (picked == null || !mounted) return;
+          setState(() {
+            if (isFrom) {
+              _fromDate = picked;
+            } else {
+              _toDate = picked;
+            }
+          });
+          _load();
+        },
+        icon: const Icon(Icons.calendar_today_outlined, size: 18),
+        label: Text(
+          value == null ? label : '$label: ${_dateOnly(value)}',
+          overflow: TextOverflow.ellipsis,
+        ),
+      );
+
+  String _dateOnly(DateTime value) =>
+      '${value.year}/${value.month.toString().padLeft(2, '0')}/${value.day.toString().padLeft(2, '0')}';
 
   Widget _overviewCard() => SectionCard(
     title: 'المؤشرات العامة',
@@ -340,6 +461,12 @@ class _PerformanceAnalyticsScreenState
           '$_delayed',
           'غير منجزة ومستحقة قبل الآن',
           Icons.schedule,
+        ),
+        _metric(
+          'غير مكتملة',
+          '${_required - _done}',
+          'المهام المتبقية ضمن الفترة المحددة',
+          Icons.pending_actions_outlined,
         ),
         _metric(
           'الموظفون النشطون',
