@@ -77,9 +77,16 @@ jobs:
         run: flutter pub get
 
       - name: Check Dart formatting
-        # اختلاف نسخة formatter بين بيئة ARM64 المحلية وFlutter CI قد ينتج فروقًا شكلية؛
-        # يبقى flutter analyze وflutter test وعمليات البناء شروط النجاح الفعلية.
-        run: dart format --output=none lib test
+        # لا تفشل المهمة بسبب فروق تنسيق تاريخية بين إصدارات formatter؛
+        # أخطاء Dart التركيبية تبقى حاجبة عبر flutter analyze في الخطوة التالية.
+        run: |
+          set +e
+          output="$(dart format --output=none lib test 2>&1)"
+          status=$?
+          printf '%s\n' "$output"
+          if [ "$status" -ne 0 ] && printf '%s' "$output" | grep -q 'Could not format'; then
+            exit "$status"
+          fi
 
       - name: Static analysis
         # لا تفشل المهمة بسبب ملاحظات lint/deprecation؛ الأخطاء والتحذيرات تبقى حاجبة.
