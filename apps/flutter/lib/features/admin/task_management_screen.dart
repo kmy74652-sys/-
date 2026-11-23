@@ -22,6 +22,7 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
   Map<String, Map<String, dynamic>> _reportByTask = {};
   Map<String, Map<String, dynamic>> _draftByTask = {};
   String _taskFilter = 'all', _reportFilter = 'all';
+  bool _unifiedOnly = false;
 
   @override
   void initState() {
@@ -34,6 +35,27 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
       : <Map<String, dynamic>>[];
   String _s(dynamic v, [String fallback = '']) =>
       v == null ? fallback : v.toString();
+
+  bool _isUnifiedTask(Map<String, dynamic> task) =>
+      _s(task['description']).contains('الوقت المحدد:');
+
+  String _lineValue(String text, String label) {
+    for (final line in text.split('\n')) {
+      if (line.trimLeft().startsWith(label)) {
+        return line.substring(line.indexOf(':') + 1).trim();
+      }
+    }
+    return '';
+  }
+
+  String _replaceLine(String text, String label, String value) {
+    final lines = text.split('\n');
+    final index = lines.indexWhere((line) => line.trimLeft().startsWith(label));
+    final next = '$label ${value.trim().isEmpty ? 'غير محدد' : value.trim()}';
+    if (index == -1) return '$text\n$next'.trim();
+    lines[index] = next;
+    return lines.join('\n').trim();
+  }
 
   Future<void> _load() async {
     if (mounted)
@@ -214,6 +236,7 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
   }
 
   List<Map<String, dynamic>> get _visibleTasks => _tasks.where((task) {
+    if (_unifiedOnly && !_isUnifiedTask(task)) return false;
     final rawTaskStatus = _s(task['status']);
     final taskMatches = _taskFilter == 'all' ||
         (_taskFilter == 'pending' && ['pending', 'new'].contains(rawTaskStatus)) ||
@@ -234,6 +257,16 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
     final title = TextEditingController(text: _s(existing?['title']));
     final description = TextEditingController(text: _s(existing?['description']));
     final descriptionCards = <TextEditingController>[description];
+    final time = TextEditingController(
+      text: existing == null
+          ? ''
+          : _lineValue(_s(existing['description']), 'الوقت المحدد:'),
+    );
+    final output = TextEditingController(
+      text: existing == null
+          ? ''
+          : _lineValue(_s(existing['description']), 'المخرج المطلوب:'),
+    );
     final parsedDue = DateTime.tryParse(_s(existing?['due_at']));
     DateTime dueDate = parsedDue?.toLocal() ?? defaultDueDate();
     String priority = _s(existing?['priority'], 'normal');
@@ -307,6 +340,27 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
             ),
           ],
         ),
+        if (existing != null && _isUnifiedTask(existing))
+          FormSection(
+            title: 'بيانات صف الجدول الموحد',
+            icon: Icons.table_chart_outlined,
+            note: 'تعديل هذه القيم ينعكس مباشرة على المهمة الظاهرة للموظف وكشف المهام.',
+            children: [
+              TextField(
+                controller: time,
+                textDirection: TextDirection.rtl,
+                decoration: formDecoration('الوقت / الفترة'),
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: output,
+                textDirection: TextDirection.rtl,
+                minLines: 2,
+                maxLines: 4,
+                decoration: formDecoration('المخرج المطلوب'),
+              ),
+            ],
+          ),
         FormSection(
           title: 'الموعد والأولوية',
           icon: Icons.event_available_outlined,
@@ -415,18 +469,28 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
     if (ok != true) {
       title.dispose();
       description.dispose();
+      time.dispose();
+      output.dispose();
       return;
     }
 
     setState(() => _busy = true);
     try {
       final dueIso = dueToIso(dueDate);
-      final descriptionText = descriptionCards
+      var descriptionText = descriptionCards
           .asMap()
           .entries
           .where((entry) => entry.value.text.trim().isNotEmpty)
           .map((entry) => 'وصف المهمة ${entry.key + 1}:\n${entry.value.text.trim()}')
           .join('\n\n');
+      if (existing != null && _isUnifiedTask(existing)) {
+        final original = descriptionCards.first.text.trim();
+        descriptionText = _replaceLine(
+          _replaceLine(original, 'الوقت المحدد:', time.text),
+          'المخرج المطلوب:',
+          output.text,
+        );
+      }
       if (existing != null) {
         await _db.rpc('admin_update_task', params: {'p_organization_id': _orgId, 'p_task_id': existing['id'], 'p_title': title.text.trim(), 'p_description': descriptionText.isEmpty ? null : descriptionText, 'p_due_at': dueIso});
       } else {
@@ -441,6 +505,8 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
       for (final card in descriptionCards) {
         card.dispose();
       }
+      time.dispose();
+      output.dispose();
       if (mounted) setState(() => _busy = false);
     }
   }
@@ -516,11 +582,25 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
                           _filterChip(value: 'بدون تقرير', label: 'بدون تقرير', group: 'report', onSelected: () => _reportFilter = 'بدون تقرير'),
                         ],
                       ),
+                      const SizedBox(height: 12),
+                      const Text('مصدر المهمة', textAlign: TextAlign.right, style: TextStyle(fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 6),
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: FilterChip(
+                          selected: _unifiedOnly,
+                          avatar: const Icon(Icons.table_chart_outlined, size: 18),
+                          label: const Text('الجدول الموحد المرسل'),
+                          onSelected: (value) => setState(() => _unifiedOnly = value),
+                        ),
+                      ),
                     ],
                   ),
                 ),
                 SectionCard(
-                  title: 'المهام (${_visibleTasks.length} من ${_tasks.length})',
+                  title: _unifiedOnly
+                      ? 'الجدول الموحد المرسل (${_visibleTasks.length})'
+                      : 'المهام والجداول المرسلة (${_visibleTasks.length} من ${_tasks.length})',
                   child: _visibleTasks.isEmpty
                       ? const Text('لا توجد مهام مطابقة للفلاتر المحددة.', textAlign: TextAlign.right)
                       : Column(
