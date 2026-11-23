@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/theme.dart';
+import '../admin/admin_screen.dart';
 import '../../shared/app_shell.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -327,11 +328,15 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) => AppShell(
-    title: 'الرئيسية',
+    title: _manageTasks ? 'لوحة إدارة المؤسسة' : 'الرئيسية',
     subtitle: _name == null || _name!.isEmpty
-        ? 'بوابة العمل والتواصل الإداري'
+        ? (_manageTasks
+              ? 'إدارة المؤسسة ومتابعة العمل والتقارير'
+              : 'بوابة العمل والتواصل الإداري')
         : 'مرحبًا ${_name!}',
-    child: RefreshIndicator(
+    child: _manageTasks
+        ? const AdminScreen(embedded: true)
+        : RefreshIndicator(
       onRefresh: _load,
       child: ListView(
         physics: const AlwaysScrollableScrollPhysics(),

@@ -6,7 +6,11 @@ import '../../shared/app_shell.dart';
 import '../../core/theme.dart';
 
 class AdminScreen extends StatefulWidget {
-  const AdminScreen({super.key});
+  const AdminScreen({super.key, this.embedded = false});
+
+  /// In embedded mode, the parent AppShell owns the page header/navigation.
+  final bool embedded;
+
   @override
   State<AdminScreen> createState() => _AdminScreenState();
 }
@@ -144,12 +148,8 @@ class _AdminScreenState extends State<AdminScreen> {
   }
 
   @override
-  Widget build(BuildContext context) => AppShell(
-    title: 'لوحة إدارة المؤسسة',
-    subtitle: _name.isEmpty
-        ? 'إدارة وفق صلاحيات الحساب وسياسات RLS'
-        : 'مرحبًا $_name',
-    child: RefreshIndicator(
+  Widget build(BuildContext context) {
+    final content = RefreshIndicator(
       onRefresh: _load,
       child: ListView(
         padding: const EdgeInsets.all(14),
@@ -184,8 +184,16 @@ class _AdminScreenState extends State<AdminScreen> {
           ],
         ],
       ),
-    ),
-  );
+    );
+    if (widget.embedded) return content;
+    return AppShell(
+      title: 'لوحة إدارة المؤسسة',
+      subtitle: _name.isEmpty
+          ? 'إدارة وفق صلاحيات الحساب وسياسات RLS'
+          : 'مرحبًا $_name',
+      child: content,
+    );
+  }
 
   Widget _overview() {
     final active = _tasks

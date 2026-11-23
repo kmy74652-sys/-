@@ -75,25 +75,22 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
 
   static const _tabs = <_ShellTab>[
     _ShellTab('/', 'الرئيسية', Icons.home_outlined),
-    _ShellTab('/settings', 'الموظفون', Icons.people_outline),
     _ShellTab('/tasks', 'المهام', Icons.task_alt_outlined),
-    _ShellTab('/admin', 'الإدارة', Icons.dashboard_outlined),
+    _ShellTab('/settings', 'الموظفون', Icons.people_outline),
   ];
 
   int _selectedIndex(String path) {
-    if (path == '/settings' || path.startsWith('/settings/')) return 1;
-    if (path == '/tasks' || path.startsWith('/tasks/')) return 2;
+    if (path == '/tasks' || path.startsWith('/tasks/')) return 1;
+    if (path == '/settings' || path.startsWith('/settings/')) return 2;
     if (path == '/' || path.isEmpty) return 0;
-    // Admin, analytics, designers, reports, HR, and agreement screens stay
-    // on their current route; this only highlights the nearest shell section.
-    if (path == '/hr' || path.startsWith('/hr/')) return 1;
-    return 3;
+    // الإدارة والتقارير والتحليلات مسارات داخلية وتُحسب بصريًا على الرئيسية.
+    return 0;
   }
 
   /// Parent route for pages that are not one of the bottom-navigation roots.
   /// Returns null on root pages so no back button is shown there.
   String? _backRoute(String path) {
-    const roots = {'/', '/settings', '/tasks', '/admin'};
+    const roots = {'/', '/settings', '/tasks'};
     if (path.isEmpty || roots.contains(path)) return null;
     final segments = path.split('/').where((e) => e.isNotEmpty).toList();
     if (segments.length <= 1) return '/';
