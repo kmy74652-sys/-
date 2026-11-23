@@ -456,7 +456,7 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
         reportVersionId: _reportVersionId,
       ));
       if (mounted) setState(() => _sent = true);
-      if (mounted) messenger.showSnackBar(const SnackBar(content: Text('تم إنشاء المهام وإرسالها للموظف بنجاح.', textAlign: TextAlign.right)));
+      if (mounted) messenger.showSnackBar(const SnackBar(content: Text('تم حفظ الجدول الموحد وإرساله للموظف بنجاح.', textAlign: TextAlign.right)));
     } catch (error) {
       if (mounted) messenger.showSnackBar(SnackBar(content: Text('تعذر إرسال الجدول: $error', textAlign: TextAlign.right)));
     } finally {

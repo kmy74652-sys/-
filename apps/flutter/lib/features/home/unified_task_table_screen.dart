@@ -259,42 +259,103 @@ class _UnifiedTaskTableScreenState extends State<UnifiedTaskTableScreen> {
     }
   }
 
-  Widget _sentTasksSection() => Card(
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(
-                'الجداول الموحدة المرسلة (${_sentTasks.length})',
-                textAlign: TextAlign.right,
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 17),
-              ),
-              const SizedBox(height: 8),
-              if (_sentLoading)
-                const Center(child: CircularProgressIndicator())
-              else if (_sentTasks.isEmpty)
-                const Text('لا توجد جداول موحدة مرسلة.', textAlign: TextAlign.right)
-              else
-                for (final task in _sentTasks)
-                  ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    title: Text('${task['title'] ?? 'مهمة'}', textAlign: TextAlign.right),
-                    subtitle: Text(
-                      '${task['status'] ?? 'جديدة'} · ${task['due_at'] ?? 'غير محدد'}',
-                      textAlign: TextAlign.right,
-                    ),
-                    trailing: Wrap(
-                      children: [
-                        IconButton(onPressed: _sentMutationBusy ? null : () => _editSentTask(task), icon: const Icon(Icons.edit_outlined)),
-                        IconButton(onPressed: _sentMutationBusy ? null : () => _deleteSentTask(task), icon: const Icon(Icons.delete_outline, color: Colors.red)),
-                      ],
-                    ),
+  List<Map<String, dynamic>> _tableRowsForTask(Map<String, dynamic> task) {
+    final description = '${task['description'] ?? ''}';
+    final rows = <Map<String, dynamic>>[];
+    final pattern = RegExp(r'(?m)^صف الجدول:\s*(.*?)\s*\|\s*(.*?)\s*\|\s*(.*?)\s*$');
+    for (final match in pattern.allMatches(description)) {
+      rows.add({
+        'task': task,
+        'time': match.group(1)?.trim() ?? 'غير محدد',
+        'title': match.group(2)?.trim() ?? '—',
+        'output': match.group(3)?.trim() ?? '—',
+      });
+    }
+    if (rows.isEmpty) {
+      final time = RegExp(r'الوقت المحدد:\s*(.*)').firstMatch(description)?.group(1);
+      final output = RegExp(r'المخرج المطلوب:\s*(.*)').firstMatch(description)?.group(1);
+      rows.add({
+        'task': task,
+        'time': time?.trim().isNotEmpty == true ? time!.trim() : 'غير محدد',
+        'title': '${task['title'] ?? 'مهمة'}',
+        'output': output?.trim().isNotEmpty == true ? output!.trim() : '—',
+      });
+    }
+    return rows;
+  }
+
+  Widget _sentTasksSection() {
+    final groups = <String, List<Map<String, dynamic>>>{};
+    for (final task in _sentTasks) {
+      final key = '${task['assigned_to'] ?? ''}|${task['due_at'] ?? ''}';
+      groups.putIfAbsent(key, () => <Map<String, dynamic>>[]).add(task);
+    }
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              'الجداول الموحدة المرسلة (${groups.length})',
+              textAlign: TextAlign.right,
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 17),
+            ),
+            const SizedBox(height: 8),
+            if (_sentLoading)
+              const Center(child: CircularProgressIndicator())
+            else if (_sentTasks.isEmpty)
+              const Text('لا توجد جداول موحدة مرسلة.', textAlign: TextAlign.right)
+            else
+              for (final group in groups.values) ...[
+                if (group.first != groups.values.first) const Divider(height: 24),
+                Text(
+                  'جدول موحد · ${group.expand(_tableRowsForTask).length} صف',
+                  textAlign: TextAlign.right,
+                  style: const TextStyle(fontWeight: FontWeight.w800),
+                ),
+                Text(
+                  '${group.first['status'] ?? 'جديدة'} · ${group.first['due_at'] ?? 'غير محدد'}',
+                  textAlign: TextAlign.right,
+                  style: const TextStyle(fontSize: 12),
+                ),
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: DataTable(
+                    columns: const [
+                      DataColumn(label: Text('الوقت')),
+                      DataColumn(label: Text('المهمة')),
+                      DataColumn(label: Text('المخرج')),
+                      DataColumn(label: Text('إجراء')),
+                    ],
+                    rows: group
+                        .expand(_tableRowsForTask)
+                        .map(
+                          (row) => DataRow(cells: [
+                            DataCell(Text('${row['time']}')),
+                            DataCell(Text('${row['title']}')),
+                            DataCell(Text('${row['output']}')),
+                            DataCell(Row(mainAxisSize: MainAxisSize.min, children: [
+                              IconButton(
+                                onPressed: _sentMutationBusy ? null : () => _editSentTask(row['task'] as Map<String, dynamic>),
+                                icon: const Icon(Icons.edit_outlined),
+                              ),
+                              IconButton(
+                                onPressed: _sentMutationBusy ? null : () => _deleteSentTask(row['task'] as Map<String, dynamic>),
+                                icon: const Icon(Icons.delete_outline, color: Colors.red),
+                              ),
+                            ])),
+                          ]),
+                        )
+                        .toList(),
                   ),
-            ],
-          ),
+                ),
+              ],
+          ],
         ),
-      );
+      ),
+    );
+  }
 
   String? _defaultBranch(Map<String, dynamic> profile) {
     final branches = profile['branches'];
@@ -352,46 +413,45 @@ class _UnifiedTaskTableScreenState extends State<UnifiedTaskTableScreen> {
     for (final member in selected) {
       final userId = member['user_id']?.toString();
       if (userId == null || userId.isEmpty) continue;
-      for (final row in draft.rows) {
-        final dispatchKey = '${userId}:${row.time}:${row.task}:${row.output}';
-        if (_successfulDispatches.contains(dispatchKey)) continue;
-        final description = [
-          'المسمى الوظيفي: ${draft.role}',
-          if (draft.branch.isNotEmpty) 'الفرع: ${draft.branch}',
-          if (draft.startDate.isNotEmpty)
-            'تاريخ بدء التطبيق: ${draft.startDate}',
-          'ساعات الدوام: ${draft.workType} · ${draft.workDays} · الاستثناء الأسبوعي: ${draft.weeklyException}',
-          if (draft.purpose.isNotEmpty) 'الهدف من الوظيفة: ${draft.purpose}',
-          'الوقت المحدد: ${row.time.isEmpty ? 'غير محدد' : row.time}',
-          if (row.output.isNotEmpty) 'المخرج المطلوب: ${row.output}',
-          if (draft.reportNotes.isNotEmpty)
-            'ملاحظات وتعليمات إضافية: ${draft.reportNotes}',
-          if (draft.responsibilities.isNotEmpty)
-            'المسؤوليات: ${draft.responsibilities.join('، ')}',
-          if (draft.authorities.isNotEmpty)
-            'الصلاحيات: ${draft.authorities.join('، ')}',
-          if (draft.instructions.isNotEmpty)
-            'التعليمات: ${draft.instructions.join('، ')}',
-          if (draft.kpis.isNotEmpty)
-            'مؤشرات الأداء: ${draft.kpis.join('؛ ')}',
-        ].join('\n');
-        await _db.rpc('create_task_with_report_form', params: {
-          'p_organization_id': organizationId,
-          'p_title': row.task,
-          'p_description': description,
-          'p_due_at': due.toIso8601String(),
-          'p_priority': 'normal',
-          'p_branch_id': branchId,
-          'p_role_code': roleCode,
-          'p_template_id': null,
-          'p_assigned_to': userId,
-          'p_report_template_id': draft.reportTemplateId,
-          'p_report_version_id': draft.reportVersionId,
-          'p_report_required':
-              draft.reportTemplateId != null && draft.reportVersionId != null,
-        });
-        _successfulDispatches.add(dispatchKey);
-      }
+      final dispatchKey = '${userId}:${draft.role}:${draft.rows.map((row) => '${row.time}|${row.task}|${row.output}').join('§')}';
+      if (_successfulDispatches.contains(dispatchKey)) continue;
+      final description = [
+        'الجدول الموحد: ${draft.role}',
+        if (draft.branch.isNotEmpty) 'الفرع: ${draft.branch}',
+        if (draft.startDate.isNotEmpty)
+          'تاريخ بدء التطبيق: ${draft.startDate}',
+        'ساعات الدوام: ${draft.workType} · ${draft.workDays} · الاستثناء الأسبوعي: ${draft.weeklyException}',
+        if (draft.purpose.isNotEmpty) 'الهدف من الوظيفة: ${draft.purpose}',
+        'الوقت المحدد: ${draft.rows.first.time.isEmpty ? 'غير محدد' : draft.rows.first.time}',
+        for (final row in draft.rows)
+          'صف الجدول: ${row.time.isEmpty ? 'غير محدد' : row.time} | ${row.task} | ${row.output.isEmpty ? '—' : row.output}',
+        if (draft.reportNotes.isNotEmpty)
+          'ملاحظات وتعليمات إضافية: ${draft.reportNotes}',
+        if (draft.responsibilities.isNotEmpty)
+          'المسؤوليات: ${draft.responsibilities.join('، ')}',
+        if (draft.authorities.isNotEmpty)
+          'الصلاحيات: ${draft.authorities.join('، ')}',
+        if (draft.instructions.isNotEmpty)
+          'التعليمات: ${draft.instructions.join('، ')}',
+        if (draft.kpis.isNotEmpty)
+          'مؤشرات الأداء: ${draft.kpis.join('؛ ')}',
+      ].join('\n');
+      await _db.rpc('create_task_with_report_form', params: {
+        'p_organization_id': organizationId,
+        'p_title': 'الجدول الموحد - ${draft.role}',
+        'p_description': description,
+        'p_due_at': due.toIso8601String(),
+        'p_priority': 'normal',
+        'p_branch_id': branchId,
+        'p_role_code': roleCode,
+        'p_template_id': null,
+        'p_assigned_to': userId,
+        'p_report_template_id': draft.reportTemplateId,
+        'p_report_version_id': draft.reportVersionId,
+        'p_report_required':
+            draft.reportTemplateId != null && draft.reportVersionId != null,
+      });
+      _successfulDispatches.add(dispatchKey);
     }
   }
 

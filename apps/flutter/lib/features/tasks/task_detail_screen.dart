@@ -33,18 +33,75 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
   List<Map<String, String>> _descriptionBlocks(String value) {
     final text = value.trim();
     final matches = RegExp(r'(?m)^وصف المهمة (\d+):\s*$').allMatches(text).toList();
-    if (matches.isEmpty) return [{'title': 'الوصف', 'body': text}];
+    if (matches.isEmpty) {
+      final body = text
+          .split('\n')
+          .where((line) => !line.trim().startsWith('صف الجدول:'))
+          .join('\n')
+          .trim();
+      return body.isEmpty ? const [] : [{'title': 'الوصف', 'body': body}];
+    }
     final blocks = <Map<String, String>>[];
     for (var i = 0; i < matches.length; i++) {
       final match = matches[i];
       final start = match.end;
       final end = i + 1 < matches.length ? matches[i + 1].start : text.length;
-      final body = text.substring(start, end).trim();
+      final body = text
+          .substring(start, end)
+          .split('\n')
+          .where((line) => !line.trim().startsWith('صف الجدول:'))
+          .join('\n')
+          .trim();
       if (body.isNotEmpty) {
         blocks.add({'title': 'وصف المهمة ${match.group(1)}', 'body': body});
       }
     }
     return blocks.isEmpty ? [{'title': 'الوصف', 'body': text}] : blocks;
+  }
+
+  List<Map<String, String>> _unifiedRows(String value) {
+    final rows = <Map<String, String>>[];
+    final pattern = RegExp(r'(?m)^صف الجدول:\s*(.*?)\s*\|\s*(.*?)\s*\|\s*(.*?)\s*$');
+    for (final match in pattern.allMatches(value)) {
+      rows.add({
+        'time': match.group(1)?.trim() ?? 'غير محدد',
+        'task': match.group(2)?.trim() ?? '—',
+        'output': match.group(3)?.trim() ?? '—',
+      });
+    }
+    return rows;
+  }
+
+  Widget _unifiedTable(String description) {
+    final rows = _unifiedRows(description);
+    if (rows.isEmpty) return const SizedBox.shrink();
+    return SectionCard(
+      title: 'الجدول الموحد للمهام',
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: DataTable(
+          headingRowColor: WidgetStatePropertyAll(
+            Theme.of(context).colorScheme.surfaceContainerHighest,
+          ),
+          columns: const [
+            DataColumn(label: Text('الوقت')),
+            DataColumn(label: Text('المهمة والمسؤولية')),
+            DataColumn(label: Text('المخرج المطلوب')),
+          ],
+          rows: rows
+              .map(
+                (row) => DataRow(
+                  cells: [
+                    DataCell(Text(row['time'] ?? '—')),
+                    DataCell(Text(row['task'] ?? '—')),
+                    DataCell(Text(row['output'] ?? '—')),
+                  ],
+                ),
+              )
+              .toList(),
+        ),
+      ),
+    );
   }
 
   String _taskStatusLabel(Object? value) => const {
@@ -1452,6 +1509,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                   ],
                 ),
               ),
+              _unifiedTable('${_task?['description'] ?? ''}'),
               if ('${_task?['description'] ?? ''}'.trim().isNotEmpty)
                 SectionCard(
                   title: 'بيانات المهمة',
