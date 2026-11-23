@@ -163,7 +163,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       textInputAction: TextInputAction.next,
                       onChanged: _queueBranding,
                       decoration: const InputDecoration(
-                        labelText: 'اسم الموظف',
+                        labelText: 'الرقم الوظيفي',
                       ),
                     ),
                     const SizedBox(height: 12),

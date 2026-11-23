@@ -337,7 +337,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _setEmployeeCode(Map<String, dynamic> person) async {
     final id = '${person['id'] ?? ''}';
     final controller = _loginCodeController(id);
-    final code = controller.text;
+    final code = controller.text.trim();
     if (!_allowed ||
         person['status'] != 'active' ||
         person['hasAuthAccount'] != true)
@@ -366,12 +366,28 @@ class _SettingsScreenState extends State<SettingsScreen> {
         );
         await _load();
       }
+    } on FunctionException catch (error) {
+      final details = '${error.details ?? ''}';
+      final message = switch (details) {
+        String value when value.contains('employee_auth_not_linked') =>
+          'لا يوجد حساب دخول مرتبط بهذا الموظف.',
+        String value when value.contains('employee_not_active') =>
+          'لا يمكن تغيير رمز موظف غير نشط.',
+        String value when value.contains('owner_account_protected') =>
+          'حساب صاحب المؤسسة محمي ولا يمكن تغييره من هذا الحساب.',
+        String value when value.contains('invalid_access_code') =>
+          'الرمز يجب أن يكون من 3 إلى 30 محرفًا دون مسافات داخلية.',
+        String value when value.contains('access_code_update_failed') =>
+          'فشل تحديث رمز الدخول في خدمة المصادقة.',
+        String value when value.contains('access_code_status_update_failed') =>
+          'تم تحديث الرمز لكن تعذر تحديث حالة العضوية؛ أعد تحميل الصفحة قبل المحاولة.',
+        _ => 'تعذر حفظ الرمز (${error.status ?? 'خطأ غير معروف'}). تحقق من الاتصال والصلاحية ثم حاول مجددًا.',
+      };
+      if (mounted) setState(() => _error = message);
     } catch (_) {
-      if (mounted)
-        setState(
-          () => _error =
-              'تعذر حفظ الرمز. تحقق من الاتصال والصلاحية ثم حاول مجددًا.',
-        );
+      if (mounted) setState(
+        () => _error = 'تعذر حفظ الرمز. تحقق من الاتصال والصلاحية ثم حاول مجددًا.',
+      );
     } finally {
       if (mounted) setState(() => _busyEmployeeId = null);
     }
