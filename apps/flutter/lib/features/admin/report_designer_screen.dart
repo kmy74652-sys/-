@@ -61,6 +61,12 @@ class _ReportDesignerScreenState extends State<ReportDesignerScreen> {
     'select': 'قائمة',
     'boolean': 'نعم/لا',
   };
+  static const _sections = <String, String>{
+    'basic': 'البيانات الأساسية',
+    'execution': 'تفاصيل التنفيذ',
+    'results': 'النتائج والملاحظات',
+    'evidence': 'الإثباتات والمرفقات',
+  };
 
   @override
   void initState() {
@@ -148,7 +154,7 @@ class _ReportDesignerScreenState extends State<ReportDesignerScreen> {
       'sort_order': i,
       'options': <String>[],
       'validation': <String, dynamic>{},
-      'config': <String, dynamic>{},
+      'config': <String, dynamic>{'section': 'basic'},
     };
   }
 
@@ -756,6 +762,7 @@ class _ReportDesignerScreenState extends State<ReportDesignerScreen> {
           ),
         ),
       ),
+      _preview(),
       FilledButton.icon(
         onPressed: _busy ? null : _save,
         icon: const Icon(Icons.save),
@@ -886,6 +893,18 @@ class _ReportDesignerScreenState extends State<ReportDesignerScreen> {
                     .toList(),
                 onChanged: (v) => _patchField(i, {'field_type': v}),
               ),
+              DropdownButtonFormField<String>(
+                value: _sections.containsKey(_fieldSection(f))
+                    ? _fieldSection(f)
+                    : 'basic',
+                decoration: const InputDecoration(labelText: 'قسم التقرير'),
+                items: _sections.entries
+                    .map((e) => DropdownMenuItem(value: e.key, child: Text(e.value)))
+                    .toList(),
+                onChanged: (v) => _patchField(i, {
+                  'config': {..._obj(f['config']), 'section': v ?? 'basic'},
+                }),
+              ),
               CheckboxListTile(
                 contentPadding: EdgeInsets.zero,
                 title: const Text('حقل مطلوب', textAlign: TextAlign.right),
@@ -895,6 +914,62 @@ class _ReportDesignerScreenState extends State<ReportDesignerScreen> {
               if (['select', 'multiselect'].contains(f['field_type']))
                 _optionsEditor(i),
               if (f['field_type'] == 'table') _columnsEditor(i),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _fieldSection(Map<String, dynamic> field) =>
+      _obj(field['config'])['section']?.toString() ?? 'basic';
+
+  Widget _preview() {
+    final groups = <String, List<Map<String, dynamic>>>{};
+    for (final key in _sections.keys) {
+      final fields = _fields.where((f) => _fieldSection(f) == key).toList();
+      if (fields.isNotEmpty) groups[key] = fields;
+    }
+    return Card(
+      color: const Color(0xfff5f8fa),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.preview_outlined, color: AppColors.navy),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'معاينة التقرير للموظف',
+                    textAlign: TextAlign.right,
+                    style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.navy),
+                  ),
+                ),
+              ],
+            ),
+            const Divider(),
+            if (groups.isEmpty)
+              const Text('أضف حقولًا لتظهر المعاينة هنا.', textAlign: TextAlign.right),
+            for (final entry in groups.entries) ...[
+              Text(_sections[entry.key]!, textAlign: TextAlign.right, style: const TextStyle(fontWeight: FontWeight.bold)),
+              const SizedBox(height: 6),
+              for (final field in entry.value)
+                Container(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10), border: Border.all(color: const Color(0xffdce4e8))),
+                  child: Row(
+                    children: [
+                      if (field['is_required'] == true) const Text('* ', style: TextStyle(color: Colors.red)),
+                      Expanded(child: Text((field['label']?.toString().trim().isEmpty ?? true) ? 'حقل بدون اسم' : field['label'].toString(), textAlign: TextAlign.right)),
+                      const Icon(Icons.text_fields, size: 18, color: AppColors.muted),
+                    ],
+                  ),
+                ),
+              const SizedBox(height: 6),
             ],
           ],
         ),
