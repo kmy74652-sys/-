@@ -227,7 +227,7 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
             DueDateField(value: dueDate, onChanged: (v) => set(() => dueDate = v)),
             ChoiceChipsField<String>(
               label: 'درجة الأولوية', value: priority,
-              options: const [('normal', 'عادية'), ('important', 'مهمة'), ('urgent', 'عاجلة'), ('critical', 'حرجة')],
+              options: const [('low', 'منخفضة'), ('normal', 'عادية'), ('high', 'عالية'), ('urgent', 'عاجلة')],
               onChanged: (v) => set(() => priority = v),
             ),
           ],
