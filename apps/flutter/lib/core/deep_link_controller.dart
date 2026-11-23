@@ -31,7 +31,7 @@ class DeepLinkController {
   }
 
   static bool _allowedPath(String path) => RegExp(
-    r'^/(tasks|tasks/[^/]+|reports|reports/daily|reports/independent|agreement|hr|settings|admin|admin/tasks|admin/report-designer|admin/task-designer|admin/performance)$',
+    r'^/(tasks|tasks/[^/]+|reports|reports/daily|reports/independent|agreement|hr|settings|admin|admin/tasks|admin/report-designer|admin/performance)$',
   ).hasMatch(path);
 
   Future<String?> initialRoute() async {

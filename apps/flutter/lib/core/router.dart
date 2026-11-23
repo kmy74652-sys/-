@@ -10,7 +10,6 @@ import '../features/tasks/tasks_screen.dart';
 import '../features/tasks/task_detail_screen.dart';
 import '../features/admin/admin_screen.dart';
 import '../features/admin/report_designer_screen.dart';
-import '../features/admin/task_designer_screen.dart';
 import '../features/admin/task_management_screen.dart';
 import '../features/admin/performance_analytics_screen.dart';
 import '../features/reports/reports_screen.dart';
@@ -66,10 +65,6 @@ void initializeRouter() {
       GoRoute(
         path: '/admin/report-designer',
         builder: (context, state) => const ReportDesignerScreen(),
-      ),
-      GoRoute(
-        path: '/admin/task-designer',
-        builder: (context, state) => const TaskDesignerScreen(),
       ),
       GoRoute(
         path: '/admin/performance',

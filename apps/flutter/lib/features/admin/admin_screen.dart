@@ -267,12 +267,6 @@ class _AdminScreenState extends State<AdminScreen> {
                 canReports,
               ),
               _nav(
-                'مصمم قوالب المهام والخطوات',
-                'task-designer',
-                Icons.view_timeline_outlined,
-                _can('task_library.manage'),
-              ),
-              _nav(
                 'مصمم التقارير والجداول',
                 'report-designer',
                 Icons.design_services_outlined,
@@ -362,7 +356,6 @@ class _AdminScreenState extends State<AdminScreen> {
         ? () {
             final route = switch (section) {
               'performance-analytics' => '/admin/performance',
-              'task-designer' => '/admin/task-designer',
               'task-management' => '/admin/tasks',
               'report-designer' => '/admin/report-designer',
               _ => null,

@@ -90,13 +90,6 @@ class _HomeScreenState extends State<HomeScreen> {
       'أدوات الإعداد',
       [
         _Module(
-          'task-designer',
-          'مصمم المهام',
-          'تصميم مهام دورية ومخصصة',
-          Icons.design_services_outlined,
-          '/admin/task-designer',
-        ),
-        _Module(
           'report-designer',
           'مصمم التقارير',
           'إنشاء تقارير ديناميكية',
@@ -201,8 +194,6 @@ class _HomeScreenState extends State<HomeScreen> {
         return _manageTasks &&
             (_permissions.contains('tasks.review') ||
                 _permissions.contains('reports.read_all'));
-      case 'task-designer':
-        return _manageTasks && _permissions.contains('task_library.manage');
       case 'report-designer':
         return _manageTasks && _permissions.contains('report_forms.manage');
       case 'agreements':
@@ -534,26 +525,12 @@ class _HomeScreenState extends State<HomeScreen> {
           _officialTablePreview(),
           const SizedBox(height: 12),
           if (manager) ...[
-            const Text('قوالب سريعة', textAlign: TextAlign.right, style: TextStyle(color: AppColors.navy, fontWeight: FontWeight.w900)),
-            const SizedBox(height: 7),
-            Wrap(
-              textDirection: TextDirection.rtl,
-              spacing: 7,
-              runSpacing: 7,
-              children: [
-                _tableAction('محاسب', Icons.calculate_outlined, '/admin/task-designer'),
-                _tableAction('أمين مخزن', Icons.inventory_2_outlined, '/admin/task-designer'),
-                _tableAction('تحميل وترتيب', Icons.local_shipping_outlined, '/admin/task-designer'),
-                _tableAction('مهام مشتركة', Icons.groups_outlined, '/tasks'),
-              ],
-            ),
-            const SizedBox(height: 10),
             Row(
               textDirection: TextDirection.rtl,
               children: [
                 Expanded(child: FilledButton.icon(onPressed: () => context.go('/tasks'), icon: const Icon(Icons.add_task), label: const Text('إنشاء مهمة وإرسالها'))),
                 const SizedBox(width: 8),
-                Expanded(child: OutlinedButton.icon(onPressed: () => context.go('/admin/task-designer'), icon: const Icon(Icons.view_list_outlined), label: const Text('إدارة القوالب'))),
+                Expanded(child: OutlinedButton.icon(onPressed: () => context.go('/admin/tasks'), icon: const Icon(Icons.assignment_outlined), label: const Text('إدارة المهام'))),
               ],
             ),
           ] else

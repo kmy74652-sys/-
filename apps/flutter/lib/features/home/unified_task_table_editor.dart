@@ -34,7 +34,6 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
   final _exceptionRows = <_UnifiedRow>[];
   bool _expanded = true;
   bool _sending = false;
-  String _template = 'فارغ';
   String _workType = 'دوام كامل';
   String _days = 'الأحد - الخميس';
   String _exception = 'الجمعة';
@@ -68,23 +67,6 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
         if (mounted) _suggestReportForRole(_role.text);
       });
     }
-  }
-
-  void _loadTemplate(String value) {
-    setState(() {
-      _template = value;
-      final title = value == 'فارغ' ? '' : 'تنفيذ مهام $value';
-      _purpose.text = title.isEmpty ? '' : 'تنظيم ومتابعة أعمال $value وفق خطة يومية واضحة.';
-      _rows
-        ..clear()
-        ..addAll(value == 'فارغ'
-            ? [_UnifiedRow('08:00', '', '')]
-            : [
-                _UnifiedRow('08:00', 'مراجعة خطة العمل اليومية', 'خطة تنفيذ معتمدة'),
-                _UnifiedRow('10:00', 'تنفيذ البنود الأساسية للدور', 'مخرجات موثقة'),
-                _UnifiedRow('14:00', 'تحديث الحالة وتجهيز التقرير اليومي', 'تقرير يومي'),
-              ]);
-    });
   }
 
   void _addTextRow(List<TextEditingController> list) =>
@@ -167,8 +149,6 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
     spacing: 7,
     runSpacing: 7,
     children: [
-      SizedBox(width: 190, child: DropdownButtonFormField<String>(value: _template, decoration: const InputDecoration(labelText: 'تحميل من قالب جاهز'), items: const ['فارغ', 'محاسب', 'أمين مخزن', 'عامل تحميل وترتيب', 'مبيعات وحسابات', 'مهام مشتركة'].map((value) => DropdownMenuItem(value: value, child: Text(value))).toList(), onChanged: (value) { if (value != null) _loadTemplate(value); })),
-      OutlinedButton.icon(onPressed: () => _loadTemplate(_template == 'فارغ' ? 'مهام مشتركة' : 'فارغ'), icon: const Icon(Icons.content_copy_outlined), label: const Text('نسخ من موظف سابق')),
       IconButton(onPressed: () => setState(() => _rows.add(_UnifiedRow('', '', ''))), icon: const Icon(Icons.add_box_outlined), tooltip: 'إضافة صف يومي'),
       IconButton(onPressed: () => setState(() => _exceptionRows.add(_UnifiedRow('', '', ''))), icon: const Icon(Icons.event_available_outlined), tooltip: 'إضافة صف استثنائي'),
     ],

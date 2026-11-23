@@ -18,9 +18,7 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
   List<Map<String, dynamic>> _tasks = [],
       _branches = [],
       _employees = [],
-      _templates = [],
-      _reportTemplates = [],
-      _requests = [];
+      _reportTemplates = [];
   Map<String, Map<String, dynamic>> _reportByTask = {};
   Map<String, Map<String, dynamic>> _draftByTask = {};
   String _taskFilter = 'all', _reportFilter = 'all';
@@ -79,13 +77,6 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
             .order('display_name')
             .limit(300),
         _db
-            .from('task_templates')
-            .select('id,title,role_code,is_active,version')
-            .eq('organization_id', org)
-            .eq('is_active', true)
-            .order('title')
-            .limit(300),
-        _db
             .from('report_form_templates')
             .select('id,title,role_code,is_active')
             .eq('organization_id', org)
@@ -100,15 +91,6 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
             .filter('approved_at', 'not.is', 'null')
             .order('version_no', ascending: false)
             .limit(500),
-        _db
-            .from('task_publication_requests')
-            .select(
-              'id,template_id,template_version,role_code,branch_id,due_at,status,requested_at,review_note,published_count',
-            )
-            .eq('organization_id', org)
-            .eq('status', 'pending_approval')
-            .order('requested_at')
-            .limit(100),
       ]);
       if (!mounted) return;
       final taskRows = _rows(results[0]);
@@ -146,9 +128,8 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
         _draftByTask = drafts;
         _branches = _rows(results[1]);
         _employees = _rows(results[2]);
-        _templates = _rows(results[3]);
-        final versions = _rows(results[5]);
-        _reportTemplates = _rows(results[4]).map((template) {
+        final versions = _rows(results[4]);
+        _reportTemplates = _rows(results[3]).map((template) {
           final version = versions.firstWhere(
             (v) => _s(v['template_id']) == _s(template['id']),
             orElse: () => <String, dynamic>{},
@@ -159,7 +140,6 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
             'version_no': version['version_no'],
           };
         }).where((template) => _s(template['version_id']).isNotEmpty).toList();
-        _requests = _rows(results[6]);
       });
     } catch (e) {
       if (mounted)
@@ -260,7 +240,6 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
     String? branchId = _s(existing?['branch_id']).isEmpty ? null : _s(existing?['branch_id']);
     String? role = 'admin_followup';
     String? assignee = _s(existing?['assigned_to']).isEmpty ? null : _s(existing?['assigned_to']);
-    String? templateId;
     String? reportTemplateId;
     String? reportVersionId;
     bool reportRequired = false;
@@ -354,17 +333,6 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
                 onChanged: (v) => set(() => branchId = v),
               ),
               DropdownButtonFormField<String>(
-                value: templateId, isExpanded: true,
-                decoration: formDecoration('قالب المهمة', hint: 'اختياري — إنشاء مباشر إذا لم تحدد قالبًا'),
-                items: [const DropdownMenuItem<String>(value: null, child: Text('إنشاء مباشر')), ..._templates.map((t) => DropdownMenuItem(value: _s(t['id']), child: Text('${_s(t['title'])} · ${_s(t['role_code'])}')))],
-                onChanged: (v) => set(() {
-                  templateId = v;
-                  reportTemplateId = null;
-                  reportVersionId = null;
-                  reportRequired = false;
-                }),
-              ),
-              DropdownButtonFormField<String>(
                 value: role, isExpanded: true, decoration: formDecoration('الدور الوظيفي'),
                 items: const [DropdownMenuItem(value: 'owner', child: Text('صاحب المؤسسة')), DropdownMenuItem(value: 'admin_followup', child: Text('المدير التنفيذي')), DropdownMenuItem(value: 'accountant', child: Text('المحاسب')), DropdownMenuItem(value: 'warehouse_keeper', child: Text('أمين المخازن')), DropdownMenuItem(value: 'warehouse_worker', child: Text('عمال التحميل'))],
                 onChanged: (v) => set(() {
@@ -389,9 +357,7 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
                 isExpanded: true,
                 decoration: formDecoration(
                   'قالب التقرير',
-                  hint: templateId == null
-                      ? 'اختياري — يعبئه الموظف بعد تنفيذ المهمة'
-                      : 'التقرير يأتي من قالب المهمة المحدد',
+                  hint: 'اختياري — يعبئه الموظف بعد تنفيذ المهمة',
                 ),
                 items: [
                   const DropdownMenuItem<String>(
@@ -409,9 +375,7 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
                         ),
                       ),
                 ],
-                onChanged: templateId != null
-                    ? null
-                    : (v) => set(() {
+                onChanged: (v) => set(() {
                   reportTemplateId = v;
                   final selected = _reportTemplates.cast<Map<String, dynamic>?>().firstWhere(
                     (r) => _s(r?['id']) == v,
@@ -465,8 +429,6 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
           .join('\n\n');
       if (existing != null) {
         await _db.rpc('admin_update_task', params: {'p_organization_id': _orgId, 'p_task_id': existing['id'], 'p_title': title.text.trim(), 'p_description': descriptionText.isEmpty ? null : descriptionText, 'p_due_at': dueIso});
-      } else if (templateId != null) {
-        await _db.rpc('assign_task_from_template', params: {'p_organization_id': _orgId, 'p_template_id': templateId, 'p_assigned_to': assignee, 'p_branch_id': branchId, 'p_starts_at': DateTime.now().toUtc().toIso8601String(), 'p_due_at': dueIso, 'p_priority': priority, 'p_instructions': descriptionText.isEmpty ? null : descriptionText, 'p_report_overrides': <dynamic>[], 'p_idempotency_key': 'flutter-template:$templateId:$assignee:$dueIso'});
       } else {
         await _db.rpc('create_task_with_report_form', params: {'p_organization_id': _orgId, 'p_title': title.text.trim(), 'p_description': descriptionText.isEmpty ? null : descriptionText, 'p_due_at': dueIso, 'p_priority': priority, 'p_branch_id': branchId, 'p_role_code': role, 'p_template_id': null, 'p_assigned_to': assignee, 'p_report_template_id': reportTemplateId, 'p_report_version_id': reportVersionId, 'p_report_required': reportRequired});
       }
@@ -482,114 +444,6 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
       if (mounted) setState(() => _busy = false);
     }
   }
-  Future<void> _publicationRequest() async {
-    if (_templates.isEmpty) {
-      _message('لا توجد قوالب نشطة للنشر.');
-      return;
-    }
-    String? template = _s(_templates.first['id']);
-    String? branch;
-    DateTime dueDate = defaultDueDate();
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, set) => AlertDialog(
-          title: const Text('طلب نشر مهمة'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              DropdownButtonFormField<String>(
-                value: template,
-                isExpanded: true,
-                items: _templates
-                    .map(
-                      (t) => DropdownMenuItem(
-                        value: _s(t['id']),
-                        child: Text(
-                          '${_s(t['title'])} · ${_s(t['role_code'])}',
-                        ),
-                      ),
-                    )
-                    .toList(),
-                onChanged: (v) => set(() => template = v),
-              ),
-              DropdownButtonFormField<String>(
-                value: branch,
-                isExpanded: true,
-                decoration: const InputDecoration(labelText: 'الفرع (اختياري)'),
-                items: [
-                  const DropdownMenuItem<String>(
-                    value: null,
-                    child: Text('كل الفروع'),
-                  ),
-                  ..._branches.map(
-                    (b) => DropdownMenuItem(
-                      value: _s(b['id']),
-                      child: Text(_s(b['name'])),
-                    ),
-                  ),
-                ],
-                onChanged: (v) => set(() => branch = v),
-              ),
-              DueDateField(
-                value: dueDate,
-                onChanged: (value) => set(() => dueDate = value),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('إلغاء'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('إرسال للموافقة'),
-            ),
-          ],
-        ),
-      ),
-    );
-    if (ok != true || template == null) return;
-    try {
-      await _db.rpc(
-        'submit_task_publication_request',
-        params: {
-          'p_organization_id': _orgId,
-          'p_template_id': template,
-          'p_branch_id': branch,
-          'p_due_at': dueToIso(dueDate),
-          'p_idempotency_key':
-              'flutter-publication:${template}:${branch ?? 'all'}:${dueToIso(dueDate)}',
-        },
-      );
-      _message('تم إرسال طلب النشر للموافقة.');
-      await _load();
-    } catch (e) {
-      _message('تعذر إرسال طلب النشر: $e');
-    }
-  }
-
-  Future<void> _review(Map<String, dynamic> row, bool approve) async {
-    try {
-      final count = await _db.rpc(
-        'review_and_publish_task_request',
-        params: {
-          'p_organization_id': _orgId,
-          'p_request_id': row['id'],
-          'p_approve': approve,
-          'p_review_note': null,
-        },
-      );
-      _message(
-        approve ? 'تم اعتماد النشر وإنشاء $count مهمة.' : 'تم رفض طلب النشر.',
-      );
-      await _load();
-    } catch (e) {
-      _message('تعذر مراجعة الطلب: $e');
-    }
-  }
-
   void _message(String text) {
     if (mounted)
       ScaffoldMessenger.of(
@@ -600,7 +454,7 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
   @override
   Widget build(BuildContext context) => AppShell(
     title: 'إدارة المهام',
-    subtitle: 'الإنشاء والتعديل والمتابعة وطلبات النشر',
+    subtitle: 'الإنشاء المباشر والمتابعة والتقارير',
     child: _loading
         ? const Center(child: CircularProgressIndicator())
         : RefreshIndicator(
@@ -620,11 +474,6 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
                         onPressed: _busy ? null : () => _saveTask(),
                         icon: const Icon(Icons.add),
                         label: const Text('إنشاء مهمة'),
-                      ),
-                      OutlinedButton.icon(
-                        onPressed: _busy ? null : _publicationRequest,
-                        icon: const Icon(Icons.publish),
-                        label: const Text('طلب نشر قالب'),
                       ),
                     ],
                   ),
@@ -750,46 +599,7 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
                           .toList(),
                     ),
                   ),
-                if (_requests.isNotEmpty)
-                  SectionCard(
-                    title: 'طلبات النشر بانتظار موافقة المالك',
-                    child: Column(
-                      children: _requests
-                          .map(
-                            (r) => ListTile(
-                              title: Text(
-                                'قالب ${_s(r['template_id'])}',
-                                textAlign: TextAlign.right,
-                              ),
-                              subtitle: Text(
-                                '${_s(r['role_code'])} · ${_branchName(_s(r['branch_id']).isEmpty ? null : _s(r['branch_id']))} · ${_s(r['due_at'])}',
-                                textAlign: TextAlign.right,
-                              ),
-                              trailing: Wrap(
-                                children: [
-                                  IconButton(
-                                    tooltip: 'اعتماد',
-                                    onPressed: () => _review(r, true),
-                                    icon: const Icon(
-                                      Icons.check,
-                                      color: Colors.green,
-                                    ),
-                                  ),
-                                  IconButton(
-                                    tooltip: 'رفض',
-                                    onPressed: () => _review(r, false),
-                                    icon: const Icon(
-                                      Icons.close,
-                                      color: Colors.red,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          )
-                          .toList(),
-                    ),
-                  ),
+
               ],
             ),
           ),
