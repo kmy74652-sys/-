@@ -247,7 +247,7 @@ class _AppCustomizerScreenState extends State<AppCustomizerScreen>
           ])),
           SectionCard(title: 'التسميات والنصوص الإرشادية', child: Column(children: [
             for (final key in ['screenTitle', 'screenSubtitle', 'sent', 'back', 'employee', 'purpose', 'purposeHint', 'hours', 'daily', 'exception', 'report', 'lists', 'kpi', 'notes', 'approval', 'time', 'task', 'output', 'employeeField', 'roleField', 'branchField', 'startDate'])
-              Padding(padding: const EdgeInsets.only(bottom: 8), child: TextField(controller: _unifiedController(key), textDirection: TextDirection.rtl, decoration: InputDecoration(labelText: UnifiedTableCustomization.defaults[key] ?? key, suffixIcon: IconButton(icon: const Icon(Icons.restore), onPressed: () => setState(() => _unifiedController(key).text = UnifiedTableCustomization.defaults[key] ?? key)))),
+              Padding(padding: const EdgeInsets.only(bottom: 8), child: TextField(controller: _unifiedController(key), textDirection: TextDirection.rtl, decoration: InputDecoration(labelText: UnifiedTableCustomization.defaults[key] ?? key, suffixIcon: IconButton(icon: const Icon(Icons.restore), onPressed: () => setState(() => _unifiedController(key).text = UnifiedTableCustomization.defaults[key] ?? key))))),
           ])),
           SectionCard(title: 'الحجم والأبعاد والتنسيق', child: Column(children: [
             _slider('مقياس الخط', _store.unifiedFontScale, .85, 1.35, (v) => setState(() => _store.setUnifiedLayout(fontScale: v))),
