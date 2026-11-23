@@ -138,7 +138,44 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
       'notes': _section(store.unifiedLabel('notes'), TextField(controller: _reportNotes, textAlign: TextAlign.right, maxLines: 3, decoration: const InputDecoration(hintText: 'تعليمات إضافية اختيارية؛ نموذج التقرير يحدده القالب المعتمد'))),
       'approval': _approvalStatus(),
     };
-    return store.unifiedSectionOrder.where((key) => store.isUnifiedVisible(key)).where(sections.containsKey).map((key) => Padding(padding: EdgeInsets.only(top: store.unifiedSpacing), child: sections[key]!)).toList();
+    final visibleKeys = store.unifiedSectionOrder
+        .where((key) => store.isUnifiedVisible(key))
+        .where(sections.containsKey)
+        .toList();
+    if (visibleKeys.isEmpty) {
+      return [
+        Padding(
+          padding: EdgeInsets.only(top: store.unifiedSpacing),
+          child: _section(
+            'لا توجد أقسام ظاهرة',
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const Text(
+                  'تم إخفاء جميع أقسام الجدول الموحد من مصمم الواجهات. أظهر قسمًا واحدًا على الأقل للمتابعة.',
+                  textAlign: TextAlign.right,
+                ),
+                const SizedBox(height: 10),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: FilledButton.icon(
+                    onPressed: () => setState(() => store.resetUnified()),
+                    icon: const Icon(Icons.restore),
+                    label: const Text('استعادة الأقسام الافتراضية'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ];
+    }
+    return visibleKeys
+        .map((key) => Padding(
+              padding: EdgeInsets.only(top: store.unifiedSpacing),
+              child: sections[key]!,
+            ))
+        .toList();
   }
 
   Widget _toolbar() => Wrap(
