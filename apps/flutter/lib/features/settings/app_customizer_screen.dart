@@ -22,6 +22,7 @@ class _AppCustomizerScreenState extends State<AppCustomizerScreen>
   bool _allowed = false;
   String _previewDevice = 'phone';
   bool _previewLandscape = false;
+  String _previewMode = 'unified';
   late final TabController _tabs;
   final Map<String, TextEditingController> _controllers = {};
 
@@ -462,6 +463,16 @@ class _AppCustomizerScreenState extends State<AppCustomizerScreen>
                   spacing: 8,
                   children: [
                     ChoiceChip(
+                      label: const Text('الجدول الموحد'),
+                      selected: _previewMode == 'unified',
+                      onSelected: (_) => setState(() => _previewMode = 'unified'),
+                    ),
+                    ChoiceChip(
+                      label: const Text('حقول عامة'),
+                      selected: _previewMode == 'generic',
+                      onSelected: (_) => setState(() => _previewMode = 'generic'),
+                    ),
+                    ChoiceChip(
                       label: const Text('هاتف'),
                       selected: _previewDevice == 'phone',
                       onSelected: (_) => setState(() => _previewDevice = 'phone'),
@@ -548,7 +559,8 @@ class _AppCustomizerScreenState extends State<AppCustomizerScreen>
                         ),
                         Text(_store.label('organizationName'), textAlign: TextAlign.right),
                         const Divider(),
-                        ..._store.fieldOrder.map(
+                        if (_previewMode == 'unified') _unifiedPreviewContent()
+                        else ..._store.fieldOrder.map(
                           (key) => Padding(
                             padding: EdgeInsets.only(bottom: _store.fieldSpacing),
                             child: TextField(
@@ -577,6 +589,63 @@ class _AppCustomizerScreenState extends State<AppCustomizerScreen>
             ),
           );
         },
+      );
+
+  Widget _unifiedPreviewContent() => Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(_store.unifiedLabel('screenTitle'), textAlign: TextAlign.right, style: const TextStyle(fontWeight: FontWeight.bold)),
+          Text(_store.unifiedLabel('screenSubtitle'), textAlign: TextAlign.right, style: const TextStyle(fontSize: 11)),
+          const SizedBox(height: 8),
+          ..._store.unifiedSectionOrder.where(_store.isUnifiedVisible).map(_unifiedPreviewSection),
+        ],
+      );
+
+  Widget _unifiedPreviewSection(String key) {
+    final title = _store.unifiedLabel(key);
+    if (key == 'employee') return _unifiedPreviewEmployee(title);
+    if (key == 'daily' || key == 'exception') {
+      return _unifiedPreviewBox(title, Column(children: [
+        Row(textDirection: TextDirection.rtl, children: [
+          Expanded(child: Text(_store.unifiedLabel('time'), textAlign: TextAlign.right)),
+          Expanded(flex: 2, child: Text(_store.unifiedLabel('task'), textAlign: TextAlign.right)),
+          Expanded(child: Text(_store.unifiedLabel('output'), textAlign: TextAlign.right)),
+        ]),
+        const Divider(height: 10),
+        const Row(textDirection: TextDirection.rtl, children: [
+          Expanded(child: Text('08:00', textAlign: TextAlign.right)),
+          Expanded(flex: 2, child: Text('مهمة معاينة', textAlign: TextAlign.right)),
+          Expanded(child: Text('مخرج', textAlign: TextAlign.right)),
+        ]),
+      ]));
+    }
+    if (key == 'sent') return _unifiedPreviewBox(title, const Text('لا توجد جداول مرسلة في المعاينة', textAlign: TextAlign.right));
+    if (key == 'approval') return _unifiedPreviewBox(title, const Wrap(textDirection: TextDirection.rtl, spacing: 4, children: [Chip(label: Text('إقرار الموظف')), Chip(label: Text('مراجعة المسؤول'))]));
+    return _unifiedPreviewBox(title, Text('محتوى قسم $title', textAlign: TextAlign.right, style: const TextStyle(fontSize: 12)));
+  }
+
+  Widget _unifiedPreviewEmployee(String title) => _unifiedPreviewBox(title, LayoutBuilder(builder: (context, constraints) {
+        final keys = ['employeeField', 'roleField', 'branchField', 'startDate'].where(_store.isUnifiedFieldVisible).toList()
+          ..sort((a, b) {
+            final left = _store.unifiedFieldLayout(a);
+            final right = _store.unifiedFieldLayout(b);
+            final row = ((left['row'] as num?)?.toInt() ?? 0).compareTo((right['row'] as num?)?.toInt() ?? 0);
+            return row != 0 ? row : ((left['column'] as num?)?.toInt() ?? 0).compareTo((right['column'] as num?)?.toInt() ?? 0);
+          });
+        return Wrap(textDirection: TextDirection.rtl, spacing: _store.unifiedSpacing, runSpacing: _store.unifiedSpacing, children: keys.map((key) {
+          final layout = _store.unifiedFieldLayout(key);
+          final span = '${layout['span'] ?? 'half'}';
+          final width = span == 'full' ? constraints.maxWidth : span == 'third' ? (constraints.maxWidth - _store.unifiedSpacing * 2) / 3 : (constraints.maxWidth - _store.unifiedSpacing) / 2;
+          final align = '${layout['align'] ?? 'right'}';
+          return SizedBox(width: width, child: TextField(readOnly: true, textAlign: align == 'left' ? TextAlign.left : align == 'center' ? TextAlign.center : TextAlign.right, decoration: InputDecoration(labelText: _store.unifiedLabel(key), isDense: true)));
+        }).toList());
+      }));
+
+  Widget _unifiedPreviewBox(String title, Widget child) => Container(
+        margin: EdgeInsets.only(bottom: _store.unifiedSpacing),
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(color: const Color(0xFFF8FBFA), borderRadius: BorderRadius.circular(_store.unifiedRadius), border: Border.all(color: const Color(0xFFD8E4E0))),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [Text(title, textAlign: TextAlign.right, style: const TextStyle(fontWeight: FontWeight.bold)), const SizedBox(height: 6), child]),
       );
 
   Widget _intro(String title, String subtitle) => Padding(
