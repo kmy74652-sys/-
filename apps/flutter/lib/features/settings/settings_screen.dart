@@ -381,7 +381,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           'فشل تحديث رمز الدخول في خدمة المصادقة.',
         String value when value.contains('access_code_status_update_failed') =>
           'تم تحديث الرمز لكن تعذر تحديث حالة العضوية؛ أعد تحميل الصفحة قبل المحاولة.',
-        _ => 'تعذر حفظ الرمز (${error.status ?? 'خطأ غير معروف'}). تحقق من الاتصال والصلاحية ثم حاول مجددًا.',
+        _ => 'تعذر حفظ الرمز (${error.status}). تحقق من الاتصال والصلاحية ثم حاول مجددًا.',
       };
       if (mounted) setState(() => _error = message);
     } catch (_) {
