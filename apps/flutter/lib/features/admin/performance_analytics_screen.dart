@@ -21,6 +21,7 @@ class _PerformanceAnalyticsScreenState
   List<_Employee> _employees = [];
   List<_Branch> _branches = [];
   _Delivery _delivery = _Delivery();
+  Map<String, int> _reportStatusCounts = {};
 
   static const _roleNames = <String, String>{
     'owner': 'صاحب المؤسسة',
@@ -111,17 +112,22 @@ class _PerformanceAnalyticsScreenState
         primary.putIfAbsent(_str(member['user_id']), () => assignment);
       }
       final reportCounts = <String, int>{};
+      final reportStatusCounts = <String, int>{};
       for (final row in taskReports) {
         if (row['status'] != null && _str(row['submitted_by']).isNotEmpty) {
           final id = _str(row['submitted_by']);
           reportCounts[id] = (reportCounts[id] ?? 0) + 1;
         }
+        final status = _str(row['status']);
+        if (status.isNotEmpty) reportStatusCounts[status] = (reportStatusCounts[status] ?? 0) + 1;
       }
       for (final row in roleReports) {
         if (row['status'] != null && _str(row['employee_user_id']).isNotEmpty) {
           final id = _str(row['employee_user_id']);
           reportCounts[id] = (reportCounts[id] ?? 0) + 1;
         }
+        final status = _str(row['status']);
+        if (status.isNotEmpty) reportStatusCounts[status] = (reportStatusCounts[status] ?? 0) + 1;
       }
       final byUser = <String, _Employee>{};
       for (final member in members) {
@@ -148,7 +154,7 @@ class _PerformanceAnalyticsScreenState
         if (employee == null) continue;
         final status = _str(task['status']);
         final priority = _str(task['priority'], 'normal');
-        final bucket = ['critical', 'urgent', 'important'].contains(priority)
+        final bucket = ['low', 'normal', 'high', 'urgent'].contains(priority)
             ? priority
             : 'normal';
         final isDone = _isDone(status);
@@ -201,6 +207,7 @@ class _PerformanceAnalyticsScreenState
         _branches = branchMap.values.toList()
           ..sort((a, b) => b.rate.compareTo(a.rate));
         _delivery = overallDelivery;
+        _reportStatusCounts = reportStatusCounts;
       });
     } catch (error) {
       if (mounted) setState(() => _error = _errorMessage(error));
@@ -303,6 +310,8 @@ class _PerformanceAnalyticsScreenState
                     ),
                   _overviewCard(),
                   const SizedBox(height: 10),
+                  _reportStatusCard(),
+                  const SizedBox(height: 10),
                   _deliveryCard(),
                   const SizedBox(height: 10),
                   _branchCards(),
@@ -343,6 +352,65 @@ class _PerformanceAnalyticsScreenState
           '$_reports',
           'تقارير مهام وأدوار',
           Icons.assessment_outlined,
+        ),
+        _metric(
+          'بانتظار المراجعة',
+          '${_reportStatusCounts['submitted'] ?? 0}',
+          'تحتاج قرار المدير',
+          Icons.pending_actions_outlined,
+        ),
+        _metric(
+          'تقارير معتمدة',
+          '${_reportStatusCounts['approved'] ?? 0}',
+          'تقارير مكتملة ومعتمدة',
+          Icons.verified_outlined,
+        ),
+        _metric(
+          'تقارير معادة',
+          '${_reportStatusCounts['returned'] ?? 0}',
+          'تحتاج تعديل الموظف',
+          Icons.replay_outlined,
+        ),
+      ],
+    ),
+  );
+
+  Widget _reportStatusCard() {
+    final items = <(String, String, Color)>[
+      ('submitted', 'بانتظار المراجعة', Colors.orange),
+      ('approved', 'معتمدة', Colors.green),
+      ('returned', 'معادة للتعديل', Colors.red),
+    ];
+    final total = items.fold<int>(0, (sum, item) => sum + (_reportStatusCounts[item.$1] ?? 0));
+    return SectionCard(
+      title: 'حالة التقارير',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          for (final item in items) _reportBar(item.$2, _reportStatusCounts[item.$1] ?? 0, total, item.$3),
+          if (total == 0) const Text('لا توجد تقارير مرسلة حتى الآن.', textAlign: TextAlign.right),
+        ],
+      ),
+    );
+  }
+
+  Widget _reportBar(String label, int count, int total, Color color) => Padding(
+    padding: const EdgeInsets.only(bottom: 10),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            Expanded(child: Text(label, textAlign: TextAlign.right)),
+            Text('$count', style: TextStyle(fontWeight: FontWeight.w800, color: color)),
+          ],
+        ),
+        const SizedBox(height: 4),
+        LinearProgressIndicator(
+          value: total == 0 ? 0 : count / total,
+          minHeight: 7,
+          color: color,
+          backgroundColor: const Color(0xFFE6ECEA),
         ),
       ],
     ),
@@ -546,7 +614,7 @@ class _PerformanceAnalyticsScreenState
             ),
             DropdownMenuItem(
               value: 'high',
-              child: Text('إنجاز المهام العاجلة والحرجة'),
+                child: Text('إنجاز المهام العالية والعاجلة'),
             ),
             DropdownMenuItem(
               value: 'delayed',
@@ -647,7 +715,7 @@ class _PerformanceAnalyticsScreenState
                     '${employee.rate.toStringAsFixed(1)}%',
                   ),
                   _detailStat(
-                    'إنجاز العاجل والحرج',
+                    'إنجاز العالية والعاجلة',
                     '${employee.highRate.toStringAsFixed(1)}%',
                   ),
                   _detailStat('المتأخرة', '${employee.delayed}'),
@@ -658,7 +726,7 @@ class _PerformanceAnalyticsScreenState
               SectionCard(
                 title: 'إحصاءات الأولوية',
                 child: Column(
-                  children: ['critical', 'urgent', 'important', 'normal']
+                  children: ['urgent', 'high', 'normal', 'low']
                       .map(
                         (priority) => ListTile(
                           dense: true,
@@ -769,10 +837,10 @@ class _PerformanceAnalyticsScreenState
 
   String _priorityName(String priority) =>
       const {
-        'critical': 'حرجة',
         'urgent': 'عاجلة',
-        'important': 'مهمة',
+        'high': 'عالية',
         'normal': 'عادية',
+        'low': 'منخفضة',
       }[priority] ??
       priority;
   String _statusName(String status) =>
@@ -781,6 +849,11 @@ class _PerformanceAnalyticsScreenState
         'approved': 'معتمدة',
         'cancelled': 'ملغاة',
         'report_submitted': 'التقرير مقدم',
+        'submitted': 'مرسل للمراجعة',
+        'pending': 'لم يبدأ',
+        'needs_revision': 'يحتاج تعديل',
+        'returned': 'معاد للتعديل',
+        'late': 'متأخرة',
         'in_progress': 'قيد التنفيذ',
         'received': 'تم الاستلام',
         'new': 'جديدة',
@@ -865,24 +938,24 @@ class _Employee {
   final int reports;
   int delayed = 0;
   final Map<String, int> required = {
-    'critical': 0,
     'urgent': 0,
-    'important': 0,
+    'high': 0,
     'normal': 0,
+    'low': 0,
   };
   final Map<String, int> done = {
-    'critical': 0,
     'urgent': 0,
-    'important': 0,
+    'high': 0,
     'normal': 0,
+    'low': 0,
   };
   final List<_Task> tasks = [];
   final _Delivery delivery = _Delivery();
   int get totalRequired => required.values.fold(0, (a, b) => a + b);
   int get totalDone => done.values.fold(0, (a, b) => a + b);
   int get highRequired =>
-      (required['critical'] ?? 0) + (required['urgent'] ?? 0);
-  int get highDone => (done['critical'] ?? 0) + (done['urgent'] ?? 0);
+      (required['high'] ?? 0) + (required['urgent'] ?? 0);
+  int get highDone => (done['high'] ?? 0) + (done['urgent'] ?? 0);
   double get rate => totalRequired == 0 ? 0 : totalDone * 100 / totalRequired;
   double get highRate =>
       highRequired == 0 ? 100 : highDone * 100 / highRequired;
