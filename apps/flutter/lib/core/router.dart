@@ -17,6 +17,7 @@ import '../features/reports/reports_screen.dart';
 import '../features/reports/independent_reports_screen.dart';
 import '../features/hr/hr_screen.dart';
 import '../features/settings/settings_screen.dart';
+import '../features/settings/app_customizer_screen.dart';
 import '../features/agreements/agreements_screen.dart';
 
 class _AuthRefreshNotifier extends ChangeNotifier {
@@ -73,6 +74,10 @@ void initializeRouter() {
       GoRoute(
         path: '/admin/performance',
         builder: (context, state) => const PerformanceAnalyticsScreen(),
+      ),
+      GoRoute(
+        path: '/admin/customizer',
+        builder: (context, state) => const AppCustomizerScreen(),
       ),
       GoRoute(
         path: '/reports',

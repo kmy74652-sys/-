@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -661,6 +662,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           ),
                         ],
                       ),
+                    ),
+                  ),
+                if (_allowed && _owner)
+                  Card(
+                    child: ListTile(
+                      leading: const Icon(Icons.dashboard_customize_outlined),
+                      title: const Text(
+                        'مصمم الواجهات والتخصيص الشامل',
+                        textAlign: TextAlign.right,
+                      ),
+                      subtitle: const Text(
+                        'تعديل التسميات والترتيب والألوان والنسخ الاحتياطي',
+                        textAlign: TextAlign.right,
+                      ),
+                      trailing: const Icon(Icons.chevron_left),
+                      onTap: () => context.push('/admin/customizer'),
                     ),
                   ),
                 if (_allowed)

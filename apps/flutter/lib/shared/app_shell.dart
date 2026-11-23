@@ -5,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../core/notifications_repository.dart';
 import '../core/notifications_runtime.dart';
 import '../core/theme.dart';
+import 'app_customizer.dart';
 import 'organization_branding.dart';
 
 class AppShell extends StatefulWidget {
@@ -32,6 +33,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    AppCustomizer.instance.load();
     _refreshUnreadCount();
     NotificationsRuntime.start(onOpen: _openTaskFromNotification);
   }
@@ -73,11 +75,11 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     }
   }
 
-  static const _tabs = <_ShellTab>[
-    _ShellTab('/', 'الرئيسية', Icons.home_outlined),
-    _ShellTab('/tasks', 'المهام', Icons.task_alt_outlined),
-    _ShellTab('/settings', 'الموظفون', Icons.people_outline),
-  ];
+  List<_ShellTab> _tabs() => [
+        _ShellTab('/', AppCustomizer.instance.label('home'), Icons.home_outlined),
+        _ShellTab('/tasks', AppCustomizer.instance.label('tasks'), Icons.task_alt_outlined),
+        _ShellTab('/settings', AppCustomizer.instance.label('employees'), Icons.people_outline),
+      ];
 
   int _selectedIndex(String path) {
     if (path == '/tasks' || path.startsWith('/tasks/')) return 1;
@@ -268,9 +270,12 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
   Widget build(BuildContext context) {
     final path = GoRouterState.of(context).uri.path;
     final selected = _selectedIndex(path);
-    return Directionality(
-      textDirection: TextDirection.rtl,
-      child: Scaffold(
+    final tabs = _tabs();
+    return AnimatedBuilder(
+      animation: AppCustomizer.instance,
+      builder: (context, _) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: Scaffold(
         backgroundColor: const Color(0xFFF5F7FD),
         body: SafeArea(
           bottom: false,
@@ -313,12 +318,12 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
               height: 62,
               child: Row(
                 children: [
-                  for (var i = 0; i < _tabs.length; i++)
+                  for (var i = 0; i < tabs.length; i++)
                     Expanded(
                       child: _BottomTab(
-                        tab: _tabs[i],
+                        tab: tabs[i],
                         selected: selected == i,
-                        onTap: () => _navigate(_tabs[i].route),
+                        onTap: () => _navigate(tabs[i].route),
                       ),
                     ),
                 ],
@@ -384,16 +389,16 @@ class _BrandHeaderState extends State<_BrandHeader> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('مانجمنت', maxLines: 1, overflow: TextOverflow.ellipsis,
+                    Text(AppCustomizer.instance.label('appName'), maxLines: 1, overflow: TextOverflow.ellipsis,
                       style: TextStyle(color: _navy, fontSize: compact ? 18 : 21, height: 1.15, fontWeight: FontWeight.w900)),
                     const SizedBox(height: 2),
-                    Text(branding.name, maxLines: 1, overflow: TextOverflow.ellipsis,
+                    Text(AppCustomizer.instance.label('organizationName'), maxLines: 1, overflow: TextOverflow.ellipsis,
                       style: const TextStyle(color: _navy, fontSize: 12, height: 1.2, fontWeight: FontWeight.w700)),
                     const SizedBox(height: 3),
                     Row(children: [
                       Container(width: 14, height: 1.2, color: _gold),
                       const SizedBox(width: 5),
-                      Flexible(child: Text(branding.tagline, maxLines: 1, overflow: TextOverflow.ellipsis,
+                      Flexible(child: Text(AppCustomizer.instance.label('tagline'), maxLines: 1, overflow: TextOverflow.ellipsis,
                         style: const TextStyle(color: Color(0xFF9A6814), fontSize: 10, fontWeight: FontWeight.w800))),
                       const SizedBox(width: 5),
                       Container(width: 14, height: 1.2, color: _gold),

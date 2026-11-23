@@ -280,6 +280,12 @@ class _AdminScreenState extends State<AdminScreen> {
                 Icons.design_services_outlined,
                 _can('report_forms.manage') || _can('task_library.manage'),
               ),
+              _nav(
+                'مصمم الواجهات والتخصيص الشامل',
+                'app-customizer',
+                Icons.dashboard_customize_outlined,
+                _can('tasks.manage'),
+              ),
             ],
           ),
         ),
@@ -366,6 +372,7 @@ class _AdminScreenState extends State<AdminScreen> {
               'performance-analytics' => '/admin/performance',
               'task-management' => '/admin/tasks',
               'report-designer' => '/admin/report-designer',
+              'app-customizer' => '/admin/customizer',
               _ => null,
             };
             if (route != null) {
