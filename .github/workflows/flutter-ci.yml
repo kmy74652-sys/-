@@ -89,8 +89,19 @@ jobs:
           fi
 
       - name: Static analysis
-        # لا تحجب التحذيرات البناء؛ أخطاء Dart الفعلية تبقى حاجبة.
-        run: flutter analyze --no-fatal-infos --no-fatal-warnings
+        # أظهر رسالة Dart التفصيلية في annotations بدل رسالة exit code العامة.
+        run: |
+          set +e
+          flutter analyze --no-fatal-infos 2>&1 | tee /tmp/flutter-analyze.log
+          status=${PIPESTATUS[0]}
+          if [ "$status" -ne 0 ]; then
+            while IFS= read -r line; do
+              case "$line" in
+                *error*|*warning*) echo "::error::$line";;
+              esac
+            done < /tmp/flutter-analyze.log
+          fi
+          exit "$status"
 
       - name: Unit and widget tests
         run: flutter test --reporter expanded
