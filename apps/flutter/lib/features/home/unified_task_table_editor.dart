@@ -1,4 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
 
 import '../../core/theme.dart';
 
@@ -124,7 +128,14 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
             const SizedBox(height: 12),
             _approvalStatus(),
             const SizedBox(height: 12),
-            FilledButton.icon(onPressed: widget.onSend, icon: const Icon(Icons.send_outlined), label: const Text('حفظ الجدول وإرساله للموظف')),
+            Row(
+              textDirection: TextDirection.rtl,
+              children: [
+                Expanded(child: FilledButton.icon(onPressed: widget.onSend, icon: const Icon(Icons.send_outlined), label: const Text('حفظ الجدول وإرساله'))),
+                const SizedBox(width: 8),
+                Expanded(child: OutlinedButton.icon(onPressed: _exportPdf, icon: const Icon(Icons.picture_as_pdf_outlined), label: const Text('تصدير PDF'))),
+              ],
+            ),
           ],
         ],
       ),
@@ -168,6 +179,127 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
   Widget _section(String title, Widget child) => Container(padding: const EdgeInsets.all(10), decoration: BoxDecoration(color: const Color(0xFFF8FBFA), borderRadius: BorderRadius.circular(12), border: Border.all(color: const Color(0xFFD8E4E0))), child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [Text(title, textAlign: TextAlign.right, style: const TextStyle(fontWeight: FontWeight.w900, color: AppColors.navy)), const SizedBox(height: 8), child]));
   Widget _input(TextEditingController controller, String label) => TextField(controller: controller, textAlign: TextAlign.right, decoration: InputDecoration(labelText: label, isDense: true));
   Widget _drop(String label, String value, List<String> values, ValueChanged<String> onChanged) => SizedBox(width: 155, child: DropdownButtonFormField<String>(value: value, isExpanded: true, decoration: InputDecoration(labelText: label, isDense: true), items: values.map((v) => DropdownMenuItem(value: v, child: Text(v, overflow: TextOverflow.ellipsis))).toList(), onChanged: (v) { if (v != null) onChanged(v); }));
+
+  Future<void> _exportPdf() async {
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      final fontData = await rootBundle.load('assets/fonts/AlshaeriArabic-Regular.ttf');
+      final font = pw.Font.ttf(fontData);
+      final document = pw.Document(
+        theme: pw.ThemeData.withFont(base: font, bold: font),
+      );
+      final rows = _rows
+          .map((row) => [row.time.text.trim(), row.task.text.trim(), row.output.text.trim(), 'جديدة'])
+          .toList();
+      final listSection = (String title, List<TextEditingController> values) => pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+        children: [
+          _pdfHeading(title),
+          ...values.asMap().entries.map((entry) => pw.Padding(
+            padding: const pw.EdgeInsets.only(bottom: 4),
+            child: pw.Text('${entry.key + 1}. ${entry.value.text.trim().isEmpty ? '—' : entry.value.text.trim()}', textDirection: pw.TextDirection.rtl),
+          )),
+          pw.SizedBox(height: 8),
+        ],
+      );
+      document.addPage(
+        pw.MultiPage(
+          pageFormat: PdfPageFormat.a4,
+          margin: const pw.EdgeInsets.fromLTRB(28, 28, 28, 32),
+          build: (context) => [
+            pw.Container(
+              padding: const pw.EdgeInsets.all(14),
+              decoration: pw.BoxDecoration(
+                color: PdfColor.fromHex('#EAF4F0'),
+                border: pw.Border.all(color: PdfColor.fromHex('#B8CEC5')),
+                borderRadius: pw.BorderRadius.circular(8),
+              ),
+              child: pw.Column(children: [
+                pw.Text('مؤسسة الشاعري للتجارة العامة', textDirection: pw.TextDirection.rtl, style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold, color: PdfColor.fromHex('#123B5D'))),
+                pw.SizedBox(height: 4),
+                pw.Text('الجدول الموحد لإنشاء وتنفيذ المهام', textDirection: pw.TextDirection.rtl, style: pw.TextStyle(fontSize: 13, fontWeight: pw.FontWeight.bold)),
+              ]),
+            ),
+            pw.SizedBox(height: 12),
+            _pdfInfoTable(),
+            pw.SizedBox(height: 12),
+            _pdfHeading('الهدف من الوظيفة'),
+            pw.Text(_purpose.text.trim().isEmpty ? '—' : _purpose.text.trim(), textDirection: pw.TextDirection.rtl),
+            pw.SizedBox(height: 10),
+            _pdfHeading('ساعات الدوام والاستثناء الأسبوعي'),
+            pw.Text('نوع الدوام: $_workType   |   الأيام: $_days   |   الاستثناء: $_exception', textDirection: pw.TextDirection.rtl),
+            pw.SizedBox(height: 12),
+            _pdfHeading('الجدول الزمني اليومي'),
+            _pdfScheduleTable(rows),
+            pw.SizedBox(height: 12),
+            listSection('المسؤوليات الأساسية', _responsibilities),
+            listSection('الصلاحيات وحدود المسؤولية', _authorities),
+            listSection('التوصيات والتعليمات الإدارية', _instructions),
+            _pdfHeading('مؤشرات تقييم الأداء'),
+            _pdfKpiTable(),
+            pw.SizedBox(height: 12),
+            _pdfHeading('التقرير اليومي المطلوب'),
+            pw.Text(_dailyReport.text.trim().isEmpty ? '—' : _dailyReport.text.trim(), textDirection: pw.TextDirection.rtl),
+            pw.SizedBox(height: 20),
+            pw.Table(
+              border: pw.TableBorder.all(color: PdfColor.fromHex('#B8CEC5')),
+              children: [[
+                _pdfCell('إقرار الموظف\nالاسم والتوقيع: __________________'),
+                _pdfCell('مراجعة المسؤول المباشر\nالاسم والتوقيع: __________________'),
+                _pdfCell('اعتماد المدير\nالاسم والتوقيع: __________________'),
+              ]],
+            ),
+          ],
+        ),
+      );
+      final bytes = await document.save();
+      await Printing.sharePdf(bytes: bytes, filename: 'unified-task-table.pdf');
+    } catch (error) {
+      messenger.showSnackBar(SnackBar(content: Text('تعذر تصدير PDF: $error', textAlign: TextAlign.right)));
+    }
+  }
+
+  pw.Widget _pdfHeading(String title) => pw.Container(
+    width: double.infinity,
+    margin: const pw.EdgeInsets.only(bottom: 6),
+    padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+    color: PdfColor.fromHex('#EAF4F0'),
+    child: pw.Text(title, textDirection: pw.TextDirection.rtl, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, color: PdfColor.fromHex('#123B5D'))),
+  );
+
+  pw.Widget _pdfInfoTable() => pw.Table(
+    border: pw.TableBorder.all(color: PdfColor.fromHex('#B8CEC5')),
+    children: [
+      [_pdfCell('الموظف / المجموعة\n${_employee.text.trim().isEmpty ? '—' : _employee.text.trim()}'), _pdfCell('المسمى الوظيفي\n${_role.text.trim().isEmpty ? '—' : _role.text.trim()}')],
+      [_pdfCell('الفرع\n${_branch.text.trim().isEmpty ? '—' : _branch.text.trim()}'), _pdfCell('تاريخ بدء التطبيق\n${_startDate.text.trim().isEmpty ? '—' : _startDate.text.trim()}')],
+    ],
+  );
+
+  pw.Widget _pdfScheduleTable(List<List<String>> rows) => pw.Table.fromTextArray(
+    headers: const ['الحالة', 'المخرج المطلوب', 'المهمة والمسؤولية', 'الوقت'],
+    data: rows.map((row) => row.reversed.toList()).toList(),
+    border: pw.TableBorder.all(color: PdfColor.fromHex('#B8CEC5')),
+    headerDecoration: pw.BoxDecoration(color: PdfColor.fromHex('#EAF4F0')),
+    headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+    cellStyle: const pw.TextStyle(fontSize: 9),
+    cellAlignment: pw.Alignment.centerRight,
+    headerAlignment: pw.Alignment.centerRight,
+  );
+
+  pw.Widget _pdfKpiTable() => pw.Table.fromTextArray(
+    headers: const ['معيار الإنجاز / القياس', 'المؤشر'],
+    data: _kpis.map((row) => [row[1].text.trim(), row[0].text.trim()]).toList(),
+    border: pw.TableBorder.all(color: PdfColor.fromHex('#B8CEC5')),
+    headerDecoration: pw.BoxDecoration(color: PdfColor.fromHex('#EAF4F0')),
+    headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+    cellAlignment: pw.Alignment.centerRight,
+    headerAlignment: pw.Alignment.centerRight,
+  );
+
+  pw.Widget _pdfCell(String text) => pw.Padding(
+    padding: const pw.EdgeInsets.all(8),
+    child: pw.Text(text, textDirection: pw.TextDirection.rtl, textAlign: pw.TextAlign.right),
+  );
 }
 
 class _UnifiedRow {
