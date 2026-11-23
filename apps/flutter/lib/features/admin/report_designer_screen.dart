@@ -549,12 +549,15 @@ class _ReportDesignerScreenState extends State<ReportDesignerScreen> {
       _error = null;
     });
     try {
+      final safeDescription = _description.trim().isEmpty
+          ? 'التقرير المطلوب: ${_title.trim()}'
+          : _description.trim();
       await _db.rpc(
         'create_task_with_report_form',
         params: {
           'p_organization_id': org,
           'p_title': _title.trim(),
-          'p_description': _description.trim().isEmpty ? null : _description.trim(),
+          'p_description': safeDescription,
           'p_due_at': result['due_at'],
           'p_priority': 'normal',
           'p_branch_id': null,
