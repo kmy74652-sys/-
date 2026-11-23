@@ -344,7 +344,20 @@ class _AppCustomizerScreenState extends State<AppCustomizerScreen>
                 padding: EdgeInsets.only(bottom: _store.fieldSpacing),
                 child: TextField(
                   readOnly: true,
-                  decoration: InputDecoration(labelText: _fieldName(key), filled: _store.fieldStyle == 'filled', fillColor: Color(_store.fieldFillColor), border: _store.fieldStyle == 'plain' ? InputBorder.none : _store.fieldStyle == 'underlined' ? const UnderlineInputBorder() : OutlineInputBorder(borderRadius: BorderRadius.circular(_store.fieldRadius)),
+                  decoration: InputDecoration(
+                    labelText: _fieldName(key),
+                    filled: _store.fieldStyle == 'filled',
+                    fillColor: Color(_store.fieldFillColor),
+                    border: _store.fieldStyle == 'plain'
+                        ? InputBorder.none
+                        : _store.fieldStyle == 'underlined'
+                            ? const UnderlineInputBorder()
+                            : OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(
+                                  _store.fieldRadius,
+                                ),
+                              ),
+                  ),
                 ),
               )).toList(),
         ),
