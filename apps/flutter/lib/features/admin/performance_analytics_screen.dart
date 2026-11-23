@@ -18,6 +18,7 @@ class _PerformanceAnalyticsScreenState
   String? _error;
   String _search = '';
   String _sort = 'completion';
+  String _taskSource = 'unified';
   String? _employeeFilter;
   DateTime? _fromDate, _toDate;
   Map<String, String> _employeeOptions = {};
@@ -63,7 +64,7 @@ class _PerformanceAnalyticsScreenState
         db
             .from('tasks')
             .select(
-              'id,title,assigned_to,position_code,branch_id,priority,status,due_at,assigned_at,received_at,opened_at',
+              'id,title,description,assigned_to,position_code,branch_id,priority,status,due_at,assigned_at,received_at,opened_at',
             )
             .isFilter('deleted_at', null)
             .order('due_at')
@@ -99,6 +100,14 @@ class _PerformanceAnalyticsScreenState
       final branchRows = _rows(results[3]);
       final taskReports = _rows(results[4]);
       final roleReports = _rows(results[5]);
+      final unifiedTaskIds = tasks
+          .where(_isUnifiedTask)
+          .map((task) => _str(task['id']))
+          .where((id) => id.isNotEmpty)
+          .toSet();
+      final evaluationTasks = _taskSource == 'unified'
+          ? tasks.where(_isUnifiedTask).toList()
+          : tasks;
       final branchNames = <String, String>{
         for (final branch in branchRows)
           if (branch['id'] != null)
@@ -117,6 +126,10 @@ class _PerformanceAnalyticsScreenState
       final reportCounts = <String, int>{};
       final reportStatusCounts = <String, int>{};
       for (final row in taskReports) {
+        if (_taskSource == 'unified' &&
+            !unifiedTaskIds.contains(_str(row['task_id']))) {
+          continue;
+        }
         if (row['status'] != null && _str(row['submitted_by']).isNotEmpty) {
           final id = _str(row['submitted_by']);
           reportCounts[id] = (reportCounts[id] ?? 0) + 1;
@@ -124,7 +137,9 @@ class _PerformanceAnalyticsScreenState
         final status = _str(row['status']);
         if (status.isNotEmpty) reportStatusCounts[status] = (reportStatusCounts[status] ?? 0) + 1;
       }
-      for (final row in roleReports) {
+      for (final row in _taskSource == 'unified'
+          ? const <Map<String, dynamic>>[]
+          : roleReports) {
         if (row['status'] != null && _str(row['employee_user_id']).isNotEmpty) {
           final id = _str(row['employee_user_id']);
           reportCounts[id] = (reportCounts[id] ?? 0) + 1;
@@ -154,7 +169,7 @@ class _PerformanceAnalyticsScreenState
         );
       }
       final overallDelivery = _Delivery();
-      for (final task in tasks) {
+      for (final task in evaluationTasks) {
         final assignedTo = _str(task['assigned_to']);
         final dueDate = DateTime.tryParse(_str(task['due_at']))?.toLocal();
         final taskDay = dueDate == null
@@ -241,6 +256,12 @@ class _PerformanceAnalyticsScreenState
   String _errorMessage(Object error) {
     final text = error.toString().replaceFirst('Exception: ', '');
     return 'تعذر تحميل مؤشرات الأداء. قد تكون بعض البيانات غير متاحة وفق صلاحيات الحساب (RLS).\n$text';
+  }
+
+  bool _isUnifiedTask(Map<String, dynamic> task) {
+    final description = _str(task['description']);
+    return description.contains('الجدول الموحد:') ||
+        _str(task['title']).startsWith('الجدول الموحد -');
   }
 
   bool _isDone(String status) =>
@@ -355,6 +376,38 @@ class _PerformanceAnalyticsScreenState
         const Text(
           'اختر موظفًا وفترة زمنية لقراءة ما أُنجز وما لم يُنجز.',
           textAlign: TextAlign.right,
+        ),
+        const SizedBox(height: 10),
+        DropdownButtonFormField<String>(
+          value: _taskSource,
+          isExpanded: true,
+          decoration: const InputDecoration(
+            labelText: 'مصدر التقييم',
+            border: OutlineInputBorder(),
+          ),
+          items: const [
+            DropdownMenuItem(
+              value: 'unified',
+              child: Text('الجدول الموحد للمهام'),
+            ),
+            DropdownMenuItem(
+              value: 'all',
+              child: Text('كل المهام'),
+            ),
+          ],
+          onChanged: (value) {
+            if (value == null) return;
+            setState(() => _taskSource = value);
+            _load();
+          },
+        ),
+        const SizedBox(height: 6),
+        Text(
+          _taskSource == 'unified'
+              ? 'يتم احتساب الإنجاز والتأخير والتقارير المرتبطة بمهام الجدول الموحد فقط.'
+              : 'يتم احتساب جميع المهام المتاحة لصلاحيات الحساب.',
+          textAlign: TextAlign.right,
+          style: const TextStyle(fontSize: 12, color: AppColors.muted),
         ),
         const SizedBox(height: 10),
         DropdownButtonFormField<String>(
