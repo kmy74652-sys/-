@@ -27,13 +27,16 @@ create index if not exists report_submissions_org_branch_date_idx on public.repo
 create index if not exists report_submissions_status_date_idx on public.report_submissions (organization_id, status, report_date desc);
 create index if not exists report_submissions_employee_date_idx on public.report_submissions (employee_id, report_date desc);
 
-insert into public.permissions (code, name_ar) values
- ('report_submissions.review', 'مراجعة تقارير الموظفين'),
- ('report_submissions.approve', 'اعتماد تقارير الموظفين نهائياً')
-on conflict (code) do update set name_ar = excluded.name_ar;
-insert into public.role_permissions (role_code, permission_code) values
- ('admin_followup', 'report_submissions.review'),
- ('owner', 'report_submissions.approve')
+insert into public.permissions (code, name_ar, domain, action) values
+ ('report_submissions.review', 'مراجعة تقارير الموظفين', 'reports', 'review'),
+ ('report_submissions.approve', 'اعتماد تقارير الموظفين نهائياً', 'reports', 'approve')
+on conflict (code) do update set name_ar = excluded.name_ar, domain = excluded.domain, action = excluded.action;
+insert into public.role_permissions (institution_id, role_id, permission_code)
+select r.institution_id, r.id, p.code
+from public.roles r
+cross join public.permissions p
+where ((r.code = 'admin_followup' and p.code = 'report_submissions.review')
+    or (r.code = 'owner' and p.code = 'report_submissions.approve'))
 on conflict do nothing;
 
 create or replace function public.prepare_report_submission()
@@ -75,7 +78,7 @@ begin
         new.submitted_at := now(); new.reviewed_by := null; new.reviewed_by_name := null; new.reviewed_at := null;
         new.approved_by := null; new.approved_by_name := null; new.approved_at := null;
       elsif old.status = 'submitted' and new.status in ('reviewed','returned') then
-        if not alshaari_private.has_permission(old.organization_id, 'report_submissions.review', old.branch_id) then
+        if not public.employee_agreement_can(old.organization_id, 'report_submissions.review', old.branch_id) then
           raise exception 'لا تملك صلاحية مراجعة التقارير';
         end if;
         select m.display_name into v_actor_name from public.organization_memberships m
@@ -85,7 +88,7 @@ begin
           raise exception 'يجب كتابة سبب إعادة التقرير';
         end if;
       elsif old.status = 'reviewed' and new.status in ('approved','returned') then
-        if not alshaari_private.has_permission(old.organization_id, 'report_submissions.approve', old.branch_id) then
+        if not public.employee_agreement_can(old.organization_id, 'report_submissions.approve', old.branch_id) then
           raise exception 'لا تملك صلاحية الاعتماد النهائي';
         end if;
         select m.display_name into v_actor_name from public.organization_memberships m
@@ -102,8 +105,8 @@ begin
         if new.answers is distinct from old.answers then raise exception 'لا يمكن تعديل إجابات التقرير بعد رفعه'; end if;
       end if;
       if new.review_note is distinct from old.review_note
-         and not (alshaari_private.has_permission(old.organization_id, 'report_submissions.review', old.branch_id)
-               or alshaari_private.has_permission(old.organization_id, 'report_submissions.approve', old.branch_id)) then
+         and not (public.employee_agreement_can(old.organization_id, 'report_submissions.review', old.branch_id)
+               or public.employee_agreement_can(old.organization_id, 'report_submissions.approve', old.branch_id)) then
         raise exception 'لا تملك صلاحية تعديل ملاحظات المراجعة';
       end if;
     end if;
@@ -121,8 +124,8 @@ alter table public.report_submissions enable row level security;
 drop policy if exists report_submissions_read on public.report_submissions;
 create policy report_submissions_read on public.report_submissions for select to authenticated
 using (employee_id = auth.uid()
-  or alshaari_private.has_permission(organization_id, 'report_submissions.review', branch_id)
-  or alshaari_private.has_permission(organization_id, 'report_submissions.approve', branch_id));
+  or public.employee_agreement_can(organization_id, 'report_submissions.review', branch_id)
+  or public.employee_agreement_can(organization_id, 'report_submissions.approve', branch_id));
 drop policy if exists report_submissions_insert_own on public.report_submissions;
 create policy report_submissions_insert_own on public.report_submissions for insert to authenticated
 with check (employee_id = auth.uid() and status in ('draft','submitted')
@@ -130,9 +133,9 @@ with check (employee_id = auth.uid() and status in ('draft','submitted')
 drop policy if exists report_submissions_update_workflow on public.report_submissions;
 create policy report_submissions_update_workflow on public.report_submissions for update to authenticated
 using ((employee_id = auth.uid() and status in ('draft','returned'))
-  or (status = 'submitted' and alshaari_private.has_permission(organization_id, 'report_submissions.review', branch_id))
-  or (status = 'reviewed' and alshaari_private.has_permission(organization_id, 'report_submissions.approve', branch_id)))
+  or (status = 'submitted' and public.employee_agreement_can(organization_id, 'report_submissions.review', branch_id))
+  or (status = 'reviewed' and public.employee_agreement_can(organization_id, 'report_submissions.approve', branch_id)))
 with check ((employee_id = auth.uid() and status in ('draft','returned','submitted'))
-  or (status in ('reviewed','returned') and alshaari_private.has_permission(organization_id, 'report_submissions.review', branch_id))
-  or (status in ('approved','returned') and alshaari_private.has_permission(organization_id, 'report_submissions.approve', branch_id)));
+  or (status in ('reviewed','returned') and public.employee_agreement_can(organization_id, 'report_submissions.review', branch_id))
+  or (status in ('approved','returned') and public.employee_agreement_can(organization_id, 'report_submissions.approve', branch_id)));
 grant select, insert, update on public.report_submissions to authenticated;
