@@ -19,6 +19,8 @@ class _HomeScreenState extends State<HomeScreen> {
   Map<String, int>? _summary;
   Set<String> _permissions = {};
   Set<String> _roles = {};
+  String? _organizationId;
+  String? _defaultBranchId;
   int _request = 0;
 
   static const _groups = <(String, List<_Module>)>[
@@ -262,6 +264,8 @@ class _HomeScreenState extends State<HomeScreen> {
         _name = name;
         _permissions = permissions;
         _roles = roles;
+        _organizationId = organization;
+        _defaultBranchId = branch;
       });
 
       final summary = await _loadSummary(
@@ -446,14 +450,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _unifiedTaskTableSection() {
     final manager = _allowed('tasks') && _manageTasks;
     if (manager) {
-      return UnifiedTaskTableEditor(
-        onSend: () {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('احفظ الجدول ثم أكمل الإرسال من شاشة إنشاء المهمة.', textAlign: TextAlign.right)),
-          );
-          context.go('/tasks');
-        },
-      );
+      return UnifiedTaskTableEditor(onSend: _sendUnifiedTable);
     }
     return SectionCard(
       title: 'الجدول الموحد لإنشاء المهام',
@@ -518,6 +515,78 @@ class _HomeScreenState extends State<HomeScreen> {
     label: Text(label),
     onPressed: () => context.go(route),
   );
+
+  Future<void> _sendUnifiedTable(UnifiedTaskTableDraft draft) async {
+    final organizationId = _organizationId;
+    if (organizationId == null || organizationId.isEmpty) {
+      throw Exception('تعذر تحديد المؤسسة المرتبطة بالحساب.');
+    }
+    final client = Supabase.instance.client;
+    final members = (await client
+            .from('organization_memberships')
+            .select('user_id,display_name,is_active')
+            .eq('organization_id', organizationId)
+            .eq('is_active', true)
+            .limit(500) as List)
+        .whereType<Map>()
+        .map((row) => Map<String, dynamic>.from(row))
+        .toList();
+    final requested = draft.employee.trim();
+    final selected = requested == 'مهام مشتركة'
+        ? members
+        : members.where((row) => (row['display_name'] ?? '').toString().trim() == requested).toList();
+    if (selected.isEmpty) throw Exception('لم يتم العثور على موظف مطابق. اكتب الاسم كما يظهر في النظام أو اختر «مهام مشتركة».');
+    final roleMap = <String, String>{
+      'صاحب المؤسسة': 'owner',
+      'المدير التنفيذي': 'admin_followup',
+      'المحاسب': 'accountant',
+      'أمين المخزن': 'warehouse_keeper',
+      'أمين مخزن': 'warehouse_keeper',
+      'عمال التحميل': 'warehouse_worker',
+      'عامل تحميل': 'warehouse_worker',
+    };
+    final roleCode = roleMap[draft.role.trim()] ?? draft.role.trim();
+    const validRoles = {'owner', 'admin_followup', 'accountant', 'warehouse_keeper', 'warehouse_worker'};
+    if (!validRoles.contains(roleCode)) throw Exception('المسمى الوظيفي غير معروف. استخدم المسمى العربي المعتمد.');
+    var branchId = _defaultBranchId;
+    if (draft.branch.trim().isNotEmpty) {
+      final branches = (await client.from('branches').select('id,name').eq('organization_id', organizationId).eq('is_active', true).limit(200) as List).whereType<Map>();
+      for (final row in branches) {
+        if ((row['name'] ?? '').toString().trim() == draft.branch.trim()) branchId = row['id']?.toString();
+      }
+    }
+    final due = DateTime.tryParse(draft.startDate)?.toUtc() ?? DateTime.now().toUtc().add(const Duration(days: 1));
+    for (final member in selected) {
+      final userId = member['user_id']?.toString();
+      if (userId == null || userId.isEmpty) continue;
+      for (final row in draft.rows) {
+        final description = [
+          if (draft.purpose.isNotEmpty) 'الهدف من الوظيفة: ${draft.purpose}',
+          'الوقت المحدد: ${row.time.isEmpty ? 'غير محدد' : row.time}',
+          if (row.output.isNotEmpty) 'المخرج المطلوب: ${row.output}',
+          if (draft.dailyReport.isNotEmpty) 'التقرير اليومي المطلوب: ${draft.dailyReport}',
+          if (draft.responsibilities.isNotEmpty) 'المسؤوليات: ${draft.responsibilities.join('، ')}',
+          if (draft.authorities.isNotEmpty) 'الصلاحيات: ${draft.authorities.join('، ')}',
+          if (draft.instructions.isNotEmpty) 'التعليمات: ${draft.instructions.join('، ')}',
+        ].join('\n');
+        await client.rpc('create_task_with_report_form', params: {
+          'p_organization_id': organizationId,
+          'p_title': row.task,
+          'p_description': description,
+          'p_due_at': due.toIso8601String(),
+          'p_priority': 'normal',
+          'p_branch_id': branchId,
+          'p_role_code': roleCode,
+          'p_template_id': null,
+          'p_assigned_to': userId,
+          'p_report_template_id': null,
+          'p_report_version_id': null,
+          'p_report_required': false,
+        });
+      }
+    }
+    await _load();
+  }
 
   Widget _officialTablePreview() => Container(
     decoration: BoxDecoration(

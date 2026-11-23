@@ -8,7 +8,7 @@ import '../../core/theme.dart';
 
 class UnifiedTaskTableEditor extends StatefulWidget {
   const UnifiedTaskTableEditor({super.key, required this.onSend});
-  final VoidCallback onSend;
+  final Future<void> Function(UnifiedTaskTableDraft draft) onSend;
 
   @override
   State<UnifiedTaskTableEditor> createState() => _UnifiedTaskTableEditorState();
@@ -29,6 +29,7 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
   ];
   final _rows = <_UnifiedRow>[_UnifiedRow('08:00', '', '')];
   bool _expanded = true;
+  bool _sending = false;
   String _template = 'فارغ';
   String _workType = 'دوام كامل';
   String _days = 'الأحد - الخميس';
@@ -131,7 +132,7 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
             Row(
               textDirection: TextDirection.rtl,
               children: [
-                Expanded(child: FilledButton.icon(onPressed: widget.onSend, icon: const Icon(Icons.send_outlined), label: const Text('حفظ الجدول وإرساله'))),
+                Expanded(child: FilledButton.icon(onPressed: _sending ? null : _submit, icon: _sending ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.send_outlined), label: Text(_sending ? 'جارٍ الإرسال...' : 'حفظ الجدول وإرساله'))),
                 const SizedBox(width: 8),
                 Expanded(child: OutlinedButton.icon(onPressed: _exportPdf, icon: const Icon(Icons.picture_as_pdf_outlined), label: const Text('تصدير PDF'))),
               ],
@@ -169,6 +170,36 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
   ]));
 
   Widget _scheduleTable(String title) => _section(title, SingleChildScrollView(scrollDirection: Axis.horizontal, child: DataTable(columnSpacing: 18, columns: const [DataColumn(label: Text('الوقت')), DataColumn(label: Text('المهمة المحددة والمسؤولية')), DataColumn(label: Text('المخرج المطلوب')), DataColumn(label: Text('إجراء'))], rows: _rows.asMap().entries.map((entry) { final i = entry.key; final row = entry.value; return DataRow(cells: [DataCell(SizedBox(width: 75, child: TextField(controller: row.time, textAlign: TextAlign.right, decoration: const InputDecoration(isDense: true)))), DataCell(SizedBox(width: 220, child: TextField(controller: row.task, textAlign: TextAlign.right, decoration: const InputDecoration(isDense: true)))), DataCell(SizedBox(width: 180, child: TextField(controller: row.output, textAlign: TextAlign.right, decoration: const InputDecoration(isDense: true)))), DataCell(Row(children: [IconButton(onPressed: () => setState(() => _rows.insert(i + 1, _UnifiedRow('', '', ''))), icon: const Icon(Icons.add, size: 19)), IconButton(onPressed: _rows.length == 1 ? null : () { final removed = _rows.removeAt(i); removed.dispose(); setState(() {}); }, icon: const Icon(Icons.delete_outline, size: 19))]))]); }).toList()));
+  Widget _scheduleTable(String title) {
+    return _section(
+      title,
+      SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: DataTable(
+          columnSpacing: 18,
+          columns: const [
+            DataColumn(label: Text('الوقت')),
+            DataColumn(label: Text('المهمة المحددة والمسؤولية')),
+            DataColumn(label: Text('المخرج المطلوب')),
+            DataColumn(label: Text('إجراء')),
+          ],
+          rows: _rows.asMap().entries.map((entry) {
+            final i = entry.key;
+            final row = entry.value;
+            return DataRow(cells: [
+              DataCell(SizedBox(width: 75, child: TextField(controller: row.time, textAlign: TextAlign.right, decoration: const InputDecoration(isDense: true)))),
+              DataCell(SizedBox(width: 220, child: TextField(controller: row.task, textAlign: TextAlign.right, decoration: const InputDecoration(isDense: true)))),
+              DataCell(SizedBox(width: 180, child: TextField(controller: row.output, textAlign: TextAlign.right, decoration: const InputDecoration(isDense: true)))),
+              DataCell(Row(children: [
+                IconButton(onPressed: () => setState(() => _rows.insert(i + 1, _UnifiedRow('', '', ''))), icon: const Icon(Icons.add, size: 19)),
+                IconButton(onPressed: _rows.length == 1 ? null : () { final removed = _rows.removeAt(i); removed.dispose(); setState(() {}); }, icon: const Icon(Icons.delete_outline, size: 19)),
+              ])),
+            ]);
+          }).toList(),
+        ),
+      ),
+    );
+  }
 
   Widget _editableList(String title, List<TextEditingController> list) => _section(title, Column(children: [for (var i = 0; i < list.length; i++) Row(children: [Expanded(child: TextField(controller: list[i], textAlign: TextAlign.right, decoration: InputDecoration(isDense: true, hintText: 'أضف بندًا'))), IconButton(onPressed: () => _removeTextRow(list, i), icon: const Icon(Icons.delete_outline))]), Align(alignment: Alignment.centerRight, child: TextButton.icon(onPressed: () => _addTextRow(list), icon: const Icon(Icons.add), label: const Text('إضافة بند')))]));
 
@@ -179,6 +210,46 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
   Widget _section(String title, Widget child) => Container(padding: const EdgeInsets.all(10), decoration: BoxDecoration(color: const Color(0xFFF8FBFA), borderRadius: BorderRadius.circular(12), border: Border.all(color: const Color(0xFFD8E4E0))), child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [Text(title, textAlign: TextAlign.right, style: const TextStyle(fontWeight: FontWeight.w900, color: AppColors.navy)), const SizedBox(height: 8), child]));
   Widget _input(TextEditingController controller, String label) => TextField(controller: controller, textAlign: TextAlign.right, decoration: InputDecoration(labelText: label, isDense: true));
   Widget _drop(String label, String value, List<String> values, ValueChanged<String> onChanged) => SizedBox(width: 155, child: DropdownButtonFormField<String>(value: value, isExpanded: true, decoration: InputDecoration(labelText: label, isDense: true), items: values.map((v) => DropdownMenuItem(value: v, child: Text(v, overflow: TextOverflow.ellipsis))).toList(), onChanged: (v) { if (v != null) onChanged(v); }));
+
+  Future<void> _submit() async {
+    final messenger = ScaffoldMessenger.of(context);
+    final tasks = _rows
+        .where((row) => row.task.text.trim().isNotEmpty)
+        .map((row) => UnifiedTaskRowData(
+              time: row.time.text.trim(),
+              task: row.task.text.trim(),
+              output: row.output.text.trim(),
+            ))
+        .toList();
+    if (_employee.text.trim().isEmpty || _role.text.trim().isEmpty) {
+      messenger.showSnackBar(const SnackBar(content: Text('اختر الموظف واكتب المسمى الوظيفي قبل الإرسال.', textAlign: TextAlign.right)));
+      return;
+    }
+    if (tasks.isEmpty) {
+      messenger.showSnackBar(const SnackBar(content: Text('أضف مهمة زمنية واحدة على الأقل قبل الإرسال.', textAlign: TextAlign.right)));
+      return;
+    }
+    setState(() => _sending = true);
+    try {
+      await widget.onSend(UnifiedTaskTableDraft(
+        employee: _employee.text.trim(),
+        role: _role.text.trim(),
+        branch: _branch.text.trim(),
+        startDate: _startDate.text.trim(),
+        purpose: _purpose.text.trim(),
+        dailyReport: _dailyReport.text.trim(),
+        rows: tasks,
+        responsibilities: _responsibilities.map((v) => v.text.trim()).where((v) => v.isNotEmpty).toList(),
+        authorities: _authorities.map((v) => v.text.trim()).where((v) => v.isNotEmpty).toList(),
+        instructions: _instructions.map((v) => v.text.trim()).where((v) => v.isNotEmpty).toList(),
+      ));
+      if (mounted) messenger.showSnackBar(const SnackBar(content: Text('تم إنشاء المهام وإرسالها للموظف بنجاح.', textAlign: TextAlign.right)));
+    } catch (error) {
+      if (mounted) messenger.showSnackBar(SnackBar(content: Text('تعذر إرسال الجدول: $error', textAlign: TextAlign.right)));
+    } finally {
+      if (mounted) setState(() => _sending = false);
+    }
+  }
 
   Future<void> _exportPdf() async {
     final messenger = ScaffoldMessenger.of(context);
@@ -306,4 +377,27 @@ class _UnifiedRow {
   _UnifiedRow(String time, String task, String output) : time = TextEditingController(text: time), task = TextEditingController(text: task), output = TextEditingController(text: output);
   final TextEditingController time, task, output;
   void dispose() { time.dispose(); task.dispose(); output.dispose(); }
+}
+
+class UnifiedTaskTableDraft {
+  const UnifiedTaskTableDraft({
+    required this.employee,
+    required this.role,
+    required this.branch,
+    required this.startDate,
+    required this.purpose,
+    required this.dailyReport,
+    required this.rows,
+    required this.responsibilities,
+    required this.authorities,
+    required this.instructions,
+  });
+  final String employee, role, branch, startDate, purpose, dailyReport;
+  final List<UnifiedTaskRowData> rows;
+  final List<String> responsibilities, authorities, instructions;
+}
+
+class UnifiedTaskRowData {
+  const UnifiedTaskRowData({required this.time, required this.task, required this.output});
+  final String time, task, output;
 }
