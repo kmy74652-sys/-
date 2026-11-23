@@ -217,7 +217,11 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
   }
 
   List<Map<String, dynamic>> get _visibleTasks => _tasks.where((task) {
-    final taskMatches = _taskFilter == 'all' || _s(task['status']) == _taskFilter;
+    final rawTaskStatus = _s(task['status']);
+    final taskMatches = _taskFilter == 'all' ||
+        (_taskFilter == 'pending' && ['pending', 'new'].contains(rawTaskStatus)) ||
+        (_taskFilter == 'submitted' && ['submitted', 'report_submitted'].contains(rawTaskStatus)) ||
+        rawTaskStatus == _taskFilter;
     final reportMatches = _reportFilter == 'all' || _reportStatus(task) == _reportFilter;
     return taskMatches && reportMatches;
   }).toList();
