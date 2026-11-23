@@ -98,7 +98,7 @@ function clientIp(request: Request) {
 }
 
 function isAccessCode(value: unknown): value is string {
-  return typeof value === 'string' && /^\S{8,64}$/.test(value);
+  return typeof value === 'string' && /^\S{3,30}$/.test(value);
 }
 
 function randomReplacementPassword() {

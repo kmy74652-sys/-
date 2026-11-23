@@ -39,10 +39,10 @@ class _LoginScreenState extends State<LoginScreen> {
       setState(() => _error = 'أدخل اسم الموظف ورمز الدخول.');
       return;
     }
-    if (!RegExp(r'^\S{8,64}$').hasMatch(code)) {
+    if (!RegExp(r'^\S{3,30}$').hasMatch(code)) {
       setState(
         () =>
-            _error = 'يجب أن تتكون كلمة المرور من 8 إلى 64 محرفًا دون مسافات.',
+            _error = 'يجب أن يتكون رمز الدخول من 3 إلى 30 محرفًا دون مسافات.',
       );
       return;
     }

@@ -120,11 +120,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _create() async {
     if (_name.text.trim().length < 2 ||
         !RegExp(r'^\d{1,32}$').hasMatch(_number.text.trim()) ||
-        !RegExp(r'^\S{8,64}$').hasMatch(_code.text) ||
+        !RegExp(r'^\S{3,30}$').hasMatch(_code.text) ||
         (_role != 'owner' && _branchId.isEmpty)) {
       setState(
         () => _error =
-            'أدخل الاسم والرقم الوظيفي ورمزًا من 8 إلى 64 محرفًا واختر الفرع.',
+            'أدخل الاسم والرقم الوظيفي ورمزًا من 3 إلى 30 محرفًا دون مسافات واختر الفرع.',
       );
       return;
     }
@@ -148,12 +148,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
       _number.clear();
       _code.clear();
       await _load();
+    } on FunctionException catch (error) {
+      final details = '${error.details ?? ''}';
+      final message = switch (details) {
+        String value when value.contains('employee_no_exists') => 'الرقم الوظيفي مستخدم مسبقًا.',
+        String value when value.contains('branch_not_found') => 'الفرع المحدد غير موجود أو غير نشط.',
+        String value when value.contains('employee_access_management_permission_required') => 'لا تملك صلاحية إنشاء حسابات الموظفين.',
+        String value when value.contains('invalid_employee_payload') => 'تحقق من الاسم والرقم الوظيفي والدور والفرع.',
+        String value when value.contains('access_code_create_failed') => 'تعذر حفظ رمز الدخول. تحقق من إعدادات حساب الموظف.',
+        _ => 'تعذر إنشاء الحساب؛ راجع الصلاحيات والبيانات ثم حاول مجددًا.',
+      };
+      if (mounted) setState(() { _busy = false; _error = message; });
     } catch (_) {
-      if (mounted)
-        setState(() {
-          _busy = false;
-          _error = 'تعذر إنشاء الحساب؛ راجع صلاحياتك ومدخلاتك.';
-        });
+      if (mounted) setState(() { _busy = false; _error = 'تعذر الاتصال بخدمة إنشاء الحساب.'; });
     }
   }
 
@@ -335,8 +342,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
         person['status'] != 'active' ||
         person['hasAuthAccount'] != true)
       return;
-    if (!RegExp(r'^\S{8,64}$').hasMatch(code)) {
-      setState(() => _error = 'اكتب رمزًا من 8 إلى 64 محرفًا دون مسافات.');
+    if (!RegExp(r'^\S{3,30}$').hasMatch(code)) {
+      setState(() => _error = 'اكتب رمزًا من 3 إلى 30 محرفًا دون مسافات.');
       return;
     }
     setState(() {
@@ -709,7 +716,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             controller: _code,
                             obscureText: true,
                             decoration: const InputDecoration(
-                              labelText: 'رمز الدخول الأولي (8–64 محرفًا)',
+                              labelText: 'رمز الدخول الأولي (3–30 محرفًا)',
                             ),
                           ),
                           DropdownButtonFormField<String>(
@@ -842,7 +849,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                 '${person['id']}',
                               ),
                               obscureText: true,
-                              maxLength: 64,
+                              maxLength: 30,
                               enabled: _busyEmployeeId == null,
                               decoration: InputDecoration(
                                 labelText: person['codeSetAt'] != null
