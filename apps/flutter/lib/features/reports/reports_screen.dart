@@ -130,7 +130,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                 .limit(500),
             _client
                 .from('task_report_form_snapshots')
-                .select('id,task_id,title,version_no,schema')
+                .select('id,task_id,title,schema')
                 .limit(1000),
           ]);
           _tasksById = {
@@ -205,11 +205,16 @@ class _ReportsScreenState extends State<ReportsScreen> {
 
   String _employeeForTask(Map<String, dynamic> row) {
     final task = _taskFor(row);
-    final userId = task?['assigned_to']?.toString() ??
-        row['submitted_by']?.toString();
-    return userId == null || userId.isEmpty
+    final assignedId = task?['assigned_to']?.toString();
+    final submittedId = row['submitted_by']?.toString();
+    final assignedName = assignedId == null ? null : _employeeNames[assignedId];
+    final submittedName =
+        submittedId == null ? null : _employeeNames[submittedId];
+    final knownName = assignedName ?? submittedName;
+    if (knownName != null && knownName.trim().isNotEmpty) return knownName;
+    return (assignedId ?? submittedId ?? '').isEmpty
         ? 'غير محدد'
-        : (_employeeNames[userId] ?? 'موظف غير معروف');
+        : 'موظف غير معروف';
   }
 
   String _formattedDate(Object? value) {
