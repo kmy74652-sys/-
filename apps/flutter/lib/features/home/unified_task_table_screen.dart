@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../shared/app_shell.dart';
+import '../../shared/app_customizer.dart';
 import 'unified_task_table_editor.dart';
 
 class UnifiedTaskTableScreen extends StatefulWidget {
@@ -29,6 +30,7 @@ class _UnifiedTaskTableScreenState extends State<UnifiedTaskTableScreen> {
   @override
   void initState() {
     super.initState();
+    AppCustomizer.instance.load();
     _loadOptions();
   }
 
@@ -285,6 +287,8 @@ class _UnifiedTaskTableScreenState extends State<UnifiedTaskTableScreen> {
   }
 
   Widget _sentTasksSection() {
+    final customizer = AppCustomizer.instance;
+    if (customizer.postSendVisibility == 'employee') return const SizedBox.shrink();
     final groups = <String, List<Map<String, dynamic>>>{};
     for (final task in _sentTasks) {
       final key = '${task['assigned_to'] ?? ''}|${task['due_at'] ?? ''}';
@@ -297,7 +301,7 @@ class _UnifiedTaskTableScreenState extends State<UnifiedTaskTableScreen> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(
-              'الجداول الموحدة المرسلة (${groups.length})',
+              '${customizer.unifiedLabel('sent')} (${groups.length})',
               textAlign: TextAlign.right,
               style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 17),
             ),
@@ -336,14 +340,16 @@ class _UnifiedTaskTableScreenState extends State<UnifiedTaskTableScreen> {
                             DataCell(Text('${row['title']}')),
                             DataCell(Text('${row['output']}')),
                             DataCell(Row(mainAxisSize: MainAxisSize.min, children: [
-                              IconButton(
-                                onPressed: _sentMutationBusy ? null : () => _editSentTask(row['task'] as Map<String, dynamic>),
-                                icon: const Icon(Icons.edit_outlined),
-                              ),
-                              IconButton(
-                                onPressed: _sentMutationBusy ? null : () => _deleteSentTask(row['task'] as Map<String, dynamic>),
-                                icon: const Icon(Icons.delete_outline, color: Colors.red),
-                              ),
+                              if (customizer.postSendShowActions) ...[
+                                IconButton(
+                                  onPressed: _sentMutationBusy ? null : () => _editSentTask(row['task'] as Map<String, dynamic>),
+                                  icon: const Icon(Icons.edit_outlined),
+                                ),
+                                IconButton(
+                                  onPressed: _sentMutationBusy ? null : () => _deleteSentTask(row['task'] as Map<String, dynamic>),
+                                  icon: const Icon(Icons.delete_outline, color: Colors.red),
+                                ),
+                              ],
                             ])),
                           ]),
                         )
@@ -480,8 +486,8 @@ class _UnifiedTaskTableScreenState extends State<UnifiedTaskTableScreen> {
                 : ListView(
                     padding: const EdgeInsets.all(12),
                     children: [
-                      _sentTasksSection(),
-                      const SizedBox(height: 12),
+                      if (AppCustomizer.instance.postSendPlacement == 'top') _sentTasksSection(),
+                      if (AppCustomizer.instance.postSendPlacement == 'top') const SizedBox(height: 12),
                       Align(
                         alignment: Alignment.centerRight,
                         child: TextButton.icon(
@@ -496,6 +502,8 @@ class _UnifiedTaskTableScreenState extends State<UnifiedTaskTableScreen> {
                         branches: _branches,
                         reports: _reports,
                       ),
+                      if (AppCustomizer.instance.postSendPlacement == 'bottom') const SizedBox(height: 12),
+                      if (AppCustomizer.instance.postSendPlacement == 'bottom') _sentTasksSection(),
                     ],
                   ),
       );
