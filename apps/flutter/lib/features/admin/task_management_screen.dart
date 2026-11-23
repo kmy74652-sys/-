@@ -726,7 +726,7 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
                                     ],
                                   ),
                                   leading: CircleAvatar(
-                                    backgroundColor: _reportStatusColor(_reportStatus(t)).withValues(alpha: 0.12),
+                                    backgroundColor: _reportStatusColor(_reportStatus(t)).withAlpha(31),
                                     child: Icon(
                                       Icons.description_outlined,
                                       color: _reportStatusColor(_reportStatus(t)),
