@@ -467,10 +467,16 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
   Future<void> _exportPdf() async {
     final messenger = ScaffoldMessenger.of(context);
     try {
-      final fontData = await rootBundle.load('assets/fonts/AlshaeriArabic-Regular.ttf');
-      final font = pw.Font.ttf(fontData);
+      final regularFontData = await rootBundle.load(
+        'assets/fonts/NotoSansArabic-Regular.ttf',
+      );
+      final boldFontData = await rootBundle.load(
+        'assets/fonts/NotoSansArabic-Bold.ttf',
+      );
+      final font = pw.Font.ttf(regularFontData);
+      final boldFont = pw.Font.ttf(boldFontData);
       final document = pw.Document(
-        theme: pw.ThemeData.withFont(base: font, bold: font),
+        theme: pw.ThemeData.withFont(base: font, bold: boldFont),
       );
       final rows = [..._rows, ..._exceptionRows]
           .map((row) => [row.time.text.trim(), row.task.text.trim(), row.output.text.trim(), 'جديدة'])
@@ -562,25 +568,72 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
     ],
   );
 
-  pw.Widget _pdfScheduleTable(List<List<String>> rows) => pw.Table.fromTextArray(
-    headers: const ['الحالة', 'المخرج المطلوب', 'المهمة والمسؤولية', 'الوقت'],
-    data: rows.map((row) => row.reversed.toList()).toList(),
-    border: pw.TableBorder.all(color: PdfColor.fromHex('#B8CEC5')),
-    headerDecoration: pw.BoxDecoration(color: PdfColor.fromHex('#EAF4F0')),
-    headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold),
-    cellStyle: const pw.TextStyle(fontSize: 9),
-    cellAlignment: pw.Alignment.centerRight,
-    headerAlignment: pw.Alignment.centerRight,
-  );
+  pw.Widget _pdfScheduleTable(List<List<String>> rows) {
+    final header = ['الحالة', 'المخرج المطلوب', 'المهمة والمسؤولية', 'الوقت'];
+    final tableRows = <List<pw.Widget>>[
+      header.map((value) => _pdfTableCell(value, bold: true)).toList(),
+      ...rows.map(
+        (row) => row.reversed.map((value) => _pdfTableCell(value)).toList(),
+      ),
+    ];
+    return pw.Table(
+      border: pw.TableBorder.all(color: PdfColor.fromHex('#B8CEC5')),
+      children: tableRows
+          .asMap()
+          .entries
+          .map(
+            (entry) => pw.TableRow(
+              decoration: entry.key == 0
+                  ? pw.BoxDecoration(color: PdfColor.fromHex('#EAF4F0'))
+                  : null,
+              children: entry.value,
+            ),
+          )
+          .toList(),
+    );
+  }
 
-  pw.Widget _pdfKpiTable() => pw.Table.fromTextArray(
-    headers: const ['معيار الإنجاز / القياس', 'المؤشر'],
-    data: _kpis.map((row) => [row[1].text.trim(), row[0].text.trim()]).toList(),
-    border: pw.TableBorder.all(color: PdfColor.fromHex('#B8CEC5')),
-    headerDecoration: pw.BoxDecoration(color: PdfColor.fromHex('#EAF4F0')),
-    headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold),
-    cellAlignment: pw.Alignment.centerRight,
-    headerAlignment: pw.Alignment.centerRight,
+  pw.Widget _pdfKpiTable() {
+    final rows = <List<pw.Widget>>[
+      [
+        _pdfTableCell('معيار الإنجاز / القياس', bold: true),
+        _pdfTableCell('المؤشر', bold: true),
+      ],
+      ..._kpis.map(
+        (row) => [
+          _pdfTableCell(row[1].text.trim().isEmpty ? '—' : row[1].text.trim()),
+          _pdfTableCell(row[0].text.trim().isEmpty ? '—' : row[0].text.trim()),
+        ],
+      ),
+    ];
+    return pw.Table(
+      border: pw.TableBorder.all(color: PdfColor.fromHex('#B8CEC5')),
+      children: rows
+          .asMap()
+          .entries
+          .map(
+            (entry) => pw.TableRow(
+              decoration: entry.key == 0
+                  ? pw.BoxDecoration(color: PdfColor.fromHex('#EAF4F0'))
+                  : null,
+              children: entry.value,
+            ),
+          )
+          .toList(),
+    );
+  }
+
+  pw.Widget _pdfTableCell(String value, {bool bold = false}) => pw.Padding(
+    padding: const pw.EdgeInsets.all(6),
+    child: pw.Text(
+      value.trim().isEmpty ? '—' : value.trim(),
+      textDirection: pw.TextDirection.rtl,
+      textAlign: pw.TextAlign.right,
+      style: pw.TextStyle(
+        fontSize: 9,
+        fontWeight: bold ? pw.FontWeight.bold : pw.FontWeight.normal,
+      ),
+    ),
   );
 
   pw.Widget _pdfCell(String text) => pw.Padding(
