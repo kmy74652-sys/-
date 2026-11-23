@@ -13,12 +13,12 @@ class ReportDesignerScreen extends StatefulWidget {
 class _ReportDesignerScreenState extends State<ReportDesignerScreen> {
   final _db = Supabase.instance.client;
   bool _busy = false, _loading = true, _required = true, _editing = false;
-  String? _error, _notice, _templateId, _versionId;
+  String? _error, _notice, _templateId, _versionId, _orgId;
   String _status = 'draft',
       _title = '',
       _description = '',
       _role = 'admin_followup';
-  List<Map<String, dynamic>> _templates = [], _fields = [];
+  List<Map<String, dynamic>> _templates = [], _fields = [], _employees = [];
   int? _selected;
 
   static const _roles = <String, String>{
@@ -111,7 +111,20 @@ class _ReportDesignerScreenState extends State<ReportDesignerScreen> {
           .eq('is_active', true)
           .order('title')
           .limit(100);
-      if (mounted) setState(() => _templates = _maps(rows));
+      final employees = await _db
+          .from('organization_memberships')
+          .select('user_id,display_name,employee_no')
+          .eq('organization_id', org)
+          .eq('is_active', true)
+          .order('display_name')
+          .limit(300);
+      if (mounted) {
+        setState(() {
+          _orgId = org;
+          _templates = _maps(rows);
+          _employees = _maps(employees);
+        });
+      }
     } catch (e) {
       if (mounted) setState(() => _error = _message(e));
     } finally {
@@ -388,6 +401,121 @@ class _ReportDesignerScreenState extends State<ReportDesignerScreen> {
     }
   }
 
+  Future<void> _approveAndSend() async {
+    if (_status == 'draft') await _approve();
+    if (_status == 'published') await _sendToEmployee();
+  }
+
+  Future<void> _sendToEmployee() async {
+    final org = _orgId;
+    final templateId = _templateId;
+    final versionId = _versionId;
+    if (org == null || templateId == null || versionId == null) return;
+    String? employeeId;
+    var due = DateTime.now().add(const Duration(days: 1));
+    due = DateTime(due.year, due.month, due.day, 17);
+    final result = await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('إرسال التقرير للموظف'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              DropdownButtonFormField<String>(
+                value: employeeId,
+                isExpanded: true,
+                decoration: const InputDecoration(labelText: 'الموظف المسؤول *'),
+                items: [
+                  const DropdownMenuItem<String>(
+                    value: null,
+                    child: Text('اختر الموظف'),
+                  ),
+                  ..._employees.map(
+                    (e) => DropdownMenuItem(
+                      value: e['user_id']?.toString(),
+                      child: Text(
+                        '${e['display_name'] ?? 'موظف'} · ${e['employee_no'] ?? ''}',
+                      ),
+                    ),
+                  ),
+                ],
+                onChanged: (value) => setDialogState(() => employeeId = value),
+              ),
+              const SizedBox(height: 10),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('الموعد النهائي', textAlign: TextAlign.right),
+                subtitle: Text(
+                  '${due.day}/${due.month}/${due.year} ${due.hour}:00',
+                  textAlign: TextAlign.right,
+                ),
+                trailing: const Icon(Icons.event_available_outlined),
+                onTap: () async {
+                  final picked = await showDatePicker(
+                    context: context,
+                    initialDate: due,
+                    firstDate: DateTime.now(),
+                    lastDate: DateTime.now().add(const Duration(days: 3650)),
+                  );
+                  if (picked != null) {
+                    setDialogState(
+                      () => due = DateTime(picked.year, picked.month, picked.day, 17),
+                    );
+                  }
+                },
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('إلغاء'),
+            ),
+            FilledButton(
+              onPressed: employeeId == null
+                  ? null
+                  : () => Navigator.of(dialogContext).pop({
+                        'employee_id': employeeId,
+                        'due_at': due.toUtc().toIso8601String(),
+                      }),
+              child: const Text('اعتماد وإرسال'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (result == null || result['employee_id'] == null) return;
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      await _db.rpc(
+        'create_task_with_report_form',
+        params: {
+          'p_organization_id': org,
+          'p_title': _title.trim(),
+          'p_description': _description.trim().isEmpty ? null : _description.trim(),
+          'p_due_at': result['due_at'],
+          'p_priority': 'normal',
+          'p_branch_id': null,
+          'p_role_code': _role,
+          'p_template_id': null,
+          'p_assigned_to': result['employee_id'],
+          'p_report_template_id': templateId,
+          'p_report_version_id': versionId,
+          'p_report_required': _required,
+        },
+      );
+      setState(() => _notice = 'تم اعتماد التقرير وإرساله للموظف داخل قائمة المهام.');
+    } catch (e) {
+      setState(() => _error = _message(e));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) => Directionality(
     textDirection: TextDirection.rtl,
@@ -638,6 +766,12 @@ class _ReportDesignerScreenState extends State<ReportDesignerScreen> {
           onPressed: _busy ? null : _approve,
           icon: const Icon(Icons.verified_outlined),
           label: const Text('اعتماد الإصدار'),
+        ),
+      if (_versionId != null && (_status == 'draft' || _status == 'published'))
+        FilledButton.icon(
+          onPressed: _busy ? null : _approveAndSend,
+          icon: const Icon(Icons.send_outlined),
+          label: const Text('اعتماد وإرسال للموظف'),
         ),
       if (_status == 'published')
         const Text(
