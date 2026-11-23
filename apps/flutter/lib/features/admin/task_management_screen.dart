@@ -22,6 +22,7 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
       _reportTemplates = [],
       _requests = [];
   Map<String, Map<String, dynamic>> _reportByTask = {};
+  String _taskFilter = 'all', _reportFilter = 'all';
 
   @override
   void initState() {
@@ -214,6 +215,19 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
     }
     return summary;
   }
+
+  List<Map<String, dynamic>> get _visibleTasks => _tasks.where((task) {
+    final taskMatches = _taskFilter == 'all' || _s(task['status']) == _taskFilter;
+    final reportMatches = _reportFilter == 'all' || _reportStatus(task) == _reportFilter;
+    return taskMatches && reportMatches;
+  }).toList();
+
+  Widget _filterChip({required String value, required String label, required String group, required VoidCallback onSelected}) =>
+      ChoiceChip(
+        label: Text(label),
+        selected: (group == 'task' ? _taskFilter : _reportFilter) == value,
+        onSelected: (_) => setState(onSelected),
+      );
 
   Future<void> _saveTask({Map<String, dynamic>? existing}) async {
     final title = TextEditingController(text: _s(existing?['title']));
@@ -620,11 +634,51 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
                   ),
                 ),
                 SectionCard(
-                  title: 'المهام (${_tasks.length})',
-                  child: _tasks.isEmpty
-                      ? const Text('لا توجد مهام.', textAlign: TextAlign.right)
+                  title: 'تصفية المتابعة',
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      const Text('حالة المهمة', textAlign: TextAlign.right, style: TextStyle(fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 6),
+                      Wrap(
+                        alignment: WrapAlignment.end,
+                        spacing: 6,
+                        runSpacing: 6,
+                        children: [
+                          _filterChip(value: 'all', label: 'الكل', group: 'task', onSelected: () => _taskFilter = 'all'),
+                          _filterChip(value: 'pending', label: 'جديدة', group: 'task', onSelected: () => _taskFilter = 'pending'),
+                          _filterChip(value: 'received', label: 'مستلمة', group: 'task', onSelected: () => _taskFilter = 'received'),
+                          _filterChip(value: 'in_progress', label: 'قيد التنفيذ', group: 'task', onSelected: () => _taskFilter = 'in_progress'),
+                          _filterChip(value: 'submitted', label: 'للمراجعة', group: 'task', onSelected: () => _taskFilter = 'submitted'),
+                          _filterChip(value: 'needs_revision', label: 'تحتاج تصحيحًا', group: 'task', onSelected: () => _taskFilter = 'needs_revision'),
+                          _filterChip(value: 'completed_approved', label: 'معتمدة', group: 'task', onSelected: () => _taskFilter = 'completed_approved'),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      const Text('حالة التقرير', textAlign: TextAlign.right, style: TextStyle(fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 6),
+                      Wrap(
+                        alignment: WrapAlignment.end,
+                        spacing: 6,
+                        runSpacing: 6,
+                        children: [
+                          _filterChip(value: 'all', label: 'الكل', group: 'report', onSelected: () => _reportFilter = 'all'),
+                          _filterChip(value: 'لم يبدأ', label: 'لم يبدأ', group: 'report', onSelected: () => _reportFilter = 'لم يبدأ'),
+                          _filterChip(value: 'مرسل للمراجعة', label: 'مرسل للمراجعة', group: 'report', onSelected: () => _reportFilter = 'مرسل للمراجعة'),
+                          _filterChip(value: 'يحتاج تعديل', label: 'يحتاج تعديل', group: 'report', onSelected: () => _reportFilter = 'يحتاج تعديل'),
+                          _filterChip(value: 'معتمد', label: 'معتمد', group: 'report', onSelected: () => _reportFilter = 'معتمد'),
+                          _filterChip(value: 'بدون تقرير', label: 'بدون تقرير', group: 'report', onSelected: () => _reportFilter = 'بدون تقرير'),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                SectionCard(
+                  title: 'المهام (${_visibleTasks.length} من ${_tasks.length})',
+                  child: _visibleTasks.isEmpty
+                      ? const Text('لا توجد مهام مطابقة للفلاتر المحددة.', textAlign: TextAlign.right)
                       : Column(
-                          children: _tasks
+                          children: _visibleTasks
                               .map(
                                 (t) => ListTile(
                                   contentPadding: EdgeInsets.zero,
