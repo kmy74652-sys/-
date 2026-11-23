@@ -21,6 +21,7 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
       _templates = [],
       _reportTemplates = [],
       _requests = [];
+  Map<String, Map<String, dynamic>> _reportByTask = {};
 
   @override
   void initState() {
@@ -55,7 +56,7 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
         _db
             .from('tasks')
             .select(
-              'id,title,description,branch_id,assigned_to,due_at,priority,status,deleted_at',
+              'id,title,description,branch_id,assigned_to,due_at,priority,status,report_required,report_flow,deleted_at',
             )
             .eq('organization_id', org)
             .isFilter('deleted_at', null)
@@ -108,9 +109,25 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
             .limit(100),
       ]);
       if (!mounted) return;
+      final taskRows = _rows(results[0]);
+      final taskIds = taskRows.map((task) => _s(task['id'])).where((id) => id.isNotEmpty).toList();
+      final reportRows = taskIds.isEmpty
+          ? <Map<String, dynamic>>[]
+          : _rows(await _db
+                .from('task_reports')
+                .select('task_id,status,submitted_at,review_note,updated_at')
+                .inFilter('task_id', taskIds)
+                .order('updated_at', ascending: false)
+                .limit(500));
+      final reports = <String, Map<String, dynamic>>{};
+      for (final report in reportRows) {
+        final taskId = _s(report['task_id']);
+        if (taskId.isNotEmpty && !reports.containsKey(taskId)) reports[taskId] = report;
+      }
       setState(() {
         _orgId = org;
-        _tasks = _rows(results[0]);
+        _tasks = taskRows;
+        _reportByTask = reports;
         _branches = _rows(results[1]);
         _employees = _rows(results[2]);
         _templates = _rows(results[3]);
@@ -170,6 +187,33 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
         'late': 'متأخرة',
       }[v] ??
       v;
+
+  String _reportStatus(Map<String, dynamic> task) {
+    final report = _reportByTask[_s(task['id'])];
+    final reportStatus = _s(report?['status']);
+    if (reportStatus == 'approved') return 'معتمد';
+    if (reportStatus == 'submitted') return 'مرسل للمراجعة';
+    if (reportStatus == 'returned' || _s(task['status']) == 'needs_revision') return 'يحتاج تعديل';
+    if (task['report_required'] == true || task['report_flow'] == 'multi_form') return 'لم يبدأ';
+    return 'بدون تقرير';
+  }
+
+  Color _reportStatusColor(String value) => const {
+    'معتمد': Colors.green,
+    'مرسل للمراجعة': Colors.orange,
+    'يحتاج تعديل': Colors.red,
+    'لم يبدأ': Colors.blueGrey,
+    'بدون تقرير': Colors.grey,
+  }[value] ?? Colors.grey;
+
+  Map<String, int> get _reportSummary {
+    final summary = <String, int>{};
+    for (final task in _tasks) {
+      final status = _reportStatus(task);
+      summary[status] = (summary[status] ?? 0) + 1;
+    }
+    return summary;
+  }
 
   Future<void> _saveTask({Map<String, dynamic>? existing}) async {
     final title = TextEditingController(text: _s(existing?['title']));
@@ -588,10 +632,31 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
                                     _s(t['title'], 'مهمة'),
                                     textAlign: TextAlign.right,
                                   ),
-                                  subtitle: Text(
-                                    '${_status(_s(t['status']))} · ${_branchName(_s(t['branch_id']).isEmpty ? null : _s(t['branch_id']))} · ${_employeeName(_s(t['assigned_to']))}',
-                                    textAlign: TextAlign.right,
+                                  subtitle: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.end,
+                                    children: [
+                                      Text(
+                                        '${_status(_s(t['status']))} · ${_branchName(_s(t['branch_id']).isEmpty ? null : _s(t['branch_id']))} · ${_employeeName(_s(t['assigned_to']))}',
+                                        textAlign: TextAlign.right,
+                                      ),
+                                      Text(
+                                        'التقرير: ${_reportStatus(t)}',
+                                        textAlign: TextAlign.right,
+                                        style: TextStyle(
+                                          color: _reportStatusColor(_reportStatus(t)),
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
+                                    ],
                                   ),
+                                  leading: CircleAvatar(
+                                    backgroundColor: _reportStatusColor(_reportStatus(t)).withValues(alpha: 0.12),
+                                    child: Icon(
+                                      Icons.description_outlined,
+                                      color: _reportStatusColor(_reportStatus(t)),
+                                    ),
+                                  ),
+                                  isThreeLine: true,
                                   trailing: PopupMenuButton<String>(
                                     onSelected: (v) => v == 'edit'
                                         ? _saveTask(existing: t)
@@ -607,11 +672,39 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
                                       ),
                                     ],
                                   ),
+                                  onTap: () => _message(
+                                    'حالة التقرير: ${_reportStatus(t)}',
+                                  ),
                                 ),
                               )
                               .toList(),
                         ),
                 ),
+                if (_tasks.isNotEmpty)
+                  SectionCard(
+                    title: 'متابعة التقارير مباشرة',
+                    child: Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      alignment: WrapAlignment.end,
+                      children: _reportSummary.entries
+                          .map(
+                            (entry) => Chip(
+                              avatar: Icon(
+                                entry.key == 'معتمد'
+                                    ? Icons.verified_outlined
+                                    : entry.key == 'مرسل للمراجعة'
+                                    ? Icons.schedule_outlined
+                                    : Icons.description_outlined,
+                                size: 18,
+                                color: _reportStatusColor(entry.key),
+                              ),
+                              label: Text('${entry.key}: ${entry.value}'),
+                            ),
+                          )
+                          .toList(),
+                    ),
+                  ),
                 if (_requests.isNotEmpty)
                   SectionCard(
                     title: 'طلبات النشر بانتظار موافقة المالك',
