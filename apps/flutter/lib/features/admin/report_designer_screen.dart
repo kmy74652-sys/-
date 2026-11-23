@@ -417,6 +417,10 @@ class _ReportDesignerScreenState extends State<ReportDesignerScreen> {
     final templateId = _templateId;
     final versionId = _versionId;
     if (org == null || templateId == null || versionId == null) return;
+    if (_fields.isEmpty) {
+      setState(() => _error = 'لا يمكن إرسال التقرير؛ أضف حقلًا واحدًا على الأقل ثم احفظه واعتمده.');
+      return;
+    }
     String? employeeId;
     var due = DateTime.now().add(const Duration(days: 1));
     due = DateTime(due.year, due.month, due.day, 17);

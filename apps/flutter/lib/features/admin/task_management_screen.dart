@@ -248,7 +248,10 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
                 value: templateId, isExpanded: true,
                 decoration: formDecoration('قالب المهمة', hint: 'اختياري — إنشاء مباشر إذا لم تحدد قالبًا'),
                 items: [const DropdownMenuItem<String>(value: null, child: Text('إنشاء مباشر')), ..._templates.map((t) => DropdownMenuItem(value: _s(t['id']), child: Text('${_s(t['title'])} · ${_s(t['role_code'])}')))],
-                onChanged: (v) => set(() => templateId = v),
+                onChanged: (v) => set(() {
+                  templateId = v;
+                  if (v == null) reportRequired = false;
+                }),
               ),
               DropdownButtonFormField<String>(
                 value: role, isExpanded: true, decoration: formDecoration('الدور الوظيفي'),
@@ -260,7 +263,22 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
                 items: [const DropdownMenuItem<String>(value: null, child: Text('اختر موظفًا')), ..._employees.map((e) => DropdownMenuItem(value: _s(e['user_id']), child: Text(_s(e['display_name'], _s(e['employee_no'])))))],
                 onChanged: (v) => set(() => assignee = v),
               ),
-              SwitchListTile(contentPadding: EdgeInsets.zero, title: const Text('إرفاق تقرير عند الإنجاز'), subtitle: const Text('يطلب من الموظف تعبئة التقرير قبل التسليم'), value: reportRequired, onChanged: (v) => set(() => reportRequired = v)),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('إرفاق تقرير عند الإنجاز'),
+                subtitle: Text(
+                  templateId == null
+                      ? 'اختر قالب مهمة يحتوي على حقول تقرير أولًا.'
+                      : 'يطلب من الموظف تعبئة التقرير قبل التسليم',
+                ),
+                value: reportRequired,
+                onChanged: templateId == null
+                    ? null
+                    : (v) => set(() {
+                        reportRequired = v;
+                        validationError = '';
+                      }),
+              ),
             ],
           ),
         if (validationError.isNotEmpty) Padding(padding: const EdgeInsets.only(bottom: 10), child: Text(validationError, style: const TextStyle(color: Colors.red, fontWeight: FontWeight.w700))),
@@ -268,6 +286,7 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
       onConfirm: (set) {
         if (title.text.trim().length < 2) { set(() => validationError = 'اكتب عنوان المهمة أولاً.'); return false; }
         if (existing == null && (assignee == null || role == null)) { set(() => validationError = 'اختر الدور والموظف المسؤول قبل إنشاء المهمة.'); return false; }
+        if (existing == null && reportRequired && templateId == null) { set(() => validationError = 'لا يمكن طلب تقرير دون قالب تقرير وحقول معتمدة. اختر قالب مهمة أولًا.'); return false; }
         return true;
       },
     );
