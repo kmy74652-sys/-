@@ -602,7 +602,9 @@ class _TasksScreenState extends State<TasksScreen>
         child: Center(child: Text('لا توجد سجلات في كشف المهام المطابق للبحث والمرشحات.')),
       );
     }
-    final completed = ordered.where((task) => {'approved', 'completed'}.contains(_normalizedStatus(task))).length;
+    final completed = ordered
+        .where((task) => {'approved', 'completed'}.contains(_normalizedStatus(task)))
+        .length;
     final submitted = ordered.where((task) => _reportByTask['${task['id']}']?['status'] == 'submitted').length;
     final pending = ordered.length - completed;
     final late = ordered.where((task) {
@@ -644,8 +646,8 @@ class _TasksScreenState extends State<TasksScreen>
               children: [
                 _ledgerSummaryChip('الإجمالي', ordered.length, Icons.receipt_long_outlined),
                 _ledgerSummaryChip('مكتملة', completed, Icons.verified_outlined),
-                _ledgerSummaryChip('بانتظار المراجعة', submitted, Icons.fact_check_outlined),
-                _ledgerSummaryChip('غير مكتملة', pending, Icons.pending_actions_outlined),
+                _ledgerSummaryChip('بانتظار المراجعة', submitted, Icons.fact_check),
+                _ledgerSummaryChip('غير مكتملة', pending, Icons.pending_actions),
                 _ledgerSummaryChip('متأخرة', late, Icons.schedule_outlined),
               ],
             ),
@@ -653,7 +655,7 @@ class _TasksScreenState extends State<TasksScreen>
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
             child: DropdownButtonFormField<String>(
-              value: _ledgerOrder,
+              initialValue: _ledgerOrder,
               isExpanded: true,
               decoration: const InputDecoration(labelText: 'ترتيب الكشف', isDense: true),
               items: const [
