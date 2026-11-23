@@ -77,7 +77,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     _ShellTab('/', 'الرئيسية', Icons.home_outlined),
     _ShellTab('/settings', 'الموظفون', Icons.people_outline),
     _ShellTab('/tasks', 'المهام', Icons.task_alt_outlined),
-    _ShellTab('/admin', 'الإعدادات', Icons.settings_outlined),
+    _ShellTab('/admin', 'الإدارة', Icons.dashboard_outlined),
   ];
 
   int _selectedIndex(String path) {

@@ -61,63 +61,6 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ],
     ),
-    (
-      'الموظفون والفروع',
-      [
-        _Module(
-          'employees',
-          'إدارة الموظفين',
-          'بيانات الموظفين والحسابات',
-          Icons.people_outline,
-          '/settings',
-        ),
-        _Module(
-          'branches',
-          'إدارة الفروع',
-          'إضافة وتعديل الفروع',
-          Icons.account_tree_outlined,
-          '/admin',
-        ),
-      ],
-    ),
-    (
-      'أدوات الإعداد',
-      [
-        _Module(
-          'report-designer',
-          'مصمم التقارير',
-          'إنشاء تقارير ديناميكية',
-          Icons.edit_note,
-          '/admin/report-designer',
-        ),
-      ],
-    ),
-    (
-      'الموارد والإعدادات',
-      [
-        _Module(
-          'agreements',
-          'اتفاقية العمل والموارد البشرية',
-          'الاتفاقيات والعقود والدوام والرواتب',
-          Icons.description_outlined,
-          '/agreement',
-        ),
-        _Module(
-          'permissions',
-          'الصلاحيات',
-          'إدارة صلاحيات المستخدمين',
-          Icons.admin_panel_settings_outlined,
-          '/settings',
-        ),
-        _Module(
-          'settings',
-          'الإعدادات',
-          'إعدادات الحساب',
-          Icons.settings_outlined,
-          '/settings',
-        ),
-      ],
-    ),
   ];
   static const _metrics = <_Metric>[
     _Metric(
@@ -201,6 +144,12 @@ class _HomeScreenState extends State<HomeScreen> {
       default:
         return false;
     }
+  }
+
+  String _moduleRoute(_Module item) {
+    if (item.key == 'tasks') return _manageTasks ? '/admin/tasks' : '/tasks';
+    if (item.key == 'reports' && !_manageTasks) return '/reports/independent';
+    return item.route;
   }
 
   @override
@@ -563,7 +512,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _moduleCard(_Module item) => Card(
     clipBehavior: Clip.antiAlias,
     child: InkWell(
-      onTap: () => context.go(item.route),
+      onTap: () => context.go(_moduleRoute(item)),
       child: SizedBox(
         height: 86,
         child: Padding(
@@ -579,7 +528,9 @@ class _HomeScreenState extends State<HomeScreen> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     Text(
-                      item.title,
+                      item.key == 'tasks' && _manageTasks
+                          ? 'إدارة المهام'
+                          : item.title,
                       textAlign: TextAlign.right,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
