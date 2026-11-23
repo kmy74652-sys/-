@@ -482,10 +482,10 @@ class _TaskDesignerScreenState extends State<TaskDesignerScreen> {
           ],
           const SizedBox(height: 10),
           _dropdown<String>('الأولوية الافتراضية', _priority, const [
+            DropdownMenuItem(value: 'low', child: Text('منخفضة')),
             DropdownMenuItem(value: 'normal', child: Text('عادية')),
-            DropdownMenuItem(value: 'important', child: Text('مهمة')),
+            DropdownMenuItem(value: 'high', child: Text('عالية')),
             DropdownMenuItem(value: 'urgent', child: Text('عاجلة')),
-            DropdownMenuItem(value: 'critical', child: Text('حرجة')),
           ], (v) => setState(() => _priority = v ?? 'normal')),
           const SizedBox(height: 10),
           TextField(

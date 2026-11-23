@@ -433,10 +433,113 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             _metricGrid(),
             const SizedBox(height: 14),
+            _unifiedTaskTableSection(),
+            const SizedBox(height: 14),
             for (final group in _groups) _moduleGroup(group.$1, group.$2),
           ],
         ],
       ),
+    ),
+  );
+
+  Widget _unifiedTaskTableSection() {
+    final manager = _allowed('tasks') && _manageTasks;
+    return SectionCard(
+      title: 'الجدول الموحد لإنشاء المهام',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            textDirection: TextDirection.rtl,
+            children: [
+              const Icon(Icons.table_chart_outlined, color: AppColors.green),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  manager
+                      ? 'أنشئ المهام وفق جدول رسمي منظم، ثم أرسلها للموظف مع التقرير المطلوب.'
+                      : 'جدولك اليومي ومخرجات المهام والتقرير المطلوب تظهر هنا بنفس الترتيب الرسمي.',
+                  textAlign: TextAlign.right,
+                  style: const TextStyle(height: 1.45),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          _officialTablePreview(),
+          const SizedBox(height: 12),
+          if (manager) ...[
+            const Text('قوالب سريعة', textAlign: TextAlign.right, style: TextStyle(color: AppColors.navy, fontWeight: FontWeight.w900)),
+            const SizedBox(height: 7),
+            Wrap(
+              textDirection: TextDirection.rtl,
+              spacing: 7,
+              runSpacing: 7,
+              children: [
+                _tableAction('محاسب', Icons.calculate_outlined, '/admin/task-designer'),
+                _tableAction('أمين مخزن', Icons.inventory_2_outlined, '/admin/task-designer'),
+                _tableAction('تحميل وترتيب', Icons.local_shipping_outlined, '/admin/task-designer'),
+                _tableAction('مهام مشتركة', Icons.groups_outlined, '/tasks'),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Row(
+              textDirection: TextDirection.rtl,
+              children: [
+                Expanded(child: FilledButton.icon(onPressed: () => context.go('/tasks'), icon: const Icon(Icons.add_task), label: const Text('إنشاء مهمة وإرسالها'))),
+                const SizedBox(width: 8),
+                Expanded(child: OutlinedButton.icon(onPressed: () => context.go('/admin/task-designer'), icon: const Icon(Icons.view_list_outlined), label: const Text('إدارة القوالب'))),
+              ],
+            ),
+          ] else
+            FilledButton.icon(
+              onPressed: _allowed('tasks') ? () => context.go('/tasks') : null,
+              icon: const Icon(Icons.playlist_add_check),
+              label: const Text('فتح جدول مهامي والتقرير اليومي'),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _tableAction(String label, IconData icon, String route) => ActionChip(
+    avatar: Icon(icon, size: 18, color: AppColors.green),
+    label: Text(label),
+    onPressed: () => context.go(route),
+  );
+
+  Widget _officialTablePreview() => Container(
+    decoration: BoxDecoration(
+      color: const Color(0xFFF8FBFA),
+      borderRadius: BorderRadius.circular(12),
+      border: Border.all(color: const Color(0xFFD8E4E0)),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+          color: const Color(0xFFEAF4F0),
+          child: const Text('مؤسسة الشاعري للتجارة العامة · جدول تنفيذ المهام', textAlign: TextAlign.right, style: TextStyle(fontWeight: FontWeight.w900, color: AppColors.navy)),
+        ),
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: DataTable(
+            headingRowColor: const WidgetStatePropertyAll(Color(0xFFF0F5F3)),
+            columnSpacing: 24,
+            columns: const [
+              DataColumn(label: Text('الوقت')),
+              DataColumn(label: Text('المهمة والمسؤولية')),
+              DataColumn(label: Text('المخرج المطلوب')),
+              DataColumn(label: Text('الحالة')),
+            ],
+            rows: const [
+              DataRow(cells: [DataCell(Text('08:00')), DataCell(Text('يُحدد من قالب الموظف')), DataCell(Text('نتيجة قابلة للمراجعة')), DataCell(Text('جديدة'))]),
+              DataRow(cells: [DataCell(Text('—')), DataCell(Text('أضف بندًا من شاشة إنشاء المهمة')), DataCell(Text('تقرير يومي')), DataCell(Text('بانتظار الإرسال'))]),
+            ],
+          ),
+        ),
+      ],
     ),
   );
 
