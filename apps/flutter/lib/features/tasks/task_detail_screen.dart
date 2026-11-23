@@ -30,6 +30,23 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
   final Map<String, TextEditingController> _formInputs = {};
   String _formInputKey(String snapshot, String field) => '$snapshot:$field';
 
+  List<Map<String, String>> _descriptionBlocks(String value) {
+    final text = value.trim();
+    final matches = RegExp(r'(?m)^وصف المهمة (\d+):\s*$').allMatches(text).toList();
+    if (matches.isEmpty) return [{'title': 'الوصف', 'body': text}];
+    final blocks = <Map<String, String>>[];
+    for (var i = 0; i < matches.length; i++) {
+      final match = matches[i];
+      final start = match.end;
+      final end = i + 1 < matches.length ? matches[i + 1].start : text.length;
+      final body = text.substring(start, end).trim();
+      if (body.isNotEmpty) {
+        blocks.add({'title': 'وصف المهمة ${match.group(1)}', 'body': body});
+      }
+    }
+    return blocks.isEmpty ? [{'title': 'الوصف', 'body': text}] : blocks;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -1375,10 +1392,31 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
               ),
               if ('${_task?['description'] ?? ''}'.trim().isNotEmpty)
                 SectionCard(
-                  title: 'وصف المهمة',
-                  child: Text(
-                    '${_task!['description']}',
-                    textAlign: TextAlign.right,
+                  title: 'بيانات المهمة',
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      for (final block in _descriptionBlocks('${_task!['description']}'))
+                        Card(
+                          margin: const EdgeInsets.only(bottom: 8),
+                          color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                          child: Padding(
+                            padding: const EdgeInsets.all(12),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                Text(
+                                  block['title']!,
+                                  textAlign: TextAlign.right,
+                                  style: const TextStyle(fontWeight: FontWeight.bold),
+                                ),
+                                const SizedBox(height: 6),
+                                Text(block['body']!, textAlign: TextAlign.right),
+                              ],
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
                 ),
               if ('${_task?['task_instructions'] ?? ''}'.trim().isNotEmpty)

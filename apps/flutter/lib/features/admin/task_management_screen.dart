@@ -146,6 +146,7 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
   Future<void> _saveTask({Map<String, dynamic>? existing}) async {
     final title = TextEditingController(text: _s(existing?['title']));
     final description = TextEditingController(text: _s(existing?['description']));
+    final descriptionCards = <TextEditingController>[description];
     final parsedDue = DateTime.tryParse(_s(existing?['due_at']));
     DateTime dueDate = parsedDue?.toLocal() ?? defaultDueDate();
     String priority = _s(existing?['priority'], 'normal');
@@ -167,7 +168,55 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
           note: 'اكتب عنوانًا واضحًا يصف النتيجة المطلوبة من الموظف.',
           children: [
             TextField(controller: title, textDirection: TextDirection.rtl, textInputAction: TextInputAction.next, decoration: formDecoration('عنوان المهمة *', hint: 'مثال: مراجعة مخزون الفرع الرئيسي')),
-            TextField(controller: description, textDirection: TextDirection.rtl, minLines: 3, maxLines: 5, decoration: formDecoration('وصف وتعليمات المهمة', hint: 'ما المطلوب تنفيذه؟ وما النتيجة المتوقعة؟')),
+            for (var i = 0; i < descriptionCards.length; i++)
+              Card(
+                margin: const EdgeInsets.only(top: 8),
+                child: Padding(
+                  padding: const EdgeInsets.all(10),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              'وصف المهمة ${i + 1}',
+                              textAlign: TextAlign.right,
+                              style: const TextStyle(fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                          if (descriptionCards.length > 1)
+                            IconButton(
+                              tooltip: 'حذف حقل الوصف',
+                              onPressed: () => set(() {
+                                descriptionCards.removeAt(i).dispose();
+                              }),
+                              icon: const Icon(Icons.remove_circle_outline, color: Colors.red),
+                            ),
+                        ],
+                      ),
+                      TextField(
+                        controller: descriptionCards[i],
+                        textDirection: TextDirection.rtl,
+                        minLines: 2,
+                        maxLines: 5,
+                        decoration: formDecoration(
+                          'محتوى البطاقة',
+                          hint: i == 0 ? 'ما المطلوب تنفيذه؟' : 'أضف تفصيلًا أو نتيجة متوقعة أخرى',
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton.icon(
+                onPressed: () => set(() => descriptionCards.add(TextEditingController())),
+                icon: const Icon(Icons.add_box_outlined),
+                label: const Text('إضافة حقل جديد'),
+              ),
+            ),
           ],
         ),
         FormSection(
@@ -231,12 +280,18 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
     setState(() => _busy = true);
     try {
       final dueIso = dueToIso(dueDate);
+      final descriptionText = descriptionCards
+          .asMap()
+          .entries
+          .where((entry) => entry.value.text.trim().isNotEmpty)
+          .map((entry) => 'وصف المهمة ${entry.key + 1}:\n${entry.value.text.trim()}')
+          .join('\n\n');
       if (existing != null) {
-        await _db.rpc('admin_update_task', params: {'p_organization_id': _orgId, 'p_task_id': existing['id'], 'p_title': title.text.trim(), 'p_description': description.text.trim().isEmpty ? null : description.text.trim(), 'p_due_at': dueIso});
+        await _db.rpc('admin_update_task', params: {'p_organization_id': _orgId, 'p_task_id': existing['id'], 'p_title': title.text.trim(), 'p_description': descriptionText.isEmpty ? null : descriptionText, 'p_due_at': dueIso});
       } else if (templateId != null) {
-        await _db.rpc('assign_task_from_template', params: {'p_organization_id': _orgId, 'p_template_id': templateId, 'p_assigned_to': assignee, 'p_branch_id': branchId, 'p_starts_at': DateTime.now().toUtc().toIso8601String(), 'p_due_at': dueIso, 'p_priority': priority, 'p_instructions': description.text.trim().isEmpty ? null : description.text.trim(), 'p_report_overrides': <dynamic>[], 'p_idempotency_key': 'flutter-template:$templateId:$assignee:$dueIso'});
+        await _db.rpc('assign_task_from_template', params: {'p_organization_id': _orgId, 'p_template_id': templateId, 'p_assigned_to': assignee, 'p_branch_id': branchId, 'p_starts_at': DateTime.now().toUtc().toIso8601String(), 'p_due_at': dueIso, 'p_priority': priority, 'p_instructions': descriptionText.isEmpty ? null : descriptionText, 'p_report_overrides': <dynamic>[], 'p_idempotency_key': 'flutter-template:$templateId:$assignee:$dueIso'});
       } else {
-        await _db.rpc('create_task_with_report_form', params: {'p_organization_id': _orgId, 'p_title': title.text.trim(), 'p_description': description.text.trim().isEmpty ? null : description.text.trim(), 'p_due_at': dueIso, 'p_priority': priority, 'p_branch_id': branchId, 'p_role_code': role, 'p_template_id': null, 'p_assigned_to': assignee, 'p_report_template_id': null, 'p_report_version_id': null, 'p_report_required': reportRequired});
+        await _db.rpc('create_task_with_report_form', params: {'p_organization_id': _orgId, 'p_title': title.text.trim(), 'p_description': descriptionText.isEmpty ? null : descriptionText, 'p_due_at': dueIso, 'p_priority': priority, 'p_branch_id': branchId, 'p_role_code': role, 'p_template_id': null, 'p_assigned_to': assignee, 'p_report_template_id': null, 'p_report_version_id': null, 'p_report_required': reportRequired});
       }
       _message(existing == null ? 'تم إنشاء المهمة وإرسالها للموظف.' : 'تم حفظ تعديلات المهمة.');
       await _load();
@@ -244,7 +299,9 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
       _message('تعذر الحفظ: ${e.toString().replaceFirst('Exception: ', '')}');
     } finally {
       title.dispose();
-      description.dispose();
+      for (final card in descriptionCards) {
+        card.dispose();
+      }
       if (mounted) setState(() => _busy = false);
     }
   }
