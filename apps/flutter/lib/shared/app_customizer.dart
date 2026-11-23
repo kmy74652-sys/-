@@ -12,6 +12,12 @@ class AppCustomizer extends ChangeNotifier {
   Map<String, String> labels = {};
   Map<String, bool> visibility = {};
   List<Map<String, dynamic>> customCards = [];
+  List<String> fieldOrder = ['title', 'description', 'status', 'date', 'attachment'];
+  String fieldStyle = 'outlined';
+  int fieldFillColor = 0xFFFFFFFF;
+  double fieldRadius = 14;
+  double fieldSpacing = 10;
+  String fieldLabelSize = 'medium';
   int primaryColor = 0xFF0B3458;
   int accentColor = 0xFFDBA62A;
   int backgroundColor = 0xFFF5F7FD;
@@ -95,11 +101,36 @@ class AppCustomizer extends ChangeNotifier {
     notifyListeners();
   }
 
+  void setFieldStyle({String? style, int? fillColor, double? newRadius,
+      double? newSpacing, String? labelSize}) {
+    if (style != null) fieldStyle = style;
+    if (fillColor != null) fieldFillColor = fillColor;
+    if (newRadius != null) fieldRadius = newRadius;
+    if (newSpacing != null) fieldSpacing = newSpacing;
+    if (labelSize != null) fieldLabelSize = labelSize;
+    notifyListeners();
+  }
+
+  void moveField(int oldIndex, int newIndex) {
+    if (oldIndex < 0 || oldIndex >= fieldOrder.length) return;
+    if (newIndex > oldIndex) newIndex--;
+    newIndex = newIndex.clamp(0, fieldOrder.length - 1).toInt();
+    final field = fieldOrder.removeAt(oldIndex);
+    fieldOrder.insert(newIndex, field);
+    notifyListeners();
+  }
+
   Map<String, dynamic> toJsonMap() => {
         'version': 1,
         'labels': labels,
         'visibility': visibility,
         'customCards': customCards,
+        'fieldOrder': fieldOrder,
+        'fieldStyle': fieldStyle,
+        'fieldFillColor': fieldFillColor,
+        'fieldRadius': fieldRadius,
+        'fieldSpacing': fieldSpacing,
+        'fieldLabelSize': fieldLabelSize,
         'theme': {
           'primaryColor': primaryColor,
           'accentColor': accentColor,
@@ -127,6 +158,12 @@ class AppCustomizer extends ChangeNotifier {
     labels = {};
     visibility = {};
     customCards = [];
+    fieldOrder = ['title', 'description', 'status', 'date', 'attachment'];
+    fieldStyle = 'outlined';
+    fieldFillColor = 0xFFFFFFFF;
+    fieldRadius = 14;
+    fieldSpacing = 10;
+    fieldLabelSize = 'medium';
     primaryColor = 0xFF0B3458;
     accentColor = 0xFFDBA62A;
     backgroundColor = 0xFFF5F7FD;
@@ -147,6 +184,24 @@ class AppCustomizer extends ChangeNotifier {
         .whereType<Map>()
         .map((e) => Map<String, dynamic>.from(e))
         .toList();
+    final importedOrder = (value['fieldOrder'] as List? ?? [])
+        .map((item) => '$item')
+        .where((item) => {'title', 'description', 'status', 'date', 'attachment'}.contains(item))
+        .toList();
+    if (importedOrder.length == 5) fieldOrder = importedOrder;
+    fieldStyle = '${value['fieldStyle'] ?? fieldStyle}';
+    fieldFillColor = _int(value['fieldFillColor'], fieldFillColor);
+    fieldRadius = (value['fieldRadius'] is num
+            ? (value['fieldRadius'] as num).toDouble()
+            : fieldRadius)
+        .clamp(6, 30)
+        .toDouble();
+    fieldSpacing = (value['fieldSpacing'] is num
+            ? (value['fieldSpacing'] as num).toDouble()
+            : fieldSpacing)
+        .clamp(4, 28)
+        .toDouble();
+    fieldLabelSize = '${value['fieldLabelSize'] ?? fieldLabelSize}';
     final theme = value['theme'] is Map
         ? Map<String, dynamic>.from(value['theme'] as Map)
         : <String, dynamic>{};

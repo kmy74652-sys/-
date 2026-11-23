@@ -272,7 +272,82 @@ class _AppCustomizerScreenState extends State<AppCustomizerScreen>
               ],
             ),
           ),
+          _fieldDesignCard(),
         ],
+      );
+
+  Widget _fieldDesignCard() => SectionCard(
+        title: 'تصميم الحقول وموقعها',
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            DropdownButtonFormField<String>(
+              value: _store.fieldStyle,
+              decoration: const InputDecoration(labelText: 'شكل الحقل'),
+              items: const [
+                DropdownMenuItem(value: 'outlined', child: Text('إطار خارجي')),
+                DropdownMenuItem(value: 'filled', child: Text('خلفية ممتلئة')),
+                DropdownMenuItem(value: 'underlined', child: Text('خط سفلي')),
+                DropdownMenuItem(value: 'plain', child: Text('بدون إطار')),
+              ],
+              onChanged: (value) => setState(() => _store.setFieldStyle(style: value)),
+            ),
+            const SizedBox(height: 10),
+            DropdownButtonFormField<String>(
+              value: _store.fieldLabelSize,
+              decoration: const InputDecoration(labelText: 'حجم عنوان الحقل'),
+              items: const [
+                DropdownMenuItem(value: 'small', child: Text('صغير')),
+                DropdownMenuItem(value: 'medium', child: Text('متوسط')),
+                DropdownMenuItem(value: 'large', child: Text('كبير')),
+              ],
+              onChanged: (value) => setState(() => _store.setFieldStyle(labelSize: value)),
+            ),
+            Row(children: [
+              const Text('استدارة الحقل'),
+              Expanded(child: Slider(value: _store.fieldRadius, min: 6, max: 30, divisions: 12, onChanged: (v) => setState(() => _store.setFieldStyle(newRadius: v)))),
+            ]),
+            Row(children: [
+              const Text('المسافة بين الحقول'),
+              Expanded(child: Slider(value: _store.fieldSpacing, min: 4, max: 28, divisions: 12, onChanged: (v) => setState(() => _store.setFieldStyle(newSpacing: v)))),
+            ]),
+            const Divider(),
+            const Text('ترتيب الحقول وموقعها', textAlign: TextAlign.right, style: TextStyle(fontWeight: FontWeight.bold)),
+            ..._store.fieldOrder.asMap().entries.map((entry) => ListTile(
+                  dense: true,
+                  title: Text(_fieldName(entry.value), textAlign: TextAlign.right),
+                  leading: const Icon(Icons.drag_handle),
+                  trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+                    IconButton(icon: const Icon(Icons.keyboard_arrow_up), onPressed: entry.key == 0 ? null : () => setState(() => _store.moveField(entry.key, entry.key - 1))),
+                    IconButton(icon: const Icon(Icons.keyboard_arrow_down), onPressed: entry.key == _store.fieldOrder.length - 1 ? null : () => setState(() => _store.moveField(entry.key, entry.key + 1))),
+                  ]),
+                )),
+            const SizedBox(height: 6),
+            _fieldPreview(),
+          ],
+        ),
+      );
+
+  String _fieldName(String key) => const {
+        'title': 'العنوان',
+        'description': 'الوصف والتفاصيل',
+        'status': 'الحالة',
+        'date': 'التاريخ',
+        'attachment': 'المرفق',
+      }[key] ?? key;
+
+  Widget _fieldPreview() => Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(color: const Color(0xFFF5F7FD), borderRadius: BorderRadius.circular(_store.fieldRadius)),
+        child: Column(
+          children: _store.fieldOrder.take(3).map((key) => Padding(
+                padding: EdgeInsets.only(bottom: _store.fieldSpacing),
+                child: TextField(
+                  readOnly: true,
+                  decoration: InputDecoration(labelText: _fieldName(key), filled: _store.fieldStyle == 'filled', fillColor: Color(_store.fieldFillColor), border: _store.fieldStyle == 'plain' ? InputBorder.none : _store.fieldStyle == 'underlined' ? const UnderlineInputBorder() : OutlineInputBorder(borderRadius: BorderRadius.circular(_store.fieldRadius)),
+                ),
+              )).toList(),
+        ),
       );
 
   Widget _colorChoice(String title, int primary, int accent) => ActionChip(

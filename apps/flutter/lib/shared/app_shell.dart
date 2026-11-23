@@ -273,7 +273,8 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     final tabs = _tabs();
     return AnimatedBuilder(
       animation: AppCustomizer.instance,
-      builder: (context, _) => Directionality(
+      builder: (context, _) {
+        return Directionality(
         textDirection: TextDirection.rtl,
         child: Scaffold(
         backgroundColor: const Color(0xFFF5F7FD),
@@ -330,8 +331,9 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
               ),
             ),
           ),
-        ),
-      ),
+        );
+        );
+      },
     );
   }
 }
