@@ -47,6 +47,24 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
     return blocks.isEmpty ? [{'title': 'الوصف', 'body': text}] : blocks;
   }
 
+  String _taskStatusLabel(Object? value) => const {
+    'pending': 'لم تبدأ',
+    'new': 'جديدة',
+    'received': 'مستلمة',
+    'in_progress': 'قيد التنفيذ',
+    'on_hold': 'متوقفة مؤقتًا',
+    'submitted': 'بانتظار المراجعة',
+    'completed': 'مكتملة',
+    'approved': 'معتمدة',
+  }['$value'] ?? 'غير محددة';
+
+  String _priorityLabel(Object? value) => const {
+    'low': 'منخفضة',
+    'normal': 'عادية',
+    'high': 'عالية',
+    'urgent': 'عاجلة',
+  }['$value'] ?? 'عادية';
+
   @override
   void initState() {
     super.initState();
@@ -1378,9 +1396,20 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Text(
-                      'الحالة: ${_task?['status'] ?? '—'} · الأولوية: ${_task?['priority'] ?? '—'}',
-                      textAlign: TextAlign.right,
+                    Wrap(
+                      alignment: WrapAlignment.end,
+                      spacing: 8,
+                      runSpacing: 6,
+                      children: [
+                        Chip(
+                          avatar: const Icon(Icons.flag_outlined, size: 18),
+                          label: Text('الأولوية: ${_priorityLabel(_task?['priority'])}'),
+                        ),
+                        Chip(
+                          avatar: const Icon(Icons.timelapse, size: 18),
+                          label: Text('الحالة: ${_taskStatusLabel(_task?['status'])}'),
+                        ),
+                      ],
                     ),
                     if (_task?['due_at'] != null)
                       Text(
@@ -1483,20 +1512,30 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                         (form['values'] as Map?) ?? {},
                       );
                       return SectionCard(
-                        title: '${form['title'] ?? 'نموذج تقرير'}',
+                        title: 'التقرير · ${form['title'] ?? 'نموذج تقرير'}',
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
-                            if (status == 'approved')
-                              const Text(
-                                'تم اعتماد هذا النموذج',
-                                textAlign: TextAlign.right,
+                            Align(
+                              alignment: Alignment.centerRight,
+                              child: Chip(
+                                avatar: Icon(
+                                  status == 'approved'
+                                      ? Icons.verified_outlined
+                                      : status == 'submitted'
+                                      ? Icons.schedule_outlined
+                                      : Icons.edit_note_outlined,
+                                  size: 18,
+                                ),
+                                label: Text(
+                                  status == 'approved'
+                                      ? 'معتمد'
+                                      : status == 'submitted'
+                                      ? 'مرسل للمراجعة'
+                                      : 'مسودة قابلة للتعديل',
+                                ),
                               ),
-                            if (status == 'submitted')
-                              const Text(
-                                'تم إرسال هذا النموذج للمراجعة',
-                                textAlign: TextAlign.right,
-                              ),
+                            ),
                             if (form['review_note'] != null)
                               Text(
                                 'ملاحظة المراجعة: ${form['review_note']}',
