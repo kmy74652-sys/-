@@ -253,7 +253,51 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
 
   Widget _editableList(String title, List<TextEditingController> list) => _section(title, Column(children: [for (var i = 0; i < list.length; i++) Row(children: [Expanded(child: TextField(controller: list[i], textAlign: TextAlign.right, decoration: InputDecoration(isDense: true, hintText: 'أضف بندًا'))), IconButton(onPressed: () => _removeTextRow(list, i), icon: const Icon(Icons.delete_outline))]), Align(alignment: Alignment.centerRight, child: TextButton.icon(onPressed: () => _addTextRow(list), icon: const Icon(Icons.add), label: const Text('إضافة بند')))]));
 
-  Widget _kpiTable() => _section('مؤشرات تقييم الأداء', Column(children: [for (var i = 0; i < _kpis.length; i++) Row(children: [Expanded(child: TextField(controller: _kpis[i][0], textAlign: TextAlign.right, decoration: const InputDecoration(labelText: 'المؤشر', isDense: true))), const SizedBox(width: 8), Expanded(child: TextField(controller: _kpis[i][1], textAlign: TextAlign.right, decoration: const InputDecoration(labelText: 'معيار الإنجاز / القياس', isDense: true))), IconButton(onPressed: _kpis.length == 1 ? null : () { final row = _kpis.removeAt(i); for (final c in row) c.dispose(); setState(() {}); }, icon: const Icon(Icons.delete_outline))]), Align(alignment: Alignment.centerRight, child: TextButton.icon(onPressed: () => setState(() => _kpis.add([TextEditingController(), TextEditingController()])), icon: const Icon(Icons.add), label: const Text('إضافة مؤشر'))]));
+  Widget _kpiTable() => _section(
+    'مؤشرات تقييم الأداء',
+    Column(
+      children: [
+        for (var i = 0; i < _kpis.length; i++)
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _kpis[i][0],
+                  textAlign: TextAlign.right,
+                  decoration: const InputDecoration(labelText: 'المؤشر', isDense: true),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: TextField(
+                  controller: _kpis[i][1],
+                  textAlign: TextAlign.right,
+                  decoration: const InputDecoration(labelText: 'معيار الإنجاز / القياس', isDense: true),
+                ),
+              ),
+              IconButton(
+                onPressed: _kpis.length == 1
+                    ? null
+                    : () {
+                        final row = _kpis.removeAt(i);
+                        for (final controller in row) controller.dispose();
+                        setState(() {});
+                      },
+                icon: const Icon(Icons.delete_outline),
+              ),
+            ],
+          ),
+        Align(
+          alignment: Alignment.centerRight,
+          child: TextButton.icon(
+            onPressed: () => setState(() => _kpis.add([TextEditingController(), TextEditingController()])),
+            icon: const Icon(Icons.add),
+            label: const Text('إضافة مؤشر'),
+          ),
+        ),
+      ],
+    ),
+  );
 
   Widget _approvalStatus() => _section('حالة الاعتماد', const Wrap(textDirection: TextDirection.rtl, spacing: 8, children: [Chip(avatar: Icon(Icons.hourglass_empty, size: 17), label: Text('إقرار الموظف: بانتظار الإقرار')), Chip(avatar: Icon(Icons.rate_review_outlined, size: 17), label: Text('مراجعة المسؤول: لم تبدأ')), Chip(avatar: Icon(Icons.verified_outlined, size: 17), label: Text('اعتماد المدير: مسودة'))]));
 
