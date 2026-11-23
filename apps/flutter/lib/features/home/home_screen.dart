@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/theme.dart';
 import '../../shared/app_shell.dart';
+import 'unified_task_table_editor.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -444,6 +445,16 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _unifiedTaskTableSection() {
     final manager = _allowed('tasks') && _manageTasks;
+    if (manager) {
+      return UnifiedTaskTableEditor(
+        onSend: () {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('احفظ الجدول ثم أكمل الإرسال من شاشة إنشاء المهمة.', textAlign: TextAlign.right)),
+          );
+          context.go('/tasks');
+        },
+      );
+    }
     return SectionCard(
       title: 'الجدول الموحد لإنشاء المهام',
       child: Column(
