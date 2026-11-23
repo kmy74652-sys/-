@@ -510,6 +510,48 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
       if (mounted) setState(() => _busy = false);
     }
   }
+
+  Future<void> _deleteTask(Map<String, dynamic> task) async {
+    final taskId = _s(task['id']);
+    if (taskId.isEmpty || _orgId == null || _busy) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('حذف المهمة؟', textAlign: TextAlign.right),
+        content: Text(
+          'سيتم حذف المهمة «${_s(task['title'], 'بدون عنوان')}» من قائمة الإدارة ومن عرض الموظف. لا يمكن التراجع عن هذا الإجراء.',
+          textAlign: TextAlign.right,
+        ),
+        actionsAlignment: MainAxisAlignment.start,
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('إلغاء'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('حذف نهائي'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    setState(() => _busy = true);
+    try {
+      await _db.rpc(
+        'admin_delete_task',
+        params: {'p_organization_id': _orgId, 'p_task_id': taskId},
+      );
+      _message('تم حذف المهمة من الإدارة ومن حساب الموظف.');
+      await _load();
+    } catch (e) {
+      _message('تعذر حذف المهمة: ${e.toString().replaceFirst('Exception: ', '')}');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   void _message(String text) {
     if (mounted)
       ScaffoldMessenger.of(
@@ -657,10 +699,21 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
                                     ),
                                   ),
                                   isThreeLine: true,
-                                  trailing: IconButton(
-                                    tooltip: 'تعديل المهمة أو صف الجدول',
-                                    onPressed: _busy ? null : () => _saveTask(existing: t),
-                                    icon: const Icon(Icons.edit_outlined),
+                                  trailing: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      IconButton(
+                                        tooltip: 'تعديل المهمة أو صف الجدول',
+                                        onPressed: _busy ? null : () => _saveTask(existing: t),
+                                        icon: const Icon(Icons.edit_outlined),
+                                      ),
+                                      IconButton(
+                                        tooltip: 'حذف المهمة',
+                                        onPressed: _busy ? null : () => _deleteTask(t),
+                                        color: Colors.red,
+                                        icon: const Icon(Icons.delete_outline),
+                                      ),
+                                    ],
                                   ),
                                   onTap: () => _message(
                                     'حالة التقرير: ${_reportStatus(t)}',
