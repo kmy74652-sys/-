@@ -757,7 +757,33 @@ class _ReportDesignerScreenState extends State<ReportDesignerScreen> {
                   'أضف حقلًا واحدًا على الأقل.',
                   textAlign: TextAlign.right,
                 ),
-              for (var i = 0; i < _fields.length; i++) _fieldTile(i),
+              if (_fields.isNotEmpty)
+                ReorderableListView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  buildDefaultDragHandles: false,
+                  itemCount: _fields.length,
+                  onReorder: (oldIndex, newIndex) {
+                    setState(() {
+                      if (newIndex > oldIndex) newIndex -= 1;
+                      final field = _fields.removeAt(oldIndex);
+                      _fields.insert(newIndex, field);
+                      if (_selected == oldIndex) {
+                        _selected = newIndex;
+                      } else if (_selected != null) {
+                        if (oldIndex < _selected! && newIndex >= _selected!) {
+                          _selected = _selected! - 1;
+                        } else if (oldIndex > _selected! && newIndex <= _selected!) {
+                          _selected = _selected! + 1;
+                        }
+                      }
+                    });
+                  },
+                  itemBuilder: (context, i) => KeyedSubtree(
+                    key: ValueKey('report_field_${_fields[i]['field_key']}'),
+                    child: _fieldTile(i),
+                  ),
+                ),
             ],
           ),
         ),
@@ -862,6 +888,13 @@ class _ReportDesignerScreenState extends State<ReportDesignerScreen> {
                   icon: const Icon(
                     Icons.remove_circle_outline,
                     color: Colors.red,
+                  ),
+                ),
+                ReorderableDragStartListener(
+                  index: i,
+                  child: const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 8),
+                    child: Icon(Icons.drag_indicator, color: AppColors.muted),
                   ),
                 ),
                 Expanded(
