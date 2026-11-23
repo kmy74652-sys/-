@@ -94,7 +94,36 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
   }
 
   @override
-  Widget build(BuildContext context) => AnimatedBuilder(
+  Widget build(BuildContext context) {
+    try {
+      return _buildEditor(context);
+    } catch (error) {
+      return Card(
+        margin: EdgeInsets.zero,
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.error_outline, color: Colors.red, size: 42),
+              const SizedBox(height: 8),
+              const Text('تعذر بناء محرر الجدول الموحد', textAlign: TextAlign.center),
+              const SizedBox(height: 8),
+              Text('$error', textAlign: TextAlign.center, style: const TextStyle(fontSize: 11)),
+              const SizedBox(height: 12),
+              OutlinedButton.icon(
+                onPressed: () => setState(() => AppCustomizer.instance.resetUnified()),
+                icon: const Icon(Icons.restore),
+                label: const Text('استعادة إعدادات الجدول'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+  }
+
+  Widget _buildEditor(BuildContext context) => AnimatedBuilder(
     animation: AppCustomizer.instance,
     builder: (context, _) => Card(
       margin: EdgeInsets.zero,
