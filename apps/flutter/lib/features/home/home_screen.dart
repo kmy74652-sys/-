@@ -544,12 +544,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _tableAction(String label, IconData icon, String route) => ActionChip(
-    avatar: Icon(icon, size: 18, color: AppColors.green),
-    label: Text(label),
-    onPressed: () => context.go(route),
-  );
-
   Future<void> _sendUnifiedTable(UnifiedTaskTableDraft draft) async {
     final organizationId = _organizationId;
     if (organizationId == null || organizationId.isEmpty) {
