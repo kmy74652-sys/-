@@ -277,7 +277,10 @@ class _UnifiedTaskTableScreenState extends State<UnifiedTaskTableScreen> {
   List<Map<String, dynamic>> _tableRowsForTask(Map<String, dynamic> task) {
     final description = '${task['description'] ?? ''}';
     final rows = <Map<String, dynamic>>[];
-    final pattern = RegExp(r'(?m)^صف الجدول:\s*(.*?)\s*\|\s*(.*?)\s*\|\s*(.*?)\s*$');
+    final pattern = RegExp(
+      r'^صف الجدول:\s*(.*?)\s*\|\s*(.*?)\s*\|\s*(.*?)\s*$',
+      multiLine: true,
+    );
     for (final match in pattern.allMatches(description)) {
       rows.add({
         'task': task,
