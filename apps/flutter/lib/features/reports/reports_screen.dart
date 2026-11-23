@@ -26,6 +26,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
   List<Map<String, dynamic>> _roleReportRows = [];
   Map<String, Map<String, dynamic>> _tasksById = {};
   Map<String, String> _employeeNames = {};
+  Map<String, Map<String, dynamic>> _snapshotsById = {};
   bool _canRead = false;
   bool _canReview = false;
   bool _canReviewRoleReports = false;
@@ -108,7 +109,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
         final data = await _client
             .from('task_reports')
             .select(
-              'id,task_id,report_form_snapshot_id,status,submitted_at,review_note,values',
+              'id,task_id,submitted_by,report_form_snapshot_id,status,submitted_at,review_note,values',
             )
             .order('submitted_at', ascending: false)
             .limit(100);
@@ -127,6 +128,10 @@ class _ReportsScreenState extends State<ReportsScreen> {
                 .eq('organization_id', organizationId)
                 .eq('is_active', true)
                 .limit(500),
+            _client
+                .from('task_report_form_snapshots')
+                .select('id,task_id,title,version_no,schema')
+                .limit(1000),
           ]);
           _tasksById = {
             for (final task in _maps(contextRows[0]))
@@ -139,9 +144,15 @@ class _ReportsScreenState extends State<ReportsScreen> {
                     (member['display_name'] ?? member['employee_no'] ?? 'موظف')
                         .toString(),
           };
+          _snapshotsById = {
+            for (final snapshot in _maps(contextRows[2]))
+              if (snapshot['id'] != null)
+                snapshot['id'].toString(): snapshot,
+          };
         } catch (_) {
           _tasksById = {};
           _employeeNames = {};
+          _snapshotsById = {};
         }
         try {
           final submissions = await _client
@@ -194,10 +205,29 @@ class _ReportsScreenState extends State<ReportsScreen> {
 
   String _employeeForTask(Map<String, dynamic> row) {
     final task = _taskFor(row);
-    final userId = task?['assigned_to']?.toString();
+    final userId = task?['assigned_to']?.toString() ??
+        row['submitted_by']?.toString();
     return userId == null || userId.isEmpty
         ? 'غير محدد'
         : (_employeeNames[userId] ?? 'موظف غير معروف');
+  }
+
+  String _formattedDate(Object? value) {
+    final raw = value?.toString().trim() ?? '';
+    if (raw.isEmpty) return 'غير متاح';
+    final parsed = DateTime.tryParse(raw);
+    if (parsed == null) return raw;
+    final local = parsed.toLocal();
+    String two(int number) => number.toString().padLeft(2, '0');
+    return '${local.year}-${two(local.month)}-${two(local.day)} '
+        '${two(local.hour)}:${two(local.minute)}';
+  }
+
+  String _snapshotTitle(Map<String, dynamic> row) {
+    final snapshotId = row['report_form_snapshot_id']?.toString();
+    final snapshot = snapshotId == null ? null : _snapshotsById[snapshotId];
+    final title = snapshot?['title']?.toString().trim() ?? '';
+    return title.isEmpty ? 'تقرير المهمة' : title;
   }
 
   String _label(Map<String, dynamic> row) {
@@ -855,7 +885,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
           ),
         ),
         subtitle: Text(
-          'الدور: ${row['role_code'] ?? 'غير محدد'} · الفرع: ${_safeId(row['branch_id'])} · التاريخ: ${row['report_date'] ?? 'غير محدد'}\nالموظف: ${_safeId(row['employee_user_id'])} · ${_statusLabel(status)}',
+          'الدور: ${row['role_code'] ?? 'غير محدد'} · الفرع: ${_safeId(row['branch_id'])} · التاريخ: ${_formattedDate(row['report_date'])}\nالموظف: ${_employeeNames[row['employee_user_id']?.toString()] ?? 'موظف غير معروف'} · ${_statusLabel(status)}',
           textAlign: TextAlign.right,
         ),
         children: [
@@ -1083,16 +1113,16 @@ class _ReportsScreenState extends State<ReportsScreen> {
         ),
         subtitle: Text(
           'الموظف: $employeeName\n'
-          'الإرسال: ${row['submitted_at'] ?? 'غير متاح'} · '
-          'الاستحقاق: ${task?['due_at'] ?? 'غير متاح'} · ${_statusLabel(status)}',
+          'الإرسال: ${_formattedDate(row['submitted_at'])} · '
+          'الاستحقاق: ${_formattedDate(task?['due_at'])} · ${_statusLabel(status)}',
           textAlign: TextAlign.right,
         ),
         children: [
           if (isForm)
-            const Padding(
-              padding: EdgeInsets.all(8),
+            Padding(
+              padding: const EdgeInsets.all(8),
               child: Text(
-                'تقرير مرتبط بنموذج مهمة متعدد النماذج.',
+                'القالب: ${_snapshotTitle(row)}',
                 textAlign: TextAlign.right,
               ),
             ),
