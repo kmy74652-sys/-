@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
@@ -469,10 +470,14 @@ class _AppCustomizerScreenState extends State<AppCustomizerScreen>
   }
 
   Future<void> _import() async {
-    final result = await FilePicker.pickFiles(type: FileType.custom, allowedExtensions: ['json'], withData: true);
-    if (result == null || result.files.single.bytes == null) return;
+    final files = await FilePicker.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['json'],
+    );
+    if (files.isEmpty || files.first.path == null) return;
     try {
-      await _store.importJson(utf8.decode(result.files.single.bytes!));
+      final bytes = await File(files.first.path!).readAsBytes();
+      await _store.importJson(utf8.decode(bytes));
       if (mounted) setState(() {});
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم استيراد الإعدادات.')));
     } catch (_) {
