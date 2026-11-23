@@ -27,6 +27,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
   Map<String, Map<String, dynamic>> _tasksById = {};
   Map<String, String> _employeeNames = {};
   Map<String, Map<String, dynamic>> _snapshotsById = {};
+  Map<String, Map<String, String>> _submissionFieldLabels = {};
   bool _canRead = false;
   bool _canReview = false;
   bool _canReviewRoleReports = false;
@@ -158,12 +159,64 @@ class _ReportsScreenState extends State<ReportsScreen> {
           final submissions = await _client
               .from('report_submissions')
               .select(
-                'id,employee_name,branch_name,report_date,answers,status,review_note,reviewed_by_name,approved_by_name,form:report_form_templates(title)',
+                'id,form_id,employee_name,branch_name,report_date,answers,status,review_note,reviewed_by_name,approved_by_name,form:report_form_templates(title)',
               )
               .neq('status', 'draft')
               .order('report_date', ascending: false)
               .limit(200);
           _submissionRows = _maps(submissions);
+          _submissionFieldLabels = {};
+          try {
+            final formIds = _submissionRows
+                .map((row) => row['form_id']?.toString() ?? '')
+                .where((id) => id.isNotEmpty)
+                .toSet()
+                .toList();
+            if (formIds.isNotEmpty) {
+              final versions = _maps(await _client
+                  .from('report_form_versions')
+                  .select('id,template_id,version_no,status,approved_by,approved_at')
+                  .inFilter('template_id', formIds)
+                  .eq('status', 'published')
+                  .order('version_no', ascending: false)
+                  .limit(500));
+              final latest = <String, Map<String, dynamic>>{};
+              for (final version in versions) {
+                final templateId = version['template_id']?.toString() ?? '';
+                if (templateId.isNotEmpty && !latest.containsKey(templateId)) {
+                  latest[templateId] = version;
+                }
+              }
+              final versionIds = latest.values
+                  .map((version) => version['id']?.toString() ?? '')
+                  .where((id) => id.isNotEmpty)
+                  .toList();
+              if (versionIds.isNotEmpty) {
+                final fields = _maps(await _client
+                    .from('report_form_version_fields')
+                    .select('version_id,field_key,label,sort_order')
+                    .inFilter('version_id', versionIds)
+                    .order('sort_order')
+                    .limit(3000));
+                final labelsByVersion = <String, Map<String, String>>{};
+                for (final field in fields) {
+                  final versionId = field['version_id']?.toString() ?? '';
+                  final key = field['field_key']?.toString() ?? '';
+                  final label = field['label']?.toString().trim() ?? '';
+                  if (versionId.isNotEmpty && key.isNotEmpty && label.isNotEmpty) {
+                    labelsByVersion.putIfAbsent(versionId, () => {})[key] = label;
+                  }
+                }
+                for (final entry in latest.entries) {
+                  final versionId = entry.value['id']?.toString() ?? '';
+                  final labels = labelsByVersion[versionId];
+                  if (labels != null) _submissionFieldLabels[entry.key] = labels;
+                }
+              }
+            }
+          } catch (_) {
+            // عرض التقرير لا يتوقف إذا تعذر جلب عناوين الحقول؛ نعرض المفتاح كبديل.
+          }
           _submissionError = null;
         } catch (_) {
           _submissionRows = [];
@@ -220,6 +273,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
   String _formattedDate(Object? value) {
     final raw = value?.toString().trim() ?? '';
     if (raw.isEmpty) return 'غير متاح';
+    if (RegExp(r'^\d{4}-\d{2}-\d{2}$').hasMatch(raw)) return raw;
     final parsed = DateTime.tryParse(raw);
     if (parsed == null) return raw;
     final local = parsed.toLocal();
@@ -608,6 +662,9 @@ class _ReportsScreenState extends State<ReportsScreen> {
 
   String _displayValue(Object? value) {
     if (value == null) return '—';
+    if (value is Map && value['strokes'] is List) {
+      return value['acknowledged'] == true ? 'تم التوقيع والموافقة' : 'توقيع مرفق';
+    }
     if (value is Map || value is List) {
       try {
         return const JsonEncoder.withIndent('  ').convert(value);
@@ -616,6 +673,11 @@ class _ReportsScreenState extends State<ReportsScreen> {
       }
     }
     return value.toString();
+  }
+
+  String _submissionFieldLabel(Map<String, dynamic> row, Object? key) {
+    final formId = row['form_id']?.toString() ?? '';
+    return _submissionFieldLabels[formId]?[key.toString()] ?? key.toString();
   }
 
   @override
@@ -986,7 +1048,15 @@ class _ReportsScreenState extends State<ReportsScreen> {
           if (row['answers'] is Map)
             for (final entry in (row['answers'] as Map).entries)
               ListTile(
-                title: Text(entry.key.toString(), textAlign: TextAlign.right),
+                title: Text(
+                  _submissionFieldLabel(row, entry.key),
+                  textAlign: TextAlign.right,
+                ),
+                leading: Text(
+                  entry.key.toString(),
+                  textDirection: TextDirection.ltr,
+                  style: const TextStyle(color: Colors.black45, fontSize: 11),
+                ),
                 subtitle: Text(
                   _displayValue(entry.value),
                   textAlign: TextAlign.right,
