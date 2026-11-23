@@ -10,6 +10,35 @@ import 'core/theme.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  ErrorWidget.builder = (details) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: Material(
+          color: const Color(0xFFF5F7FD),
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.error_outline, color: Color(0xFFB3261E), size: 48),
+                  const SizedBox(height: 12),
+                  const Text(
+                    'تعذر عرض هذه الصفحة',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'أغلق الصفحة وافتحها من جديد. إذا استمرت المشكلة أرسل هذه الرسالة للدعم:\n${details.exceptionAsString()}',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(fontSize: 12),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
   await SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
     DeviceOrientation.portraitDown,

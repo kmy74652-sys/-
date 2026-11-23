@@ -61,7 +61,14 @@ class AppCustomizer extends ChangeNotifier {
 
   bool isUnifiedVisible(String key) => unifiedVisibility[key] ?? true;
   bool isUnifiedFieldVisible(String key) => unifiedFieldVisibility[key] ?? true;
-  Map<String, dynamic> unifiedFieldLayout(String key) => unifiedFieldLayouts[key] ?? {'row': 0, 'column': 0, 'span': 'half', 'align': 'right'};
+  Map<String, dynamic> unifiedFieldLayout(String key) {
+    final raw = unifiedFieldLayouts[key];
+    final row = raw?['row'] is num ? (raw!['row'] as num).toInt() : int.tryParse('${raw?['row'] ?? 0}') ?? 0;
+    final column = raw?['column'] is num ? (raw!['column'] as num).toInt() : int.tryParse('${raw?['column'] ?? 0}') ?? 0;
+    final span = {'full', 'half', 'third'}.contains(raw?['span']) ? raw!['span'] : 'half';
+    final align = {'right', 'center', 'left'}.contains(raw?['align']) ? raw!['align'] : 'right';
+    return {'row': row.clamp(0, 99), 'column': column.clamp(0, 2), 'span': span, 'align': align};
+  }
   void moveUnifiedField(String key, {int dx = 0, int dy = 0}) {
     final current = Map<String, dynamic>.from(unifiedFieldLayout(key));
     current['row'] = ((current['row'] as num?)?.toInt() ?? 0) + dy;
