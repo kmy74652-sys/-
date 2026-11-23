@@ -40,8 +40,8 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         _Module(
           'daily-report',
-          'التقرير اليومي',
-          'إرسال تقرير دورك للإدارة',
+          'التقارير اليومية المصممة',
+          'تعبئة النماذج المعتمدة من الإدارة',
           Icons.assignment_outlined,
           '/reports/daily',
         ),

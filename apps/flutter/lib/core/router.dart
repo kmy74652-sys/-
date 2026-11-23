@@ -14,7 +14,6 @@ import '../features/admin/report_designer_screen.dart';
 import '../features/admin/task_management_screen.dart';
 import '../features/admin/performance_analytics_screen.dart';
 import '../features/reports/reports_screen.dart';
-import '../features/reports/role_report_screen.dart';
 import '../features/reports/independent_reports_screen.dart';
 import '../features/hr/hr_screen.dart';
 import '../features/settings/settings_screen.dart';
@@ -81,7 +80,7 @@ void initializeRouter() {
       ),
       GoRoute(
         path: '/reports/daily',
-        builder: (context, state) => const RoleDailyReportScreen(),
+        builder: (context, state) => const IndependentReportsScreen(),
       ),
       GoRoute(
         path: '/reports/independent',
