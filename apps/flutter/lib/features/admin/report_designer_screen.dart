@@ -957,18 +957,7 @@ class _ReportDesignerScreenState extends State<ReportDesignerScreen> {
               Text(_sections[entry.key]!, textAlign: TextAlign.right, style: const TextStyle(fontWeight: FontWeight.bold)),
               const SizedBox(height: 6),
               for (final field in entry.value)
-                Container(
-                  margin: const EdgeInsets.only(bottom: 8),
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10), border: Border.all(color: const Color(0xffdce4e8))),
-                  child: Row(
-                    children: [
-                      if (field['is_required'] == true) const Text('* ', style: TextStyle(color: Colors.red)),
-                      Expanded(child: Text((field['label']?.toString().trim().isEmpty ?? true) ? 'حقل بدون اسم' : field['label'].toString(), textAlign: TextAlign.right)),
-                      const Icon(Icons.text_fields, size: 18, color: AppColors.muted),
-                    ],
-                  ),
-                ),
+                _previewField(field),
               const SizedBox(height: 6),
             ],
           ],
@@ -976,6 +965,61 @@ class _ReportDesignerScreenState extends State<ReportDesignerScreen> {
       ),
     );
   }
+
+  Widget _previewField(Map<String, dynamic> field) {
+    final type = field['field_type']?.toString() ?? 'short_text';
+    final label = (field['label']?.toString().trim().isEmpty ?? true)
+        ? 'حقل بدون اسم'
+        : field['label'].toString();
+    final required = field['is_required'] == true ? ' *' : '';
+    final options = (field['options'] as List? ?? []).map((e) => e.toString()).where((e) => e.isNotEmpty).toList();
+    Widget control;
+    if (type == 'long_text' || type == 'decision_notes') {
+      control = const TextField(maxLines: 3, enabled: false, decoration: InputDecoration(hintText: 'اكتب التفاصيل هنا...'));
+    } else if (type == 'select' || type == 'multiselect') {
+      control = InputDecorator(
+        decoration: const InputDecoration(border: OutlineInputBorder(), suffixIcon: Icon(Icons.arrow_drop_down)),
+        child: Text(options.isEmpty ? 'اختر من القائمة' : options.take(2).join('، '), textAlign: TextAlign.right),
+      );
+    } else if (type == 'boolean') {
+      control = const Row(mainAxisAlignment: MainAxisAlignment.end, children: [Text('لا'), SizedBox(width: 10), Icon(Icons.radio_button_unchecked), SizedBox(width: 18), Text('نعم'), SizedBox(width: 10), Icon(Icons.radio_button_unchecked)]);
+    } else if (type == 'image' || type == 'multi_image') {
+      control = _uploadPreview(Icons.photo_camera_outlined, type == 'multi_image' ? 'إضافة صور' : 'رفع صورة');
+    } else if (type == 'file' || type == 'attachment') {
+      control = _uploadPreview(Icons.attach_file, 'إرفاق ملف أو مستند');
+    } else if (type == 'signature') {
+      control = _uploadPreview(Icons.draw_outlined, 'منطقة التوقيع');
+    } else if (type == 'table') {
+      final columns = _tableColumns(field);
+      control = Container(
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(border: Border.all(color: const Color(0xffdce4e8)), borderRadius: BorderRadius.circular(8)),
+        child: Row(children: [for (final column in columns.take(3)) Expanded(child: Padding(padding: const EdgeInsets.all(4), child: Text(column['label'].toString(), textAlign: TextAlign.center, style: const TextStyle(fontSize: 12))))]),
+      );
+    } else if (type == 'date' || type == 'datetime' || type == 'date_range') {
+      control = const TextField(enabled: false, decoration: InputDecoration(hintText: 'اختر التاريخ', suffixIcon: Icon(Icons.calendar_today_outlined)));
+    } else if (type == 'calculated' || type == 'system_reference') {
+      control = const InputDecorator(decoration: InputDecoration(border: OutlineInputBorder()), child: Text('يُعبّأ تلقائيًا', textAlign: TextAlign.right));
+    } else {
+      control = TextField(enabled: false, decoration: InputDecoration(hintText: type == 'short_text' ? 'اكتب هنا...' : 'أدخل القيمة'));
+    }
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10), border: Border.all(color: const Color(0xffdce4e8))),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Text('$label$required', textAlign: TextAlign.right, style: const TextStyle(fontWeight: FontWeight.bold)),
+        const SizedBox(height: 6),
+        control,
+      ]),
+    );
+  }
+
+  Widget _uploadPreview(IconData icon, String label) => OutlinedButton.icon(
+    onPressed: null,
+    icon: Icon(icon),
+    label: Text(label),
+  );
 
   void _swap(int a, int b) {
     final item = _fields.removeAt(a);
