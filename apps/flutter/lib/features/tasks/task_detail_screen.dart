@@ -32,7 +32,10 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
 
   List<Map<String, String>> _descriptionBlocks(String value) {
     final text = value.trim();
-    final matches = RegExp(r'(?m)^وصف المهمة (\d+):\s*$').allMatches(text).toList();
+    final matches = RegExp(
+      r'^وصف المهمة (\d+):\s*$',
+      multiLine: true,
+    ).allMatches(text).toList();
     if (matches.isEmpty) {
       final body = text
           .split('\n')
@@ -61,7 +64,10 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
 
   List<Map<String, String>> _unifiedRows(String value) {
     final rows = <Map<String, String>>[];
-    final pattern = RegExp(r'(?m)^صف الجدول:\s*(.*?)\s*\|\s*(.*?)\s*\|\s*(.*?)\s*$');
+    final pattern = RegExp(
+      r'^صف الجدول:\s*(.*?)\s*\|\s*(.*?)\s*\|\s*(.*?)\s*$',
+      multiLine: true,
+    );
     for (final match in pattern.allMatches(value)) {
       rows.add({
         'time': match.group(1)?.trim() ?? 'غير محدد',

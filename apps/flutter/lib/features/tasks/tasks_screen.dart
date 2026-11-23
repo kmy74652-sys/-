@@ -489,7 +489,8 @@ class _TasksScreenState extends State<TasksScreen>
         : workHour(5).replaceFirst('الاستثناء الأسبوعي:', '').trim();
     final officialRows = <Map<String, String>>[];
     final rowPattern = RegExp(
-      r'(?m)^صف الجدول:\s*(.*?)\s*\|\s*(.*?)\s*\|\s*(.*?)\s*$',
+      r'^صف الجدول:\s*(.*?)\s*\|\s*(.*?)\s*\|\s*(.*?)\s*$',
+      multiLine: true,
     );
     for (final task in tasks) {
       final description = '${task['description'] ?? ''}';
