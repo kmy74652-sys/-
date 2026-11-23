@@ -430,11 +430,11 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
             pw.SizedBox(height: 20),
             pw.Table(
               border: pw.TableBorder.all(color: PdfColor.fromHex('#B8CEC5')),
-              children: [[
+              children: [pw.TableRow(children: [
                 _pdfCell('إقرار الموظف\nالاسم والتوقيع: __________________'),
                 _pdfCell('مراجعة المسؤول المباشر\nالاسم والتوقيع: __________________'),
                 _pdfCell('اعتماد المدير\nالاسم والتوقيع: __________________'),
-              ]],
+              ])],
             ),
           ],
         ),
@@ -457,8 +457,8 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
   pw.Widget _pdfInfoTable() => pw.Table(
     border: pw.TableBorder.all(color: PdfColor.fromHex('#B8CEC5')),
     children: [
-      [_pdfCell('الموظف / المجموعة\n${_employee.text.trim().isEmpty ? '—' : _employee.text.trim()}'), _pdfCell('المسمى الوظيفي\n${_role.text.trim().isEmpty ? '—' : _role.text.trim()}')],
-      [_pdfCell('الفرع\n${_branch.text.trim().isEmpty ? '—' : _branch.text.trim()}'), _pdfCell('تاريخ بدء التطبيق\n${_startDate.text.trim().isEmpty ? '—' : _startDate.text.trim()}')],
+      pw.TableRow(children: [_pdfCell('الموظف / المجموعة\n${_employee.text.trim().isEmpty ? '—' : _employee.text.trim()}'), _pdfCell('المسمى الوظيفي\n${_role.text.trim().isEmpty ? '—' : _role.text.trim()}')]),
+      pw.TableRow(children: [_pdfCell('الفرع\n${_branch.text.trim().isEmpty ? '—' : _branch.text.trim()}'), _pdfCell('تاريخ بدء التطبيق\n${_startDate.text.trim().isEmpty ? '—' : _startDate.text.trim()}')]),
     ],
   );
 
