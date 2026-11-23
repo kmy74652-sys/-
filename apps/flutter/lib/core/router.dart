@@ -6,6 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../features/auth/login_screen.dart';
 import '../features/home/home_screen.dart';
+import '../features/home/unified_task_table_screen.dart';
 import '../features/tasks/tasks_screen.dart';
 import '../features/tasks/task_detail_screen.dart';
 import '../features/admin/admin_screen.dart';
@@ -52,6 +53,10 @@ void initializeRouter() {
       GoRoute(path: '/', builder: (context, state) => const HomeScreen()),
       GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
       GoRoute(path: '/tasks', builder: (context, state) => const TasksScreen()),
+      GoRoute(
+        path: '/admin/unified-tasks',
+        builder: (context, state) => const UnifiedTaskTableScreen(),
+      ),
       GoRoute(
         path: '/tasks/:taskId',
         builder: (context, state) =>

@@ -4,7 +4,6 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/theme.dart';
 import '../../shared/app_shell.dart';
-import 'unified_task_table_editor.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -19,11 +18,6 @@ class _HomeScreenState extends State<HomeScreen> {
   Map<String, int>? _summary;
   Set<String> _permissions = {};
   Set<String> _roles = {};
-  String? _organizationId;
-  String? _defaultBranchId;
-  List<UnifiedEmployeeOption> _unifiedEmployees = const [];
-  List<String> _unifiedBranches = const [];
-  List<UnifiedReportOption> _unifiedReports = const [];
   int _request = 0;
 
   static const _groups = <(String, List<_Module>)>[
@@ -258,11 +252,8 @@ class _HomeScreenState extends State<HomeScreen> {
         _name = name;
         _permissions = permissions;
         _roles = roles;
-        _organizationId = organization;
-        _defaultBranchId = branch;
       });
 
-      if (organization != null) await _loadUnifiedOptions(organization);
       final summary = await _loadSummary(
         client,
         organization,
@@ -279,59 +270,6 @@ class _HomeScreenState extends State<HomeScreen> {
         setState(() => _error = e.toString().replaceFirst('Exception: ', ''));
     } finally {
       if (ticket == _request && mounted) setState(() => _loading = false);
-    }
-  }
-
-  Future<void> _loadUnifiedOptions(String organizationId) async {
-    try {
-      final client = Supabase.instance.client;
-      final results = await Future.wait<dynamic>([
-        client.from('organization_memberships').select('user_id,display_name').eq('organization_id', organizationId).eq('is_active', true).order('display_name').limit(500),
-        client.from('branches').select('name').eq('organization_id', organizationId).eq('is_active', true).order('name').limit(200),
-        client.from('report_form_templates').select('id,title,role_code').eq('organization_id', organizationId).eq('is_active', true).order('title').limit(200),
-        client.from('report_form_versions').select('id,template_id,status,version_no,approved_by,approved_at,report_required').eq('status', 'published').limit(500),
-        client.from('report_form_version_fields').select('version_id,is_required').limit(2000),
-      ]);
-      if (!mounted) return;
-      final employees = (results[0] as List).whereType<Map>().map((row) => UnifiedEmployeeOption(name: (row['display_name'] ?? '').toString(), userId: (row['user_id'] ?? '').toString())).where((item) => item.name.isNotEmpty && item.userId.isNotEmpty).toList();
-      setState(() {
-        _unifiedEmployees = [const UnifiedEmployeeOption(name: 'مهام مشتركة', userId: ''), ...employees];
-        _unifiedBranches = (results[1] as List).whereType<Map>().map((row) => (row['name'] ?? '').toString()).where((name) => name.isNotEmpty).toList();
-        final templates = (results[2] as List).whereType<Map>().toList();
-        final versions = (results[3] as List).whereType<Map>().where((row) => row['approved_by'] != null && row['approved_at'] != null).toList();
-        final fieldsByVersion = <String, List<Map<String, dynamic>>>{};
-        for (final row in (results[4] as List).whereType<Map>()) {
-          final id = row['version_id']?.toString();
-          if (id == null || id.isEmpty) continue;
-          fieldsByVersion.putIfAbsent(id, () => <Map<String, dynamic>>[]).add(Map<String, dynamic>.from(row));
-        }
-        final latestByTemplate = <String, Map<String, dynamic>>{};
-        for (final version in versions) {
-          final templateId = version['template_id']?.toString();
-          if (templateId == null) continue;
-          final current = latestByTemplate[templateId];
-          final number = int.tryParse('${version['version_no'] ?? 0}') ?? 0;
-          final currentNumber = int.tryParse('${current?['version_no'] ?? 0}') ?? 0;
-          if (current == null || number > currentNumber) latestByTemplate[templateId] = Map<String, dynamic>.from(version);
-        }
-        _unifiedReports = latestByTemplate.values.map((version) {
-          final matches = templates.where((row) => row['id']?.toString() == version['template_id']?.toString()).toList();
-          final template = matches.isEmpty ? null : matches.first;
-          final fields = fieldsByVersion[version['id']?.toString()] ?? const <Map<String, dynamic>>[];
-          final required = fields.where((field) => field['is_required'] == true).length;
-          return template == null ? null : UnifiedReportOption(
-            templateId: template['id'].toString(),
-            versionId: version['id'].toString(),
-            title: template['title'].toString(),
-            roleCode: (template['role_code'] ?? '').toString(),
-            versionNumber: '${version['version_no'] ?? '—'}',
-            fieldCount: fields.length,
-            requiredFieldCount: required,
-          );
-        }).whereType<UnifiedReportOption>().toList();
-      });
-    } catch (_) {
-      // Manual entry remains available when optional lists are unavailable.
     }
   }
 
@@ -496,165 +434,32 @@ class _HomeScreenState extends State<HomeScreen> {
   );
 
   Widget _unifiedTaskTableSection() {
-    final manager = _allowed('tasks') && _manageTasks;
-    if (manager) {
-      return UnifiedTaskTableEditor(onSend: _sendUnifiedTable, employees: _unifiedEmployees, branches: _unifiedBranches, reports: _unifiedReports);
-    }
     return SectionCard(
       title: 'الجدول الموحد لإنشاء المهام',
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: _manageTasks ? () => context.push('/admin/unified-tasks') : null,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Row(
             textDirection: TextDirection.rtl,
             children: [
-              const Icon(Icons.table_chart_outlined, color: AppColors.green),
-              const SizedBox(width: 8),
-              Expanded(
+              const Icon(Icons.table_chart_outlined, color: AppColors.green, size: 32),
+              const SizedBox(width: 12),
+              const Expanded(
                 child: Text(
-                  manager
-                      ? 'أنشئ المهام وفق جدول رسمي منظم، ثم أرسلها للموظف مع التقرير المطلوب.'
-                      : 'جدولك اليومي ومخرجات المهام والتقرير المطلوب تظهر هنا بنفس الترتيب الرسمي.',
+                  'افتح الجدول الموحد لإنشاء المهام وإرسالها للموظف',
                   textAlign: TextAlign.right,
-                  style: const TextStyle(height: 1.45),
+                  style: TextStyle(fontWeight: FontWeight.w700),
                 ),
               ),
+              const Icon(Icons.chevron_left),
             ],
           ),
-          const SizedBox(height: 12),
-          _officialTablePreview(),
-          const SizedBox(height: 12),
-          if (manager) ...[
-            Row(
-              textDirection: TextDirection.rtl,
-              children: [
-                Expanded(child: FilledButton.icon(onPressed: () => context.go('/tasks'), icon: const Icon(Icons.add_task), label: const Text('إنشاء مهمة وإرسالها'))),
-                const SizedBox(width: 8),
-                Expanded(child: OutlinedButton.icon(onPressed: () => context.go('/admin/tasks'), icon: const Icon(Icons.assignment_outlined), label: const Text('إدارة المهام'))),
-              ],
-            ),
-          ] else
-            FilledButton.icon(
-              onPressed: _allowed('tasks') ? () => context.go('/tasks') : null,
-              icon: const Icon(Icons.playlist_add_check),
-              label: const Text('فتح جدول مهامي والتقرير اليومي'),
-            ),
-        ],
+        ),
       ),
     );
   }
-
-  Future<void> _sendUnifiedTable(UnifiedTaskTableDraft draft) async {
-    final organizationId = _organizationId;
-    if (organizationId == null || organizationId.isEmpty) {
-      throw Exception('تعذر تحديد المؤسسة المرتبطة بالحساب.');
-    }
-    final client = Supabase.instance.client;
-    final members = (await client
-            .from('organization_memberships')
-            .select('user_id,display_name,is_active')
-            .eq('organization_id', organizationId)
-            .eq('is_active', true)
-            .limit(500) as List)
-        .whereType<Map>()
-        .map((row) => Map<String, dynamic>.from(row))
-        .toList();
-    final requested = draft.employee.trim();
-    final selected = requested == 'مهام مشتركة'
-        ? members
-        : members.where((row) => (row['display_name'] ?? '').toString().trim() == requested).toList();
-    if (selected.isEmpty) throw Exception('لم يتم العثور على موظف مطابق. اكتب الاسم كما يظهر في النظام أو اختر «مهام مشتركة».');
-    final roleMap = <String, String>{
-      'صاحب المؤسسة': 'owner',
-      'المدير التنفيذي': 'admin_followup',
-      'المحاسب': 'accountant',
-      'أمين المخزن': 'warehouse_keeper',
-      'أمين مخزن': 'warehouse_keeper',
-      'عمال التحميل': 'warehouse_worker',
-      'عامل تحميل': 'warehouse_worker',
-    };
-    final roleCode = roleMap[draft.role.trim()] ?? draft.role.trim();
-    const validRoles = {'owner', 'admin_followup', 'accountant', 'warehouse_keeper', 'warehouse_worker'};
-    if (!validRoles.contains(roleCode)) throw Exception('المسمى الوظيفي غير معروف. استخدم المسمى العربي المعتمد.');
-    var branchId = _defaultBranchId;
-    if (draft.branch.trim().isNotEmpty) {
-      final branches = (await client.from('branches').select('id,name').eq('organization_id', organizationId).eq('is_active', true).limit(200) as List).whereType<Map>();
-      for (final row in branches) {
-        if ((row['name'] ?? '').toString().trim() == draft.branch.trim()) branchId = row['id']?.toString();
-      }
-    }
-    final due = DateTime.tryParse(draft.startDate)?.toUtc() ?? DateTime.now().toUtc().add(const Duration(days: 1));
-    for (final member in selected) {
-      final userId = member['user_id']?.toString();
-      if (userId == null || userId.isEmpty) continue;
-      for (final row in draft.rows) {
-        final description = [
-          'المسمى الوظيفي: ${draft.role}',
-          if (draft.branch.isNotEmpty) 'الفرع: ${draft.branch}',
-          if (draft.startDate.isNotEmpty) 'تاريخ بدء التطبيق: ${draft.startDate}',
-          'ساعات الدوام: ${draft.workType} · ${draft.workDays} · الاستثناء الأسبوعي: ${draft.weeklyException}',
-          if (draft.purpose.isNotEmpty) 'الهدف من الوظيفة: ${draft.purpose}',
-          'الوقت المحدد: ${row.time.isEmpty ? 'غير محدد' : row.time}',
-          if (row.output.isNotEmpty) 'المخرج المطلوب: ${row.output}',
-          if (draft.reportNotes.isNotEmpty) 'ملاحظات وتعليمات إضافية: ${draft.reportNotes}',
-          if (draft.responsibilities.isNotEmpty) 'المسؤوليات: ${draft.responsibilities.join('، ')}',
-          if (draft.authorities.isNotEmpty) 'الصلاحيات: ${draft.authorities.join('، ')}',
-          if (draft.instructions.isNotEmpty) 'التعليمات: ${draft.instructions.join('، ')}',
-          if (draft.kpis.isNotEmpty) 'مؤشرات الأداء: ${draft.kpis.join('؛ ')}',
-        ].join('\n');
-        await client.rpc('create_task_with_report_form', params: {
-          'p_organization_id': organizationId,
-          'p_title': row.task,
-          'p_description': description,
-          'p_due_at': due.toIso8601String(),
-          'p_priority': 'normal',
-          'p_branch_id': branchId,
-          'p_role_code': roleCode,
-          'p_template_id': null,
-          'p_assigned_to': userId,
-          'p_report_template_id': draft.reportTemplateId,
-          'p_report_version_id': draft.reportVersionId,
-          'p_report_required': draft.reportTemplateId != null && draft.reportVersionId != null,
-        });
-      }
-    }
-    await _load();
-  }
-
-  Widget _officialTablePreview() => Container(
-    decoration: BoxDecoration(
-      color: const Color(0xFFF8FBFA),
-      borderRadius: BorderRadius.circular(12),
-      border: Border.all(color: const Color(0xFFD8E4E0)),
-    ),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-          color: const Color(0xFFEAF4F0),
-          child: const Text('مؤسسة الشاعري للتجارة العامة · جدول تنفيذ المهام', textAlign: TextAlign.right, style: TextStyle(fontWeight: FontWeight.w900, color: AppColors.navy)),
-        ),
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: DataTable(
-            headingRowColor: const WidgetStatePropertyAll(Color(0xFFF0F5F3)),
-            columnSpacing: 24,
-            columns: const [
-              DataColumn(label: Text('الوقت')),
-              DataColumn(label: Text('المهمة والمسؤولية')),
-              DataColumn(label: Text('المخرج المطلوب')),
-              DataColumn(label: Text('الحالة')),
-            ],
-            rows: const [
-              DataRow(cells: [DataCell(Text('08:00')), DataCell(Text('يُحدد من قالب الموظف')), DataCell(Text('نتيجة قابلة للمراجعة')), DataCell(Text('جديدة'))]),
-              DataRow(cells: [DataCell(Text('—')), DataCell(Text('أضف بندًا من شاشة إنشاء المهمة')), DataCell(Text('تقرير يومي')), DataCell(Text('بانتظار الإرسال'))]),
-            ],
-          ),
-        ),
-      ],
-    ),
-  );
 
   Widget _metricGrid() => LayoutBuilder(
     builder: (context, constraints) {
