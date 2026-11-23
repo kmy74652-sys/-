@@ -58,7 +58,7 @@ class _UnifiedTaskTableScreenState extends State<UnifiedTaskTableScreen> {
       if (!allowed) throw Exception('هذا القسم متاح لصلاحيات إدارة المهام فقط.');
       _organizationId = organization;
       _defaultBranchId = _defaultBranch(profile);
-      final results = await Future.wait<dynamic>([
+      final baseResults = await Future.wait<dynamic>([
         _db
             .from('organization_memberships')
             .select('user_id,display_name')
@@ -73,6 +73,10 @@ class _UnifiedTaskTableScreenState extends State<UnifiedTaskTableScreen> {
             .eq('is_active', true)
             .order('name')
             .limit(200),
+      ]).timeout(const Duration(seconds: 20));
+      List<dynamic> reportResults = const [];
+      try {
+        reportResults = await Future.wait<dynamic>([
         _db
             .from('report_form_templates')
             .select('id,title,role_code')
@@ -89,8 +93,12 @@ class _UnifiedTaskTableScreenState extends State<UnifiedTaskTableScreen> {
             .from('report_form_version_fields')
             .select('version_id,is_required')
             .limit(2000),
-      ]);
-      final employees = (results[0] as List)
+        ]).timeout(const Duration(seconds: 20));
+      } catch (_) {
+        // القوالب اختيارية؛ لا تمنع فتح محرر الجدول إذا تعذر تحميلها.
+        reportResults = const [];
+      }
+      final employees = (baseResults[0] as List)
           .whereType<Map>()
           .map((row) => UnifiedEmployeeOption(
                 name: (row['display_name'] ?? '').toString(),
@@ -98,13 +106,18 @@ class _UnifiedTaskTableScreenState extends State<UnifiedTaskTableScreen> {
               ))
           .where((item) => item.name.isNotEmpty && item.userId.isNotEmpty)
           .toList();
-      final templates = (results[2] as List).whereType<Map>().toList();
-      final versions = (results[3] as List)
+      final templates = reportResults.length > 0
+          ? (reportResults[0] as List).whereType<Map>().toList()
+          : <Map>[];
+      final versions = reportResults.length > 1
+          ? (reportResults[1] as List)
           .whereType<Map>()
           .where((row) => row['approved_by'] != null && row['approved_at'] != null)
-          .toList();
+          .toList()
+          : <Map>[];
       final fieldsByVersion = <String, List<Map<String, dynamic>>>{};
-      for (final row in (results[4] as List).whereType<Map>()) {
+      for (final row in (reportResults.length > 2 ? reportResults[2] as List : const [])
+          .whereType<Map>()) {
         final id = row['version_id']?.toString();
         if (id == null || id.isEmpty) continue;
         fieldsByVersion
@@ -146,7 +159,7 @@ class _UnifiedTaskTableScreenState extends State<UnifiedTaskTableScreen> {
           const UnifiedEmployeeOption(name: 'مهام مشتركة', userId: ''),
           ...employees,
         ];
-        _branches = (results[1] as List)
+        _branches = (baseResults[1] as List)
             .whereType<Map>()
             .map((row) => UnifiedBranchOption(
                   id: (row['id'] ?? '').toString(),
@@ -161,7 +174,7 @@ class _UnifiedTaskTableScreenState extends State<UnifiedTaskTableScreen> {
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _error = e.toString().replaceFirst('Exception: ', '');
+        _error = 'تعذر تحميل بيانات الجدول الموحد. تحقق من الاتصال والصلاحيات ثم أعد المحاولة.';
         _loading = false;
       });
     }
@@ -480,7 +493,16 @@ class _UnifiedTaskTableScreenState extends State<UnifiedTaskTableScreen> {
         title: 'الجدول الموحد لإنشاء المهام',
         subtitle: 'إنشاء منظم وإرسال مباشر للموظف',
         child: _loading
-            ? const Center(child: CircularProgressIndicator())
+            ? const Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    CircularProgressIndicator(),
+                    SizedBox(height: 12),
+                    Text('جارٍ تحميل بيانات الجدول الموحد...', textAlign: TextAlign.center),
+                  ],
+                ),
+              )
             : _error != null
                 ? Center(
                     child: Column(
