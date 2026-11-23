@@ -28,7 +28,7 @@ class _AppCustomizerScreenState extends State<AppCustomizerScreen>
   @override
   void initState() {
     super.initState();
-    _tabs = TabController(length: 4, vsync: this);
+    _tabs = TabController(length: 5, vsync: this);
     _loadPermission();
   }
 
@@ -55,6 +55,11 @@ class _AppCustomizerScreenState extends State<AppCustomizerScreen>
         () => TextEditingController(text: _store.label(key)),
       );
 
+  TextEditingController _unifiedController(String key) => _controllers.putIfAbsent(
+        'unified:$key',
+        () => TextEditingController(text: _store.unifiedLabel(key)),
+      );
+
   @override
   Widget build(BuildContext context) => AppShell(
         title: 'مصمم الواجهات والتحكم الشامل',
@@ -74,6 +79,7 @@ class _AppCustomizerScreenState extends State<AppCustomizerScreen>
                             Tab(text: 'التسميات'),
                             Tab(text: 'الترتيب والإظهار'),
                             Tab(text: 'المظهر والألوان'),
+                            Tab(text: 'تخصيص الجدول الموحد'),
                             Tab(text: 'المعاينة والحفظ'),
                           ],
                         ),
@@ -85,6 +91,7 @@ class _AppCustomizerScreenState extends State<AppCustomizerScreen>
                             _labelsTab(),
                             _layoutTab(),
                             _themeTab(),
+                            _unifiedTableTab(),
                             _storageTab(),
                           ],
                         ),
@@ -215,6 +222,63 @@ class _AppCustomizerScreenState extends State<AppCustomizerScreen>
         value: _store.isVisible(key),
         onChanged: (value) => setState(() => _store.setVisibility(key, value)),
       );
+
+  Widget _unifiedTableTab() => ListView(
+        padding: const EdgeInsets.all(12),
+        children: [
+          _intro('تخصيص الجدول الموحد لإنشاء المهام', 'تحكم في ترتيب الأقسام والتسميات والأحجام وإعدادات العرض بعد الإرسال دون تغيير مسار الإرسال أو قاعدة البيانات.'),
+          SectionCard(title: 'الأقسام وترتيبها وإظهارها', child: Column(children: [
+            ..._store.unifiedSectionOrder.asMap().entries.map((entry) => ListTile(
+              dense: true,
+              title: Text(_store.unifiedLabel(entry.value), textAlign: TextAlign.right),
+              leading: Switch(value: _store.isUnifiedVisible(entry.value), onChanged: (v) => setState(() => _store.setUnifiedVisibility(entry.value, v))),
+              trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+                IconButton(icon: const Icon(Icons.keyboard_arrow_up), onPressed: entry.key == 0 ? null : () => setState(() => _store.moveUnifiedSection(entry.key, entry.key - 1))),
+                IconButton(icon: const Icon(Icons.keyboard_arrow_down), onPressed: entry.key == _store.unifiedSectionOrder.length - 1 ? null : () => setState(() => _store.moveUnifiedSection(entry.key, entry.key + 1))),
+              ]),
+            )),
+          ])),
+          SectionCard(title: 'الحقول الداخلية', child: Column(children: [
+            for (final key in ['employeeField', 'roleField', 'branchField', 'startDate', 'time', 'task', 'output'])
+              SwitchListTile(title: Text(_store.unifiedLabel(key), textAlign: TextAlign.right), value: _store.isUnifiedFieldVisible(key), onChanged: (v) => setState(() => _store.setUnifiedFieldVisibility(key, v))),
+          ])),
+          SectionCard(title: 'التسميات والنصوص الإرشادية', child: Column(children: [
+            for (final key in ['screenTitle', 'screenSubtitle', 'sent', 'back', 'employee', 'purpose', 'purposeHint', 'hours', 'daily', 'exception', 'report', 'lists', 'kpi', 'notes', 'approval', 'time', 'task', 'output', 'employeeField', 'roleField', 'branchField', 'startDate'])
+              Padding(padding: const EdgeInsets.only(bottom: 8), child: TextField(controller: _unifiedController(key), textDirection: TextDirection.rtl, decoration: InputDecoration(labelText: UnifiedTableCustomization.defaults[key] ?? key, suffixIcon: IconButton(icon: const Icon(Icons.restore), onPressed: () => setState(() => _unifiedController(key).text = UnifiedTableCustomization.defaults[key] ?? key)))),
+          ])),
+          SectionCard(title: 'الحجم والأبعاد والتنسيق', child: Column(children: [
+            _slider('مقياس الخط', _store.unifiedFontScale, .85, 1.35, (v) => setState(() => _store.setUnifiedLayout(fontScale: v))),
+            _slider('ارتفاع مربعات الإدخال', _store.unifiedInputHeight, 40, 110, (v) => setState(() => _store.setUnifiedLayout(inputHeight: v))),
+            _slider('ارتفاع صفوف الجدول', _store.unifiedRowHeight, 40, 120, (v) => setState(() => _store.setUnifiedLayout(rowHeight: v))),
+            _slider('استدارة البطاقات', _store.unifiedRadius, 6, 30, (v) => setState(() => _store.setUnifiedLayout(radius: v))),
+            _slider('المسافة بين العناصر', _store.unifiedSpacing, 4, 28, (v) => setState(() => _store.setUnifiedLayout(spacing: v))),
+            SwitchListTile(title: const Text('عرض الحقول المتجاورة حيثما يناسب'), value: _store.unifiedTwoColumns, onChanged: (v) => setState(() => _store.setUnifiedLayout(twoColumns: v))),
+          ])),
+          SectionCard(title: 'إعدادات العرض بعد الإرسال', child: Column(children: [
+            DropdownButtonFormField<String>(value: _store.postSendPlacement, decoration: const InputDecoration(labelText: 'موضع الجداول المرسلة'), items: const [DropdownMenuItem(value: 'top', child: Text('أعلى شاشة الجدول')), DropdownMenuItem(value: 'bottom', child: Text('أسفل شاشة الجدول')), DropdownMenuItem(value: 'dedicated', child: Text('في القسم المخصص فقط'))], onChanged: (v) => setState(() => _store.setPostSend(placement: v))),
+            DropdownButtonFormField<String>(value: _store.postSendVisibility, decoration: const InputDecoration(labelText: 'نطاق الرؤية'), items: const [DropdownMenuItem(value: 'manager', child: Text('المدير فقط')), DropdownMenuItem(value: 'employee', child: Text('الموظف المستلم فقط')), DropdownMenuItem(value: 'shared', child: Text('عرض مشترك حسب الصلاحيات'))], onChanged: (v) => setState(() => _store.setPostSend(visibility: v))),
+            DropdownButtonFormField<String>(value: _store.postSendStyle, decoration: const InputDecoration(labelText: 'نمط القائمة'), items: const [DropdownMenuItem(value: 'standard', child: Text('بطاقة قياسية')), DropdownMenuItem(value: 'compact', child: Text('بطاقة مضغوطة')), DropdownMenuItem(value: 'table', child: Text('عرض جدولي'))], onChanged: (v) => setState(() => _store.setPostSend(style: v))),
+            DropdownButtonFormField<String>(value: _store.postSendSort, decoration: const InputDecoration(labelText: 'ترتيب المرسلات'), items: const [DropdownMenuItem(value: 'newest', child: Text('الأحدث أولًا')), DropdownMenuItem(value: 'employee', child: Text('حسب الموظف')), DropdownMenuItem(value: 'branch', child: Text('حسب الفرع')), DropdownMenuItem(value: 'status', child: Text('حسب الحالة'))], onChanged: (v) => setState(() => _store.setPostSend(sort: v))),
+            SwitchListTile(title: const Text('إظهار الموظف والمسمى'), value: _store.postSendShowEmployee, onChanged: (v) => setState(() => _store.setPostSend(showEmployee: v))),
+            SwitchListTile(title: const Text('إظهار الفرع وتاريخ البدء'), value: _store.postSendShowBranch, onChanged: (v) => setState(() => _store.setPostSend(showBranch: v))),
+            SwitchListTile(title: const Text('إظهار الملخص والهدف'), value: _store.postSendShowSummary, onChanged: (v) => setState(() => _store.setPostSend(showSummary: v))),
+            SwitchListTile(title: const Text('إظهار الحالة ووقت الإرسال'), value: _store.postSendShowStatus, onChanged: (v) => setState(() => _store.setPostSend(showStatus: v))),
+            SwitchListTile(title: const Text('إظهار أزرار التفاصيل والطباعة'), value: _store.postSendShowActions, onChanged: (v) => setState(() => _store.setPostSend(showActions: v))),
+          ])),
+          Row(children: [Expanded(child: FilledButton.icon(onPressed: _saveUnified, icon: const Icon(Icons.save), label: const Text('حفظ تطبيق الجدول'))), const SizedBox(width: 8), Expanded(child: OutlinedButton.icon(onPressed: () => setState(() => _store.resetUnified()), icon: const Icon(Icons.restore), label: const Text('استعادة الافتراضي')))]),
+        ],
+      );
+
+  Widget _slider(String title, double value, double min, double max, ValueChanged<double> onChanged) => Row(children: [SizedBox(width: 150, child: Text(title, textAlign: TextAlign.right)), Expanded(child: Slider(value: value.clamp(min, max).toDouble(), min: min, max: max, onChanged: onChanged))]);
+
+  Future<void> _saveUnified() async {
+    for (final key in UnifiedTableCustomization.defaults.keys) {
+      final controller = _controllers['unified:$key'];
+      if (controller != null) _store.setUnifiedLabel(key, controller.text);
+    }
+    await _store.save();
+    if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم حفظ تخصيص الجدول الموحد وتطبيقه.')));
+  }
 
   Widget _themeTab() => ListView(
         padding: const EdgeInsets.all(12),

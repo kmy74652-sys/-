@@ -5,6 +5,7 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 
 import '../../core/theme.dart';
+import '../../shared/app_customizer.dart';
 
 class UnifiedTaskTableEditor extends StatefulWidget {
   const UnifiedTaskTableEditor({super.key, required this.onSend, this.employees = const [], this.branches = const [], this.reports = const []});
@@ -43,6 +44,12 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
   String _exception = 'الجمعة';
   String? _reportVersionId;
   String? _reportTemplateId;
+
+  @override
+  void initState() {
+    super.initState();
+    AppCustomizer.instance.load();
+  }
 
   @override
   void dispose() {
@@ -87,69 +94,52 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
   }
 
   @override
-  Widget build(BuildContext context) => Card(
-    margin: EdgeInsets.zero,
-    elevation: 0,
-    color: Colors.white,
-    shape: RoundedRectangleBorder(
-      borderRadius: BorderRadius.circular(16),
-      side: const BorderSide(color: Color(0xFFD8E4E0)),
-    ),
-    child: Padding(
-      padding: const EdgeInsets.all(12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            textDirection: TextDirection.rtl,
-            children: [
-              const Icon(Icons.table_chart_outlined, color: AppColors.green),
-              const SizedBox(width: 8),
-              const Expanded(child: Text('الجدول الموحد لإنشاء المهام', textAlign: TextAlign.right, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: AppColors.navy))),
-              IconButton(onPressed: () => setState(() => _expanded = !_expanded), icon: Icon(_expanded ? Icons.expand_less : Icons.expand_more), tooltip: _expanded ? 'طي التفاصيل' : 'إظهار التفاصيل'),
-            ],
-          ),
+  Widget build(BuildContext context) => AnimatedBuilder(
+    animation: AppCustomizer.instance,
+    builder: (context, _) => Card(
+      margin: EdgeInsets.zero,
+      elevation: 0,
+      color: Colors.white,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppCustomizer.instance.unifiedRadius), side: const BorderSide(color: Color(0xFFD8E4E0))),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Row(textDirection: TextDirection.rtl, children: [
+            const Icon(Icons.table_chart_outlined, color: AppColors.green), const SizedBox(width: 8),
+            Expanded(child: Text(AppCustomizer.instance.unifiedLabel('screenTitle'), textAlign: TextAlign.right, style: TextStyle(fontSize: 16 * AppCustomizer.instance.unifiedFontScale, fontWeight: FontWeight.w900, color: AppColors.navy))),
+            IconButton(onPressed: () => setState(() => _expanded = !_expanded), icon: Icon(_expanded ? Icons.expand_less : Icons.expand_more), tooltip: _expanded ? 'طي التفاصيل' : 'إظهار التفاصيل'),
+          ]),
           if (_expanded) ...[
-            const Divider(height: 16),
-            _toolbar(),
+            const Divider(height: 16), _toolbar(),
+            ..._unifiedSections(),
             const SizedBox(height: 12),
-            _employeeCard(),
-            const SizedBox(height: 10),
-            _section('الهدف من الوظيفة', TextField(controller: _purpose, textAlign: TextAlign.right, maxLines: 2, decoration: const InputDecoration(hintText: 'اكتب الهدف العام من الوظيفة'))),
-            const SizedBox(height: 10),
-            _workHours(),
-            const SizedBox(height: 10),
-            _scheduleTable('الجدول الزمني اليومي', _rows),
-            const SizedBox(height: 10),
-            _scheduleTable('العمل الاستثنائي ($_exception)', _exceptionRows),
-            const SizedBox(height: 10),
-            _reportSelector(),
-            const SizedBox(height: 10),
-            _editableList('المسؤوليات الأساسية', _responsibilities),
-            const SizedBox(height: 10),
-            _editableList('الصلاحيات وحدود المسؤولية', _authorities),
-            const SizedBox(height: 10),
-            _editableList('التوصيات والتعليمات الإدارية', _instructions),
-            const SizedBox(height: 10),
-            _kpiTable(),
-            const SizedBox(height: 10),
-            _section('ملاحظات وتعليمات للإدارة أو الموظف', TextField(controller: _reportNotes, textAlign: TextAlign.right, maxLines: 3, decoration: const InputDecoration(hintText: 'تعليمات إضافية اختيارية؛ نموذج التقرير يحدده القالب المعتمد'))),
-            const SizedBox(height: 12),
-            _approvalStatus(),
-            const SizedBox(height: 12),
-            Row(
-              textDirection: TextDirection.rtl,
-              children: [
-                Expanded(child: FilledButton.icon(onPressed: _sending || _sent ? null : _submit, icon: _sending ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)) : Icon(_sent ? Icons.check_circle_outline : Icons.send_outlined), label: Text(_sending ? 'جارٍ الإرسال...' : _sent ? 'تم الإرسال' : 'حفظ الجدول وإرساله'))),
-                const SizedBox(width: 8),
-                Expanded(child: OutlinedButton.icon(onPressed: _exportPdf, icon: const Icon(Icons.picture_as_pdf_outlined), label: const Text('تصدير PDF'))),
-              ],
-            ),
+            Row(textDirection: TextDirection.rtl, children: [
+              Expanded(child: FilledButton.icon(onPressed: _sending || _sent ? null : _submit, icon: _sending ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)) : Icon(_sent ? Icons.check_circle_outline : Icons.send_outlined), label: Text(_sending ? 'جارٍ الإرسال...' : _sent ? 'تم الإرسال' : 'حفظ الجدول وإرساله'))),
+              const SizedBox(width: 8), Expanded(child: OutlinedButton.icon(onPressed: _exportPdf, icon: const Icon(Icons.picture_as_pdf_outlined), label: const Text('تصدير PDF'))),
+            ]),
           ],
-        ],
+        ]),
       ),
     ),
   );
+
+  List<Widget> _unifiedSections() {
+    final store = AppCustomizer.instance;
+    final sections = <String, Widget>{
+      'sent': _section(store.unifiedLabel('sent'), Text('${store.unifiedLabel('back')} · تُعرض المرسلات في القسم المخصص بعد الحفظ.', textAlign: TextAlign.right)),
+      'employee': _employeeCard(),
+      'purpose': _section(store.unifiedLabel('purpose'), TextField(controller: _purpose, textAlign: TextAlign.right, maxLines: 2, decoration: InputDecoration(hintText: store.unifiedLabel('purposeHint')))),
+      'hours': _workHours(),
+      'daily': _scheduleTable(store.unifiedLabel('daily'), _rows),
+      'exception': _scheduleTable('${store.unifiedLabel('exception')} ($_exception)', _exceptionRows),
+      'report': _reportSelector(),
+      'lists': Column(children: [_editableList('المسؤوليات الأساسية', _responsibilities), const SizedBox(height: 10), _editableList('الصلاحيات وحدود المسؤولية', _authorities), const SizedBox(height: 10), _editableList('التوصيات والتعليمات الإدارية', _instructions)]),
+      'kpi': _kpiTable(),
+      'notes': _section(store.unifiedLabel('notes'), TextField(controller: _reportNotes, textAlign: TextAlign.right, maxLines: 3, decoration: const InputDecoration(hintText: 'تعليمات إضافية اختيارية؛ نموذج التقرير يحدده القالب المعتمد'))),
+      'approval': _approvalStatus(),
+    };
+    return store.unifiedSectionOrder.where((key) => store.isUnifiedVisible(key)).where(sections.containsKey).map((key) => Padding(padding: EdgeInsets.only(top: store.unifiedSpacing), child: sections[key]!)).toList();
+  }
 
   Widget _toolbar() => Wrap(
     textDirection: TextDirection.rtl,
@@ -161,18 +151,20 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
     ],
   );
 
-  Widget _employeeCard() => _section('بيانات الموظف والاعتماد', Column(children: [
-    Row(children: [Expanded(child: _employeeField()), const SizedBox(width: 8), Expanded(child: _roleField())]),
-    const SizedBox(height: 8),
-    Row(children: [Expanded(child: _branchField()), const SizedBox(width: 8), Expanded(child: _input(_startDate, 'تاريخ بدء التطبيق'))]),
+  Widget _employeeCard() => _section(AppCustomizer.instance.unifiedLabel('employee'), Column(children: [
+    if (AppCustomizer.instance.isUnifiedFieldVisible('employeeField') || AppCustomizer.instance.isUnifiedFieldVisible('roleField'))
+      Row(children: [if (AppCustomizer.instance.isUnifiedFieldVisible('employeeField')) Expanded(child: _employeeField()), if (AppCustomizer.instance.isUnifiedFieldVisible('employeeField') && AppCustomizer.instance.isUnifiedFieldVisible('roleField')) const SizedBox(width: 8), if (AppCustomizer.instance.isUnifiedFieldVisible('roleField')) Expanded(child: _roleField())]),
+    if (AppCustomizer.instance.isUnifiedFieldVisible('employeeField') || AppCustomizer.instance.isUnifiedFieldVisible('roleField')) const SizedBox(height: 8),
+    if (AppCustomizer.instance.isUnifiedFieldVisible('branchField') || AppCustomizer.instance.isUnifiedFieldVisible('startDate'))
+      Row(children: [if (AppCustomizer.instance.isUnifiedFieldVisible('branchField')) Expanded(child: _branchField()), if (AppCustomizer.instance.isUnifiedFieldVisible('branchField') && AppCustomizer.instance.isUnifiedFieldVisible('startDate')) const SizedBox(width: 8), if (AppCustomizer.instance.isUnifiedFieldVisible('startDate')) Expanded(child: _input(_startDate, AppCustomizer.instance.unifiedLabel('startDate')))]),
   ]));
 
   Widget _employeeField() => widget.employees.isEmpty
-      ? _input(_employee, 'الموظف أو مهام مشتركة')
+      ? _input(_employee, AppCustomizer.instance.unifiedLabel('employeeField'))
       : DropdownButtonFormField<String>(
           value: widget.employees.any((item) => item.name == _employee.text) ? _employee.text : null,
           isExpanded: true,
-          decoration: const InputDecoration(labelText: 'الموظف أو المجموعة', isDense: true),
+          decoration: InputDecoration(labelText: AppCustomizer.instance.unifiedLabel('employeeField'), isDense: true),
           items: widget.employees.map((item) => DropdownMenuItem(value: item.name, child: Text(item.name, overflow: TextOverflow.ellipsis))).toList(),
           onChanged: (value) {
             setState(() => _employee.text = value ?? '');
@@ -183,7 +175,7 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
   Widget _roleField() => DropdownButtonFormField<String>(
     value: const ['المحاسب', 'أمين مخزن', 'عامل تحميل', 'المدير التنفيذي', 'صاحب المؤسسة'].contains(_role.text) ? _role.text : null,
     isExpanded: true,
-    decoration: const InputDecoration(labelText: 'المسمى الوظيفي', isDense: true),
+    decoration: InputDecoration(labelText: AppCustomizer.instance.unifiedLabel('roleField'), isDense: true),
     items: const ['المحاسب', 'أمين مخزن', 'عامل تحميل', 'المدير التنفيذي', 'صاحب المؤسسة'].map((value) => DropdownMenuItem(value: value, child: Text(value, overflow: TextOverflow.ellipsis))).toList(),
     onChanged: (value) {
       if (value == null) return;
@@ -193,13 +185,13 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
   );
 
   Widget _branchField() => widget.branches.isEmpty
-      ? _input(_branch, 'الفرع')
+      ? _input(_branch, AppCustomizer.instance.unifiedLabel('branchField'))
       : DropdownButtonFormField<String>(
           value: widget.branches.any((item) => item.name == _branch.text)
               ? _branch.text
               : null,
           isExpanded: true,
-          decoration: const InputDecoration(labelText: 'الفرع', isDense: true),
+          decoration: InputDecoration(labelText: AppCustomizer.instance.unifiedLabel('branchField'), isDense: true),
           items: widget.branches
               .map((item) => DropdownMenuItem(
                     value: item.name,
@@ -239,7 +231,7 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
   Widget _reportSelector() {
     final selected = _selectedReport;
     return _section(
-      'قالب التقرير اليومي',
+      AppCustomizer.instance.unifiedLabel('report'),
       Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -299,7 +291,7 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
     );
   }
 
-  Widget _workHours() => _section('ساعات الدوام الرسمية', Wrap(textDirection: TextDirection.rtl, spacing: 8, runSpacing: 8, children: [
+  Widget _workHours() => _section(AppCustomizer.instance.unifiedLabel('hours'), Wrap(textDirection: TextDirection.rtl, spacing: 8, runSpacing: 8, children: [
     _drop('نوع الدوام', _workType, ['دوام كامل', 'دوام جزئي', 'مناوبة'], (v) => setState(() => _workType = v)),
     _drop('الأيام', _days, ['الأحد - الخميس', 'السبت - الخميس', 'حسب المناوبة'], (v) => setState(() => _days = v)),
     _drop('الاستثناء الأسبوعي', _exception, ['الجمعة', 'الأحد', 'لا يوجد'], (v) => setState(() => _exception = v)),
@@ -309,25 +301,25 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
   ]));
 
   Widget _scheduleTable(String title, List<_UnifiedRow> source) {
+    final visible = [
+      if (AppCustomizer.instance.isUnifiedFieldVisible('time')) 'time',
+      if (AppCustomizer.instance.isUnifiedFieldVisible('task')) 'task',
+      if (AppCustomizer.instance.isUnifiedFieldVisible('output')) 'output',
+    ];
     return _section(
       title,
       SingleChildScrollView(
         scrollDirection: Axis.horizontal,
         child: DataTable(
           columnSpacing: 18,
-          columns: const [
-            DataColumn(label: Text('الوقت')),
-            DataColumn(label: Text('المهمة المحددة والمسؤولية')),
-            DataColumn(label: Text('المخرج المطلوب')),
-            DataColumn(label: Text('إجراء')),
-          ],
+          columns: [...visible.map((key) => DataColumn(label: Text(AppCustomizer.instance.unifiedLabel(key)))), const DataColumn(label: Text('إجراء'))],
           rows: source.asMap().entries.map((entry) {
             final i = entry.key;
             final row = entry.value;
             return DataRow(cells: [
-              DataCell(SizedBox(width: 75, child: TextField(controller: row.time, textAlign: TextAlign.right, decoration: const InputDecoration(isDense: true)))),
-              DataCell(SizedBox(width: 220, child: TextField(controller: row.task, textAlign: TextAlign.right, decoration: const InputDecoration(isDense: true)))),
-              DataCell(SizedBox(width: 180, child: TextField(controller: row.output, textAlign: TextAlign.right, decoration: const InputDecoration(isDense: true)))),
+              if (visible.contains('time')) DataCell(SizedBox(width: 75, child: TextField(controller: row.time, textAlign: TextAlign.right, decoration: const InputDecoration(isDense: true)))),
+              if (visible.contains('task')) DataCell(SizedBox(width: 220, child: TextField(controller: row.task, textAlign: TextAlign.right, decoration: const InputDecoration(isDense: true)))),
+              if (visible.contains('output')) DataCell(SizedBox(width: 180, child: TextField(controller: row.output, textAlign: TextAlign.right, decoration: const InputDecoration(isDense: true)))),
               DataCell(Row(children: [
                 IconButton(onPressed: () => setState(() => source.insert(i + 1, _UnifiedRow('', '', ''))), icon: const Icon(Icons.add, size: 19)),
                 IconButton(onPressed: source.isEmpty ? null : () { final removed = source.removeAt(i); removed.dispose(); setState(() {}); }, icon: const Icon(Icons.delete_outline, size: 19)),
@@ -389,7 +381,7 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
 
   Widget _approvalStatus() => _section('حالة الاعتماد', const Wrap(textDirection: TextDirection.rtl, spacing: 8, children: [Chip(avatar: Icon(Icons.hourglass_empty, size: 17), label: Text('إقرار الموظف: بانتظار الإقرار')), Chip(avatar: Icon(Icons.rate_review_outlined, size: 17), label: Text('مراجعة المسؤول: لم تبدأ')), Chip(avatar: Icon(Icons.verified_outlined, size: 17), label: Text('اعتماد المدير: مسودة'))]));
 
-  Widget _section(String title, Widget child) => Container(padding: const EdgeInsets.all(10), decoration: BoxDecoration(color: const Color(0xFFF8FBFA), borderRadius: BorderRadius.circular(12), border: Border.all(color: const Color(0xFFD8E4E0))), child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [Text(title, textAlign: TextAlign.right, style: const TextStyle(fontWeight: FontWeight.w900, color: AppColors.navy)), const SizedBox(height: 8), child]));
+  Widget _section(String title, Widget child) => Container(padding: const EdgeInsets.all(10), decoration: BoxDecoration(color: const Color(0xFFF8FBFA), borderRadius: BorderRadius.circular(AppCustomizer.instance.unifiedRadius), border: Border.all(color: const Color(0xFFD8E4E0))), child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [Text(title, textAlign: TextAlign.right, style: TextStyle(fontWeight: FontWeight.w900, color: AppColors.navy, fontSize: 14 * AppCustomizer.instance.unifiedFontScale)), const SizedBox(height: 8), child]));
   Widget _input(TextEditingController controller, String label) => TextField(controller: controller, textAlign: TextAlign.right, decoration: InputDecoration(labelText: label, isDense: true));
   Widget _drop(String label, String value, List<String> values, ValueChanged<String> onChanged) => SizedBox(width: 155, child: DropdownButtonFormField<String>(value: value, isExpanded: true, decoration: InputDecoration(labelText: label, isDense: true), items: values.map((v) => DropdownMenuItem(value: v, child: Text(v, overflow: TextOverflow.ellipsis))).toList(), onChanged: (v) { if (v != null) onChanged(v); }));
 
