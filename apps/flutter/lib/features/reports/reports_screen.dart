@@ -24,6 +24,8 @@ class _ReportsScreenState extends State<ReportsScreen> {
   List<Map<String, dynamic>> _rows = [];
   List<Map<String, dynamic>> _submissionRows = [];
   List<Map<String, dynamic>> _roleReportRows = [];
+  Map<String, Map<String, dynamic>> _tasksById = {};
+  Map<String, String> _employeeNames = {};
   bool _canRead = false;
   bool _canReview = false;
   bool _canReviewRoleReports = false;
@@ -72,6 +74,13 @@ class _ReportsScreenState extends State<ReportsScreen> {
       final root = rawProfile is Map ? rawProfile : const <dynamic, dynamic>{};
       final employee = root['employee'];
       final rawPermissions = employee is Map ? employee['permissions'] : null;
+      final organizationId = employee is Map
+          ? (employee['institutionId'] ??
+                  employee['institution_id'] ??
+                  employee['organization_id'])
+              ?.toString() ??
+              ''
+          : '';
       final permissions = rawPermissions is List
           ? rawPermissions.map((e) => e.toString()).toSet()
           : <String>{};
@@ -104,6 +113,36 @@ class _ReportsScreenState extends State<ReportsScreen> {
             .order('submitted_at', ascending: false)
             .limit(100);
         _rows = _maps(data);
+        try {
+          final contextRows = await Future.wait<dynamic>([
+            _client
+                .from('tasks')
+                .select('id,title,assigned_to,due_at')
+                .eq('organization_id', organizationId)
+                .isFilter('deleted_at', null)
+                .limit(1000),
+            _client
+                .from('organization_memberships')
+                .select('user_id,display_name,employee_no')
+                .eq('organization_id', organizationId)
+                .eq('is_active', true)
+                .limit(500),
+          ]);
+          _tasksById = {
+            for (final task in _maps(contextRows[0]))
+              if (task['id'] != null) task['id'].toString(): task,
+          };
+          _employeeNames = {
+            for (final member in _maps(contextRows[1]))
+              if (member['user_id'] != null)
+                member['user_id'].toString():
+                    (member['display_name'] ?? member['employee_no'] ?? 'موظف')
+                        .toString(),
+          };
+        } catch (_) {
+          _tasksById = {};
+          _employeeNames = {};
+        }
         try {
           final submissions = await _client
               .from('report_submissions')
@@ -148,9 +187,30 @@ class _ReportsScreenState extends State<ReportsScreen> {
     return id.length <= 8 ? id : '${id.substring(0, 8)}…';
   }
 
-  String _label(Map<String, dynamic> row) => row['task_id'] == null
-      ? 'تقرير مستقل'
-      : 'تقرير المهمة ${_safeId(row['task_id'])}';
+  Map<String, dynamic>? _taskFor(Map<String, dynamic> row) {
+    final id = row['task_id']?.toString();
+    return id == null ? null : _tasksById[id];
+  }
+
+  String _employeeForTask(Map<String, dynamic> row) {
+    final task = _taskFor(row);
+    final userId = task?['assigned_to']?.toString();
+    return userId == null || userId.isEmpty
+        ? 'غير محدد'
+        : (_employeeNames[userId] ?? 'موظف غير معروف');
+  }
+
+  String _label(Map<String, dynamic> row) {
+    final task = _taskFor(row);
+    if (task == null) {
+      return row['task_id'] == null
+          ? 'تقرير مستقل'
+          : 'تقرير المهمة ${_safeId(row['task_id'])}';
+    }
+    return task['title']?.toString().trim().isNotEmpty == true
+        ? task['title'].toString()
+        : 'مهمة ${_safeId(row['task_id'])}';
+  }
 
   String _statusLabel(String status) => switch (status) {
     'submitted' => 'بانتظار المراجعة',
@@ -176,6 +236,9 @@ class _ReportsScreenState extends State<ReportsScreen> {
       row['status'],
       row['values'],
       row['answers'],
+      _label(row),
+      _employeeForTask(row),
+      _taskFor(row)?['due_at'],
     ];
     return values.any(
       (value) => value.toString().toLowerCase().contains(query),
@@ -1006,6 +1069,8 @@ class _ReportsScreenState extends State<ReportsScreen> {
         id.isNotEmpty &&
         row['task_id'] != null;
     final isForm = row['report_form_snapshot_id'] != null;
+    final task = _taskFor(row);
+    final employeeName = _employeeForTask(row);
     return Card(
       child: ExpansionTile(
         title: Text(
@@ -1017,7 +1082,9 @@ class _ReportsScreenState extends State<ReportsScreen> {
           ),
         ),
         subtitle: Text(
-          '${_statusLabel(status)} · ${row['submitted_at'] ?? 'وقت الإرسال غير متاح'}',
+          'الموظف: $employeeName\n'
+          'الإرسال: ${row['submitted_at'] ?? 'غير متاح'} · '
+          'الاستحقاق: ${task?['due_at'] ?? 'غير متاح'} · ${_statusLabel(status)}',
           textAlign: TextAlign.right,
         ),
         children: [
