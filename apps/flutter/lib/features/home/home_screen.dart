@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/theme.dart';
+import '../admin/admin_screen.dart';
 import '../../shared/app_shell.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -379,6 +380,22 @@ class _HomeScreenState extends State<HomeScreen> {
                 const SizedBox(height: 10),
                 _unifiedTaskTableSection(),
               ],
+            ],
+            if (_manageTasks) ...[
+              const SizedBox(height: 8),
+              const Padding(
+                padding: EdgeInsets.fromLTRB(4, 0, 4, 7),
+                child: Text(
+                  'لوحة إدارة المؤسسة',
+                  textAlign: TextAlign.right,
+                  style: TextStyle(
+                    color: AppColors.navy,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+              AdminScreen(inline: true, showSummary: false),
             ],
           ],
         ],

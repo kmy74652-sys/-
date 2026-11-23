@@ -6,10 +6,21 @@ import '../../shared/app_shell.dart';
 import '../../core/theme.dart';
 
 class AdminScreen extends StatefulWidget {
-  const AdminScreen({super.key, this.embedded = false});
+  const AdminScreen({
+    super.key,
+    this.embedded = false,
+    this.inline = false,
+    this.showSummary = true,
+  });
 
   /// In embedded mode, the parent AppShell owns the page header/navigation.
   final bool embedded;
+
+  /// Renders the administration panel as content inside another scroll view.
+  final bool inline;
+
+  /// HomeScreen already renders the task metrics.
+  final bool showSummary;
 
   @override
   State<AdminScreen> createState() => _AdminScreenState();
@@ -149,6 +160,40 @@ class _AdminScreenState extends State<AdminScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (widget.inline) {
+      if (_loading && _tasks.isEmpty) {
+        return const Padding(
+          padding: EdgeInsets.all(24),
+          child: Center(child: CircularProgressIndicator()),
+        );
+      }
+      if (_error != null) {
+        return SectionCard(
+          title: 'تعذر تحميل لوحة الإدارة',
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(_error!, textAlign: TextAlign.right),
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton.icon(
+                  onPressed: _load,
+                  icon: const Icon(Icons.refresh),
+                  label: const Text('إعادة المحاولة'),
+                ),
+              ),
+            ],
+          ),
+        );
+      }
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (_loading) const LinearProgressIndicator(),
+          _overview(),
+        ],
+      );
+    }
     final content = RefreshIndicator(
       onRefresh: _load,
       child: ListView(
@@ -228,19 +273,20 @@ class _AdminScreenState extends State<AdminScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        SectionCard(
-          title: 'ملخص المهام',
-          child: Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              _metric('إجمالي المهام', _tasks.length, Icons.task_alt),
-              _metric('قيد التنفيذ', active, Icons.play_circle_outline),
-              _metric('بانتظار المراجعة', review, Icons.fact_check_outlined),
-              _metric('متأخرة', late, Icons.schedule),
-            ],
+        if (widget.showSummary)
+          SectionCard(
+            title: 'ملخص المهام',
+            child: Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                _metric('إجمالي المهام', _tasks.length, Icons.task_alt),
+                _metric('قيد التنفيذ', active, Icons.play_circle_outline),
+                _metric('بانتظار المراجعة', review, Icons.fact_check_outlined),
+                _metric('متأخرة', late, Icons.schedule),
+              ],
+            ),
           ),
-        ),
         const SizedBox(height: 10),
         SectionCard(
           title: 'أقسام الإدارة',
