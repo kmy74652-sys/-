@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -24,10 +25,17 @@ class _LoginScreenState extends State<LoginScreen> {
 
   void _queueBranding(String value) {
     _brandingTimer?.cancel();
+    final employeeNumber = value.trim();
+    if (employeeNumber.length < 3 || employeeNumber.length > 30) {
+      if (mounted && _branding != OrganizationBranding.fallback) {
+        setState(() => _branding = OrganizationBranding.fallback);
+      }
+      return;
+    }
     _brandingTimer = Timer(const Duration(milliseconds: 350), () async {
       final branding = await OrganizationBrandingStore.instance
-          .forEmployeeNumber(value);
-      if (mounted && value == _employee.text.trim()) {
+          .forEmployeeNumber(employeeNumber);
+      if (mounted && employeeNumber == _employee.text.trim()) {
         setState(() => _branding = branding);
       }
     });
@@ -111,6 +119,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
+    backgroundColor: const Color(0xFFF5F7FD),
     body: SafeArea(
       child: Center(
         child: SingleChildScrollView(
@@ -118,8 +127,14 @@ class _LoginScreenState extends State<LoginScreen> {
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 460),
             child: Card(
+              margin: const EdgeInsets.symmetric(vertical: 24),
+              elevation: 1,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(24),
+                side: const BorderSide(color: Color(0xFFDCE5EC)),
+              ),
               child: Padding(
-                padding: const EdgeInsets.all(22),
+                padding: const EdgeInsets.fromLTRB(24, 26, 24, 22),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
@@ -160,10 +175,14 @@ class _LoginScreenState extends State<LoginScreen> {
                       controller: _employee,
                       enabled: !_busy,
                       textAlign: TextAlign.right,
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                       textInputAction: TextInputAction.next,
                       onChanged: _queueBranding,
                       decoration: const InputDecoration(
                         labelText: 'الرقم الوظيفي',
+                        hintText: 'أدخل الرقم الوظيفي',
+                        prefixIcon: Icon(Icons.badge_outlined),
                       ),
                     ),
                     const SizedBox(height: 12),
@@ -176,6 +195,8 @@ class _LoginScreenState extends State<LoginScreen> {
                       onSubmitted: (_) => _login(),
                       decoration: const InputDecoration(
                         labelText: 'كلمة المرور',
+                        hintText: 'أدخل رمز الدخول من 3 إلى 30 محرفًا',
+                        prefixIcon: Icon(Icons.lock_outline),
                       ),
                     ),
                     const SizedBox(height: 14),
