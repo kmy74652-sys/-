@@ -652,24 +652,6 @@ class _AppCustomizerScreenState extends State<AppCustomizerScreen>
     }
   }
 
-  Future<void> _reset() async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('إعادة ضبط المصنع'),
-        content: const Text('سيتم حذف تخصيصات الواجهة وإرجاع القيم الافتراضية. هل تريد المتابعة؟'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('إلغاء')),
-          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('إعادة الضبط')),
-        ],
-      ),
-    );
-    if (confirmed == true) {
-      await _store.reset();
-      for (final entry in _controllers.entries) entry.value.text = _store.label(entry.key);
-      if (mounted) setState(() {});
-    }
-  }
 }
 
 class _ProfileLoader {
