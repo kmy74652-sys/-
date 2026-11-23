@@ -118,23 +118,25 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-    backgroundColor: const Color(0xFFF5F7FD),
-    body: SafeArea(
-      child: Center(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(18),
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 460),
-            child: Card(
-              margin: const EdgeInsets.symmetric(vertical: 24),
-              elevation: 1,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(24),
-                side: const BorderSide(color: Color(0xFFDCE5EC)),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(24, 26, 24, 22),
+  Widget build(BuildContext context) => Directionality(
+    textDirection: TextDirection.rtl,
+    child: Scaffold(
+      backgroundColor: const Color(0xFFF5F7FD),
+      body: SafeArea(
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 24),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 460),
+              child: Card(
+                margin: EdgeInsets.zero,
+                elevation: 1,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(24),
+                  side: const BorderSide(color: Color(0xFFDCE5EC)),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(24, 26, 24, 22),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
@@ -194,8 +196,8 @@ class _LoginScreenState extends State<LoginScreen> {
                       textInputAction: TextInputAction.done,
                       onSubmitted: (_) => _login(),
                       decoration: const InputDecoration(
-                        labelText: 'كلمة المرور',
-                        hintText: 'أدخل رمز الدخول من 3 إلى 30 محرفًا',
+                        labelText: 'رمز الدخول',
+                        hintText: 'من 3 إلى 30 محرفًا دون مسافات',
                         prefixIcon: Icon(Icons.lock_outline),
                       ),
                     ),
@@ -212,11 +214,12 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     const SizedBox(height: 12),
                     const Text(
-                      'نسيت الرمز أو لم يُعيّن لك بعد؟ تواصل مع الإدارة.',
+                      'نسيت رمز الدخول أو لم يُعيّن لك بعد؟ تواصل مع الإدارة.',
                       textAlign: TextAlign.right,
                       style: TextStyle(color: AppColors.muted),
                     ),
                   ],
+                ),
                 ),
               ),
             ),
