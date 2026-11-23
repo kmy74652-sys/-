@@ -84,7 +84,14 @@ class AppCustomizer extends ChangeNotifier {
     unifiedFieldLayouts[key] = current; notifyListeners();
   }
   String unifiedLabel(String key) => unifiedLabels[key] ?? UnifiedTableCustomization.defaults[key] ?? key;
-  void setUnifiedVisibility(String key, bool value) { unifiedVisibility[key] = value; notifyListeners(); }
+  void setUnifiedVisibility(String key, bool value) {
+    if (!value && isUnifiedVisible(key)) {
+      final visibleCount = unifiedSectionOrder.where(isUnifiedVisible).length;
+      if (visibleCount <= 1) return;
+    }
+    unifiedVisibility[key] = value;
+    notifyListeners();
+  }
   void setUnifiedFieldVisibility(String key, bool value) { unifiedFieldVisibility[key] = value; notifyListeners(); }
   void setUnifiedLabel(String key, String value) { unifiedLabels[key] = value.trim().isEmpty ? (UnifiedTableCustomization.defaults[key] ?? key) : value.trim(); notifyListeners(); }
   void moveUnifiedSection(int oldIndex, int newIndex) { if (oldIndex < 0 || oldIndex >= unifiedSectionOrder.length) return; newIndex = newIndex.clamp(0, unifiedSectionOrder.length - 1).toInt(); final item = unifiedSectionOrder.removeAt(oldIndex); unifiedSectionOrder.insert(newIndex, item); notifyListeners(); }
