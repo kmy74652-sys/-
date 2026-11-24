@@ -216,15 +216,86 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     return 0;
   }
 
-  /// Parent route for pages that are not one of the bottom-navigation roots.
-  /// Returns null on root pages so no back button is shown there.
   String? _backRoute(String path) {
-    const roots = {'/', '/settings', '/tasks'};
-    if (path.isEmpty || roots.contains(path)) return null;
-    final segments = path.split('/').where((e) => e.isNotEmpty).toList();
-    if (segments.length <= 1) return '/';
-    final parent = '/${segments.sublist(0, segments.length - 1).join('/')}';
-    return parent;
+    switch (path) {
+      case '/':
+      case '/tasks':
+      case '/reports':
+      case '/reports/independent':
+      case '/hr':
+      case '/settings':
+        return null;
+      case '/admin/tasks':
+      case '/admin/unified-task-management':
+      case '/admin/performance':
+      case '/admin/report-designer':
+        return '/admin';
+      case '/admin/customizer':
+        return '/settings';
+      case '/admin':
+        return '/';
+    }
+    if (path.startsWith('/tasks/')) {
+      return _managesTasks ? '/admin/tasks' : '/tasks';
+    }
+    return '/';
+  }
+
+  List<_Breadcrumb> _breadcrumbs(Uri uri) {
+    final path = uri.path;
+    if (path == '/') return const [_Breadcrumb('الرئيسية')];
+    if (path.startsWith('/tasks/')) {
+      return [
+        _Breadcrumb('الرئيسية', '/'),
+        _Breadcrumb(
+          'المهام والمتابعة',
+          _managesTasks ? '/admin/tasks' : '/tasks',
+        ),
+        _Breadcrumb('تفاصيل المهمة'),
+      ];
+    }
+    if (path == '/tasks') {
+      return const [_Breadcrumb('الرئيسية', '/'), _Breadcrumb('المهام والمتابعة')];
+    }
+    if (path == '/reports' || path == '/reports/independent') {
+      return const [_Breadcrumb('الرئيسية', '/'), _Breadcrumb('التقارير')];
+    }
+    if (path == '/admin' && uri.queryParameters['section'] == 'employees') {
+      return const [_Breadcrumb('الرئيسية', '/'), _Breadcrumb('الموظفون')];
+    }
+    if (path == '/admin') {
+      return const [_Breadcrumb('الرئيسية', '/'), _Breadcrumb('الإدارة والتحليلات')];
+    }
+    if (path == '/admin/tasks') {
+      return const [_Breadcrumb('الرئيسية', '/'), _Breadcrumb('المهام والمتابعة')];
+    }
+    if (path == '/admin/unified-task-management') {
+      return const [_Breadcrumb('الرئيسية', '/'), _Breadcrumb('الجداول الموحدة')];
+    }
+    if (path == '/admin/performance') {
+      return const [
+        _Breadcrumb('الرئيسية', '/'),
+        _Breadcrumb('الإدارة والتحليلات', '/admin'),
+        _Breadcrumb('تحليلات الأداء'),
+      ];
+    }
+    if (path == '/admin/report-designer') {
+      return const [
+        _Breadcrumb('الرئيسية', '/'),
+        _Breadcrumb('الإدارة والتحليلات', '/admin'),
+        _Breadcrumb('مصمم التقارير'),
+      ];
+    }
+    if (path == '/admin/customizer') {
+      return const [_Breadcrumb('الرئيسية', '/'), _Breadcrumb('الإعدادات'), _Breadcrumb('تخصيص التطبيق')];
+    }
+    if (path == '/hr') {
+      return const [_Breadcrumb('الرئيسية', '/'), _Breadcrumb('الموارد البشرية')];
+    }
+    if (path == '/settings') {
+      return const [_Breadcrumb('الرئيسية', '/'), _Breadcrumb('الإعدادات')];
+    }
+    return const [_Breadcrumb('الرئيسية', '/')];
   }
 
   Future<void> _signOut(BuildContext context) async {
@@ -430,9 +501,11 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
-    final path = GoRouterState.of(context).uri.path;
+    final location = GoRouterState.of(context).uri;
+    final path = location.path;
     final selected = _selectedIndex(path);
     final tabs = _tabs();
+    final breadcrumbs = _breadcrumbs(location);
     return AnimatedBuilder(
       animation: AppCustomizer.instance,
       builder: (context, _) {
@@ -457,6 +530,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
                   _PageTitleBar(
                     title: widget.title,
                     subtitle: widget.subtitle,
+                    breadcrumbs: breadcrumbs,
                     onBack: _backRoute(path) == null
                         ? null
                         : () => _navigate(_backRoute(path)!),
@@ -641,11 +715,24 @@ class _BrandLogo extends StatelessWidget {
 
 /// Slim page-title strip under the brand header: back button (on inner
 /// pages), page title and an optional one-line subtitle.
+class _Breadcrumb {
+  const _Breadcrumb(this.label, [this.route]);
+
+  final String label;
+  final String? route;
+}
+
 class _PageTitleBar extends StatelessWidget {
-  const _PageTitleBar({required this.title, this.subtitle, this.onBack});
+  const _PageTitleBar({
+    required this.title,
+    this.subtitle,
+    this.breadcrumbs = const [],
+    this.onBack,
+  });
 
   final String title;
   final String? subtitle;
+  final List<_Breadcrumb> breadcrumbs;
   final VoidCallback? onBack;
 
   static const _orgName = 'مؤسسة الشاعري للتجارة العامة';
@@ -656,7 +743,12 @@ class _PageTitleBar extends StatelessWidget {
     final showSub = sub.isNotEmpty && sub != _orgName && sub != title;
     return Container(
       width: double.infinity,
-      padding: EdgeInsets.fromLTRB(onBack == null ? 16 : 6, 8, 16, 8),
+      padding: EdgeInsets.fromLTRB(
+        onBack == null ? 16 : 6,
+        8,
+        16,
+        breadcrumbs.length > 1 ? 7 : 8,
+      ),
       decoration: const BoxDecoration(
         color: Color(0xFFF9FBFD),
         border: Border(
@@ -713,6 +805,45 @@ class _PageTitleBar extends StatelessWidget {
                       height: 1.3,
                     ),
                   ),
+                if (breadcrumbs.length > 1) ...[
+                  const SizedBox(height: 5),
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      textDirection: TextDirection.ltr,
+                      children: [
+                        for (var i = 0; i < breadcrumbs.length; i++) ...[
+                          if (i > 0)
+                            const Padding(
+                              padding: EdgeInsets.symmetric(horizontal: 5),
+                              child: Icon(
+                                Icons.chevron_left,
+                                size: 15,
+                                color: Color(0xFF8A98A8),
+                              ),
+                            ),
+                          InkWell(
+                            onTap: breadcrumbs[i].route == null
+                                ? null
+                                : () => context.go(breadcrumbs[i].route!),
+                            child: Text(
+                              breadcrumbs[i].label,
+                              style: TextStyle(
+                                color: breadcrumbs[i].route == null
+                                    ? const Color(0xFF637188)
+                                    : const Color(0xFF0B568C),
+                                fontSize: 10.5,
+                                fontWeight: breadcrumbs[i].route == null
+                                    ? FontWeight.w700
+                                    : FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
