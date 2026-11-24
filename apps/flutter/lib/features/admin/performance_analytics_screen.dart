@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -26,6 +28,9 @@ class _PerformanceAnalyticsScreenState
   List<_Branch> _branches = [];
   _Delivery _delivery = _Delivery();
   Map<String, int> _reportStatusCounts = {};
+  RealtimeChannel? _realtime;
+  Timer? _refreshTimer;
+  int _loadToken = 0;
 
   static const _roleNames = <String, String>{
     'owner': 'صاحب المؤسسة',
@@ -38,7 +43,49 @@ class _PerformanceAnalyticsScreenState
   @override
   void initState() {
     super.initState();
+    _subscribeToChanges();
     _load();
+  }
+
+  void _subscribeToChanges() {
+    final db = Supabase.instance.client;
+    _realtime = db
+        .channel('performance-analytics-live')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'tasks',
+          callback: (_) => _scheduleRefresh(),
+        )
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'task_reports',
+          callback: (_) => _scheduleRefresh(),
+        )
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'employee_role_reports',
+          callback: (_) => _scheduleRefresh(),
+        )
+      ..subscribe();
+  }
+
+  void _scheduleRefresh() {
+    if (!mounted) return;
+    _refreshTimer?.cancel();
+    _refreshTimer = Timer(const Duration(milliseconds: 350), _load);
+  }
+
+  @override
+  void dispose() {
+    _refreshTimer?.cancel();
+    final channel = _realtime;
+    if (channel != null) {
+      Supabase.instance.client.removeChannel(channel);
+    }
+    super.dispose();
   }
 
   List<Map<String, dynamic>> _rows(dynamic value) => value is List
@@ -51,7 +98,29 @@ class _PerformanceAnalyticsScreenState
   String _str(dynamic value, [String fallback = '']) =>
       value == null ? fallback : value.toString();
 
+  bool _matchesTaskFilter(Map<String, dynamic> task) {
+    final assignedTo = _str(task['assigned_to']);
+    if (_employeeFilter != null && assignedTo != _employeeFilter) return false;
+    final rawDate = _str(task['due_at']);
+    final parsed = DateTime.tryParse(rawDate)?.toLocal();
+    final day = parsed == null
+        ? null
+        : DateTime(parsed.year, parsed.month, parsed.day);
+    final from = _fromDate == null
+        ? null
+        : DateTime(_fromDate!.year, _fromDate!.month, _fromDate!.day);
+    final to = _toDate == null
+        ? null
+        : DateTime(_toDate!.year, _toDate!.month, _toDate!.day);
+    if ((from != null || to != null) && day == null) return false;
+    if (day != null &&
+        ((from != null && day.isBefore(from)) ||
+            (to != null && day.isAfter(to)))) return false;
+    return true;
+  }
+
   Future<void> _load() async {
+    final token = ++_loadToken;
     if (!mounted) return;
     setState(() {
       _loading = true;
@@ -91,7 +160,7 @@ class _PerformanceAnalyticsScreenState
             .limit(2000),
         db
             .from('employee_role_reports')
-            .select('id,employee_user_id,status')
+            .select('id,employee_user_id,status,report_date')
             .limit(2000),
       ]);
       final tasks = _rows(results[0]);
@@ -100,6 +169,7 @@ class _PerformanceAnalyticsScreenState
       final branchRows = _rows(results[3]);
       final taskReports = _rows(results[4]);
       final roleReports = _rows(results[5]);
+      if (!mounted || token != _loadToken) return;
       final unifiedTaskIds = tasks
           .where(_isUnifiedTask)
           .map((task) => _str(task['id']))
@@ -123,29 +193,52 @@ class _PerformanceAnalyticsScreenState
         if (member == null || member['user_id'] == null) continue;
         primary.putIfAbsent(_str(member['user_id']), () => assignment);
       }
+      final taskById = <String, Map<String, dynamic>>{
+        for (final task in tasks) _str(task['id']): task,
+      };
       final reportCounts = <String, int>{};
       final reportStatusCounts = <String, int>{};
       for (final row in taskReports) {
-        if (_taskSource == 'unified' &&
-            !unifiedTaskIds.contains(_str(row['task_id']))) {
-          continue;
-        }
-        if (row['status'] != null && _str(row['submitted_by']).isNotEmpty) {
-          final id = _str(row['submitted_by']);
-          reportCounts[id] = (reportCounts[id] ?? 0) + 1;
+        final task = taskById[_str(row['task_id'])];
+        if (task == null ||
+            (_taskSource == 'unified' &&
+                !unifiedTaskIds.contains(_str(row['task_id']))) ||
+            !_matchesTaskFilter(task)) continue;
+        final employeeId = _str(task['assigned_to'], _str(row['submitted_by']));
+        if (employeeId.isNotEmpty) {
+          reportCounts[employeeId] = (reportCounts[employeeId] ?? 0) + 1;
         }
         final status = _str(row['status']);
-        if (status.isNotEmpty) reportStatusCounts[status] = (reportStatusCounts[status] ?? 0) + 1;
+        if (status.isNotEmpty) {
+          reportStatusCounts[status] = (reportStatusCounts[status] ?? 0) + 1;
+        }
       }
-      for (final row in _taskSource == 'unified'
-          ? const <Map<String, dynamic>>[]
-          : roleReports) {
-        if (row['status'] != null && _str(row['employee_user_id']).isNotEmpty) {
-          final id = _str(row['employee_user_id']);
-          reportCounts[id] = (reportCounts[id] ?? 0) + 1;
+      if (_taskSource != 'unified') {
+        for (final row in roleReports) {
+          final employeeId = _str(row['employee_user_id']);
+          final reportDate = DateTime.tryParse(_str(row['report_date']))?.toLocal();
+          final day = reportDate == null
+              ? null
+              : DateTime(reportDate.year, reportDate.month, reportDate.day);
+          final from = _fromDate == null
+              ? null
+              : DateTime(_fromDate!.year, _fromDate!.month, _fromDate!.day);
+          final to = _toDate == null
+              ? null
+              : DateTime(_toDate!.year, _toDate!.month, _toDate!.day);
+          if (_employeeFilter != null && employeeId != _employeeFilter) continue;
+          if ((from != null || to != null) && day == null) continue;
+          if (day != null &&
+              ((from != null && day.isBefore(from)) ||
+                  (to != null && day.isAfter(to)))) continue;
+          if (employeeId.isNotEmpty) {
+            reportCounts[employeeId] = (reportCounts[employeeId] ?? 0) + 1;
+          }
+          final status = _str(row['status']);
+          if (status.isNotEmpty) {
+            reportStatusCounts[status] = (reportStatusCounts[status] ?? 0) + 1;
+          }
         }
-        final status = _str(row['status']);
-        if (status.isNotEmpty) reportStatusCounts[status] = (reportStatusCounts[status] ?? 0) + 1;
       }
       final byUser = <String, _Employee>{};
       final employeeOptions = <String, String>{};
@@ -170,22 +263,8 @@ class _PerformanceAnalyticsScreenState
       }
       final overallDelivery = _Delivery();
       for (final task in evaluationTasks) {
-        final assignedTo = _str(task['assigned_to']);
         final dueDate = DateTime.tryParse(_str(task['due_at']))?.toLocal();
-        final taskDay = dueDate == null
-            ? null
-            : DateTime(dueDate.year, dueDate.month, dueDate.day);
-        final from = _fromDate == null
-            ? null
-            : DateTime(_fromDate!.year, _fromDate!.month, _fromDate!.day);
-        final to = _toDate == null
-            ? null
-            : DateTime(_toDate!.year, _toDate!.month, _toDate!.day);
-        if (_employeeFilter != null && assignedTo != _employeeFilter) continue;
-        if ((from != null || to != null) && taskDay == null) continue;
-        if (taskDay != null &&
-            ((from != null && taskDay.isBefore(from)) ||
-                (to != null && taskDay.isAfter(to)))) continue;
+        if (!_matchesTaskFilter(task)) continue;
         final employee = byUser[_str(task['assigned_to'])];
         if (employee == null) continue;
         final status = _str(task['status']);
@@ -196,7 +275,7 @@ class _PerformanceAnalyticsScreenState
         final isDone = _isDone(status);
         employee.required[bucket] = (employee.required[bucket] ?? 0) + 1;
         if (isDone) employee.done[bucket] = (employee.done[bucket] ?? 0) + 1;
-        final due = DateTime.tryParse(_str(task['due_at']));
+        final due = dueDate;
         if (!isDone &&
             status != 'cancelled' &&
             due != null &&
@@ -237,7 +316,7 @@ class _PerformanceAnalyticsScreenState
         branch.highRequired += employee.highRequired;
         branch.highDone += employee.highDone;
       }
-      if (!mounted) return;
+      if (!mounted || token != _loadToken) return;
       setState(() {
         _employees = employees;
         _branches = branchMap.values.toList()
@@ -1138,7 +1217,7 @@ class _Employee {
   int get highDone => (done['high'] ?? 0) + (done['urgent'] ?? 0);
   double get rate => totalRequired == 0 ? 0 : totalDone * 100 / totalRequired;
   double get highRate =>
-      highRequired == 0 ? 100 : highDone * 100 / highRequired;
+      highRequired == 0 ? 0 : highDone * 100 / highRequired;
   double priorityRate(String key) =>
       (required[key] ?? 0) == 0 ? 0 : (done[key] ?? 0) * 100 / required[key]!;
 }
