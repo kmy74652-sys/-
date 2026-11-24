@@ -421,6 +421,20 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
     }
   }
 
+  Future<void> _submitTaskForReview() async {
+    // The secured status RPC requires a report row first. Unified tasks with
+    // no report fields use the validated report RPC with an empty payload.
+    if (_forms.isNotEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('أكمل إرسال نماذج التقرير أولًا')),
+        );
+      }
+      return;
+    }
+    await _submitReport();
+  }
+
   Object? _convert(String value, String type) {
     if (value.isEmpty) return null;
     if (type == 'integer' || type == 'number' || type == 'decimal')
@@ -1779,7 +1793,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                     ),
                   if (['in_progress', 'on_hold'].contains(_task?['status']))
                     FilledButton(
-                      onPressed: _saving ? null : () => _status('submitted'),
+                      onPressed: _saving ? null : _submitTaskForReview,
                       child: const Text('إرسال المهمة للمراجعة'),
                     ),
                   if (['report_submitted', 'submitted'].contains(_task?['status']))
