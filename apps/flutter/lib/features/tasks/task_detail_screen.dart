@@ -171,7 +171,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
       final task = await db
           .from('tasks')
           .select(
-            'id,title,description,due_at,priority,status,task_instructions,proof_required,proof_instructions,report_flow',
+            'id,title,description,due_at,priority,status,task_instructions,proof_required,proof_instructions,report_flow,report_required',
           )
           .eq('id', widget.taskId)
           .single();
@@ -422,8 +422,12 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
   }
 
   Future<void> _submitTaskForReview() async {
-    // The secured status RPC requires a report row first. Unified tasks with
-    // no report fields use the validated report RPC with an empty payload.
+    // The administration's report_required flag decides whether a report is
+    // needed. Optional-report tasks go through the secured status RPC directly.
+    if (_task?['report_required'] != true) {
+      await _status('submitted');
+      return;
+    }
     if (_forms.isNotEmpty) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
