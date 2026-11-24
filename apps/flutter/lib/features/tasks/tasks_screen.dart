@@ -34,6 +34,7 @@ class _TasksScreenState extends State<TasksScreen>
   bool _queueBusy = false;
   String _view = 'tasks';
   String _ledgerOrder = 'latest';
+  bool _officialHeaderCollapsed = false;
 
   static const Map<String, String> _statusLabels = {
     'pending': 'جديدة',
@@ -574,23 +575,66 @@ class _TasksScreenState extends State<TasksScreen>
     final weeklyException = legacyWorkHours
         ? workHour(2).replaceFirst('الاستثناء الأسبوعي:', '').trim()
         : workHour(5).replaceFirst('الاستثناء الأسبوعي:', '').trim();
-    Widget keyValueTable(List<(String, String)> rows) => Table(
-          border: TableBorder.all(color: const Color(0xFFD8E4E0), width: 0.8),
-          columnWidths: const {
-            0: FlexColumnWidth(0.36),
-            1: FlexColumnWidth(0.64),
-          },
-          children: rows
-              .map(
-                (row) => TableRow(
-                  children: [
-                    _officialCell(row.$1, bold: true, background: const Color(0xFFF1F6F4)),
-                    _officialCell(row.$2),
-                  ],
-                ),
-              )
-              .toList(),
+    Widget compactField(String label, String fieldValue) => Container(
+          constraints: const BoxConstraints(minHeight: 52),
+          padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
+          color: const Color(0xFFF8FBFA),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                label,
+                textAlign: TextAlign.right,
+                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: AppColors.navy),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(height: 2),
+              Text(
+                fieldValue.trim().isEmpty ? '—' : fieldValue,
+                textAlign: TextAlign.right,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontSize: 12),
+              ),
+            ],
+          ),
         );
+
+    Widget compactGrid(List<(String, String)> fields) {
+      final items = [...fields];
+      if (items.length.isOdd) items.add(('', ''));
+      return Table(
+        textDirection: Directionality.of(context),
+        border: TableBorder.all(color: const Color(0xFFD8E4E0), width: 0.8),
+        columnWidths: const {0: FlexColumnWidth(1), 1: FlexColumnWidth(1)},
+        children: [
+          for (var i = 0; i < items.length; i += 2)
+            TableRow(
+              children: [
+                compactField(items[i].$1, items[i].$2),
+                compactField(items[i + 1].$1, items[i + 1].$2),
+              ],
+            ),
+        ],
+      );
+    }
+
+    final employeeFields = <(String, String)>[
+      ('المسمى الوظيفي', value('المسمى الوظيفي')),
+      ('الفرع', value('الفرع')),
+      ('تاريخ بدء التطبيق', value('تاريخ بدء التطبيق')),
+      ('الهدف من الوظيفة', value('الهدف من الوظيفة')),
+    ];
+    final workFields = <(String, String)>[
+      ('نوع الدوام', workHour(0)),
+      ('الأيام', workHour(1)),
+      ('الاستثناء الأسبوعي', weeklyException),
+      if (firstPeriod != '—' && firstPeriod.isNotEmpty) ('الفترة الأولى', firstPeriod),
+      if (breakPeriod != '—' && breakPeriod.isNotEmpty) ('الاستراحة', breakPeriod),
+      if (secondPeriod != '—' && secondPeriod.isNotEmpty) ('الفترة الثانية', secondPeriod),
+    ];
     final officialRows = <Map<String, String>>[];
     final rowPattern = RegExp(
       r'^صف الجدول:\s*(.*?)\s*\|\s*(.*?)\s*\|\s*(.*?)\s*$',
@@ -645,39 +689,41 @@ class _TasksScreenState extends State<TasksScreen>
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Text(
-              'مؤسسة الشاعري للتجارة العامة · الجدول الرسمي',
-              textAlign: TextAlign.right,
-              style: TextStyle(fontWeight: FontWeight.w900, color: AppColors.navy),
+            Row(
+              textDirection: Directionality.of(context),
+              children: [
+                const Expanded(
+                  child: Text(
+                    'مؤسسة الشاعري للتجارة العامة · الجدول الرسمي',
+                    textAlign: TextAlign.right,
+                    style: TextStyle(fontWeight: FontWeight.w900, color: AppColors.navy),
+                  ),
+                ),
+                TextButton.icon(
+                  onPressed: () => setState(() => _officialHeaderCollapsed = !_officialHeaderCollapsed),
+                  icon: Icon(_officialHeaderCollapsed ? Icons.visibility_outlined : Icons.visibility_off_outlined, size: 17),
+                  label: Text(_officialHeaderCollapsed ? 'إظهار' : 'إخفاء'),
+                ),
+              ],
             ),
-            const SizedBox(height: 8),
-            const Text(
-              'بيانات الموظف والاعتماد والهدف',
-              textAlign: TextAlign.right,
-              style: TextStyle(fontWeight: FontWeight.w800, color: AppColors.navy),
-            ),
-            const SizedBox(height: 6),
-            keyValueTable([
-              ('المسمى الوظيفي', value('المسمى الوظيفي')),
-              ('الفرع', value('الفرع')),
-              ('تاريخ بدء التطبيق', value('تاريخ بدء التطبيق')),
-              ('الهدف من الوظيفة', value('الهدف من الوظيفة')),
-            ]),
-            const SizedBox(height: 12),
-            const Text(
-              'ساعات الدوام والاستثناء الأسبوعي',
-              textAlign: TextAlign.right,
-              style: TextStyle(fontWeight: FontWeight.w800, color: AppColors.navy),
-            ),
-            const SizedBox(height: 6),
-            keyValueTable([
-              ('نوع الدوام', workHour(0)),
-              ('الأيام', workHour(1)),
-              ('الاستثناء الأسبوعي', weeklyException),
-              ('الفترة الأولى', firstPeriod),
-              ('الاستراحة', breakPeriod),
-              ('الفترة الثانية', secondPeriod),
-            ]),
+            if (!_officialHeaderCollapsed) ...[
+              const SizedBox(height: 4),
+              const Text(
+                'بيانات الموظف والاعتماد والهدف',
+                textAlign: TextAlign.right,
+                style: TextStyle(fontWeight: FontWeight.w800, color: AppColors.navy),
+              ),
+              const SizedBox(height: 5),
+              compactGrid(employeeFields),
+              const SizedBox(height: 8),
+              const Text(
+                'ساعات الدوام والاستثناء الأسبوعي',
+                textAlign: TextAlign.right,
+                style: TextStyle(fontWeight: FontWeight.w800, color: AppColors.navy),
+              ),
+              const SizedBox(height: 5),
+              compactGrid(workFields),
+            ],
             const SizedBox(height: 8),
             Table(
               textDirection: Directionality.of(context),
