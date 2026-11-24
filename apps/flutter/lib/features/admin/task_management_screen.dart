@@ -7,8 +7,13 @@ import '../../shared/app_shell.dart';
 import '../../shared/form_widgets.dart';
 
 class TaskManagementScreen extends StatefulWidget {
-  const TaskManagementScreen({super.key, this.unifiedOnly = false});
+  const TaskManagementScreen({
+    super.key,
+    this.unifiedOnly = false,
+    this.initialTaskFilter,
+  });
   final bool unifiedOnly;
+  final String? initialTaskFilter;
   @override
   State<TaskManagementScreen> createState() => _TaskManagementScreenState();
 }
@@ -31,6 +36,19 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
   @override
   void initState() {
     super.initState();
+    const supportedFilters = {
+      'all',
+      'pending',
+      'received',
+      'in_progress',
+      'submitted',
+      'needs_revision',
+      'completed_approved',
+      'late',
+    };
+    if (supportedFilters.contains(widget.initialTaskFilter)) {
+      _taskFilter = widget.initialTaskFilter!;
+    }
     _load();
   }
 
@@ -408,9 +426,14 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
   List<Map<String, dynamic>> get _visibleTasks => _tasks.where((task) {
     if (_isUnifiedTask(task) != widget.unifiedOnly) return false;
     final rawTaskStatus = _s(task['status']);
+    final dueAt = DateTime.tryParse(_s(task['due_at']));
     final taskMatches = _taskFilter == 'all' ||
         (_taskFilter == 'pending' && ['pending', 'new'].contains(rawTaskStatus)) ||
         (_taskFilter == 'submitted' && ['submitted', 'report_submitted'].contains(rawTaskStatus)) ||
+        (_taskFilter == 'late' &&
+            (rawTaskStatus == 'late' ||
+                (dueAt != null && dueAt.isBefore(DateTime.now()))) &&
+            !['approved', 'completed', 'completed_approved'].contains(rawTaskStatus)) ||
         rawTaskStatus == _taskFilter;
     final reportMatches = _reportFilter == 'all' || _reportStatus(task) == _reportFilter;
     return taskMatches && reportMatches;
@@ -432,6 +455,7 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
         'submitted': 'للمراجعة',
         'needs_revision': 'تحتاج تصحيحًا',
         'completed_approved': 'معتمدة',
+        'late': 'متأخرة',
       }[_taskFilter] ?? _taskFilter);
     }
     if (_reportFilter != 'all') values.add(_reportFilter);
@@ -964,6 +988,7 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
                       const SizedBox(height: 6),
                       _filterRow([
                         _filterChip(value: 'completed_approved', label: 'معتمدة', group: 'task', onSelected: () => _taskFilter = 'completed_approved'),
+                        _filterChip(value: 'late', label: 'متأخرة', group: 'task', onSelected: () => _taskFilter = 'late'),
                       ]),
                       const SizedBox(height: 12),
                       const Text(

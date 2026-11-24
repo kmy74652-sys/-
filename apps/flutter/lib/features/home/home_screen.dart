@@ -467,7 +467,18 @@ class _HomeScreenState extends State<HomeScreen> {
     child: InkWell(
       borderRadius: BorderRadius.circular(15),
       onTap: _allowed('tasks')
-          ? () => context.go(_manageTasks ? '/admin/tasks' : '/tasks')
+          ? () {
+              final route = _manageTasks ? '/admin/tasks' : '/tasks';
+              final status = switch (item.key) {
+                'in_progress' => 'in_progress',
+                'submitted' => 'submitted',
+                'late' => 'late',
+                _ => null,
+              };
+              context.go(
+                status == null ? route : '$route?status=$status',
+              );
+            }
           : null,
       child: SizedBox(
         height: compact ? 116 : 126,

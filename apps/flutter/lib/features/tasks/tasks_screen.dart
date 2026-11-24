@@ -11,7 +11,9 @@ import '../../core/task_cache.dart';
 import '../../shared/app_shell.dart';
 
 class TasksScreen extends StatefulWidget {
-  const TasksScreen({super.key});
+  const TasksScreen({super.key, this.initialStatus});
+
+  final String? initialStatus;
   @override
   State<TasksScreen> createState() => _TasksScreenState();
 }
@@ -56,6 +58,10 @@ class _TasksScreenState extends State<TasksScreen>
   @override
   void initState() {
     super.initState();
+    const supportedStatuses = {'all', 'pending', 'in_progress', 'submitted', 'approved', 'rejected', 'late'};
+    if (supportedStatuses.contains(widget.initialStatus)) {
+      _statusFilter = widget.initialStatus!;
+    }
     WidgetsBinding.instance.addObserver(this);
     _load();
     _loadTaskEditIdentity();

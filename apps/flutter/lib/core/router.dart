@@ -124,7 +124,12 @@ void initializeRouter() {
     routes: [
       GoRoute(path: '/', builder: (context, state) => const HomeScreen()),
       GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
-      GoRoute(path: '/tasks', builder: (context, state) => const TasksScreen()),
+      GoRoute(
+        path: '/tasks',
+        builder: (context, state) => TasksScreen(
+          initialStatus: state.uri.queryParameters['status'],
+        ),
+      ),
       GoRoute(
         path: '/admin/unified-tasks',
         builder: (context, state) => const _PermissionGate(
@@ -142,9 +147,11 @@ void initializeRouter() {
       GoRoute(path: '/admin', redirect: (context, state) => '/'),
       GoRoute(
         path: '/admin/tasks',
-        builder: (context, state) => const _PermissionGate(
+        builder: (context, state) => _PermissionGate(
           permissions: {'tasks.manage'},
-          child: TaskManagementScreen(),
+          child: TaskManagementScreen(
+            initialTaskFilter: state.uri.queryParameters['status'],
+          ),
         ),
       ),
       GoRoute(
