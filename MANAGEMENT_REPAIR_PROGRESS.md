@@ -20,3 +20,15 @@
 APK مباشر: https://github.com/kmy74652-sys/-/releases/download/latest/alshaeri-latest.apk
 AAB: https://github.com/kmy74652-sys/-/releases/download/latest/alshaeri-latest.aab
 CI: https://github.com/kmy74652-sys/-/actions/runs/45395625081
+
+## مصمم التقارير: تنسيق المكتبة والحذف الآمن — مكتمل برمجيًا، بانتظار CI
+
+تم تعديل `apps/flutter/lib/features/admin/report_designer_screen.dart` لتنسيق الطابع الزمني باستخدام `DateTime.tryParse(...).toLocal()` و`intl` بصيغة `dd/MM/yyyy HH:mm`، وترتيب القوالب بالأحدث تعديلًا ثم إنشاءً، وإظهار الوصف كاملًا باتجاه RTL، وتوحيد صف أزرار «تعديل / إصدار جديد» و«نسخ» و«حذف»، مع زر تحديث واضح أسفل المكتبة.
+
+أضيفت نافذة تأكيد وزر حذف فعلي يستدعي `admin_delete_report_template`، وتُحدّث القائمة بإعادة التحميل بعد النجاح. الأخطاء المرتبطة بتقارير مرسلة أو تقارير موظفين أو Snapshots تُعرض برسائل عربية محددة ولا تُحذف البيانات التاريخية.
+
+تم إنشاء وتطبيق `supabase/migrations/20261124171000_safe_report_template_delete.sql` على مشروع الإنتاج `fjmryqhdwxsocdzswnkq`. الدالة تتحقق من صلاحية الإدارة، وترفض القالب المرتبط بـ `report_submissions` أو `employee_dynamic_reports` أو `task_report_form_snapshots`، وتحذف القالب وإصداراته وحقوله فقط عند عدم وجود أي مرجع تاريخي. تحقق SQL من تعريف الدالة الجديدة ومن أعداد الارتباطات دون تعديل البيانات: القالب غير المستخدم الوحيد قابل للحذف، والقوالب الأخرى محمية.
+
+لم تُضف ملفات البناء وتقارير المراجعة غير المتتبعة إلى Git. لا تتوفر أدوات Flutter/Dart محليًا؛ التحقق النهائي سيكون عبر GitHub Actions.
+
+الخطوة التالية: commit ورفع التعديلات، ثم متابعة CI حتى نجاح التحليل والاختبارات وبناء APK/AAB.

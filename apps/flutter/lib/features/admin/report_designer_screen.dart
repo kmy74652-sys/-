@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/theme.dart';
@@ -120,7 +121,8 @@ class _ReportDesignerScreenState extends State<ReportDesignerScreen> {
           )
           .eq('organization_id', org)
           .eq('is_active', true)
-          .order('title')
+          .order('updated_at', ascending: false)
+          .order('created_at', ascending: false)
           .limit(100);
       final employees = await _db
           .from('organization_memberships')
@@ -144,6 +146,80 @@ class _ReportDesignerScreenState extends State<ReportDesignerScreen> {
   }
 
   String _message(Object e) => e.toString().replaceFirst('Exception: ', '');
+
+  String _formatTimestamp(Object? raw) {
+    final parsed = DateTime.tryParse(raw?.toString() ?? '');
+    if (parsed == null) return 'تاريخ غير متاح';
+    return DateFormat('dd/MM/yyyy HH:mm').format(parsed.toLocal());
+  }
+
+  String _deleteError(Object error) {
+    final message = _message(error);
+    if (message.contains('report_template_has_submissions')) {
+      return 'لا يمكن حذف القالب لأنه مرتبط بتقارير مرسلة محفوظة. أبقيناه للحفاظ على السجل التاريخي.';
+    }
+    if (message.contains('report_template_has_dynamic_reports')) {
+      return 'لا يمكن حذف القالب لأنه مرتبط بتقارير موظفين محفوظة. أبقيناه للحفاظ على السجل التاريخي.';
+    }
+    if (message.contains('report_template_has_snapshots')) {
+      return 'لا يمكن حذف القالب لأنه مستخدم في مهام أو نماذج محفوظة. أبقيناه حتى لا تتضرر البيانات السابقة.';
+    }
+    if (message.contains('management_role_required')) {
+      return 'لا تملك صلاحية حذف قوالب التقارير.';
+    }
+    return 'تعذر حذف القالب: $message';
+  }
+
+  Future<void> _deleteTemplate(Map<String, dynamic> template) async {
+    final title = template['title']?.toString() ?? 'هذا القالب';
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: AlertDialog(
+          title: const Text('حذف قالب التقرير؟'),
+          content: Text(
+            'سيُحذف «$title» وإصداراته وحقوله غير المستخدمة فقط. إذا كان مرتبطًا بتقرير أو مهمة محفوظة سيرفض النظام العملية ولن تُحذف أي بيانات تاريخية.',
+            textAlign: TextAlign.right,
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('إلغاء'),
+            ),
+            FilledButton(
+              style: FilledButton.styleFrom(backgroundColor: Colors.red),
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('حذف القالب'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    setState(() {
+      _busy = true;
+      _error = null;
+      _notice = null;
+    });
+    try {
+      await _db.rpc(
+        'admin_delete_report_template',
+        params: {
+          'p_organization_id': _orgId ?? await _organizationId(),
+          'p_template_id': template['id'],
+        },
+      );
+      if (mounted) {
+        setState(() => _notice = 'تم حذف القالب وإصداراته وحقوله غير المرتبطة بنجاح.');
+        await _loadTemplates();
+      }
+    } catch (e) {
+      if (mounted) setState(() => _error = _deleteError(e));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
   Map<String, dynamic> _newField(int i, Set<String> used) {
     var n = i + 1;
     while (used.contains('field_$n')) {
@@ -667,23 +743,45 @@ class _ReportDesignerScreenState extends State<ReportDesignerScreen> {
                   textAlign: TextAlign.right,
                 ),
                 Text(
-                  '${_roles[t['role_code']] ?? t['role_code'] ?? ''}${t['updated_at'] == null ? '' : ' · ${t['updated_at']}'}',
+                  'الدور: ${_roles[t['role_code']] ?? t['role_code'] ?? 'غير محدد'}  ·  آخر تعديل: ${_formatTimestamp(t['updated_at'] ?? t['created_at'])}',
                   textAlign: TextAlign.right,
                   style: const TextStyle(color: AppColors.muted),
                 ),
-                if ((t['description']?.toString() ?? '').isNotEmpty)
-                  Text(t['description'].toString(), textAlign: TextAlign.right),
-                Wrap(
-                  alignment: WrapAlignment.start,
-                  spacing: 8,
+                if ((t['description']?.toString() ?? '').trim().isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    t['description'].toString(),
+                    textAlign: TextAlign.right,
+                    softWrap: true,
+                  ),
+                ],
+                const SizedBox(height: 12),
+                Row(
                   children: [
-                    OutlinedButton(
-                      onPressed: _busy ? null : () => _open(t),
-                      child: const Text('تعديل / إصدار جديد'),
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: _busy ? null : () => _open(t),
+                        child: const Text('تعديل / إصدار جديد'),
+                      ),
                     ),
-                    OutlinedButton(
-                      onPressed: _busy ? null : () => _open(t, copy: true),
-                      child: const Text('نسخ'),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: _busy ? null : () => _open(t, copy: true),
+                        child: const Text('نسخ'),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: _busy ? null : () => _deleteTemplate(t),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: Colors.red.shade700,
+                          side: BorderSide(color: Colors.red.shade300),
+                        ),
+                        icon: const Icon(Icons.delete_outline),
+                        label: const Text('حذف'),
+                      ),
                     ),
                   ],
                 ),
@@ -691,10 +789,14 @@ class _ReportDesignerScreenState extends State<ReportDesignerScreen> {
             ),
           ),
         ),
-      TextButton.icon(
-        onPressed: _loadTemplates,
-        icon: const Icon(Icons.refresh),
-        label: const Text('تحديث المكتبة'),
+      const SizedBox(height: 8),
+      Align(
+        alignment: Alignment.center,
+        child: OutlinedButton.icon(
+          onPressed: _busy ? null : _loadTemplates,
+          icon: const Icon(Icons.refresh),
+          label: const Text('تحديث المكتبة'),
+        ),
       ),
     ],
   );
