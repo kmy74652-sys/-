@@ -153,6 +153,11 @@ class _ReportDesignerScreenState extends State<ReportDesignerScreen> {
     return DateFormat('dd/MM/yyyy HH:mm').format(parsed.toLocal());
   }
 
+  String _templateKind(Map<String, dynamic> template) {
+    final title = template['title']?.toString() ?? '';
+    return title.contains('نسخة') ? 'نسخة مستقلة' : 'قالب أساسي';
+  }
+
   String _deleteError(Object error) {
     final message = _message(error);
     if (message.contains('report_template_has_submissions')) {
@@ -734,13 +739,27 @@ class _ReportDesignerScreenState extends State<ReportDesignerScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Text(
-                  t['title']?.toString() ?? '',
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.navy,
-                  ),
-                  textAlign: TextAlign.right,
+                Row(
+                  textDirection: Directionality.of(context),
+                  children: [
+                    Expanded(
+                      child: Text(
+                        t['title']?.toString() ?? '',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.navy,
+                          fontSize: 16,
+                        ),
+                        textAlign: TextAlign.right,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Chip(
+                      label: Text(_templateKind(t)),
+                      visualDensity: VisualDensity.compact,
+                      padding: EdgeInsets.zero,
+                    ),
+                  ],
                 ),
                 Text(
                   'الدور: ${_roles[t['role_code']] ?? t['role_code'] ?? 'غير محدد'}  ·  آخر تعديل: ${_formatTimestamp(t['updated_at'] ?? t['created_at'])}',

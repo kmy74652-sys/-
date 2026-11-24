@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../shared/app_shell.dart';
@@ -57,6 +58,97 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
     if (index == -1) return '$text\n$next'.trim();
     lines[index] = next;
     return lines.join('\n').trim();
+  }
+
+  String _localDateTime(dynamic value) {
+    final parsed = DateTime.tryParse(_s(value));
+    if (parsed == null) return 'غير محدد';
+    return DateFormat('dd/MM/yyyy HH:mm').format(parsed.toLocal());
+  }
+
+  List<Map<String, String>> _descriptionRows(String text) {
+    final rows = <Map<String, String>>[];
+    final extras = <String>[];
+    final fields = <String, String>{};
+    for (final rawLine in text.split('\n')) {
+      final line = rawLine.trim();
+      if (line.isEmpty) continue;
+      final separator = line.indexOf(':');
+      if (separator <= 0) {
+        extras.add(line);
+        continue;
+      }
+      final label = line.substring(0, separator).trim();
+      final value = line.substring(separator + 1).trim();
+      if (label == 'وصف المهمة 1' || label == 'وصف المهمة') continue;
+      if (label == 'صف الجدول') {
+        final parts = value.split('|').map((part) => part.trim()).toList();
+        if (parts.isNotEmpty && parts[0].isNotEmpty) fields['الوقت / الفترة'] = parts[0];
+        if (parts.length > 1 && parts[1].isNotEmpty) fields['المهمة / المسؤولية'] = parts[1];
+        if (parts.length > 2 && parts[2].isNotEmpty) fields['المخرج المطلوب'] = parts.sublist(2).join(' | ');
+      } else {
+        final normalizedLabel = label == 'الجدول الموحد' ? 'الجدول الموحد الرسمي' : label;
+        fields[normalizedLabel] = value.isEmpty ? 'غير محدد' : value;
+      }
+    }
+    const preferredOrder = [
+      'الجدول الموحد الرسمي',
+      'المسمى الوظيفي',
+      'الفرع',
+      'الوقت المحدد',
+      'الوقت / الفترة',
+      'المهمة / المسؤولية',
+      'المخرج المطلوب',
+    ];
+    for (final label in preferredOrder) {
+      final value = fields.remove(label);
+      if (value != null && value.isNotEmpty) {
+        rows.add({'label': label, 'value': value});
+      }
+    }
+    fields.forEach((label, value) {
+      rows.add({'label': label, 'value': value.isEmpty ? 'غير محدد' : value});
+    });
+    if (extras.isNotEmpty) rows.add({'label': 'تفاصيل إضافية', 'value': extras.join('\n')});
+    if (rows.isEmpty) rows.add({'label': 'الوصف', 'value': 'لا توجد تفاصيل وصف محفوظة.'});
+    return rows;
+  }
+
+  Widget _descriptionTable(String text) {
+    final rows = _descriptionRows(text);
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: Container(
+        decoration: BoxDecoration(
+          border: Border.all(color: Theme.of(context).dividerColor),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Table(
+          columnWidths: const {0: FlexColumnWidth(1.05), 1: FlexColumnWidth(2)},
+          border: TableBorder.symmetric(
+            inside: BorderSide(color: Colors.grey, width: 0.35),
+          ),
+          children: [
+            TableRow(
+              decoration: BoxDecoration(color: Theme.of(context).colorScheme.surfaceVariant),
+              children: const [
+                Padding(padding: EdgeInsets.all(9), child: Text('العنصر', textAlign: TextAlign.right, style: TextStyle(fontWeight: FontWeight.bold))),
+                Padding(padding: EdgeInsets.all(9), child: Text('البيانات', textAlign: TextAlign.right, style: TextStyle(fontWeight: FontWeight.bold))),
+              ],
+            ),
+            ...rows.map(
+              (row) => TableRow(
+                children: [
+                  Padding(padding: const EdgeInsets.all(9), child: Text(row['label']!, textAlign: TextAlign.right, style: const TextStyle(fontWeight: FontWeight.w600))),
+                  Padding(padding: const EdgeInsets.all(9), child: Text(row['value']!, textAlign: TextAlign.right)),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Future<void> _load() async {
@@ -267,11 +359,44 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
       _tasks.where((task) => _isUnifiedTask(task) == widget.unifiedOnly).toList();
 
   Widget _filterChip({required String value, required String label, required String group, required VoidCallback onSelected}) =>
-      ChoiceChip(
-        label: Text(label),
-        selected: (group == 'task' ? _taskFilter : _reportFilter) == value,
-        onSelected: (_) => setState(onSelected),
+      SizedBox(
+        width: double.infinity,
+        child: ChoiceChip(
+          label: Text(label, textAlign: TextAlign.center),
+          selected: (group == 'task' ? _taskFilter : _reportFilter) == value,
+          onSelected: (_) => setState(onSelected),
+        ),
       );
+
+  Widget _filterRow(List<Widget> chips) {
+    final padded = [...chips];
+    while (padded.length < 3) {
+      padded.add(const SizedBox.shrink());
+    }
+    if (chips.length == 1) {
+      return Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [SizedBox(width: 132, child: chips.single)],
+      );
+    }
+    return Row(
+      textDirection: Directionality.of(context),
+      children: [
+        for (final chip in padded)
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsetsDirectional.only(end: 6),
+              child: chip,
+            ),
+          ),
+      ],
+    );
+  }
+
+  void _resetFilters() => setState(() {
+        _taskFilter = 'all';
+        _reportFilter = 'all';
+      });
 
   Future<void> _saveTask({Map<String, dynamic>? existing}) async {
     final title = TextEditingController(text: _s(existing?['title']));
@@ -336,16 +461,25 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
                             ),
                         ],
                       ),
-                      TextField(
-                        controller: descriptionCards[i],
-                        textDirection: TextDirection.rtl,
-                        minLines: 2,
-                        maxLines: 5,
-                        decoration: formDecoration(
-                          'محتوى البطاقة',
-                          hint: i == 0 ? 'ما المطلوب تنفيذه؟' : 'أضف تفصيلًا أو نتيجة متوقعة أخرى',
+                      if (existing != null && _isUnifiedTask(existing) && i == 0) ...[
+                        _descriptionTable(descriptionCards[i].text),
+                        const SizedBox(height: 8),
+                        Text(
+                          'يتم تعديل الوقت والمخرج المطلوب من قسم «بيانات صف الجدول الموحد» أدناه، مع الحفاظ على بقية بيانات الصف كاملة.',
+                          textAlign: TextAlign.right,
+                          style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
                         ),
-                      ),
+                      ] else
+                        TextField(
+                          controller: descriptionCards[i],
+                          textDirection: TextDirection.rtl,
+                          minLines: 2,
+                          maxLines: 5,
+                          decoration: formDecoration(
+                            'محتوى البطاقة',
+                            hint: i == 0 ? 'ما المطلوب تنفيذه؟' : 'أضف تفصيلًا أو نتيجة متوقعة أخرى',
+                          ),
+                        ),
                     ],
                   ),
                 ),
@@ -619,42 +753,57 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
                 ),
                 SectionCard(
                   title: 'تصفية المتابعة',
+                  trailing: TextButton.icon(
+                    onPressed: _resetFilters,
+                    icon: const Icon(Icons.restart_alt, size: 18),
+                    label: const Text('إعادة تعيين'),
+                  ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      const Text('حالة المهمة', textAlign: TextAlign.right, style: TextStyle(fontWeight: FontWeight.bold)),
+                      const Text(
+                        'حالة المهمة',
+                        textAlign: TextAlign.right,
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
                       const SizedBox(height: 6),
-                      Wrap(
-                        alignment: WrapAlignment.end,
-                        spacing: 6,
-                        runSpacing: 6,
-                        children: [
+                      _filterRow([
                           _filterChip(value: 'all', label: 'الكل', group: 'task', onSelected: () => _taskFilter = 'all'),
                           _filterChip(value: 'pending', label: 'جديدة', group: 'task', onSelected: () => _taskFilter = 'pending'),
                           _filterChip(value: 'received', label: 'مستلمة', group: 'task', onSelected: () => _taskFilter = 'received'),
-                          _filterChip(value: 'in_progress', label: 'قيد التنفيذ', group: 'task', onSelected: () => _taskFilter = 'in_progress'),
-                          _filterChip(value: 'submitted', label: 'للمراجعة', group: 'task', onSelected: () => _taskFilter = 'submitted'),
-                          _filterChip(value: 'needs_revision', label: 'تحتاج تصحيحًا', group: 'task', onSelected: () => _taskFilter = 'needs_revision'),
-                          _filterChip(value: 'completed_approved', label: 'معتمدة', group: 'task', onSelected: () => _taskFilter = 'completed_approved'),
-                        ],
                       ),
-                      const SizedBox(height: 12),
-                      const Text('حالة التقرير', textAlign: TextAlign.right, style: TextStyle(fontWeight: FontWeight.bold)),
                       const SizedBox(height: 6),
-                      Wrap(
-                        alignment: WrapAlignment.end,
-                        spacing: 6,
-                        runSpacing: 6,
-                        children: [
+                      _filterRow([
+                        _filterChip(value: 'in_progress', label: 'قيد التنفيذ', group: 'task', onSelected: () => _taskFilter = 'in_progress'),
+                        _filterChip(value: 'submitted', label: 'للمراجعة', group: 'task', onSelected: () => _taskFilter = 'submitted'),
+                        _filterChip(value: 'needs_revision', label: 'تحتاج تصحيحًا', group: 'task', onSelected: () => _taskFilter = 'needs_revision'),
+                      ]),
+                      const SizedBox(height: 6),
+                      _filterRow([
+                        _filterChip(value: 'completed_approved', label: 'معتمدة', group: 'task', onSelected: () => _taskFilter = 'completed_approved'),
+                      ]),
+                      const SizedBox(height: 12),
+                      const Text(
+                        'حالة التقرير',
+                        textAlign: TextAlign.right,
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 6),
+                      _filterRow([
                           _filterChip(value: 'all', label: 'الكل', group: 'report', onSelected: () => _reportFilter = 'all'),
                           _filterChip(value: 'لم يبدأ', label: 'لم يبدأ', group: 'report', onSelected: () => _reportFilter = 'لم يبدأ'),
-                          _filterChip(value: 'مرسل للمراجعة', label: 'مرسل للمراجعة', group: 'report', onSelected: () => _reportFilter = 'مرسل للمراجعة'),
                           _filterChip(value: 'مسودة', label: 'مسودة', group: 'report', onSelected: () => _reportFilter = 'مسودة'),
-                          _filterChip(value: 'يحتاج تعديل', label: 'يحتاج تعديل', group: 'report', onSelected: () => _reportFilter = 'يحتاج تعديل'),
-                          _filterChip(value: 'معتمد', label: 'معتمد', group: 'report', onSelected: () => _reportFilter = 'معتمد'),
-                          _filterChip(value: 'بدون تقرير', label: 'بدون تقرير', group: 'report', onSelected: () => _reportFilter = 'بدون تقرير'),
-                        ],
-                      ),
+                      ]),
+                      const SizedBox(height: 6),
+                      _filterRow([
+                        _filterChip(value: 'مرسل للمراجعة', label: 'مرسل للمراجعة', group: 'report', onSelected: () => _reportFilter = 'مرسل للمراجعة'),
+                        _filterChip(value: 'يحتاج تعديل', label: 'يحتاج تعديل', group: 'report', onSelected: () => _reportFilter = 'يحتاج تعديل'),
+                        _filterChip(value: 'معتمد', label: 'معتمد', group: 'report', onSelected: () => _reportFilter = 'معتمد'),
+                      ]),
+                      const SizedBox(height: 6),
+                      _filterRow([
+                        _filterChip(value: 'بدون تقرير', label: 'بدون تقرير', group: 'report', onSelected: () => _reportFilter = 'بدون تقرير'),
+                      ]),
                     ],
                   ),
                 ),
@@ -702,14 +851,12 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
                                           ),
                                         ),
                                       Text(
-                                        'الموعد: ${_s(t['due_at'], 'غير محدد')}',
+                                        'الموعد: ${_localDateTime(t['due_at'])}',
                                         textAlign: TextAlign.right,
                                       ),
                                       if (_s(t['description']).trim().isNotEmpty)
                                         Text(
-                                          _s(t['description']).split('\n').take(2).join(' · '),
-                                          maxLines: 2,
-                                          overflow: TextOverflow.ellipsis,
+                                          _s(t['description']),
                                           textAlign: TextAlign.right,
                                         ),
                                     ],

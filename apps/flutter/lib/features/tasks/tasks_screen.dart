@@ -459,6 +459,20 @@ class _TasksScreenState extends State<TasksScreen>
     ),
   );
 
+  Widget _officialCell(String text, {bool bold = false, Color? background}) =>
+      Container(
+        color: background,
+        constraints: const BoxConstraints(minHeight: 48),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+        alignment: Alignment.centerRight,
+        child: Text(
+          text.trim().isEmpty ? '—' : text,
+          textAlign: TextAlign.right,
+          softWrap: true,
+          style: TextStyle(fontWeight: bold ? FontWeight.w700 : FontWeight.normal),
+        ),
+      );
+
   Widget _officialTableCard(List<Map<String, dynamic>> tasks) {
     final firstDescription = '${tasks.first['description'] ?? ''}';
     String value(String label) {
@@ -487,6 +501,23 @@ class _TasksScreenState extends State<TasksScreen>
     final weeklyException = legacyWorkHours
         ? workHour(2).replaceFirst('الاستثناء الأسبوعي:', '').trim()
         : workHour(5).replaceFirst('الاستثناء الأسبوعي:', '').trim();
+    Widget keyValueTable(List<(String, String)> rows) => Table(
+          border: TableBorder.all(color: const Color(0xFFD8E4E0), width: 0.8),
+          columnWidths: const {
+            0: FlexColumnWidth(0.36),
+            1: FlexColumnWidth(0.64),
+          },
+          children: rows
+              .map(
+                (row) => TableRow(
+                  children: [
+                    _officialCell(row.$1, bold: true, background: const Color(0xFFF1F6F4)),
+                    _officialCell(row.$2),
+                  ],
+                ),
+              )
+              .toList(),
+        );
     final officialRows = <Map<String, String>>[];
     final rowPattern = RegExp(
       r'^صف الجدول:\s*(.*?)\s*\|\s*(.*?)\s*\|\s*(.*?)\s*$',
@@ -539,58 +570,61 @@ class _TasksScreenState extends State<TasksScreen>
               style: TextStyle(fontWeight: FontWeight.w900, color: AppColors.navy),
             ),
             const SizedBox(height: 8),
-            Text(
-              'المسمى الوظيفي: ${value('المسمى الوظيفي')} · الفرع: ${value('الفرع')}',
+            const Text(
+              'بيانات الموظف والاعتماد والهدف',
               textAlign: TextAlign.right,
+              style: TextStyle(fontWeight: FontWeight.w800, color: AppColors.navy),
             ),
-            Text('بداية التطبيق: ${value('تاريخ بدء التطبيق')}', textAlign: TextAlign.right),
-            if (workHours.isNotEmpty && workHours.first != '—') ...[
-              const SizedBox(height: 8),
-              const Text('ساعات الدوام والاستثناء الأسبوعي', textAlign: TextAlign.right, style: TextStyle(fontWeight: FontWeight.w800, color: AppColors.navy)),
-              SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: DataTable(
-                  columns: const [
-                    DataColumn(label: Text('نوع الدوام')),
-                    DataColumn(label: Text('الأيام')),
-                    DataColumn(label: Text('الفترة الأولى')),
-                    DataColumn(label: Text('الاستراحة')),
-                    DataColumn(label: Text('الفترة الثانية')),
-                    DataColumn(label: Text('الاستثناء الأسبوعي')),
-                  ],
-                  rows: [
-                    DataRow(cells: [
-                      DataCell(Text(workHour(0))),
-                      DataCell(Text(workHour(1))),
-                      DataCell(Text(firstPeriod)),
-                      DataCell(Text(breakPeriod)),
-                      DataCell(Text(secondPeriod)),
-                      DataCell(Text(weeklyException)),
-                    ]),
-                  ],
-                ),
-              ),
-            ],
-            if (value('الهدف من الوظيفة') != '—')
-              Text('الهدف: ${value('الهدف من الوظيفة')}', textAlign: TextAlign.right),
+            const SizedBox(height: 6),
+            keyValueTable([
+              ('المسمى الوظيفي', value('المسمى الوظيفي')),
+              ('الفرع', value('الفرع')),
+              ('تاريخ بدء التطبيق', value('تاريخ بدء التطبيق')),
+              ('الهدف من الوظيفة', value('الهدف من الوظيفة')),
+            ]),
+            const SizedBox(height: 12),
+            const Text(
+              'ساعات الدوام والاستثناء الأسبوعي',
+              textAlign: TextAlign.right,
+              style: TextStyle(fontWeight: FontWeight.w800, color: AppColors.navy),
+            ),
+            const SizedBox(height: 6),
+            keyValueTable([
+              ('نوع الدوام', workHour(0)),
+              ('الأيام', workHour(1)),
+              ('الاستثناء الأسبوعي', weeklyException),
+              ('الفترة الأولى', firstPeriod),
+              ('الاستراحة', breakPeriod),
+              ('الفترة الثانية', secondPeriod),
+            ]),
             const SizedBox(height: 8),
             SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               child: DataTable(
-                columnSpacing: 18,
-                columns: const [
-                  DataColumn(label: Text('الوقت')),
-                  DataColumn(label: Text('المهمة والمسؤولية')),
-                  DataColumn(label: Text('المخرج المطلوب')),
-                  DataColumn(label: Text('الحالة')),
+                headingRowHeight: 58,
+                dataRowMinHeight: 54,
+                dataRowMaxHeight: 90,
+                columnSpacing: 24,
+                horizontalMargin: 14,
+                dividerThickness: 0.8,
+                columns: [
+                  for (final heading in const ['الوقت', 'المهمة والمسؤولية', 'المخرج المطلوب', 'الحالة'])
+                    DataColumn(
+                      label: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        child: Text(heading, textAlign: TextAlign.right),
+                      ),
+                    ),
                 ],
                 rows: officialRows
-                    .map((row) => DataRow(cells: [
-                          DataCell(Text(row['time'] ?? '—')),
-                          DataCell(Text(row['title'] ?? '—')),
-                          DataCell(Text(row['output'] ?? '—')),
-                          DataCell(Text(row['status'] ?? 'جديدة')),
-                        ]))
+                    .map(
+                      (row) => DataRow(cells: [
+                        DataCell(Padding(padding: const EdgeInsets.symmetric(vertical: 8), child: Text(row['time'] ?? '—'))),
+                        DataCell(Padding(padding: const EdgeInsets.symmetric(vertical: 8), child: Text(row['title'] ?? '—'))),
+                        DataCell(Padding(padding: const EdgeInsets.symmetric(vertical: 8), child: Text(row['output'] ?? '—'))),
+                        DataCell(Padding(padding: const EdgeInsets.symmetric(vertical: 8), child: Text(row['status'] ?? 'جديدة'))),
+                      ]),
+                    )
                     .toList(),
               ),
             ),
