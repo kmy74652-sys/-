@@ -434,12 +434,15 @@ class _HomeScreenState extends State<HomeScreen> {
           child: Row(
             textDirection: TextDirection.rtl,
             children: [
-              const Icon(Icons.table_chart_outlined, color: AppColors.green, size: 32),
-              const SizedBox(width: 12),
+              const Icon(Icons.table_chart_outlined,
+                  color: AppColors.green, size: 30),
+              const SizedBox(width: 9),
               const Expanded(
                 child: Text(
                   'افتح الجدول الموحد لإنشاء المهام وإرسالها للموظف',
                   textAlign: TextAlign.right,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                   style: TextStyle(fontWeight: FontWeight.w700),
                 ),
               ),
@@ -570,17 +573,17 @@ class _HomeScreenState extends State<HomeScreen> {
             }
           : null,
       child: SizedBox(
-        height: compact ? 116 : 126,
+        height: compact ? 108 : 126,
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 9),
+          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 7),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(item.icon, color: item.foreground, size: compact ? 25 : 29),
+              Icon(item.icon, color: item.foreground, size: compact ? 23 : 29),
               Text(
                 _summary?[item.key]?.toString() ?? '—',
                 style: TextStyle(
-                  fontSize: compact ? 25 : 29,
+                  fontSize: compact ? 23 : 29,
                   fontWeight: FontWeight.w900,
                   color: item.foreground,
                 ),
@@ -588,9 +591,11 @@ class _HomeScreenState extends State<HomeScreen> {
               Text(
                 item.title,
                 textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
                 style: TextStyle(
-                  fontSize: compact ? 10 : 12,
-                  height: 1.35,
+                  fontSize: compact ? 10.5 : 12,
+                  height: 1.25,
                   fontWeight: FontWeight.w800,
                   color: item.foreground,
                 ),
@@ -650,14 +655,14 @@ class _HomeScreenState extends State<HomeScreen> {
     child: InkWell(
       onTap: () => context.go(_moduleRoute(item)),
       child: SizedBox(
-        height: 86,
+        height: 92,
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
           child: Row(
             textDirection: TextDirection.rtl,
             children: [
-              Icon(item.icon, size: 30, color: AppColors.green),
-              const SizedBox(width: 8),
+              Icon(item.icon, size: 27, color: AppColors.green),
+              const SizedBox(width: 7),
               Expanded(
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -672,7 +677,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                         color: AppColors.navy,
-                        fontSize: 14,
+                        fontSize: 13.5,
                         fontWeight: FontWeight.w800,
                       ),
                     ),
@@ -684,8 +689,8 @@ class _HomeScreenState extends State<HomeScreen> {
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                         color: Color(0xFF4E596C),
-                        fontSize: 10.5,
-                        height: 1.3,
+                        fontSize: 10,
+                        height: 1.2,
                       ),
                     ),
                   ],
