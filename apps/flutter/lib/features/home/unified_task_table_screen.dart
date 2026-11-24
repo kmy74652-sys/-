@@ -49,9 +49,9 @@ class _UnifiedTaskTableScreenState extends State<UnifiedTaskTableScreen> {
         throw Exception('تعذر تحديد المؤسسة المرتبطة بالحساب.');
       }
       final permissions = profile['permissions'];
-      final allowed = permissions is List && permissions.map((e) => e.toString()).any(
-            (permission) => permission == 'tasks.manage' || permission == 'tasks.review',
-          );
+      final allowed = permissions is List && permissions
+          .map((e) => e.toString())
+          .contains('tasks.manage');
       if (!allowed) throw Exception('هذا القسم متاح لصلاحيات إدارة المهام فقط.');
       _organizationId = organization;
       _defaultBranchId = _defaultBranch(profile);
@@ -191,6 +191,7 @@ class _UnifiedTaskTableScreenState extends State<UnifiedTaskTableScreen> {
   String _stableDispatchKey({
     required String organizationId,
     required String userId,
+    required String branchId,
     required String roleCode,
     required String startDate,
     required String reportVersionId,
@@ -200,6 +201,7 @@ class _UnifiedTaskTableScreenState extends State<UnifiedTaskTableScreen> {
     final canonical = [
       organizationId,
       userId,
+      branchId,
       roleCode,
       startDate,
       reportVersionId,
@@ -277,6 +279,7 @@ class _UnifiedTaskTableScreenState extends State<UnifiedTaskTableScreen> {
         final dispatchKey = _stableDispatchKey(
           organizationId: organizationId,
           userId: userId,
+          branchId: branchId ?? '',
           roleCode: roleCode,
           startDate: draft.startDate,
           reportVersionId: draft.reportVersionId ?? '',
@@ -309,7 +312,7 @@ class _UnifiedTaskTableScreenState extends State<UnifiedTaskTableScreen> {
           'p_priority': 'normal',
           'p_branch_id': branchId,
           'p_role_code': roleCode,
-          'p_template_id': null,
+          'p_template_id': draft.reportTemplateId,
           'p_assigned_to': userId,
           'p_report_template_id': draft.reportTemplateId,
           'p_report_version_id': draft.reportVersionId,

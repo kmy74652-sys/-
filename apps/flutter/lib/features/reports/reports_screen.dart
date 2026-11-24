@@ -1238,9 +1238,32 @@ class _ReportsScreenState extends State<ReportsScreen> {
           textAlign: TextAlign.right,
           style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.navy),
         ),
-        subtitle: Text(
-          'الموظف: ${row['employee_name'] ?? 'غير محدد'} · الدور: ${row['role_code'] ?? 'غير محدد'}\nالتاريخ: ${row['report_date'] ?? 'غير محدد'} · ${_statusLabel(status)}',
-          textAlign: TextAlign.right,
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              'الموظف: ${row['employee_name'] ?? 'غير محدد'} · الدور: ${row['role_code'] ?? 'غير محدد'}\nالتاريخ: ${_formattedDate(row['report_date'])}',
+              textAlign: TextAlign.right,
+            ),
+            const SizedBox(height: 5),
+            Align(
+              alignment: Alignment.centerRight,
+              child: Chip(
+                avatar: Icon(
+                  status == 'approved'
+                      ? Icons.verified_outlined
+                      : status == 'returned'
+                      ? Icons.edit_note_outlined
+                      : status == 'submitted'
+                      ? Icons.rate_review_outlined
+                      : Icons.pending_actions_outlined,
+                  size: 16,
+                ),
+                label: Text(_statusLabel(status)),
+                visualDensity: VisualDensity.compact,
+              ),
+            ),
+          ],
         ),
         children: [
           if (answers is Map)
