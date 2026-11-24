@@ -706,7 +706,7 @@ class _TasksScreenState extends State<TasksScreen>
   Widget _ledgerEntry(Map<String, dynamic> task) {
     final report = _reportByTask['${task['id']}'];
     final status = _normalizedStatus(task);
-    final date = '${task['updated_at'] ?? task['due_at'] ?? task['created_at'] ?? 'غير محدد'}';
+    final date = _formatLedgerDate(task['updated_at'] ?? task['due_at'] ?? task['created_at']);
     return InkWell(
       onTap: () => context.push('/tasks/${task['id']}'),
       child: Container(
@@ -739,6 +739,15 @@ class _TasksScreenState extends State<TasksScreen>
         ),
       ),
     );
+  }
+
+  String _formatLedgerDate(Object? raw) {
+    final value = raw?.toString().trim() ?? '';
+    if (value.isEmpty) return 'غير محدد';
+    final parsed = DateTime.tryParse(value)?.toLocal();
+    if (parsed == null) return value;
+    String two(int number) => number.toString().padLeft(2, '0');
+    return '${two(parsed.day)}/${two(parsed.month)}/${parsed.year} · ${two(parsed.hour)}:${two(parsed.minute)}';
   }
 
   String _reportStatusLabel(Object? status) => switch ('$status') {

@@ -173,16 +173,20 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                 .then(
                   (rows) => List<Map<String, dynamic>>.from(rows as List),
                 );
-      final results = await Future.wait<dynamic>([
-        fieldsFuture,
-        db
-            .from('task_execution_steps')
-            .select(
-              'id,title,instructions,sort_order,is_required,evidence_required,evidence_instructions,completed_at',
-            )
-            .eq('task_id', widget.taskId)
-            .order('sort_order'),
-      ]);
+      // Unified-table tasks use immutable report snapshots and do not have
+      // execution-step rows. Do not query that optional table for them: an
+      // employee may read the task while RLS correctly hides step rows.
+      final stepsFuture = _task!['report_flow'] == 'multi_form'
+          ? Future.value(const <Map<String, dynamic>>[])
+          : db
+                .from('task_execution_steps')
+                .select(
+                  'id,title,instructions,sort_order,is_required,evidence_required,evidence_instructions,completed_at',
+                )
+                .eq('task_id', widget.taskId)
+                .order('sort_order')
+                .then((rows) => List<Map<String, dynamic>>.from(rows as List));
+      final results = await Future.wait<dynamic>([fieldsFuture, stepsFuture]);
       _fields = List<Map<String, dynamic>>.from(results[0] as List);
       _steps = List<Map<String, dynamic>>.from(results[1] as List);
       _forms = [];
@@ -259,13 +263,22 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
       for (final field in _fields) {
         _inputs.putIfAbsent('${field['field_key']}', TextEditingController.new);
       }
-      await db.rpc(
-        'mobile_mark_task_opened',
-        params: {'p_task_id': widget.taskId},
-      );
+      // Opening telemetry must never hide an otherwise readable task.
+      try {
+        await db.rpc(
+          'mobile_mark_task_opened',
+          params: {'p_task_id': widget.taskId},
+        );
+      } catch (_) {
+        // The task details are already loaded; status telemetry can retry on
+        // the next open without blocking the employee.
+      }
       _error = null;
-    } catch (_) {
-      _error = 'تعذر تحميل تفاصيل المهمة. تحقق من صلاحيات الحساب والاتصال.';
+    } catch (error) {
+      final message = error.toString().replaceFirst('Exception: ', '').trim();
+      _error = message.isEmpty
+          ? 'تعذر تحميل تفاصيل المهمة. تحقق من صلاحيات الحساب والاتصال.'
+          : 'تعذر تحميل تفاصيل المهمة: $message';
     } finally {
       if (mounted) setState(() => _busy = false);
     }
