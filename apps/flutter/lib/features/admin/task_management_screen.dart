@@ -117,7 +117,7 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
   Widget _descriptionTable(String text) {
     final rows = _descriptionRows(text);
     return Directionality(
-      textDirection: TextDirection.rtl,
+      textDirection: Directionality.of(context),
       child: Container(
         decoration: BoxDecoration(
           border: Border.all(color: Theme.of(context).dividerColor),
@@ -433,7 +433,7 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
           icon: Icons.assignment_outlined,
           note: 'اكتب عنوانًا واضحًا يصف النتيجة المطلوبة من الموظف.',
           children: [
-            TextField(controller: title, textDirection: TextDirection.rtl, textInputAction: TextInputAction.next, decoration: formDecoration('عنوان المهمة *', hint: 'مثال: مراجعة مخزون الفرع الرئيسي')),
+            TextField(controller: title, textDirection: Directionality.of(ctx), textInputAction: TextInputAction.next, decoration: formDecoration('عنوان المهمة *', hint: 'مثال: مراجعة مخزون الفرع الرئيسي')),
             for (var i = 0; i < descriptionCards.length; i++)
               Card(
                 margin: const EdgeInsets.only(top: 8),
@@ -472,7 +472,7 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
                       ] else
                         TextField(
                           controller: descriptionCards[i],
-                          textDirection: TextDirection.rtl,
+                          textDirection: Directionality.of(ctx),
                           minLines: 2,
                           maxLines: 5,
                           decoration: formDecoration(
@@ -502,13 +502,13 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
             children: [
               TextField(
                 controller: time,
-                textDirection: TextDirection.rtl,
+                textDirection: Directionality.of(ctx),
                 decoration: formDecoration('الوقت / الفترة'),
               ),
               const SizedBox(height: 8),
               TextField(
                 controller: output,
-                textDirection: TextDirection.rtl,
+                textDirection: Directionality.of(ctx),
                 minLines: 2,
                 maxLines: 4,
                 decoration: formDecoration('المخرج المطلوب'),
