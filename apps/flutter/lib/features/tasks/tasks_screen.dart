@@ -926,7 +926,7 @@ class _TasksScreenState extends State<TasksScreen>
       if (breakPeriod != '—' && breakPeriod.isNotEmpty) ('الاستراحة', breakPeriod),
       if (secondPeriod != '—' && secondPeriod.isNotEmpty) ('الفترة الثانية', secondPeriod),
     ];
-    final officialRows = <Map<String, String>>[];
+    final officialRows = <Map<String, dynamic>>[];
     final rowPattern = RegExp(
       r'^صف الجدول:\s*(.*?)\s*\|\s*(.*?)\s*\|\s*(.*?)\s*$',
       multiLine: true,
