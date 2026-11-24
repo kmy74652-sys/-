@@ -68,8 +68,8 @@ class _AppCustomizerScreenState extends State<AppCustomizerScreen>
             ? const Center(child: CircularProgressIndicator())
             : !_allowed
                 ? const Center(child: Text('هذا القسم متاح للمدير فقط.'))
-                : Column(
-                    children: [
+                    : Column(
+                        children: [
                       Material(
                         color: Colors.white,
                         child: TabBar(
@@ -92,6 +92,20 @@ class _AppCustomizerScreenState extends State<AppCustomizerScreen>
                             _themeTab(),
                             _unifiedTableTab(),
                           ],
+                        ),
+                      ),
+                      SafeArea(
+                        top: false,
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+                          child: SizedBox(
+                            width: double.infinity,
+                            child: FilledButton.icon(
+                              onPressed: _save,
+                              icon: const Icon(Icons.save_outlined),
+                              label: const Text('حفظ وتطبيق التغييرات'),
+                            ),
+                          ),
                         ),
                       ),
                     ],
@@ -616,7 +630,16 @@ class _AppCustomizerScreenState extends State<AppCustomizerScreen>
   }
 
   Future<void> _save() async {
-    for (final entry in _controllers.entries) _store.setLabel(entry.key, entry.value.text);
+    for (final entry in _controllers.entries) {
+      if (entry.key.startsWith('unified:')) {
+        _store.setUnifiedLabel(
+          entry.key.substring('unified:'.length),
+          entry.value.text,
+        );
+      } else {
+        _store.setLabel(entry.key, entry.value.text);
+      }
+    }
     await _store.save();
     if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم حفظ وتطبيق التغييرات.')));
   }
@@ -643,7 +666,9 @@ class _AppCustomizerScreenState extends State<AppCustomizerScreen>
       final bytes = await File(files.first.path!).readAsBytes();
       await _store.importJson(utf8.decode(bytes));
       for (final entry in _controllers.entries) {
-        entry.value.text = _store.label(entry.key);
+        entry.value.text = entry.key.startsWith('unified:')
+            ? _store.unifiedLabel(entry.key.substring('unified:'.length))
+            : _store.label(entry.key);
       }
       if (mounted) setState(() {});
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم استيراد الإعدادات.')));

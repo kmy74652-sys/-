@@ -828,7 +828,7 @@ class _IndependentReportsScreenState extends State<IndependentReportsScreen> {
           ? FileType.image
           : FileType.any;
       final files = allowMultiple
-          ? await FilePicker.pickFiles(type: pickerType)
+          ? await FilePicker.pickFiles(type: pickerType, allowMultiple: true)
           : [
               if (await FilePicker.pickFile(type: pickerType) case final file?)
                 file,

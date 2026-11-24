@@ -91,6 +91,7 @@ class _LoginScreenState extends State<LoginScreen> {
       final pending = await DeepLinkController().consumePending();
       if (mounted) context.go(pending ?? '/');
     } on FunctionException catch (e) {
+      if (!mounted) return;
       setState(
         () => _error = switch (e.status) {
           429 => 'محاولات كثيرة. انتظر 15 دقيقة ثم حاول مجددًا.',
@@ -101,6 +102,7 @@ class _LoginScreenState extends State<LoginScreen> {
         },
       );
     } catch (e) {
+      if (!mounted) return;
       setState(
         () => _error = e is _LoginFailure ? e.message : 'تعذر إكمال تسجيل الدخول بسبب انقطاع الاتصال. تحقق من الإنترنت وحاول مجددًا.',
       );

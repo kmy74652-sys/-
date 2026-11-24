@@ -381,7 +381,7 @@ class _HomeScreenState extends State<HomeScreen> {
             for (final group in _groups) ...[
               const SizedBox(height: 14),
               _moduleGroup(group.$1, group.$2),
-              if (group.$1 == 'العمل والمتابعة') ...[
+              if (group.$1 == 'العمل والمتابعة' && _manageTasks) ...[
                 const SizedBox(height: 10),
                 _unifiedTaskTableSection(),
               ],
@@ -439,14 +439,21 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _metricGrid() => LayoutBuilder(
     builder: (context, constraints) {
       final width = constraints.maxWidth;
-      return Row(
-        textDirection: TextDirection.rtl,
-        children: [
-          for (var i = 0; i < _metrics.length; i++) ...[
-            if (i > 0) const SizedBox(width: 7),
-            Expanded(child: _metricCard(_metrics[i], width < 370)),
-          ],
-        ],
+      final columns = width < 560 ? 2 : 4;
+      return GridView.builder(
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        itemCount: _metrics.length,
+        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: columns,
+          crossAxisSpacing: 7,
+          mainAxisSpacing: 7,
+          childAspectRatio: width < 370 ? 1.15 : 1.35,
+        ),
+        itemBuilder: (context, index) => _metricCard(
+          _metrics[index],
+          width < 370,
+        ),
       );
     },
   );

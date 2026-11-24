@@ -78,7 +78,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
   List<_ShellTab> _tabs() => [
         _ShellTab('/', AppCustomizer.instance.label('home'), Icons.home_outlined),
         _ShellTab('/tasks', AppCustomizer.instance.label('tasks'), Icons.task_alt_outlined),
-        _ShellTab('/settings', AppCustomizer.instance.label('employees'), Icons.people_outline),
+        _ShellTab('/settings', 'الإعدادات', Icons.settings_outlined),
       ];
 
   int _selectedIndex(String path) {
@@ -108,6 +108,27 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     } finally {
       if (context.mounted) context.go('/login');
     }
+  }
+
+  Future<void> _confirmSignOut(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('تسجيل الخروج'),
+        content: const Text('هل تريد تسجيل الخروج من حسابك الحالي؟'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('إلغاء'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('تسجيل الخروج'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true && context.mounted) await _signOut(context);
   }
 
   Future<void> _showNotifications(BuildContext context) async {
@@ -172,12 +193,26 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
               const Divider(height: 1),
               Expanded(
                 child: failed
-                    ? const Center(
+                    ? Center(
                         child: Padding(
-                          padding: EdgeInsets.all(24),
-                          child: Text(
-                            'تعذر تحميل التنبيهات حالياً.',
-                            textAlign: TextAlign.center,
+                          padding: const EdgeInsets.all(24),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Text(
+                                'تعذر تحميل التنبيهات حالياً.',
+                                textAlign: TextAlign.center,
+                              ),
+                              const SizedBox(height: 8),
+                              OutlinedButton.icon(
+                                onPressed: () {
+                                  Navigator.pop(sheetContext);
+                                  _showNotifications(context);
+                                },
+                                icon: const Icon(Icons.refresh),
+                                label: const Text('إعادة المحاولة'),
+                              ),
+                            ],
                           ),
                         ),
                       )
@@ -287,7 +322,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
                 children: [
                   _BrandHeader(
                     unreadCount: _unreadCount,
-                    onAccount: () => _signOut(context),
+                    onAccount: () => _confirmSignOut(context),
                     onNotifications: () => _showNotifications(context),
                   ),
                   _PageTitleBar(
