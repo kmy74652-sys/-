@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -187,7 +189,7 @@ class _UnifiedTaskTableScreenState extends State<UnifiedTaskTableScreen> {
     try {
       final rows = await _db
           .from('tasks')
-          .select('id,title,description,due_at,status,assigned_to,branch_id')
+          .select('id,title,description,due_at,status,assigned_to,branch_id,idempotency_key')
           .eq('organization_id', organization)
           .isFilter('deleted_at', null)
           .order('due_at')
@@ -195,7 +197,12 @@ class _UnifiedTaskTableScreenState extends State<UnifiedTaskTableScreen> {
       final sent = (rows as List)
           .whereType<Map>()
           .map((row) => Map<String, dynamic>.from(row))
-          .where((row) => '${row['description'] ?? ''}'.contains('الوقت المحدد:'))
+          .where((row) {
+            final description = '${row['description'] ?? ''}';
+            return description.contains('الجدول الموحد الرسمي:') ||
+                description.contains('صف الجدول:') ||
+                description.contains('الوقت المحدد:');
+          })
           .toList();
       if (mounted) setState(() => _sentTasks = sent);
     } finally {
@@ -404,6 +411,46 @@ class _UnifiedTaskTableScreenState extends State<UnifiedTaskTableScreen> {
     return null;
   }
 
+  String _stableDispatchKey({
+    required String organizationId,
+    required String userId,
+    required String roleCode,
+    required String startDate,
+    required String reportVersionId,
+    required int rowIndex,
+    required UnifiedTaskRowData row,
+  }) {
+    final canonical = [
+      organizationId,
+      userId,
+      roleCode,
+      startDate,
+      reportVersionId,
+      '$rowIndex',
+      row.time,
+      row.task,
+      row.output,
+    ].join('|');
+    // Stable FNV-1a hash: no package or platform-specific hashCode is used.
+    var hash = 2166136261;
+    for (final byte in utf8.encode(canonical)) {
+      hash ^= byte;
+      hash = (hash * 16777619) & 0xFFFFFFFF;
+    }
+    return 'unified:$organizationId:${hash.toRadixString(16).padLeft(8, '0')}';
+  }
+
+  Future<bool> _dispatchAlreadyExists(String key) async {
+    final rows = await _db
+        .from('tasks')
+        .select('id')
+        .eq('organization_id', _organizationId!)
+        .eq('idempotency_key', key)
+        .isFilter('deleted_at', null)
+        .limit(1);
+    return (rows as List).isNotEmpty;
+  }
+
   Future<void> _send(UnifiedTaskTableDraft draft) async {
     final organizationId = _organizationId;
     if (organizationId == null || organizationId.isEmpty) {
@@ -448,47 +495,54 @@ class _UnifiedTaskTableScreenState extends State<UnifiedTaskTableScreen> {
     for (final member in selected) {
       final userId = member['user_id']?.toString();
       if (userId == null || userId.isEmpty) continue;
-      final dispatchKey = '${userId}:${draft.role}:${draft.rows.map((row) => '${row.time}|${row.task}|${row.output}').join('§')}';
-      if (_successfulDispatches.contains(dispatchKey)) continue;
-      final description = [
-        'الجدول الموحد: ${draft.role}',
-        'المسمى الوظيفي: ${draft.role}',
-        if (draft.branch.isNotEmpty) 'الفرع: ${draft.branch}',
-        if (draft.startDate.isNotEmpty)
-          'تاريخ بدء التطبيق: ${draft.startDate}',
-        'ساعات الدوام: ${draft.workType} · ${draft.workDays} · الفترة الأولى: ${draft.firstPeriod.isEmpty ? '—' : draft.firstPeriod} · الاستراحة: ${draft.breakPeriod.isEmpty ? '—' : draft.breakPeriod} · الفترة الثانية: ${draft.secondPeriod.isEmpty ? '—' : draft.secondPeriod} · الاستثناء الأسبوعي: ${draft.weeklyException}',
-        if (draft.purpose.isNotEmpty) 'الهدف من الوظيفة: ${draft.purpose}',
-        'الوقت المحدد: ${draft.rows.first.time.isEmpty ? 'غير محدد' : draft.rows.first.time}',
-        for (final row in draft.rows)
+      for (var rowIndex = 0; rowIndex < draft.rows.length; rowIndex++) {
+        final row = draft.rows[rowIndex];
+        final dispatchKey = _stableDispatchKey(
+          organizationId: organizationId,
+          userId: userId,
+          roleCode: roleCode,
+          startDate: draft.startDate,
+          reportVersionId: draft.reportVersionId ?? '',
+          rowIndex: rowIndex,
+          row: row,
+        );
+        if (_successfulDispatches.contains(dispatchKey) || await _dispatchAlreadyExists(dispatchKey)) {
+          _successfulDispatches.add(dispatchKey);
+          continue;
+        }
+        final description = [
+          'الجدول الموحد الرسمي: ${draft.role}',
           'صف الجدول: ${row.time.isEmpty ? 'غير محدد' : row.time} | ${row.task} | ${row.output.isEmpty ? '—' : row.output}',
-        if (draft.reportNotes.isNotEmpty)
-          'ملاحظات وتعليمات إضافية: ${draft.reportNotes}',
-        if (draft.responsibilities.isNotEmpty)
-          'المسؤوليات: ${draft.responsibilities.join('، ')}',
-        if (draft.authorities.isNotEmpty)
-          'الصلاحيات: ${draft.authorities.join('، ')}',
-        if (draft.instructions.isNotEmpty)
-          'التعليمات: ${draft.instructions.join('، ')}',
-        if (draft.kpis.isNotEmpty)
-          'مؤشرات الأداء: ${draft.kpis.join('؛ ')}',
-      ].join('\n');
-      await _db.rpc('create_task_with_report_form', params: {
-        'p_organization_id': organizationId,
-        'p_title': 'الجدول الموحد - ${draft.role}',
-        'p_description': description,
-        'p_due_at': due.toIso8601String(),
-        'p_priority': 'normal',
-        'p_branch_id': branchId,
-        'p_role_code': roleCode,
-        'p_template_id': null,
-        'p_assigned_to': userId,
-        'p_report_template_id': draft.reportTemplateId,
-        'p_report_version_id': draft.reportVersionId,
-        'p_report_required':
-            draft.reportTemplateId != null && draft.reportVersionId != null,
-      });
-      _successfulDispatches.add(dispatchKey);
+          'المسمى الوظيفي: ${draft.role}',
+          if (draft.branch.isNotEmpty) 'الفرع: ${draft.branch}',
+          if (draft.startDate.isNotEmpty) 'تاريخ بدء التطبيق: ${draft.startDate}',
+          'ساعات الدوام: ${draft.workType} · ${draft.workDays} · الفترة الأولى: ${draft.firstPeriod.isEmpty ? '—' : draft.firstPeriod} · الاستراحة: ${draft.breakPeriod.isEmpty ? '—' : draft.breakPeriod} · الفترة الثانية: ${draft.secondPeriod.isEmpty ? '—' : draft.secondPeriod} · الاستثناء الأسبوعي: ${draft.weeklyException}',
+          if (draft.purpose.isNotEmpty) 'الهدف من الوظيفة: ${draft.purpose}',
+          if (draft.reportNotes.isNotEmpty) 'ملاحظات وتعليمات إضافية: ${draft.reportNotes}',
+          if (draft.responsibilities.isNotEmpty) 'المسؤوليات: ${draft.responsibilities.join('، ')}',
+          if (draft.authorities.isNotEmpty) 'الصلاحيات: ${draft.authorities.join('، ')}',
+          if (draft.instructions.isNotEmpty) 'التعليمات: ${draft.instructions.join('، ')}',
+          if (draft.kpis.isNotEmpty) 'مؤشرات الأداء: ${draft.kpis.join('؛ ')}',
+        ].join('\n');
+        await _db.rpc('create_task_with_report_form', params: {
+          'p_organization_id': organizationId,
+          'p_title': 'الجدول الموحد - ${draft.role} · ${row.task}',
+          'p_description': description,
+          'p_due_at': due.toIso8601String(),
+          'p_priority': 'normal',
+          'p_branch_id': branchId,
+          'p_role_code': roleCode,
+          'p_template_id': null,
+          'p_assigned_to': userId,
+          'p_report_template_id': draft.reportTemplateId,
+          'p_report_version_id': draft.reportVersionId,
+          'p_report_required': draft.reportTemplateId != null && draft.reportVersionId != null,
+          'p_idempotency_key': dispatchKey,
+        });
+        _successfulDispatches.add(dispatchKey);
+      }
     }
+    await _loadSentTasks();
   }
 
   @override
