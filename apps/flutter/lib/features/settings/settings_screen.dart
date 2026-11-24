@@ -149,13 +149,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
       _code.clear();
       await _load();
     } on FunctionException catch (error) {
-      final details = '${error.details ?? ''}';
+      final rawDetails = error.details;
+      final details = rawDetails is Map
+          ? '${rawDetails['error'] ?? rawDetails['message'] ?? rawDetails}'
+          : '$rawDetails';
       final message = switch (details) {
         String value when value.contains('employee_no_exists') => 'الرقم الوظيفي مستخدم مسبقًا.',
         String value when value.contains('branch_not_found') => 'الفرع المحدد غير موجود أو غير نشط.',
         String value when value.contains('employee_access_management_permission_required') => 'لا تملك صلاحية إنشاء حسابات الموظفين.',
         String value when value.contains('invalid_employee_payload') => 'تحقق من الاسم والرقم الوظيفي والدور والفرع.',
+        String value when value.contains('employee_auth_exists') => 'يوجد حساب مصادقة قديم مرتبط بهذا الرقم. استخدم رقمًا وظيفيًا آخر أو احذف الحساب القديم من إدارة المستخدمين.',
+        String value when value.contains('employee_auth_lookup_failed') => 'تعذر التحقق من حساب المصادقة القديم. حاول مجددًا.',
+        String value when value.contains('employee_auth_create_failed') => 'تعذر إنشاء حساب المصادقة. تحقق من إعدادات Supabase ثم حاول مجددًا.',
+        String value when value.contains('employee_create_failed') => 'تعذر إنشاء ملف الموظف. لم يتم إنشاء حساب ناقص.',
+        String value when value.contains('employee_access_setup_failed') => 'تعذر ربط صلاحيات الموظف. لم يتم إنشاء حساب ناقص.',
         String value when value.contains('access_code_create_failed') => 'تعذر حفظ رمز الدخول. تحقق من إعدادات حساب الموظف.',
+        String value when value.contains('employee_code_auth_unavailable') => 'خدمة إنشاء الحساب غير متاحة حاليًا. تحقق من نشر خدمة Supabase ثم حاول مجددًا.',
+        String value when value.contains('database_update_required') => 'قاعدة البيانات تحتاج إلى تحديث متوافق مع هذه النسخة. راجع نشر Supabase ثم حاول مجددًا.',
         _ => 'تعذر إنشاء الحساب؛ راجع الصلاحيات والبيانات ثم حاول مجددًا.',
       };
       if (mounted) setState(() { _busy = false; _error = message; });

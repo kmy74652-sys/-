@@ -111,6 +111,15 @@ function randomAccessCode() {
   return [...bytes].map((byte) => String(byte % 10)).join('');
 }
 
+async function findAuthUserByEmail(admin: AdminClient, email: string) {
+  const { data, error } = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 });
+  if (error) return { user: null, error };
+  return {
+    user: data.users.find((user) => user.email?.toLowerCase() === email.toLowerCase()) ?? null,
+    error: null,
+  };
+}
+
 function toBase64(bytes: Uint8Array) {
   let binary = '';
   for (const byte of bytes) binary += String.fromCharCode(byte);
@@ -576,30 +585,47 @@ async function createEmployee(body: Record<string, unknown>, request: Request, c
     email_confirm: true,
     user_metadata: { employee_no: employeeNo, organization_id: owner.institutionId },
   });
-  if (authError || !authData.user) return response({ error: 'employee_auth_create_failed' }, 400);
+  let authUser = authData.user;
+  let createdAuthUser = Boolean(authUser);
+  if (!authUser && authError?.code === 'email_exists') {
+    const existingAuth = await findAuthUserByEmail(clients.adminClient, syntheticEmail);
+    if (existingAuth.error) return response({ error: 'employee_auth_lookup_failed' }, 503);
+    if (!existingAuth.user) return response({ error: 'employee_auth_create_failed' }, 400);
+    const { data: linkedMembership, error: linkedMembershipError } = await clients.adminClient
+      .from('organization_memberships')
+      .select('id,organization_id,employee_no')
+      .eq('user_id', existingAuth.user.id)
+      .limit(1)
+      .maybeSingle();
+    if (linkedMembershipError) return response({ error: 'employee_auth_lookup_failed' }, 503);
+    if (linkedMembership) return response({ error: 'employee_auth_exists' }, 409);
+    authUser = existingAuth.user;
+    createdAuthUser = false;
+  }
+  if (!authUser) return response({ error: 'employee_auth_create_failed' }, 400);
 
   const { data: membership, error: membershipError } = await clients.adminClient
     .from('organization_memberships')
-    .insert({ organization_id: owner.institutionId, user_id: authData.user.id, display_name: fullName, is_active: true, employee_no: employeeNo })
+    .insert({ organization_id: owner.institutionId, user_id: authUser.id, display_name: fullName, is_active: true, employee_no: employeeNo })
     .select('id,employee_no,display_name,is_active')
     .single();
   if (membershipError || !membership) {
-    await clients.adminClient.auth.admin.deleteUser(authData.user.id);
+    if (createdAuthUser) await clients.adminClient.auth.admin.deleteUser(authUser.id);
     return response({ error: 'employee_create_failed' }, 400);
   }
 
   const { error: roleError } = await clients.adminClient.from('role_assignments').insert({ organization_id: owner.institutionId, membership_id: membership.id, role_code: roleCode, branch_id: roleCode === 'owner' ? null : branchId });
   if (roleError) {
     await clients.adminClient.from('organization_memberships').delete().eq('id', membership.id);
-    await clients.adminClient.auth.admin.deleteUser(authData.user.id);
+    if (createdAuthUser) await clients.adminClient.auth.admin.deleteUser(authUser.id);
     return response({ error: 'employee_access_setup_failed' }, 400);
   }
 
   const code = requestedCode ?? randomAccessCode();
-  const credentialUpdate = await setEmployeeAccessCode(clients.adminClient, membership.id, authData.user.id, code);
+  const credentialUpdate = await setEmployeeAccessCode(clients.adminClient, membership.id, authUser.id, code);
   if (credentialUpdate.error) {
     await clients.adminClient.from('organization_memberships').delete().eq('id', membership.id);
-    await clients.adminClient.auth.admin.deleteUser(authData.user.id);
+    if (createdAuthUser) await clients.adminClient.auth.admin.deleteUser(authUser.id);
     return response({ error: 'access_code_create_failed' }, 500);
   }
   const now = new Date().toISOString();
