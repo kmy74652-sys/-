@@ -352,6 +352,24 @@ class _ReportsScreenState extends State<ReportsScreen> {
     _ => 'حالة التقرير: $status',
   };
 
+  Widget _statusBadge(String status) {
+    final color = switch (status) {
+      'approved' => Colors.green,
+      'returned' || 'rejected' => Colors.deepOrange,
+      'submitted' || 'reviewed' => Colors.indigo,
+      'draft' => Colors.amber.shade800,
+      _ => AppColors.muted,
+    };
+    return Chip(
+      avatar: Icon(Icons.circle, size: 10, color: color),
+      label: Text(_statusLabel(status)),
+      labelStyle: TextStyle(color: color, fontWeight: FontWeight.w700, fontSize: 11),
+      backgroundColor: color.withAlpha(24),
+      visualDensity: VisualDensity.compact,
+      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+    );
+  }
+
   bool _matchesSearch(Map<String, dynamic> row) {
     final query = _search.trim().toLowerCase();
     if (query.isEmpty) return true;
@@ -1044,10 +1062,25 @@ class _ReportsScreenState extends State<ReportsScreen> {
             color: AppColors.navy,
           ),
         ),
-        subtitle: Text(
-          'الدور: ${row['role_code'] ?? 'غير محدد'} · الفرع: ${_safeId(row['branch_id'])} · التاريخ: ${_formattedDate(row['report_date'])}\nالموظف: ${_employeeNames[row['employee_user_id']?.toString()] ?? 'موظف غير معروف'} · ${_statusLabel(status)}',
-          textAlign: TextAlign.right,
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              'الموظف: ${_employeeNames[row['employee_user_id']?.toString()] ?? 'موظف غير معروف'} · الفرع: ${_safeId(row['branch_id'])}',
+              textAlign: TextAlign.right,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            Text(
+              'التاريخ: ${_formattedDate(row['report_date'])} · الدور: ${row['role_code'] ?? 'غير محدد'}',
+              textAlign: TextAlign.right,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            Align(alignment: Alignment.centerRight, child: _statusBadge(status)),
+          ],
         ),
+        trailing: const _DetailsAffordance(),
         children: [
           if (values is Map && values.isNotEmpty)
             for (final entry in values.entries)
@@ -1134,10 +1167,25 @@ class _ReportsScreenState extends State<ReportsScreen> {
             color: AppColors.navy,
           ),
         ),
-        subtitle: Text(
-          'الموظف: ${row['employee_name'] ?? 'غير محدد'} · الفرع: ${row['branch_name'] ?? 'غير محدد'}\nالتاريخ: ${row['report_date'] ?? 'غير محدد'} · ${_statusLabel(status)}',
-          textAlign: TextAlign.right,
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              'الموظف: ${row['employee_name'] ?? 'غير محدد'} · الفرع: ${row['branch_name'] ?? 'غير محدد'}',
+              textAlign: TextAlign.right,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            Text(
+              'التاريخ: ${_formattedDate(row['report_date'])}',
+              textAlign: TextAlign.right,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            Align(alignment: Alignment.centerRight, child: _statusBadge(status)),
+          ],
         ),
+        trailing: const _DetailsAffordance(),
         children: [
           if (row['answers'] is Map)
             for (final entry in (row['answers'] as Map).entries)
@@ -1322,6 +1370,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
             ),
           ],
         ),
+        trailing: const _DetailsAffordance(),
         children: [
           if (answers is Map)
             for (final entry in answers.entries)
@@ -1390,12 +1439,25 @@ class _ReportsScreenState extends State<ReportsScreen> {
             color: AppColors.navy,
           ),
         ),
-        subtitle: Text(
-          'الموظف: $employeeName\n'
-          'الإرسال: ${_formattedDate(row['submitted_at'])} · '
-          'الاستحقاق: ${_formattedDate(task?['due_at'])} · ${_statusLabel(status)}',
-          textAlign: TextAlign.right,
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              'الموظف: $employeeName · المهمة: ${_label(row)}',
+              textAlign: TextAlign.right,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            Text(
+              'التاريخ: ${_formattedDate(row['submitted_at'])} · الاستحقاق: ${_formattedDate(task?['due_at'])}',
+              textAlign: TextAlign.right,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            Align(alignment: Alignment.centerRight, child: _statusBadge(status)),
+          ],
         ),
+        trailing: const _DetailsAffordance(),
         children: [
           if (isForm)
             Padding(
@@ -1493,4 +1555,21 @@ class _ReportsScreenState extends State<ReportsScreen> {
       ),
     );
   }
+}
+
+class _DetailsAffordance extends StatelessWidget {
+  const _DetailsAffordance();
+
+  @override
+  Widget build(BuildContext context) => const Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.expand_more, size: 19, color: AppColors.navy),
+          Text(
+            'عرض التفاصيل',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 9, color: AppColors.muted),
+          ),
+        ],
+      );
 }

@@ -32,6 +32,7 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
   final Set<String> _expandedUnifiedTasks = <String>{};
   String _taskFilter = 'all', _reportFilter = 'all';
   bool _filtersExpanded = false;
+  bool _canManageActions = false;
 
   @override
   void initState() {
@@ -251,6 +252,8 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
       final allowed = permissions is List && permissions.map((e) => e.toString()).any(
             (permission) => permission == 'tasks.manage' || permission == 'tasks.review',
           );
+      _canManageActions = permissions is List &&
+          permissions.map((e) => e.toString()).contains('tasks.manage');
       if (!allowed) {
         if (mounted) {
           setState(() {
@@ -1030,7 +1033,9 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
                               .map((t) {
                                 final taskId = _s(t['id']);
                                 final expanded = _expandedUnifiedTasks.contains(taskId);
-                                return ListTile(
+                                return Card(
+                                  margin: const EdgeInsets.only(bottom: 8),
+                                  child: ListTile(
                                   contentPadding: EdgeInsets.zero,
                                   title: Text(
                                     _s(t['title'], 'مهمة'),
@@ -1073,7 +1078,7 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
                                           _s(t['description']),
                                           textAlign: TextAlign.right,
                                         ),
-                                      if (widget.unifiedOnly)
+
                                         Align(
                                           alignment: Alignment.centerRight,
                                           child: TextButton.icon(
@@ -1101,27 +1106,30 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
                                   trailing: Row(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
-                                      if (widget.unifiedOnly)
+                                      if (widget.unifiedOnly && _canManageActions)
                                         IconButton(
                                           tooltip: 'تعديل من الجدول الموحد',
                                           onPressed: _busy ? null : () => _openUnifiedEditor(t),
                                           icon: const Icon(Icons.table_chart_outlined),
                                         ),
-                                      IconButton(
-                                        tooltip: 'تعديل المهمة أو صف الجدول',
-                                        onPressed: _busy ? null : () => _saveTask(existing: t),
-                                        icon: const Icon(Icons.edit_outlined),
-                                      ),
-                                      IconButton(
-                                        tooltip: 'حذف المهمة',
-                                        onPressed: _busy ? null : () => _deleteTask(t),
-                                        color: Colors.red,
-                                        icon: const Icon(Icons.delete_outline),
-                                      ),
+                                      if (_canManageActions)
+                                        IconButton(
+                                          tooltip: 'تعديل المهمة أو صف الجدول',
+                                          onPressed: _busy ? null : () => _saveTask(existing: t),
+                                          icon: const Icon(Icons.edit_outlined),
+                                        ),
+                                      if (_canManageActions)
+                                        IconButton(
+                                          tooltip: 'حذف المهمة',
+                                          onPressed: _busy ? null : () => _deleteTask(t),
+                                          color: Colors.red,
+                                          icon: const Icon(Icons.delete_outline),
+                                        ),
                                     ],
                                   ),
                                   onTap: () => _message(
                                     'حالة التقرير: ${_reportStatus(t)}',
+                                  ),
                                   ),
                                 );
                               })
