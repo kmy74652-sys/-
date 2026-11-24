@@ -49,6 +49,7 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
   void initState() {
     super.initState();
     AppCustomizer.instance.load();
+    _startDate.text = _formatDate(DateTime.now());
   }
 
   @override
@@ -155,7 +156,6 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
   List<Widget> _unifiedSections() {
     final store = AppCustomizer.instance;
     final sections = <String, Widget>{
-      'sent': _section(store.unifiedLabel('sent'), Text('${store.unifiedLabel('back')} · تُعرض المرسلات في القسم المخصص بعد الحفظ.', textAlign: TextAlign.right)),
       'employee': _employeeCard(),
       'purpose': _section(store.unifiedLabel('purpose'), TextField(controller: _purpose, textAlign: TextAlign.right, maxLines: 2, decoration: InputDecoration(hintText: store.unifiedLabel('purposeHint')))),
       'hours': _workHours(),
@@ -218,7 +218,7 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
   );
 
   Widget _employeeCard() => _section(AppCustomizer.instance.unifiedLabel('employee'), LayoutBuilder(builder: (context, constraints) {
-    final fields = <String, Widget>{'employeeField': _employeeField(), 'roleField': _roleField(), 'branchField': _branchField(), 'startDate': _input(_startDate, AppCustomizer.instance.unifiedLabel('startDate'))};
+    final fields = <String, Widget>{'employeeField': _employeeField(), 'roleField': _roleField(), 'branchField': _branchField(), 'startDate': _dateField()};
     final keys = fields.keys.where(AppCustomizer.instance.isUnifiedFieldVisible).toList()..sort((a, b) { final la = AppCustomizer.instance.unifiedFieldLayout(a), lb = AppCustomizer.instance.unifiedFieldLayout(b); final row = ((la['row'] as num?)?.toInt() ?? 0).compareTo((lb['row'] as num?)?.toInt() ?? 0); return row != 0 ? row : ((la['column'] as num?)?.toInt() ?? 0).compareTo((lb['column'] as num?)?.toInt() ?? 0); });
     return Wrap(textDirection: TextDirection.rtl, spacing: AppCustomizer.instance.unifiedSpacing, runSpacing: AppCustomizer.instance.unifiedSpacing, children: keys.map((key) { final layout = AppCustomizer.instance.unifiedFieldLayout(key); final span = '${layout['span'] ?? 'half'}'; final width = span == 'full' ? constraints.maxWidth : span == 'third' ? (constraints.maxWidth - AppCustomizer.instance.unifiedSpacing * 2) / 3 : (constraints.maxWidth - AppCustomizer.instance.unifiedSpacing) / 2; return SizedBox(width: width, child: Align(alignment: _alignment('${layout['align'] ?? 'right'}'), child: fields[key])); }).toList());
   }));
@@ -361,9 +361,9 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
     _drop('نوع الدوام', _workType, ['دوام كامل', 'دوام جزئي', 'مناوبة'], (v) => setState(() => _workType = v)),
     _drop('الأيام', _days, ['الأحد - الخميس', 'السبت - الخميس', 'حسب المناوبة'], (v) => setState(() => _days = v)),
     _drop('الاستثناء الأسبوعي', _exception, ['الجمعة', 'الأحد', 'لا يوجد'], (v) => setState(() => _exception = v)),
-    SizedBox(width: 110, child: TextField(controller: _firstPeriod, textAlign: TextAlign.center, decoration: const InputDecoration(labelText: 'الفترة الأولى', hintText: '08:00 - 12:00'))),
-    SizedBox(width: 110, child: TextField(controller: _breakPeriod, textAlign: TextAlign.center, decoration: const InputDecoration(labelText: 'الاستراحة', hintText: '12:00 - 13:00'))),
-    SizedBox(width: 110, child: TextField(controller: _secondPeriod, textAlign: TextAlign.center, decoration: const InputDecoration(labelText: 'الفترة الثانية', hintText: '13:00 - 17:00'))),
+    _periodField(_firstPeriod, 'الفترة الأولى', const TimeOfDay(hour: 8, minute: 0), const TimeOfDay(hour: 12, minute: 0)),
+    _periodField(_breakPeriod, 'الاستراحة', const TimeOfDay(hour: 12, minute: 0), const TimeOfDay(hour: 13, minute: 0)),
+    _periodField(_secondPeriod, 'الفترة الثانية', const TimeOfDay(hour: 13, minute: 0), const TimeOfDay(hour: 17, minute: 0)),
   ]));
 
   Widget _scheduleTable(String title, List<_UnifiedRow> source) {
@@ -388,7 +388,7 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
             final i = entry.key;
             final row = entry.value;
             return DataRow(cells: [
-              for (final key in visible) DataCell(SizedBox(width: _scheduleFieldWidth(key), child: TextField(controller: _scheduleController(key, row), textAlign: _textAlign(key), decoration: const InputDecoration(isDense: true)))),
+              for (final key in visible) DataCell(SizedBox(width: _scheduleFieldWidth(key), child: _scheduleField(key, row))),
               DataCell(Row(children: [
                 IconButton(onPressed: () => setState(() => source.insert(i + 1, _UnifiedRow('', '', ''))), icon: const Icon(Icons.add, size: 19)),
                 IconButton(onPressed: source.isEmpty ? null : () { final removed = source.removeAt(i); removed.dispose(); setState(() {}); }, icon: const Icon(Icons.delete_outline, size: 19)),
@@ -401,6 +401,131 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
   }
 
   TextEditingController _scheduleController(String key, _UnifiedRow row) => key == 'time' ? row.time : key == 'task' ? row.task : row.output;
+
+  Widget _scheduleField(String key, _UnifiedRow row) {
+    if (key == 'time') return _timeField(row.time, 'الوقت');
+    return TextField(
+      controller: _scheduleController(key, row),
+      textAlign: _textAlign(key),
+      decoration: const InputDecoration(isDense: true),
+    );
+  }
+
+  Widget _dateField() => TextField(
+        controller: _startDate,
+        readOnly: true,
+        textAlign: TextAlign.center,
+        textDirection: TextDirection.ltr,
+        decoration: InputDecoration(
+          labelText: AppCustomizer.instance.unifiedLabel('startDate'),
+          isDense: true,
+          suffixIcon: IconButton(
+            tooltip: 'اختيار التاريخ',
+            onPressed: _pickStartDate,
+            icon: const Icon(Icons.calendar_today_outlined),
+          ),
+        ),
+        onTap: _pickStartDate,
+      );
+
+  Widget _timeField(TextEditingController controller, String label) => TextField(
+        controller: controller,
+        readOnly: true,
+        textAlign: TextAlign.center,
+        textDirection: TextDirection.ltr,
+        decoration: InputDecoration(
+          labelText: label,
+          isDense: true,
+          suffixIcon: const Icon(Icons.schedule_outlined, size: 19),
+        ),
+        onTap: () => _pickTime(controller),
+      );
+
+  Widget _periodField(
+    TextEditingController controller,
+    String label,
+    TimeOfDay defaultStart,
+    TimeOfDay defaultEnd,
+  ) => SizedBox(
+        width: 155,
+        child: TextField(
+          controller: controller,
+          readOnly: true,
+          textAlign: TextAlign.center,
+          textDirection: TextDirection.ltr,
+          decoration: InputDecoration(
+            labelText: label,
+            hintText: '08:00 - 12:00',
+            isDense: true,
+            suffixIcon: const Icon(Icons.access_time_outlined, size: 19),
+          ),
+          onTap: () => _pickPeriod(controller, label, defaultStart, defaultEnd),
+        ),
+      );
+
+  String _formatDate(DateTime value) =>
+      '${value.year.toString().padLeft(4, '0')}-${value.month.toString().padLeft(2, '0')}-${value.day.toString().padLeft(2, '0')}';
+
+  String _formatTime(TimeOfDay value) =>
+      '${value.hour.toString().padLeft(2, '0')}:${value.minute.toString().padLeft(2, '0')}';
+
+  TimeOfDay _parseTime(String value, TimeOfDay fallback) {
+    final match = RegExp(r'^(\d{1,2}):(\d{2})$').firstMatch(value.trim());
+    final hour = int.tryParse(match?.group(1) ?? '');
+    final minute = int.tryParse(match?.group(2) ?? '');
+    if (hour == null || minute == null || hour > 23 || minute > 59) return fallback;
+    return TimeOfDay(hour: hour, minute: minute);
+  }
+
+  Future<void> _pickStartDate() async {
+    final initial = DateTime.tryParse(_startDate.text) ?? DateTime.now();
+    final value = await showDatePicker(
+      context: context,
+      initialDate: initial,
+      firstDate: DateTime(2020),
+      lastDate: DateTime(2100),
+      helpText: 'اختر تاريخ بدء التطبيق',
+      cancelText: 'إلغاء',
+      confirmText: 'اختيار',
+    );
+    if (value != null && mounted) setState(() => _startDate.text = _formatDate(value));
+  }
+
+  Future<void> _pickTime(TextEditingController controller) async {
+    final value = await showTimePicker(
+      context: context,
+      initialTime: _parseTime(controller.text, TimeOfDay.now()),
+      helpText: 'اختر الوقت',
+      cancelText: 'إلغاء',
+      confirmText: 'اختيار',
+    );
+    if (value != null && mounted) setState(() => controller.text = _formatTime(value));
+  }
+
+  Future<void> _pickPeriod(
+    TextEditingController controller,
+    String label,
+    TimeOfDay defaultStart,
+    TimeOfDay defaultEnd,
+  ) async {
+    final parts = controller.text.split('-').map((part) => part.trim()).toList();
+    final start = await showTimePicker(
+      context: context,
+      initialTime: _parseTime(parts.isNotEmpty ? parts.first : '', defaultStart),
+      helpText: 'اختر بداية $label',
+      cancelText: 'إلغاء',
+      confirmText: 'التالي',
+    );
+    if (start == null || !mounted) return;
+    final end = await showTimePicker(
+      context: context,
+      initialTime: _parseTime(parts.length > 1 ? parts.last : '', defaultEnd),
+      helpText: 'اختر نهاية $label',
+      cancelText: 'إلغاء',
+      confirmText: 'حفظ',
+    );
+    if (end != null && mounted) setState(() => controller.text = '${_formatTime(start)} - ${_formatTime(end)}');
+  }
   TextAlign _textAlign(String key) {
     final align = '${AppCustomizer.instance.unifiedFieldLayout(key)['align'] ?? 'right'}';
     return align == 'left' ? TextAlign.left : align == 'center' ? TextAlign.center : TextAlign.right;
