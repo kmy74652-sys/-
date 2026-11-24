@@ -5,7 +5,6 @@ import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/theme.dart';
-import '../admin/admin_screen.dart';
 import '../../shared/app_shell.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -21,6 +20,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Map<String, int>? _summary;
   Set<String> _permissions = {};
   Set<String> _roles = {};
+  bool _adminExpanded = false;
   RealtimeChannel? _tasksRealtime;
   Timer? _summaryRefreshTimer;
   int _request = 0;
@@ -52,6 +52,15 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ],
     ),
+  ];
+  static const _adminModules = <_Module>[
+    _Module('employees', 'الموظفون', 'ملفات الموظفين وبياناتهم الأساسية', Icons.people_outline, '/admin?section=employees'),
+    _Module('branches', 'الفروع', 'إدارة الفروع والحالة التشغيلية', Icons.account_tree_outlined, '/admin?section=branches'),
+    _Module('activity', 'سجل النشاط', 'متابعة العمليات الإدارية الأخيرة', Icons.history, '/admin?section=activity'),
+    _Module('report-designer', 'مصمم التقارير', 'إدارة قوالب التقارير وإصداراتها', Icons.dashboard_customize_outlined, '/admin/report-designer'),
+    _Module('customizer', 'تخصيص الواجهات', 'إعدادات العرض والتخصيص المؤسسي', Icons.palette_outlined, '/admin/customizer'),
+    _Module('hr', 'الموارد البشرية', 'اتفاقيات الموظفين وبيانات الموارد البشرية', Icons.badge_outlined, '/hr'),
+    _Module('settings', 'الإعدادات', 'إعدادات الحساب والتطبيق', Icons.settings_outlined, '/settings'),
   ];
   static const _metrics = <_Metric>[
     _Metric(
@@ -115,6 +124,10 @@ class _HomeScreenState extends State<HomeScreen> {
         return _manageTasks &&
             (_permissions.contains('tasks.review') ||
                 _permissions.contains('reports.read_all'));
+      case 'activity':
+        return _manageTasks && _permissions.contains('audit.read');
+      case 'customizer':
+        return _manageTasks && _permissions.contains('customizer.manage');
       case 'report-designer':
         return _manageTasks && _permissions.contains('report_forms.manage');
       case 'agreements':
@@ -402,19 +415,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ],
             if (_manageTasks) ...[
               const SizedBox(height: 8),
-              const Padding(
-                padding: EdgeInsets.fromLTRB(4, 0, 4, 7),
-                child: Text(
-                  'لوحة إدارة المؤسسة',
-                  textAlign: TextAlign.right,
-                  style: TextStyle(
-                    color: AppColors.navy,
-                    fontSize: 15,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-              ),
-              AdminScreen(inline: true, showSummary: false),
+              _managementPanel(),
             ],
           ],
         ],
@@ -450,27 +451,94 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  Widget _managementPanel() {
+    final visible = _adminModules.where((item) => _allowed(item.key)).toList();
+    if (visible.isEmpty) return const SizedBox.shrink();
+    return SectionCard(
+      title: 'لوحة إدارة المؤسسة',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          InkWell(
+            borderRadius: BorderRadius.circular(12),
+            onTap: () => setState(() => _adminExpanded = !_adminExpanded),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 2),
+              child: Row(
+                textDirection: TextDirection.rtl,
+                children: [
+                  const Icon(Icons.admin_panel_settings_outlined,
+                      color: AppColors.green, size: 30),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      _adminExpanded
+                          ? 'إخفاء أقسام الإدارة'
+                          : 'إظهار أقسام الإدارة (${visible.length})',
+                      textAlign: TextAlign.right,
+                      style: const TextStyle(fontWeight: FontWeight.w800),
+                    ),
+                  ),
+                  AnimatedRotation(
+                    turns: _adminExpanded ? .5 : 0,
+                    duration: const Duration(milliseconds: 180),
+                    child: const Icon(Icons.expand_more),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          AnimatedSize(
+            duration: const Duration(milliseconds: 220),
+            curve: Curves.easeOut,
+            child: !_adminExpanded
+                ? const SizedBox.shrink()
+                : Padding(
+                    padding: const EdgeInsets.only(top: 12),
+                    child: _moduleGrid(visible),
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _metricGrid() => LayoutBuilder(
     builder: (context, constraints) {
       final visibleMetrics = _metrics
           .where((item) => item.key != 'reports_pending' || _manageTasks)
           .toList();
       final width = constraints.maxWidth;
-      final columns = width < 560 ? 2 : 4;
+      if (width < 560) {
+        const gap = 7.0;
+        final cardWidth = (width - gap) / 2;
+        return Wrap(
+          spacing: gap,
+          runSpacing: gap,
+          textDirection: TextDirection.rtl,
+          children: [
+            for (var index = 0; index < visibleMetrics.length; index++)
+              SizedBox(
+                width: index == visibleMetrics.length - 1 &&
+                        visibleMetrics.length.isOdd
+                    ? width
+                    : cardWidth,
+                child: _metricCard(visibleMetrics[index], width < 370),
+              ),
+          ],
+        );
+      }
       return GridView.builder(
         shrinkWrap: true,
         physics: const NeverScrollableScrollPhysics(),
         itemCount: visibleMetrics.length,
-        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: columns,
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 4,
           crossAxisSpacing: 7,
           mainAxisSpacing: 7,
-          childAspectRatio: width < 370 ? 1.15 : 1.35,
+          childAspectRatio: 1.35,
         ),
-        itemBuilder: (context, index) => _metricCard(
-          visibleMetrics[index],
-          width < 370,
-        ),
+        itemBuilder: (context, index) => _metricCard(visibleMetrics[index], false),
       );
     },
   );
@@ -554,27 +622,28 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
           ),
-          LayoutBuilder(
-            builder: (context, constraints) {
-              const gap = 8.0;
-              final columns = constraints.maxWidth >= 560 ? 3 : 2;
-              final cardWidth =
-                  (constraints.maxWidth - gap * (columns - 1)) / columns;
-              return Wrap(
-                textDirection: TextDirection.rtl,
-                spacing: gap,
-                runSpacing: gap,
-                children: [
-                  for (final item in visible)
-                    SizedBox(width: cardWidth, child: _moduleCard(item)),
-                ],
-              );
-            },
-          ),
+          _moduleGrid(visible),
         ],
       ),
     );
   }
+
+  Widget _moduleGrid(List<_Module> modules) => LayoutBuilder(
+    builder: (context, constraints) {
+      const gap = 8.0;
+      final columns = constraints.maxWidth >= 560 ? 3 : 2;
+      final cardWidth = (constraints.maxWidth - gap * (columns - 1)) / columns;
+      return Wrap(
+        textDirection: TextDirection.rtl,
+        spacing: gap,
+        runSpacing: gap,
+        children: [
+          for (final item in modules)
+            SizedBox(width: cardWidth, child: _moduleCard(item)),
+        ],
+      );
+    },
+  );
 
   Widget _moduleCard(_Module item) => Card(
     clipBehavior: Clip.antiAlias,
