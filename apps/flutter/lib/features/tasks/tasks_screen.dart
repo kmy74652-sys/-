@@ -473,6 +473,49 @@ class _TasksScreenState extends State<TasksScreen>
         ),
       );
 
+  String _cleanOfficialOutput(String title, String output) {
+    final cleanTitle = title.trim();
+    final cleanOutput = output.trim();
+    if (cleanOutput.isEmpty || cleanOutput == cleanTitle) return '—';
+    return cleanOutput;
+  }
+
+  Widget _officialStatusChip(String statusKey, String label) {
+    final style = switch (statusKey) {
+      'in_progress' => (Icons.autorenew, const Color(0xff9a6700), const Color(0xfffff4cc)),
+      'submitted' => (Icons.fact_check_outlined, const Color(0xff1565c0), const Color(0xffe5f0ff)),
+      'approved' => (Icons.verified_outlined, const Color(0xff137333), const Color(0xffe5f5e9)),
+      'rejected' => (Icons.replay_outlined, const Color(0xffb3261e), const Color(0xffffe9e7)),
+      'late' => (Icons.schedule_outlined, const Color(0xffb3261e), const Color(0xffffe9e7)),
+      _ => (Icons.fiber_new_outlined, AppColors.navy, const Color(0xffeaf1f8)),
+    };
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+      decoration: BoxDecoration(
+        color: style.$3,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        textDirection: Directionality.of(context),
+        children: [
+          Icon(style.$1, size: 15, color: style.$2),
+          const SizedBox(width: 4),
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 82),
+            child: Text(
+              label,
+              textAlign: TextAlign.right,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(color: style.$2, fontSize: 11, fontWeight: FontWeight.w700),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _officialTableCard(List<Map<String, dynamic>> tasks) {
     final firstDescription = '${tasks.first['description'] ?? ''}';
     String value(String label) {
@@ -535,18 +578,26 @@ class _TasksScreenState extends State<TasksScreen>
           (line) => line.startsWith('المخرج المطلوب:'),
           orElse: () => 'المخرج المطلوب: —',
         );
-        officialRows.add({
-          'time': timeLine.replaceFirst('الوقت المحدد:', '').trim(),
-          'title': '${task['title'] ?? 'مهمة'}',
-          'output': outputLine.replaceFirst('المخرج المطلوب:', '').trim(),
-          'status': _statusLabels[_normalizedStatus(task)] ?? 'جديدة',
-        });
+          officialRows.add({
+            'time': timeLine.replaceFirst('الوقت المحدد:', '').trim(),
+            'title': '${task['title'] ?? 'مهمة'}',
+            'output': _cleanOfficialOutput(
+              '${task['title'] ?? 'مهمة'}',
+              outputLine.replaceFirst('المخرج المطلوب:', ''),
+            ),
+            'statusKey': _normalizedStatus(task),
+            'status': _statusLabels[_normalizedStatus(task)] ?? 'جديدة',
+          });
       } else {
         for (final match in matches) {
           officialRows.add({
             'time': match.group(1)?.trim() ?? 'غير محدد',
             'title': match.group(2)?.trim() ?? '—',
-            'output': match.group(3)?.trim() ?? '—',
+            'output': _cleanOfficialOutput(
+              match.group(2)?.trim() ?? '—',
+              match.group(3)?.trim() ?? '',
+            ),
+            'statusKey': _normalizedStatus(task),
             'status': _statusLabels[_normalizedStatus(task)] ?? 'جديدة',
           });
         }
@@ -598,35 +649,44 @@ class _TasksScreenState extends State<TasksScreen>
               ('الفترة الثانية', secondPeriod),
             ]),
             const SizedBox(height: 8),
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: DataTable(
-                headingRowHeight: 58,
-                dataRowMinHeight: 54,
-                dataRowMaxHeight: 90,
-                columnSpacing: 24,
-                horizontalMargin: 14,
-                dividerThickness: 0.8,
-                columns: [
-                  for (final heading in const ['الوقت', 'المهمة والمسؤولية', 'المخرج المطلوب', 'الحالة'])
-                    DataColumn(
-                      label: Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 8),
-                        child: Text(heading, textAlign: TextAlign.right),
-                      ),
-                    ),
-                ],
-                rows: officialRows
-                    .map(
-                      (row) => DataRow(cells: [
-                        DataCell(Padding(padding: const EdgeInsets.symmetric(vertical: 8), child: Text(row['time'] ?? '—'))),
-                        DataCell(Padding(padding: const EdgeInsets.symmetric(vertical: 8), child: Text(row['title'] ?? '—'))),
-                        DataCell(Padding(padding: const EdgeInsets.symmetric(vertical: 8), child: Text(row['output'] ?? '—'))),
-                        DataCell(Padding(padding: const EdgeInsets.symmetric(vertical: 8), child: Text(row['status'] ?? 'جديدة'))),
-                      ]),
-                    )
-                    .toList(),
+            Table(
+              textDirection: Directionality.of(context),
+              defaultVerticalAlignment: TableCellVerticalAlignment.middle,
+              columnWidths: const {
+                0: FlexColumnWidth(0.72),
+                1: FlexColumnWidth(1.55),
+                2: FlexColumnWidth(1.35),
+                3: FlexColumnWidth(0.95),
+              },
+              border: TableBorder(
+                horizontalInside: BorderSide(color: Color(0xFFD8E4E0), width: 0.8),
               ),
+              children: [
+                TableRow(
+                  decoration: const BoxDecoration(color: Color(0xFFEAF1EF)),
+                  children: [
+                    _officialCell('الوقت', bold: true, background: const Color(0xFFEAF1EF)),
+                    _officialCell('المهمة والمسؤولية', bold: true, background: const Color(0xFFEAF1EF)),
+                    _officialCell('المخرج المطلوب', bold: true, background: const Color(0xFFEAF1EF)),
+                    _officialCell('الحالة', bold: true, background: const Color(0xFFEAF1EF)),
+                  ],
+                ),
+                ...officialRows.map(
+                  (row) => TableRow(
+                    children: [
+                      _officialCell(row['time'] ?? '—'),
+                      _officialCell(row['title'] ?? '—'),
+                      _officialCell(row['output'] ?? '—'),
+                      Container(
+                        constraints: const BoxConstraints(minHeight: 48),
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 7),
+                        alignment: Alignment.center,
+                        child: _officialStatusChip(row['statusKey'] ?? 'pending', row['status'] ?? 'جديدة'),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: 6),
             if (value('المسؤوليات') != '—')
