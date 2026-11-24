@@ -51,12 +51,12 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     } catch (_) {}
 
     Future<void> loadEmployees() async {
-      if (organizationId == null || organizationId!.isEmpty) return;
+      if (organizationId == null || organizationId.isEmpty) return;
       try {
         final rows = await client
             .from('organization_memberships')
             .select('id,user_id,display_name,employee_no')
-            .eq('organization_id', organizationId!)
+            .eq('organization_id', organizationId)
             .eq('is_active', true)
             .or('display_name.ilike.%$query%,employee_no.ilike.%$query%')
             .limit(20);
@@ -74,12 +74,12 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     }
 
     Future<void> loadTasks() async {
-      if (organizationId == null || organizationId!.isEmpty) return;
+      if (organizationId == null || organizationId.isEmpty) return;
       try {
         final rows = await client
             .from('tasks')
             .select('id,title,description,status')
-            .eq('organization_id', organizationId!)
+            .eq('organization_id', organizationId)
             .isFilter('deleted_at', null)
             .or('title.ilike.%$query%,description.ilike.%$query%')
             .order('updated_at', ascending: false)
@@ -120,12 +120,12 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     }
 
     Future<void> loadBranches() async {
-      if (organizationId == null || organizationId!.isEmpty) return;
+      if (organizationId == null || organizationId.isEmpty) return;
       try {
         final rows = await client
             .from('branches')
             .select('id,name,code')
-            .eq('organization_id', organizationId!)
+            .eq('organization_id', organizationId)
             .or('name.ilike.%$query%,code.ilike.%$query%')
             .limit(20);
         for (final row in rows.whereType<Map>()) {
@@ -142,12 +142,12 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     }
 
     Future<void> loadTemplates() async {
-      if (organizationId == null || organizationId!.isEmpty) return;
+      if (organizationId == null || organizationId.isEmpty) return;
       try {
         final rows = await client
             .from('report_form_templates')
             .select('id,title,role_code')
-            .eq('organization_id', organizationId!)
+            .eq('organization_id', organizationId)
             .or('title.ilike.%$query%,role_code.ilike.%$query%')
             .limit(20);
         for (final row in rows.whereType<Map>()) {
