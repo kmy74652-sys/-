@@ -35,6 +35,8 @@ class _TasksScreenState extends State<TasksScreen>
   String _view = 'tasks';
   String _ledgerOrder = 'latest';
   bool _officialHeaderCollapsed = false;
+  String? _organizationId;
+  bool _canEditOfficialTasks = false;
 
   static const Map<String, String> _statusLabels = {
     'pending': 'جديدة',
@@ -56,6 +58,7 @@ class _TasksScreenState extends State<TasksScreen>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _load();
+    _loadTaskEditIdentity();
     _tasksChannel = Supabase.instance.client
         .channel('tasks-screen-${identityHashCode(this)}')
         .onPostgresChanges(
@@ -111,7 +114,7 @@ class _TasksScreenState extends State<TasksScreen>
         final page = await client
             .from('tasks')
             .select(
-              'id,title,description,due_at,priority,status,report_required,report_form_snapshot_id,assigned_at,received_at,opened_at,created_at,updated_at',
+              'id,organization_id,title,description,due_at,priority,status,report_required,report_form_snapshot_id,assigned_at,received_at,opened_at,created_at,updated_at',
             )
             .isFilter('deleted_at', null)
             .order('due_at')
@@ -158,6 +161,36 @@ class _TasksScreenState extends State<TasksScreen>
       }
     } finally {
       if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _loadTaskEditIdentity() async {
+    try {
+      final raw = await Supabase.instance.client.rpc('mobile_my_profile');
+      final root = raw is Map
+          ? Map<String, dynamic>.from(raw)
+          : <String, dynamic>{};
+      final employee = root['employee'];
+      if (employee is! Map) return;
+      final profile = Map<String, dynamic>.from(employee);
+      final roles = profile['roles'] is List
+          ? (profile['roles'] as List)
+                .whereType<Map>()
+                .map((role) => '${role['code'] ?? ''}')
+                .toSet()
+          : <String>{};
+      final organization = (profile['institutionId'] ??
+              profile['institution_id'] ??
+              profile['organization_id'])
+          ?.toString();
+      if (!mounted) return;
+      setState(() {
+        _organizationId = organization;
+        _canEditOfficialTasks =
+            roles.contains('owner') || roles.contains('admin_followup');
+      });
+    } catch (_) {
+      // Keep the edit affordance hidden; Supabase remains the final authority.
     }
   }
 
@@ -554,10 +587,139 @@ class _TasksScreenState extends State<TasksScreen>
     return words.length <= 2 ? clean : '${words.take(2).join(' ')}...';
   }
 
+  String _replaceOfficialRow(
+    String description, {
+    required String time,
+    required String title,
+    required String output,
+  }) {
+    final row = 'صف الجدول: ${time.trim()} | ${title.trim()} | ${output.trim()}';
+    final rowPattern = RegExp(r'^صف الجدول:\s*.*$', multiLine: true);
+    if (rowPattern.hasMatch(description)) {
+      return description.replaceFirst(rowPattern, row);
+    }
+    final lines = description.split('\n').map((line) {
+      if (line.startsWith('الوقت المحدد:')) return 'الوقت المحدد: ${time.trim()}';
+      if (line.startsWith('المخرج المطلوب:')) return 'المخرج المطلوب: ${output.trim()}';
+      return line;
+    }).toList();
+    return lines.join('\n');
+  }
+
+  Future<Map<String, String>?> _editOfficialRowDialog(
+    Map<String, dynamic> row,
+  ) async {
+    final timeController = TextEditingController(text: '${row['time'] ?? ''}');
+    final titleController = TextEditingController(text: '${row['title'] ?? ''}');
+    final outputController = TextEditingController(
+      text: row['output'] == '—' ? '' : '${row['output'] ?? ''}',
+    );
+    final result = await showDialog<Map<String, String>>(
+      context: context,
+      builder: (dialogContext) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: AlertDialog(
+          title: const Text('تعديل بيانات صف المهمة'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: timeController,
+                  textDirection: TextDirection.rtl,
+                  decoration: const InputDecoration(labelText: 'الوقت'),
+                ),
+                TextField(
+                  controller: titleController,
+                  maxLines: 2,
+                  textDirection: TextDirection.rtl,
+                  decoration: const InputDecoration(labelText: 'المهمة والمسؤولية'),
+                ),
+                TextField(
+                  controller: outputController,
+                  maxLines: 2,
+                  textDirection: TextDirection.rtl,
+                  decoration: const InputDecoration(labelText: 'المخرج المطلوب'),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('إلغاء'),
+            ),
+            FilledButton.icon(
+              onPressed: () {
+                final title = titleController.text.trim();
+                if (title.isEmpty) return;
+                Navigator.of(dialogContext).pop({
+                  'time': timeController.text.trim(),
+                  'title': title,
+                  'output': outputController.text.trim(),
+                });
+              },
+              icon: const Icon(Icons.save_outlined),
+              label: const Text('حفظ التعديلات'),
+            ),
+          ],
+        ),
+      ),
+    );
+    timeController.dispose();
+    titleController.dispose();
+    outputController.dispose();
+    return result;
+  }
+
+  Future<void> _editOfficialRow(Map<String, dynamic> row) async {
+    if (!_canEditOfficialTasks) return;
+    final task = row['_task'];
+    final organizationId = '${task is Map ? task['organization_id'] ?? _organizationId ?? '' : _organizationId ?? ''}';
+    final taskId = '${row['taskId'] ?? ''}';
+    if (taskId.isEmpty || organizationId.isEmpty) return;
+    final values = await _editOfficialRowDialog(row);
+    if (values == null || !mounted) return;
+    try {
+      final description = _replaceOfficialRow(
+        '${task is Map ? task['description'] ?? '' : ''}',
+        time: values['time'] ?? '',
+        title: values['title'] ?? '',
+        output: values['output'] ?? '',
+      );
+      await Supabase.instance.client.rpc(
+        'admin_update_task',
+        params: {
+          'p_organization_id': organizationId,
+          'p_task_id': taskId,
+          'p_title': values['title'],
+          'p_description': description,
+          'p_due_at': null,
+        },
+      );
+      await _load();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('تم حفظ تعديلات صف المهمة')),
+        );
+      }
+    } catch (error) {
+      if (!mounted) return;
+      final raw = error.toString();
+      final message = raw.contains('management_role_required')
+          ? 'لا تملك صلاحية تعديل المهام.'
+          : raw.contains('task_not_found')
+          ? 'المهمة غير موجودة أو لم تعد متاحة.'
+          : 'تعذر حفظ التعديل: $raw';
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    }
+  }
+
   Future<void> _showOfficialTextCard({
     required String section,
     required String time,
     required String text,
+    Map<String, dynamic>? row,
   }) async {
     final clean = text.trim();
     if (clean.isEmpty || clean == '—') return;
@@ -629,10 +791,28 @@ class _TasksScreenState extends State<TasksScreen>
                 ),
                 Padding(
                   padding: const EdgeInsets.fromLTRB(18, 0, 18, 16),
-                  child: FilledButton.icon(
-                    onPressed: () => Navigator.of(dialogContext).pop(),
-                    icon: const Icon(Icons.close),
-                    label: const Text('إغلاق'),
+                  child: Row(
+                    children: [
+                      if (_canEditOfficialTasks && row != null)
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: () async {
+                              Navigator.of(dialogContext).pop();
+                              await _editOfficialRow(row);
+                            },
+                            icon: const Icon(Icons.edit_outlined),
+                            label: const Text('تعديل'),
+                          ),
+                        ),
+                      if (_canEditOfficialTasks && row != null) const SizedBox(width: 8),
+                      Expanded(
+                        child: FilledButton.icon(
+                          onPressed: () => Navigator.of(dialogContext).pop(),
+                          icon: const Icon(Icons.close),
+                          label: const Text('إغلاق'),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],
@@ -647,12 +827,13 @@ class _TasksScreenState extends State<TasksScreen>
     required String section,
     required String time,
     required String text,
+    Map<String, dynamic>? row,
   }) {
     final preview = _officialTwoWordPreview(text);
     return InkWell(
       onTap: preview == '—'
           ? null
-          : () => _showOfficialTextCard(section: section, time: time, text: text),
+          : () => _showOfficialTextCard(section: section, time: time, text: text, row: row),
       child: _officialCell(preview, singleLine: true),
     );
   }
@@ -763,6 +944,8 @@ class _TasksScreenState extends State<TasksScreen>
           orElse: () => 'المخرج المطلوب: —',
         );
           officialRows.add({
+            'taskId': '${task['id'] ?? ''}',
+            '_task': task,
             'time': timeLine.replaceFirst('الوقت المحدد:', '').trim(),
             'title': '${task['title'] ?? 'مهمة'}',
             'output': _cleanOfficialOutput(
@@ -775,6 +958,8 @@ class _TasksScreenState extends State<TasksScreen>
       } else {
         for (final match in matches) {
           officialRows.add({
+            'taskId': '${task['id'] ?? ''}',
+            '_task': task,
             'time': match.group(1)?.trim() ?? 'غير محدد',
             'title': match.group(2)?.trim() ?? '—',
             'output': _cleanOfficialOutput(
@@ -865,11 +1050,13 @@ class _TasksScreenState extends State<TasksScreen>
                         section: 'المهمة والمسؤولية',
                         time: row['time'] ?? '—',
                         text: row['title'] ?? '—',
+                        row: row,
                       ),
                       _officialTextCell(
                         section: 'المخرج المطلوب',
                         time: row['time'] ?? '—',
                         text: row['output'] ?? '—',
+                        row: row,
                       ),
                       Container(
                         constraints: const BoxConstraints(minHeight: 48),
