@@ -38,6 +38,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
   final Set<String> _saving = {};
   String _filter = 'all';
   String _stream = 'tasks';
+  bool _filtersExpanded = false;
   final _searchController = TextEditingController();
   String _search = '';
   final Map<String, TextEditingController> _submissionNotes = {};
@@ -66,6 +67,14 @@ class _ReportsScreenState extends State<ReportsScreen> {
       controller.dispose();
     }
     super.dispose();
+  }
+
+  void _resetFilters() {
+    setState(() {
+      _filter = 'all';
+      _search = '';
+      _searchController.clear();
+    });
   }
 
   List<Map<String, dynamic>> _maps(Object? value) => value is List
@@ -882,34 +891,69 @@ class _ReportsScreenState extends State<ReportsScreen> {
             ),
           ),
         ],
-        Wrap(
-          alignment: WrapAlignment.end,
-          spacing: 6,
-          children:
-              (_stream == 'tasks'
-                      ? <(String, String)>[
-                          ('all', 'الكل'),
-                          ('submitted', 'بانتظار المراجعة'),
-                          ('approved', 'معتمدة'),
-                          ('returned', 'معادة'),
-                          ('rejected', 'مرفوضة'),
-                        ]
-                      : <(String, String)>[
-                          ('all', 'الكل'),
-                          ('submitted', 'بانتظار المراجعة'),
-                          if (_stream == 'submissions')
-                            ('reviewed', 'بانتظار الاعتماد'),
-                          ('approved', 'معتمدة'),
-                          ('returned', 'معادة'),
-                        ])
-                  .map(
-                    (item) => ChoiceChip(
-                      label: Text(item.$2),
-                      selected: _filter == item.$1,
-                      onSelected: (_) => setState(() => _filter = item.$1),
+        Card(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      _filter == 'all' ? 'الفلاتر' : 'الفلاتر · نشط: 1',
+                      textAlign: TextAlign.right,
+                      style: const TextStyle(fontWeight: FontWeight.w800),
                     ),
-                  )
-                  .toList(),
+                  ),
+                  TextButton(
+                    onPressed: _resetFilters,
+                    child: const Text('إعادة التعيين'),
+                  ),
+                  IconButton(
+                    tooltip: _filtersExpanded ? 'إخفاء الفلاتر' : 'إظهار الفلاتر',
+                    onPressed: () => setState(() => _filtersExpanded = !_filtersExpanded),
+                    icon: Icon(_filtersExpanded ? Icons.expand_less : Icons.expand_more),
+                  ),
+                ],
+              ),
+              AnimatedSize(
+                duration: const Duration(milliseconds: 220),
+                child: !_filtersExpanded
+                    ? const SizedBox.shrink()
+                    : Padding(
+                        padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+                        child: Wrap(
+                          alignment: WrapAlignment.end,
+                          spacing: 6,
+                          children:
+                              (_stream == 'tasks'
+                                      ? <(String, String)>[
+                                          ('all', 'الكل'),
+                                          ('submitted', 'بانتظار المراجعة'),
+                                          ('approved', 'معتمدة'),
+                                          ('returned', 'معادة'),
+                                          ('rejected', 'مرفوضة'),
+                                        ]
+                                      : <(String, String)>[
+                                          ('all', 'الكل'),
+                                          ('submitted', 'بانتظار المراجعة'),
+                                          if (_stream == 'submissions')
+                                            ('reviewed', 'بانتظار الاعتماد'),
+                                          ('approved', 'معتمدة'),
+                                          ('returned', 'معادة'),
+                                        ])
+                                  .map(
+                                    (item) => ChoiceChip(
+                                      label: Text(item.$2),
+                                      selected: _filter == item.$1,
+                                      onSelected: (_) => setState(() => _filter = item.$1),
+                                    ),
+                                  )
+                                  .toList(),
+                        ),
+                      ),
+              ),
+            ],
+          ),
         ),
         const SizedBox(height: 10),
         TextField(

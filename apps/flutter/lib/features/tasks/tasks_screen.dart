@@ -29,6 +29,7 @@ class _TasksScreenState extends State<TasksScreen>
   String _search = '';
   String _statusFilter = 'all';
   String _priorityFilter = 'all';
+  bool _filtersExpanded = false;
   StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
   RealtimeChannel? _tasksChannel;
   int _pendingCount = 0;
@@ -407,60 +408,66 @@ class _TasksScreenState extends State<TasksScreen>
                       ],
                     ),
                     const SizedBox(height: 8),
-                    const Align(
-                      alignment: Alignment.centerRight,
-                      child: Text(
-                        'الحالة',
-                        style: TextStyle(fontWeight: FontWeight.w700),
-                      ),
-                    ),
-                    SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: Row(
-                        textDirection: TextDirection.rtl,
+                    Card(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          _chip(
-                            'all',
-                            'الكل',
-                            _statusFilter,
-                            (v) => _statusFilter = v,
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  _statusFilter == 'all' && _priorityFilter == 'all'
+                                      ? 'الفلاتر'
+                                      : 'الفلاتر · نشط: ${(_statusFilter == 'all' ? 0 : 1) + (_priorityFilter == 'all' ? 0 : 1)}',
+                                  textAlign: TextAlign.right,
+                                  style: const TextStyle(fontWeight: FontWeight.w800),
+                                ),
+                              ),
+                              TextButton(
+                                onPressed: _resetFilters,
+                                child: const Text('إعادة التعيين'),
+                              ),
+                              IconButton(
+                                tooltip: _filtersExpanded ? 'إخفاء الفلاتر' : 'إظهار الفلاتر',
+                                onPressed: () => setState(() => _filtersExpanded = !_filtersExpanded),
+                                icon: Icon(_filtersExpanded ? Icons.expand_less : Icons.expand_more),
+                              ),
+                            ],
                           ),
-                          ..._statusLabels.entries.map(
-                            (entry) => _chip(
-                              entry.key,
-                              entry.value,
-                              _statusFilter,
-                              (v) => _statusFilter = v,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const Align(
-                      alignment: Alignment.centerRight,
-                      child: Text(
-                        'الأولوية',
-                        style: TextStyle(fontWeight: FontWeight.w700),
-                      ),
-                    ),
-                    SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: Row(
-                        textDirection: TextDirection.rtl,
-                        children: [
-                          _chip(
-                            'all',
-                            'كل الأولويات',
-                            _priorityFilter,
-                            (v) => _priorityFilter = v,
-                          ),
-                          ..._priorityLabels.entries.map(
-                            (entry) => _chip(
-                              entry.key,
-                              entry.value,
-                              _priorityFilter,
-                              (v) => _priorityFilter = v,
-                            ),
+                          AnimatedSize(
+                            duration: const Duration(milliseconds: 220),
+                            child: !_filtersExpanded
+                                ? const SizedBox.shrink()
+                                : Padding(
+                                    padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                                      children: [
+                                        const Text('الحالة', textAlign: TextAlign.right, style: TextStyle(fontWeight: FontWeight.w700)),
+                                        SingleChildScrollView(
+                                          scrollDirection: Axis.horizontal,
+                                          child: Row(
+                                            textDirection: TextDirection.rtl,
+                                            children: [
+                                              _chip('all', 'الكل', _statusFilter, (v) => _statusFilter = v),
+                                              ..._statusLabels.entries.map((entry) => _chip(entry.key, entry.value, _statusFilter, (v) => _statusFilter = v)),
+                                            ],
+                                          ),
+                                        ),
+                                        const Text('الأولوية', textAlign: TextAlign.right, style: TextStyle(fontWeight: FontWeight.w700)),
+                                        SingleChildScrollView(
+                                          scrollDirection: Axis.horizontal,
+                                          child: Row(
+                                            textDirection: TextDirection.rtl,
+                                            children: [
+                                              _chip('all', 'كل الأولويات', _priorityFilter, (v) => _priorityFilter = v),
+                                              ..._priorityLabels.entries.map((entry) => _chip(entry.key, entry.value, _priorityFilter, (v) => _priorityFilter = v)),
+                                            ],
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
                           ),
                         ],
                       ),
