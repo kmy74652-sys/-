@@ -159,16 +159,15 @@ class _ReportsScreenState extends State<ReportsScreen> {
           final submissions = await _client
               .from('report_submissions')
               .select(
-                'id,form_id,employee_name,branch_name,report_date,answers,status,review_note,reviewed_by_name,approved_by_name,form:report_form_templates(title)',
+                'id,form_id,employee_name,branch_name,report_date,answers,status,review_note,reviewed_by_name,approved_by_name,created_at,submitted_at,form:report_form_templates(title)',
               )
-              .neq('status', 'draft')
               .order('report_date', ascending: false)
               .limit(200);
           _submissionRows = _maps(submissions);
           try {
             final dynamicRows = _maps(await _client
                 .from('employee_dynamic_reports')
-                .select('id,template_id,version_id,employee_user_id,role_code,branch_id,report_date,values,status,review_note,submitted_at')
+                .select('id,template_id,version_id,employee_user_id,role_code,branch_id,report_date,values,status,review_note,created_at,submitted_at')
                 .eq('organization_id', organizationId)
                 .order('submitted_at', ascending: false)
                 .limit(200));
@@ -179,6 +178,8 @@ class _ReportsScreenState extends State<ReportsScreen> {
                   'employee_name': _employeeNames[row['employee_user_id']?.toString()] ?? 'موظف',
                   'branch_name': 'غير محدد',
                   'answers': row['values'],
+                  'created_at': row['created_at'],
+                  'submitted_at': row['submitted_at'],
                 }));
           } catch (_) {
             // لا نمنع عرض مسار report_submissions إذا كانت بنية المسار الديناميكي غير منشورة.
@@ -678,6 +679,46 @@ class _ReportsScreenState extends State<ReportsScreen> {
     }
   }
 
+  bool _pastDraftDeadline(Map<String, dynamic> row) {
+    final raw = row['created_at'] ?? row['submitted_at'];
+    final created = raw == null ? null : DateTime.tryParse(raw.toString());
+    return created != null && DateTime.now().toUtc().isAfter(
+      created.toUtc().add(const Duration(hours: 24)),
+    );
+  }
+
+  Future<void> _finalizeDraft(Map<String, dynamic> row) async {
+    final id = row['id']?.toString();
+    if (id == null || id.isEmpty || _saving.contains(id)) return;
+    final isDynamic = row['_source'] == 'dynamic';
+    if (isDynamic ? !_canReview : !_canReviewSubmissions) return;
+    if (!_pastDraftDeadline(row)) {
+      setState(() => _submissionError = 'لا يمكن الترحيل النيابي قبل مرور 24 ساعة على إنشاء المسودة.');
+      return;
+    }
+    setState(() {
+      _saving.add(id);
+      _submissionError = null;
+    });
+    try {
+      await _client.rpc(
+        isDynamic ? 'finalize_employee_dynamic_report' : 'finalize_report_submission',
+        params: {'p_report_id': id},
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('تم ترحيل التقرير نهائيًا نيابةً عن الموظف وإحالته للمراجعة.')),
+      );
+      await _load();
+    } catch (error) {
+      if (mounted) {
+        setState(() => _submissionError = 'تعذر الترحيل النهائي النيابي: ${error.toString().replaceFirst('Exception: ', '')}');
+      }
+    } finally {
+      if (mounted) setState(() => _saving.remove(id));
+    }
+  }
+
   String _displayValue(Object? value) {
     if (value == null) return '—';
     if (value is Map && value['strokes'] is List) {
@@ -1140,6 +1181,31 @@ class _ReportsScreenState extends State<ReportsScreen> {
                 ],
               ),
             ),
+          if (status == 'draft' && _canReviewSubmissions)
+            Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    _pastDraftDeadline(row)
+                        ? 'مضى أكثر من 24 ساعة — التقرير غير مرحّل نهائيًا.'
+                        : 'تبقى المسودة قابلة للإكمال لدى الموظف حتى مرور 24 ساعة.',
+                    textAlign: TextAlign.right,
+                    style: TextStyle(
+                      color: _pastDraftDeadline(row) ? Colors.deepOrange : Colors.black54,
+                      fontWeight: _pastDraftDeadline(row) ? FontWeight.bold : FontWeight.normal,
+                    ),
+                  ),
+                  OutlinedButton(
+                    onPressed: id.isEmpty || _saving.contains(id) || !_pastDraftDeadline(row)
+                        ? null
+                        : () => _finalizeDraft(row),
+                    child: const Text('ترحيل نهائي نيابةً عن الموظف'),
+                  ),
+                ],
+              ),
+            ),
           if (status == 'submitted' && !_canReviewSubmissions)
             const Padding(
               padding: EdgeInsets.all(12),
@@ -1163,6 +1229,8 @@ class _ReportsScreenState extends State<ReportsScreen> {
 
   Widget _dynamicSubmissionCard(Map<String, dynamic> row) {
     final answers = row['answers'];
+    final id = row['id']?.toString() ?? '';
+    final status = row['status']?.toString() ?? 'غير معروف';
     return Card(
       child: ExpansionTile(
         title: const Text(
@@ -1171,7 +1239,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
           style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.navy),
         ),
         subtitle: Text(
-          'الموظف: ${row['employee_name'] ?? 'غير محدد'} · الدور: ${row['role_code'] ?? 'غير محدد'}\nالتاريخ: ${row['report_date'] ?? 'غير محدد'} · ${_statusLabel(row['status']?.toString() ?? 'غير معروف')}',
+          'الموظف: ${row['employee_name'] ?? 'غير محدد'} · الدور: ${row['role_code'] ?? 'غير محدد'}\nالتاريخ: ${row['report_date'] ?? 'غير محدد'} · ${_statusLabel(status)}',
           textAlign: TextAlign.right,
         ),
         children: [
@@ -1187,9 +1255,34 @@ class _ReportsScreenState extends State<ReportsScreen> {
               padding: EdgeInsets.all(12),
               child: Text('لا توجد إجابات قابلة للعرض.', textAlign: TextAlign.right),
             ),
+          if (status == 'draft' && _canReview)
+            Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    _pastDraftDeadline(row)
+                        ? 'مضى أكثر من 24 ساعة — التقرير غير مرحّل نهائيًا.'
+                        : 'تبقى المسودة قابلة للإكمال لدى الموظف حتى مرور 24 ساعة.',
+                    textAlign: TextAlign.right,
+                    style: TextStyle(
+                      color: _pastDraftDeadline(row) ? Colors.deepOrange : Colors.black54,
+                      fontWeight: _pastDraftDeadline(row) ? FontWeight.bold : FontWeight.normal,
+                    ),
+                  ),
+                  OutlinedButton(
+                    onPressed: id.isEmpty || _saving.contains(id) || !_pastDraftDeadline(row)
+                        ? null
+                        : () => _finalizeDraft(row),
+                    child: const Text('ترحيل نهائي نيابةً عن الموظف'),
+                  ),
+                ],
+              ),
+            ),
           const Padding(
             padding: EdgeInsets.all(12),
-            child: Text('هذا التقرير محفوظ عبر المسار الديناميكي ويظهر هنا للقراءة. إجراءات المراجعة الحالية مرتبطة بمسار report_submissions فقط.', textAlign: TextAlign.right),
+            child: Text('هذا التقرير محفوظ عبر المسار الديناميكي. تبقى المسودة قابلة للتعديل، ثم تُحال للمراجعة بعد الترحيل النهائي.', textAlign: TextAlign.right),
           ),
         ],
       ),

@@ -81,6 +81,8 @@ class _IndependentReportsScreenState extends State<IndependentReportsScreen> {
               'version_id': row['version_id'],
               'status': row['status'],
               'review_note': row['review_note'],
+              'created_at': row['created_at'],
+              'submitted_at': row['submitted_at'],
               'answers': row['values'] is Map ? row['values'] : <String, dynamic>{},
             },
       };
@@ -89,7 +91,7 @@ class _IndependentReportsScreenState extends State<IndependentReportsScreen> {
         final rows = await _client
             .from('report_submissions')
             .select(
-              'id,form_id,answers,status,review_note,reviewed_by_name,approved_by_name',
+              'id,form_id,answers,status,review_note,reviewed_by_name,approved_by_name,created_at,submitted_at',
             )
             .eq('employee_id', _client.auth.currentUser!.id)
             .eq('branch_id', _branchId!)
@@ -176,7 +178,15 @@ class _IndependentReportsScreenState extends State<IndependentReportsScreen> {
     });
     try {
       final current = _submissions[form.id];
-      if (submit && form.versionId != null) {
+      if (!submit && form.versionId != null) {
+        await _client.rpc('save_my_dynamic_report_draft', params: {
+          'p_template_id': form.id,
+          'p_version_id': form.versionId,
+          'p_report_date': _today,
+          'p_values': answers,
+          'p_branch_id': _branchId,
+        });
+      } else if (submit && form.versionId != null) {
         await _client.rpc('submit_my_dynamic_report', params: {
           'p_template_id': form.id,
           'p_version_id': form.versionId,
@@ -202,8 +212,8 @@ class _IndependentReportsScreenState extends State<IndependentReportsScreen> {
       if (mounted)
         setState(
           () => _notice = submit
-              ? 'تم إرسال التقرير للمراجعة.'
-              : 'تم حفظ المسودة.',
+              ? 'تم ترحيل التقرير نهائيًا وإرساله للمراجعة.'
+              : 'تم الترحيل غير النهائي. يمكنك مواصلة التعديل قبل الترحيل النهائي.',
         );
       await _load();
     } catch (_) {
@@ -337,7 +347,7 @@ class _IndependentReportsScreenState extends State<IndependentReportsScreen> {
                   ),
                 ),
                 const Text(
-                  'احفظ مسودة أو ارفع التقرير للإدارة للمراجعة.',
+                  'رحّل التقرير غير نهائيًا أثناء الإكمال، ثم رحّله نهائيًا عند الجاهزية للمراجعة.',
                   textAlign: TextAlign.right,
                 ),
                 if (_error != null) _message(_error!, warning: true),
@@ -409,7 +419,7 @@ class _IndependentReportsScreenState extends State<IndependentReportsScreen> {
                           ? null
                           : () => _save(form, submit: false),
                       child: Text(
-                        _busy == form.id ? 'جارٍ الحفظ…' : 'حفظ مسودة',
+                        _busy == form.id ? 'جارٍ الحفظ…' : 'ترحيل غير نهائي',
                       ),
                     ),
                   ),
@@ -423,8 +433,8 @@ class _IndependentReportsScreenState extends State<IndependentReportsScreen> {
                         _busy == form.id
                             ? 'جارٍ الإرسال…'
                             : status == 'returned'
-                            ? 'إعادة الإرسال'
-                            : 'إرسال التقرير',
+                            ? 'إعادة الترحيل النهائي'
+                            : 'ترحيل نهائي',
                       ),
                     ),
                   ),
