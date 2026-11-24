@@ -28,6 +28,7 @@ class _TasksScreenState extends State<TasksScreen>
   String _statusFilter = 'all';
   String _priorityFilter = 'all';
   StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
+  RealtimeChannel? _tasksChannel;
   int _pendingCount = 0;
   int _failedCount = 0;
   bool _queueBusy = false;
@@ -54,6 +55,25 @@ class _TasksScreenState extends State<TasksScreen>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _load();
+    _tasksChannel = Supabase.instance.client
+        .channel('tasks-screen-${identityHashCode(this)}')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'tasks',
+          callback: (_) {
+            if (mounted) _load();
+          },
+        )
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'task_reports',
+          callback: (_) {
+            if (mounted) _load();
+          },
+        )
+      ..subscribe();
     _connectivitySubscription = Connectivity().onConnectivityChanged.listen((
       results,
     ) {
@@ -65,6 +85,9 @@ class _TasksScreenState extends State<TasksScreen>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _connectivitySubscription?.cancel();
+    if (_tasksChannel != null) {
+      Supabase.instance.client.removeChannel(_tasksChannel!);
+    }
     _searchController.dispose();
     super.dispose();
   }
@@ -459,7 +482,12 @@ class _TasksScreenState extends State<TasksScreen>
     ),
   );
 
-  Widget _officialCell(String text, {bool bold = false, Color? background}) =>
+  Widget _officialCell(
+    String text, {
+    bool bold = false,
+    Color? background,
+    bool singleLine = false,
+  }) =>
       Container(
         color: background,
         constraints: const BoxConstraints(minHeight: 48),
@@ -468,7 +496,9 @@ class _TasksScreenState extends State<TasksScreen>
         child: Text(
           text.trim().isEmpty ? '—' : text,
           textAlign: TextAlign.right,
-          softWrap: true,
+          softWrap: !singleLine,
+          maxLines: singleLine ? 1 : null,
+          overflow: singleLine ? TextOverflow.ellipsis : TextOverflow.clip,
           style: TextStyle(fontWeight: bold ? FontWeight.w700 : FontWeight.normal),
         ),
       );
@@ -502,11 +532,11 @@ class _TasksScreenState extends State<TasksScreen>
           Icon(style.$1, size: 15, color: style.$2),
           const SizedBox(width: 4),
           ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 82),
+            constraints: const BoxConstraints(maxWidth: 112),
             child: Text(
               label,
               textAlign: TextAlign.right,
-              maxLines: 2,
+              maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(color: style.$2, fontSize: 11, fontWeight: FontWeight.w700),
             ),
@@ -653,10 +683,10 @@ class _TasksScreenState extends State<TasksScreen>
               textDirection: Directionality.of(context),
               defaultVerticalAlignment: TableCellVerticalAlignment.middle,
               columnWidths: const {
-                0: FlexColumnWidth(0.72),
+                0: FlexColumnWidth(0.90),
                 1: FlexColumnWidth(1.55),
-                2: FlexColumnWidth(1.35),
-                3: FlexColumnWidth(0.95),
+                2: FlexColumnWidth(1.45),
+                3: FlexColumnWidth(1.05),
               },
               border: TableBorder(
                 horizontalInside: BorderSide(color: Color(0xFFD8E4E0), width: 0.8),
@@ -665,7 +695,7 @@ class _TasksScreenState extends State<TasksScreen>
                 TableRow(
                   decoration: const BoxDecoration(color: Color(0xFFEAF1EF)),
                   children: [
-                    _officialCell('الوقت', bold: true, background: const Color(0xFFEAF1EF)),
+                    _officialCell('الوقت', bold: true, background: const Color(0xFFEAF1EF), singleLine: true),
                     _officialCell('المهمة والمسؤولية', bold: true, background: const Color(0xFFEAF1EF)),
                     _officialCell('المخرج المطلوب', bold: true, background: const Color(0xFFEAF1EF)),
                     _officialCell('الحالة', bold: true, background: const Color(0xFFEAF1EF)),
@@ -674,7 +704,7 @@ class _TasksScreenState extends State<TasksScreen>
                 ...officialRows.map(
                   (row) => TableRow(
                     children: [
-                      _officialCell(row['time'] ?? '—'),
+                      _officialCell(row['time'] ?? '—', singleLine: true),
                       _officialCell(row['title'] ?? '—'),
                       _officialCell(row['output'] ?? '—'),
                       Container(

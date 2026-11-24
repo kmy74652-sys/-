@@ -28,6 +28,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
   final Map<String, List<String>> _evidenceIds = {};
   List<Map<String, dynamic>> _forms = [];
   final Map<String, TextEditingController> _formInputs = {};
+  RealtimeChannel? _taskChannel;
   String _formInputKey(String snapshot, String field) => '$snapshot:$field';
 
   List<Map<String, String>> _descriptionBlocks(String value) {
@@ -136,6 +137,17 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
   void initState() {
     super.initState();
     _load();
+    _taskChannel = Supabase.instance.client
+        .channel('task-detail-${widget.taskId}-${identityHashCode(this)}')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'tasks',
+          callback: (_) {
+            if (mounted) _load();
+          },
+        )
+      ..subscribe();
   }
 
   @override
@@ -145,6 +157,9 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
     }
     for (final controller in _formInputs.values) {
       controller.dispose();
+    }
+    if (_taskChannel != null) {
+      Supabase.instance.client.removeChannel(_taskChannel!);
     }
     super.dispose();
   }
@@ -1742,6 +1757,16 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                   ),
                 ),
               const SizedBox(height: 12),
+              if (_task != null)
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: Text(
+                    'حالة المهمة: ${_taskStatusLabel(_task!['status'])}',
+                    textAlign: TextAlign.right,
+                    style: const TextStyle(fontWeight: FontWeight.w800),
+                  ),
+                ),
+              const SizedBox(height: 8),
               Wrap(
                 spacing: 8,
                 runSpacing: 8,
@@ -1755,7 +1780,17 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                   if (['in_progress', 'on_hold'].contains(_task?['status']))
                     FilledButton(
                       onPressed: _saving ? null : () => _status('submitted'),
-                      child: const Text('إرسال للمراجعة'),
+                      child: const Text('إرسال المهمة للمراجعة'),
+                    ),
+                  if (['report_submitted', 'submitted'].contains(_task?['status']))
+                    const Chip(
+                      avatar: Icon(Icons.hourglass_top_outlined, size: 17),
+                      label: Text('بانتظار مراجعة الإدارة'),
+                    ),
+                  if (['completed_approved', 'approved'].contains(_task?['status']))
+                    const Chip(
+                      avatar: Icon(Icons.verified_outlined, size: 17),
+                      label: Text('مكتملة ومعتمدة'),
                     ),
                   OutlinedButton.icon(
                     onPressed: _timeline,
