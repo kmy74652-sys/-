@@ -12,6 +12,7 @@ import '../features/tasks/tasks_screen.dart';
 import '../features/tasks/task_detail_screen.dart';
 import '../features/admin/report_designer_screen.dart';
 import '../features/admin/task_management_screen.dart';
+import '../features/admin/admin_screen.dart';
 import '../features/admin/performance_analytics_screen.dart';
 import '../features/reports/reports_screen.dart';
 import '../features/reports/independent_reports_screen.dart';
@@ -142,9 +143,12 @@ void initializeRouter() {
         builder: (context, state) =>
             TaskDetailScreen(taskId: state.pathParameters['taskId']!),
       ),
-      // لوحة الإدارة الكاملة أصبحت داخل الرئيسية للمدير؛ يمنع هذا المسار
-      // إنشاء نسخة ثانية من نفس اللوحة عند فتح رابط قديم.
-      GoRoute(path: '/admin', redirect: (context, state) => '/'),
+      GoRoute(
+        path: '/admin',
+        builder: (context, state) => AdminScreen(
+          initialSection: state.uri.queryParameters['section'],
+        ),
+      ),
       GoRoute(
         path: '/admin/tasks',
         builder: (context, state) => _PermissionGate(

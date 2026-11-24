@@ -11,6 +11,7 @@ class AdminScreen extends StatefulWidget {
     this.embedded = false,
     this.inline = false,
     this.showSummary = true,
+    this.initialSection,
   });
 
   /// In embedded mode, the parent AppShell owns the page header/navigation.
@@ -21,6 +22,7 @@ class AdminScreen extends StatefulWidget {
 
   /// HomeScreen already renders the task metrics.
   final bool showSummary;
+  final String? initialSection;
 
   @override
   State<AdminScreen> createState() => _AdminScreenState();
@@ -49,6 +51,10 @@ class _AdminScreenState extends State<AdminScreen> {
   @override
   void initState() {
     super.initState();
+    const sections = {'overview', 'tasks', 'reports', 'branches', 'employees', 'activity', 'performance'};
+    if (sections.contains(widget.initialSection)) {
+      _section = widget.initialSection!;
+    }
     _load();
   }
 
