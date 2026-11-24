@@ -13,7 +13,7 @@ class OrganizationBranding {
 
   static const fallback = OrganizationBranding(
     name: 'مؤسسة الشاعري للتجارة العامة',
-    tagline: 'معًا .. نحو إدارة أفضل',
+    tagline: 'Smart Business Management',
     logoUrl: null,
   );
 }

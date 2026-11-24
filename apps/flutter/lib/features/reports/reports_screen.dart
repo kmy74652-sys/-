@@ -426,8 +426,8 @@ class _ReportsScreenState extends State<ReportsScreen> {
     }
     final bytes = Uint8List.fromList(utf8.encode('\uFEFF${_csvFor(rows)}'));
     final path = await FilePicker.saveFile(
-      dialogTitle: 'حفظ تقارير الشاعري بصيغة CSV',
-      fileName: 'alshaeri-reports-${DateTime.now().millisecondsSinceEpoch}.csv',
+      dialogTitle: 'حفظ تقارير NEXORA بصيغة CSV',
+      fileName: 'nexora-reports-${DateTime.now().millisecondsSinceEpoch}.csv',
       type: FileType.custom,
       allowedExtensions: ['csv'],
       bytes: bytes,

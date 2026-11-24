@@ -149,12 +149,22 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     const SizedBox(height: 6),
                     const Text(
-                      'مانجمنت',
+                      'NEXORA',
                       textAlign: TextAlign.right,
                       style: TextStyle(
                         fontSize: 28,
                         fontWeight: FontWeight.w900,
                         color: AppColors.navy,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    const Text(
+                      'Smart Business Management',
+                      textAlign: TextAlign.right,
+                      style: TextStyle(
+                        color: Color(0xFFD9A441),
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: .3,
                       ),
                     ),
                     const SizedBox(height: 8),
@@ -242,7 +252,7 @@ class _LoginBrandLogo extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final fallback = Image.asset(
-      'assets/images/alshaeri-official-logo.png',
+      'assets/images/nexora-logo.png',
       height: 110,
       fit: BoxFit.contain,
     );

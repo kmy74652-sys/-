@@ -32,7 +32,7 @@ class AppCustomizer extends ChangeNotifier {
   bool unifiedTwoColumns = true;
 
   static const defaults = <String, String>{
-    'appName': 'مانجمنت', 'organizationName': 'مؤسسة الشاعري للتجارة العامة', 'tagline': 'معًا .. نحو إدارة أفضل',
+    'appName': 'NEXORA', 'organizationName': 'مؤسسة الشاعري للتجارة العامة', 'tagline': 'Smart Business Management',
     'home': 'الرئيسية', 'tasks': 'المهام', 'employees': 'الموظفون', 'workSection': 'العمل والمتابعة', 'unifiedTable': 'الجدول الموحد لإنشاء المهام', 'taskManagement': 'إدارة المهام', 'reports': 'التقارير', 'dailyReports': 'التقارير اليومية المصممة', 'employeeReports': 'تقارير الموظف', 'adminSections': 'أقسام الإدارة', 'totalTasks': 'إجمالي المهام', 'inProgress': 'قيد التنفيذ', 'submitted': 'بانتظار المراجعة', 'lateTasks': 'مهام متأخرة',
   };
 
@@ -45,6 +45,7 @@ class AppCustomizer extends ChangeNotifier {
     } else {
       try { _apply(Map<String, dynamic>.from(jsonDecode(raw) as Map)); } catch (_) { _resetValues(); }
     }
+    _migrateBranding();
     _repairUnifiedVisibility();
     _loaded = true;
     notifyListeners();
@@ -56,6 +57,15 @@ class AppCustomizer extends ChangeNotifier {
     }
     if (unifiedFieldVisibility.values.every((visible) => !visible)) {
       unifiedFieldVisibility = {'employeeField': true, 'roleField': true};
+    }
+  }
+
+  void _migrateBranding() {
+    if (labels['appName'] == 'مانجمنت' || labels['appName'] == 'برنامج الشاعري') {
+      labels['appName'] = defaults['appName']!;
+    }
+    if (labels['tagline'] == 'معًا .. نحو إدارة أفضل') {
+      labels['tagline'] = defaults['tagline']!;
     }
   }
 

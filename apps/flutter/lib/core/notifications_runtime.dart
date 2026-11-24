@@ -33,8 +33,8 @@ class NotificationsRuntime {
       await androidPlugin?.createNotificationChannel(
         const AndroidNotificationChannel(
           'alshaeri_notifications',
-          'تنبيهات الشاعري',
-          description: 'تنبيهات المهام داخل تطبيق الشاعري',
+          'تنبيهات NEXORA',
+          description: 'تنبيهات المهام داخل NEXORA',
           importance: Importance.high,
         ),
       );
@@ -79,8 +79,8 @@ class NotificationsRuntime {
       const NotificationDetails(
         android: AndroidNotificationDetails(
           'alshaeri_notifications',
-          'تنبيهات الشاعري',
-          channelDescription: 'تنبيهات المهام داخل تطبيق الشاعري',
+          'تنبيهات NEXORA',
+          channelDescription: 'تنبيهات المهام داخل NEXORA',
           importance: Importance.high,
           priority: Priority.high,
         ),

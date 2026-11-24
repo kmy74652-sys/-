@@ -448,7 +448,7 @@ class _BrandLogo extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final fallback = Image.asset('assets/images/alshaeri-official-logo.png', width: width, height: height, fit: BoxFit.contain, semanticLabel: 'شعار المؤسسة');
+    final fallback = Image.asset('assets/images/nexora-logo.png', width: width, height: height, fit: BoxFit.contain, semanticLabel: 'شعار NEXORA');
     if (url == null) return fallback;
     return Image.network(url!, width: width, height: height, fit: BoxFit.contain, semanticLabel: 'شعار المؤسسة', errorBuilder: (_, __, ___) => fallback);
   }

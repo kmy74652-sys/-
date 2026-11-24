@@ -625,7 +625,7 @@ class _AppCustomizerScreenState extends State<AppCustomizerScreen>
     await _save();
     final path = await FilePicker.saveFile(
       dialogTitle: 'تصدير إعدادات الواجهة',
-      fileName: 'alshaeri-ui-settings.json',
+      fileName: 'nexora-ui-settings.json',
       type: FileType.custom,
       allowedExtensions: ['json'],
       bytes: Uint8List.fromList(utf8.encode(const JsonEncoder.withIndent('  ').convert(_store.toJsonMap()))),

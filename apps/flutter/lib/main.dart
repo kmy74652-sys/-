@@ -100,7 +100,7 @@ class _AlshaeriAppState extends State<AlshaeriApp> {
 
   @override
   Widget build(BuildContext context) => MaterialApp.router(
-    title: 'برنامج الشاعري',
+    title: 'NEXORA — Smart Business Management',
     debugShowCheckedModeBanner: false,
     theme: appTheme(),
     routerConfig: appRouter,
