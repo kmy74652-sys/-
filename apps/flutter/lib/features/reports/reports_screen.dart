@@ -10,7 +10,9 @@ import '../../core/theme.dart';
 import '../../shared/app_shell.dart';
 
 class ReportsScreen extends StatefulWidget {
-  const ReportsScreen({super.key});
+  const ReportsScreen({super.key, this.initialFilter});
+
+  final String? initialFilter;
   @override
   State<ReportsScreen> createState() => _ReportsScreenState();
 }
@@ -43,6 +45,17 @@ class _ReportsScreenState extends State<ReportsScreen> {
   @override
   void initState() {
     super.initState();
+    const supportedFilters = {
+      'all',
+      'submitted',
+      'reviewed',
+      'approved',
+      'returned',
+      'rejected',
+    };
+    if (supportedFilters.contains(widget.initialFilter)) {
+      _filter = widget.initialFilter!;
+    }
     _load();
   }
 

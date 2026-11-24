@@ -82,6 +82,13 @@ class _HomeScreenState extends State<HomeScreen> {
       Color(0xFFFFE2E7),
       Color(0xFFAB2B37),
     ),
+    _Metric(
+      'reports_pending',
+      'تقارير غير معتمدة',
+      Icons.pending_actions_outlined,
+      Color(0xFFF0E7FF),
+      Color(0xFF68419A),
+    ),
   ];
 
   bool get _manageTasks => _permissions.contains('tasks.manage');
@@ -244,7 +251,13 @@ class _HomeScreenState extends State<HomeScreen> {
     bool executes,
   ) async {
     if (!manages && !executes)
-      return {'all': 0, 'in_progress': 0, 'submitted': 0, 'late': 0};
+      return {
+        'all': 0,
+        'in_progress': 0,
+        'submitted': 0,
+        'late': 0,
+        'reports_pending': 0,
+      };
     final user = client.auth.currentUser;
     if (user == null) throw Exception('انتهت الجلسة. سجّل الدخول مجددًا.');
     if (organization == null || organization.isEmpty)
@@ -308,6 +321,7 @@ class _HomeScreenState extends State<HomeScreen> {
       'in_progress': active,
       'submitted': submitted,
       'late': late,
+      'reports_pending': submitted,
     };
   }
 
@@ -438,12 +452,15 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _metricGrid() => LayoutBuilder(
     builder: (context, constraints) {
+      final visibleMetrics = _metrics
+          .where((item) => item.key != 'reports_pending' || _manageTasks)
+          .toList();
       final width = constraints.maxWidth;
       final columns = width < 560 ? 2 : 4;
       return GridView.builder(
         shrinkWrap: true,
         physics: const NeverScrollableScrollPhysics(),
-        itemCount: _metrics.length,
+        itemCount: visibleMetrics.length,
         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
           crossAxisCount: columns,
           crossAxisSpacing: 7,
@@ -451,7 +468,7 @@ class _HomeScreenState extends State<HomeScreen> {
           childAspectRatio: width < 370 ? 1.15 : 1.35,
         ),
         itemBuilder: (context, index) => _metricCard(
-          _metrics[index],
+          visibleMetrics[index],
           width < 370,
         ),
       );
@@ -466,8 +483,12 @@ class _HomeScreenState extends State<HomeScreen> {
     ),
     child: InkWell(
       borderRadius: BorderRadius.circular(15),
-      onTap: _allowed('tasks')
+      onTap: _allowed(item.key == 'reports_pending' ? 'reports' : 'tasks')
           ? () {
+              if (item.key == 'reports_pending') {
+                context.go('/reports?status=submitted');
+                return;
+              }
               final route = _manageTasks ? '/admin/tasks' : '/tasks';
               final status = switch (item.key) {
                 'in_progress' => 'in_progress',

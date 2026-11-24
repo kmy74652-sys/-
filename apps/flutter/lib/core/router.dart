@@ -188,7 +188,7 @@ void initializeRouter() {
       ),
       GoRoute(
         path: '/reports',
-        builder: (context, state) => const _PermissionGate(
+        builder: (context, state) => _PermissionGate(
           permissions: {
             'reports.read_all',
             'tasks.review',
@@ -196,7 +196,9 @@ void initializeRouter() {
             'report_submissions.review',
             'report_submissions.approve',
           },
-          child: ReportsScreen(),
+          child: ReportsScreen(
+            initialFilter: state.uri.queryParameters['status'],
+          ),
         ),
       ),
       GoRoute(
