@@ -744,7 +744,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
       padding: const EdgeInsets.all(12),
       children: [
         const Text(
-          'مصادر التقارير',
+          'تقارير الموظفين',
           textAlign: TextAlign.right,
           style: TextStyle(
             color: AppColors.navy,
@@ -752,35 +752,12 @@ class _ReportsScreenState extends State<ReportsScreen> {
             fontWeight: FontWeight.bold,
           ),
         ),
-        Wrap(
-          alignment: WrapAlignment.end,
-          spacing: 8,
-          children: [
-            ChoiceChip(
-              label: const Text('تقارير المهام'),
-              selected: _stream == 'tasks',
-              onSelected: (_) => setState(() {
-                _stream = 'tasks';
-                _filter = 'all';
-              }),
-            ),
-            ChoiceChip(
-              label: const Text('التقارير المستقلة'),
-              selected: _stream == 'submissions',
-              onSelected: (_) => setState(() {
-                _stream = 'submissions';
-                _filter = 'all';
-              }),
-            ),
-            ChoiceChip(
-              label: const Text('تقارير الأدوار اليومية'),
-              selected: _stream == 'role_reports',
-              onSelected: (_) => setState(() {
-                _stream = 'role_reports';
-                _filter = 'all';
-              }),
-            ),
-          ],
+        const Padding(
+          padding: EdgeInsets.symmetric(vertical: 6),
+          child: Text(
+            'تظهر هنا تقارير المهام المرتبطة بالجدول الموحد أو المهام الإدارية. يرفع الموظف التقرير من داخل المهمة، وتتم المراجعة والاعتماد من نفس المسار.',
+            textAlign: TextAlign.right,
+          ),
         ),
         if (_stream == 'tasks') ...[
           const Text(
