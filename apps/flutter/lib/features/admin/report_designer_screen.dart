@@ -184,7 +184,7 @@ class _ReportDesignerScreenState extends State<ReportDesignerScreen> {
         child: AlertDialog(
           title: const Text('حذف قالب التقرير؟'),
           content: Text(
-            'سيُحذف «$title» وإصداراته وحقوله غير المستخدمة فقط. إذا كان مرتبطًا بتقرير أو مهمة محفوظة سيرفض النظام العملية ولن تُحذف أي بيانات تاريخية.',
+            'سيُحذف «$title» وإصداراته وحقوله وتقاريره المرسلة وتقارير الموظفين ولقطات المهام المرتبطة به نهائيًا. ستبقى المهام نفسها، لكن لا يمكن استعادة البيانات المحذوفة.',
             textAlign: TextAlign.right,
           ),
           actions: [
@@ -216,7 +216,7 @@ class _ReportDesignerScreenState extends State<ReportDesignerScreen> {
         },
       );
       if (mounted) {
-        setState(() => _notice = 'تم حذف القالب وإصداراته وحقوله غير المرتبطة بنجاح.');
+        setState(() => _notice = 'تم حذف القالب وجميع سجلاته المرتبطة نهائيًا.');
         await _loadTemplates();
       }
     } catch (e) {
