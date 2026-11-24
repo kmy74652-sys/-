@@ -34,24 +34,10 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         _Module(
           'reports',
-          'التقارير',
-          'تقارير شاملة ومفصلة',
-          Icons.assessment_outlined,
-          '/reports',
-        ),
-        _Module(
-          'daily-report',
-          'التقارير اليومية المصممة',
-          'تعبئة النماذج المعتمدة من الإدارة',
-          Icons.assignment_outlined,
-          '/reports/daily',
-        ),
-        _Module(
-          'independent-reports',
-          'تقارير الموظف',
-          'النماذج المستقلة والمسودات',
+          'تقارير الموظفين',
+          'التقارير المرفوعة للمراجعة والاعتماد',
           Icons.description_outlined,
-          '/reports/independent',
+          '/reports',
         ),
         _Module(
           'performance',
@@ -98,15 +84,6 @@ class _HomeScreenState extends State<HomeScreen> {
   bool get _employeeManager =>
       _roles.any((r) => r == 'owner' || r == 'admin_followup') &&
       _permissions.contains('employees.manage');
-  bool get _hasDailyReportRole => _roles.any(
-    (r) => const {
-      'accountant',
-      'warehouse_keeper',
-      'warehouse_worker',
-      'admin_followup',
-      'owner',
-    }.contains(r),
-  );
   bool _allowed(String key) {
     switch (key) {
       case 'tasks':
@@ -116,11 +93,6 @@ class _HomeScreenState extends State<HomeScreen> {
             ? (_permissions.contains('reports.read_all') ||
                   _permissions.contains('tasks.review'))
             : _permissions.contains('tasks.execute');
-      case 'daily-report':
-        return _hasDailyReportRole;
-      case 'independent-reports':
-        return _permissions.contains('tasks.execute') ||
-            _permissions.contains('reports.read_all');
       case 'employees':
         return _employeeManager ||
             (_manageTasks && _permissions.contains('employees.read'));
