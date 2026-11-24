@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-
 import '../home/unified_task_table_editor.dart';
+import '../../core/theme.dart';
 import '../../shared/app_shell.dart';
 import '../../shared/form_widgets.dart';
 
@@ -878,7 +878,7 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         Row(
-                          textDirection: TextDirection.rtl,
+                          textDirection: Directionality.of(context),
                           children: [
                             Expanded(
                               child: InkWell(
@@ -887,7 +887,7 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
                                 child: Padding(
                                   padding: const EdgeInsets.symmetric(vertical: 4),
                                   child: Row(
-                                    textDirection: TextDirection.rtl,
+                                    textDirection: Directionality.of(context),
                                     children: [
                                       AnimatedRotation(
                                         turns: _filtersExpanded ? .5 : 0,
