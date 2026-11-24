@@ -24,6 +24,7 @@ class _UnifiedTaskTableScreenState extends State<UnifiedTaskTableScreen> {
   List<UnifiedBranchOption> _branches = const [];
   List<UnifiedReportOption> _reports = const [];
   final Set<String> _successfulDispatches = <String>{};
+  bool _hasUnsavedChanges = false;
 
   @override
   void initState() {
@@ -322,13 +323,33 @@ class _UnifiedTaskTableScreenState extends State<UnifiedTaskTableScreen> {
         _successfulDispatches.add(dispatchKey);
       }
     }
+    if (mounted) setState(() => _hasUnsavedChanges = false);
+  }
+
+  Future<bool> _confirmDiscardChanges() async {
+    if (!_hasUnsavedChanges || !mounted) return true;
+    final leave = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('تغييرات غير محفوظة', textAlign: TextAlign.right),
+        content: const Text('لديك تغييرات غير محفوظة، هل تريد الخروج؟', textAlign: TextAlign.right),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(dialogContext).pop(false), child: const Text('البقاء')),
+          FilledButton(onPressed: () => Navigator.of(dialogContext).pop(true), child: const Text('الخروج وفقدان التعديلات')),
+        ],
+      ),
+    );
+    return leave == true;
   }
 
   @override
   Widget build(BuildContext context) => AppShell(
         title: 'الجدول الموحد لإنشاء المهام',
         subtitle: 'إنشاء منظم وإرسال مباشر للموظف',
-        child: _loading
+        onBeforeNavigate: _confirmDiscardChanges,
+        child: WillPopScope(
+          onWillPop: _confirmDiscardChanges,
+          child: _loading
             ? const Center(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -365,12 +386,12 @@ class _UnifiedTaskTableScreenState extends State<UnifiedTaskTableScreen> {
                           runSpacing: 4,
                           children: [
                             TextButton.icon(
-                              onPressed: () => context.pop(),
+                              onPressed: () async { if (await _confirmDiscardChanges() && mounted) context.pop(); },
                               icon: const Icon(Icons.arrow_forward),
                               label: const Text('العودة إلى الرئيسية'),
                             ),
                             OutlinedButton.icon(
-                              onPressed: () => context.push('/admin/unified-task-management'),
+                              onPressed: () async { if (await _confirmDiscardChanges() && mounted) context.push('/admin/unified-task-management'); },
                               icon: const Icon(Icons.manage_search_outlined),
                               label: const Text('إدارة الجداول الموحدة'),
                             ),
@@ -379,11 +400,13 @@ class _UnifiedTaskTableScreenState extends State<UnifiedTaskTableScreen> {
                       ),
                       UnifiedTaskTableEditor(
                         onSend: _send,
+                        onChanged: () { if (!_hasUnsavedChanges && mounted) setState(() => _hasUnsavedChanges = true); },
                         employees: _employees,
                         branches: _branches,
                         reports: _reports,
                       ),
                     ],
                   ),
+        ),
       );
 }

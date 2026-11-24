@@ -8,13 +8,14 @@ import '../../core/theme.dart';
 import '../../shared/app_customizer.dart';
 
 class UnifiedTaskTableEditor extends StatefulWidget {
-  const UnifiedTaskTableEditor({super.key, required this.onSend, this.onSave, this.initialDraft, this.employees = const [], this.branches = const [], this.reports = const []});
+  const UnifiedTaskTableEditor({super.key, required this.onSend, this.onSave, this.initialDraft, this.employees = const [], this.branches = const [], this.reports = const [], this.onChanged});
   final Future<void> Function(UnifiedTaskTableDraft draft) onSend;
   final Future<void> Function(UnifiedTaskTableDraft draft)? onSave;
   final UnifiedTaskTableDraft? initialDraft;
   final List<UnifiedEmployeeOption> employees;
   final List<UnifiedBranchOption> branches;
   final List<UnifiedReportOption> reports;
+  final VoidCallback? onChanged;
 
   @override
   State<UnifiedTaskTableEditor> createState() => _UnifiedTaskTableEditorState();
@@ -137,11 +138,14 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
     }
   }
 
-  void _addTextRow(List<TextEditingController> list) =>
-      setState(() => list.add(TextEditingController()));
+  void _addTextRow(List<TextEditingController> list) {
+    widget.onChanged?.call();
+    setState(() => list.add(TextEditingController()));
+  }
 
   void _removeTextRow(List<TextEditingController> list, int index) {
     if (list.length == 1) return;
+    widget.onChanged?.call();
     final controller = list.removeAt(index);
     controller.dispose();
     setState(() {});
@@ -217,14 +221,14 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
     final store = AppCustomizer.instance;
     final sections = <String, Widget>{
       'employee': _employeeCard(),
-      'purpose': _section(store.unifiedLabel('purpose'), TextField(controller: _purpose, textAlign: TextAlign.right, maxLines: 2, decoration: InputDecoration(hintText: store.unifiedLabel('purposeHint')))),
+      'purpose': _section(store.unifiedLabel('purpose'), TextField(controller: _purpose, onChanged: (_) => widget.onChanged?.call(), textAlign: TextAlign.right, maxLines: 2, decoration: InputDecoration(hintText: store.unifiedLabel('purposeHint')))),
       'hours': _workHours(),
       'daily': _scheduleTable(store.unifiedLabel('daily'), _rows),
       'exception': _scheduleTable('${store.unifiedLabel('exception')} ($_exception)', _exceptionRows),
       'report': _reportSelector(),
       'lists': Column(children: [_editableList('المسؤوليات الأساسية', _responsibilities), const SizedBox(height: 10), _editableList('الصلاحيات وحدود المسؤولية', _authorities), const SizedBox(height: 10), _editableList('التوصيات والتعليمات الإدارية', _instructions)]),
       'kpi': _kpiTable(),
-      'notes': _section(store.unifiedLabel('notes'), TextField(controller: _reportNotes, textAlign: TextAlign.right, maxLines: 3, decoration: const InputDecoration(hintText: 'تعليمات إضافية اختيارية؛ نموذج التقرير يحدده القالب المعتمد'))),
+      'notes': _section(store.unifiedLabel('notes'), TextField(controller: _reportNotes, onChanged: (_) => widget.onChanged?.call(), textAlign: TextAlign.right, maxLines: 3, decoration: const InputDecoration(hintText: 'تعليمات إضافية اختيارية؛ نموذج التقرير يحدده القالب المعتمد'))),
       'approval': _approvalStatus(),
     };
     final visibleKeys = store.unifiedSectionOrder
@@ -272,8 +276,8 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
     spacing: 7,
     runSpacing: 7,
     children: [
-      IconButton(onPressed: () => setState(() => _rows.add(_UnifiedRow('', '', ''))), icon: const Icon(Icons.add_box_outlined), tooltip: 'إضافة صف يومي'),
-      IconButton(onPressed: () => setState(() => _exceptionRows.add(_UnifiedRow('', '', ''))), icon: const Icon(Icons.event_available_outlined), tooltip: 'إضافة صف استثنائي'),
+      IconButton(onPressed: () { widget.onChanged?.call(); setState(() => _rows.add(_UnifiedRow('', '', ''))); }, icon: const Icon(Icons.add_box_outlined), tooltip: 'إضافة صف يومي'),
+      IconButton(onPressed: () { widget.onChanged?.call(); setState(() => _exceptionRows.add(_UnifiedRow('', '', ''))); }, icon: const Icon(Icons.event_available_outlined), tooltip: 'إضافة صف استثنائي'),
     ],
   );
 
@@ -293,6 +297,7 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
           decoration: InputDecoration(labelText: AppCustomizer.instance.unifiedLabel('employeeField'), isDense: true),
           items: widget.employees.map((item) => DropdownMenuItem(value: item.name, child: Text(item.name, overflow: TextOverflow.ellipsis))).toList(),
           onChanged: (value) {
+            widget.onChanged?.call();
             setState(() => _employee.text = value ?? '');
             _suggestReportForRole(_role.text);
           },
@@ -450,8 +455,8 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
             return DataRow(cells: [
               for (final key in visible) DataCell(SizedBox(width: _scheduleFieldWidth(key), child: _scheduleField(key, row))),
               DataCell(Row(children: [
-                IconButton(onPressed: () => setState(() => source.insert(i + 1, _UnifiedRow('', '', ''))), icon: const Icon(Icons.add, size: 19)),
-                IconButton(onPressed: source.isEmpty ? null : () { final removed = source.removeAt(i); removed.dispose(); setState(() {}); }, icon: const Icon(Icons.delete_outline, size: 19)),
+                IconButton(onPressed: () { widget.onChanged?.call(); setState(() => source.insert(i + 1, _UnifiedRow('', '', ''))); }, icon: const Icon(Icons.add, size: 19)),
+                IconButton(onPressed: source.isEmpty ? null : () { widget.onChanged?.call(); final removed = source.removeAt(i); removed.dispose(); setState(() {}); }, icon: const Icon(Icons.delete_outline, size: 19)),
               ])),
             ]);
           }).toList(),
@@ -466,6 +471,7 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
     if (key == 'time') return _timeField(row.time, 'الوقت');
     return TextField(
       controller: _scheduleController(key, row),
+      onChanged: (_) => widget.onChanged?.call(),
       textAlign: _textAlign(key),
       decoration: const InputDecoration(isDense: true),
     );
@@ -481,11 +487,11 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
           isDense: true,
           suffixIcon: IconButton(
             tooltip: 'اختيار التاريخ',
-            onPressed: _pickStartDate,
+            onPressed: () { widget.onChanged?.call(); _pickStartDate(); },
             icon: const Icon(Icons.calendar_today_outlined),
           ),
         ),
-        onTap: _pickStartDate,
+        onTap: () { widget.onChanged?.call(); _pickStartDate(); },
       );
 
   Widget _timeField(TextEditingController controller, String label) => TextField(
@@ -498,7 +504,7 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
           isDense: true,
           suffixIcon: const Icon(Icons.schedule_outlined, size: 19),
         ),
-        onTap: () => _pickTime(controller),
+        onTap: () { widget.onChanged?.call(); _pickTime(controller); },
       );
 
   Widget _periodField(
@@ -519,7 +525,7 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
             isDense: true,
             suffixIcon: const Icon(Icons.access_time_outlined, size: 19),
           ),
-          onTap: () => _pickPeriod(controller, label, defaultStart, defaultEnd),
+          onTap: () { widget.onChanged?.call(); _pickPeriod(controller, label, defaultStart, defaultEnd); },
         ),
       );
 
@@ -595,7 +601,7 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
     return span == 'full' ? 300 : span == 'third' ? 110 : key == 'time' ? 150 : 220;
   }
 
-  Widget _editableList(String title, List<TextEditingController> list) => _section(title, Column(children: [for (var i = 0; i < list.length; i++) Row(children: [Expanded(child: TextField(controller: list[i], textAlign: TextAlign.right, decoration: InputDecoration(isDense: true, hintText: 'أضف بندًا'))), IconButton(onPressed: () => _removeTextRow(list, i), icon: const Icon(Icons.delete_outline))]), Align(alignment: Alignment.centerRight, child: TextButton.icon(onPressed: () => _addTextRow(list), icon: const Icon(Icons.add), label: const Text('إضافة بند')))]));
+  Widget _editableList(String title, List<TextEditingController> list) => _section(title, Column(children: [for (var i = 0; i < list.length; i++) Row(children: [Expanded(child: TextField(controller: list[i], onChanged: (_) => widget.onChanged?.call(), textAlign: TextAlign.right, decoration: InputDecoration(isDense: true, hintText: 'أضف بندًا'))), IconButton(onPressed: () { widget.onChanged?.call(); _removeTextRow(list, i); }, icon: const Icon(Icons.delete_outline))]), Align(alignment: Alignment.centerRight, child: TextButton.icon(onPressed: () { widget.onChanged?.call(); _addTextRow(list); }, icon: const Icon(Icons.add), label: const Text('إضافة بند')))]));
 
   Widget _kpiTable() => _section(
     'مؤشرات تقييم الأداء',
@@ -607,6 +613,7 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
               Expanded(
                 child: TextField(
                   controller: _kpis[i][0],
+                  onChanged: (_) => widget.onChanged?.call(),
                   textAlign: TextAlign.right,
                   decoration: const InputDecoration(labelText: 'المؤشر', isDense: true),
                 ),
@@ -615,6 +622,7 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
               Expanded(
                 child: TextField(
                   controller: _kpis[i][1],
+                  onChanged: (_) => widget.onChanged?.call(),
                   textAlign: TextAlign.right,
                   decoration: const InputDecoration(labelText: 'معيار الإنجاز / القياس', isDense: true),
                 ),
@@ -646,8 +654,8 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
   Widget _approvalStatus() => _section('حالة الاعتماد', const Wrap(textDirection: TextDirection.rtl, spacing: 8, children: [Chip(avatar: Icon(Icons.hourglass_empty, size: 17), label: Text('إقرار الموظف: بانتظار الإقرار')), Chip(avatar: Icon(Icons.rate_review_outlined, size: 17), label: Text('مراجعة المسؤول: لم تبدأ')), Chip(avatar: Icon(Icons.verified_outlined, size: 17), label: Text('اعتماد المدير: مسودة'))]));
 
   Widget _section(String title, Widget child) => Container(padding: const EdgeInsets.all(10), decoration: BoxDecoration(color: const Color(0xFFF8FBFA), borderRadius: BorderRadius.circular(AppCustomizer.instance.unifiedRadius), border: Border.all(color: const Color(0xFFD8E4E0))), child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [Text(title, textAlign: TextAlign.right, style: TextStyle(fontWeight: FontWeight.w900, color: AppColors.navy, fontSize: 14 * AppCustomizer.instance.unifiedFontScale)), const SizedBox(height: 8), child]));
-  Widget _input(TextEditingController controller, String label) => TextField(controller: controller, textAlign: TextAlign.right, decoration: InputDecoration(labelText: label, isDense: true));
-  Widget _drop(String label, String value, List<String> values, ValueChanged<String> onChanged) => SizedBox(width: 155, child: DropdownButtonFormField<String>(value: value, isExpanded: true, decoration: InputDecoration(labelText: label, isDense: true), items: values.map((v) => DropdownMenuItem(value: v, child: Text(v, overflow: TextOverflow.ellipsis))).toList(), onChanged: (v) { if (v != null) onChanged(v); }));
+  Widget _input(TextEditingController controller, String label) => TextField(controller: controller, onChanged: (_) => widget.onChanged?.call(), textAlign: TextAlign.right, decoration: InputDecoration(labelText: label, isDense: true));
+  Widget _drop(String label, String value, List<String> values, ValueChanged<String> onChanged) => SizedBox(width: 155, child: DropdownButtonFormField<String>(value: value, isExpanded: true, decoration: InputDecoration(labelText: label, isDense: true), items: values.map((v) => DropdownMenuItem(value: v, child: Text(v, overflow: TextOverflow.ellipsis))).toList(), onChanged: (v) { if (v != null) { widget.onChanged?.call(); onChanged(v); } }));
 
   Future<void> _submit() async {
     final messenger = ScaffoldMessenger.of(context);
