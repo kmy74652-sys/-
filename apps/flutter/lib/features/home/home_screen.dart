@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -19,6 +21,8 @@ class _HomeScreenState extends State<HomeScreen> {
   Map<String, int>? _summary;
   Set<String> _permissions = {};
   Set<String> _roles = {};
+  RealtimeChannel? _tasksRealtime;
+  Timer? _summaryRefreshTimer;
   int _request = 0;
 
   static const _groups = <(String, List<_Module>)>[
@@ -128,7 +132,32 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    _subscribeToTaskChanges();
     _load();
+  }
+
+  void _subscribeToTaskChanges() {
+    _tasksRealtime = Supabase.instance.client
+        .channel('home-task-summary-live')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'tasks',
+          callback: (_) => _scheduleSummaryRefresh(),
+        )
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'task_reports',
+          callback: (_) => _scheduleSummaryRefresh(),
+        )
+      ..subscribe();
+  }
+
+  void _scheduleSummaryRefresh() {
+    if (!mounted) return;
+    _summaryRefreshTimer?.cancel();
+    _summaryRefreshTimer = Timer(const Duration(milliseconds: 350), _load);
   }
 
   Future<void> _load() async {
@@ -227,6 +256,7 @@ class _HomeScreenState extends State<HomeScreen> {
           .from('tasks')
           .select('id,status,due_at')
           .eq('organization_id', organization);
+      query = query.isFilter('deleted_at', null);
       if (!manages) query = query.eq('assigned_to', user.id);
       if (branch != null) query = query.eq('branch_id', branch);
       final page = await query.order('id').range(offset, offset + pageSize - 1);
@@ -295,6 +325,9 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void dispose() {
     _request++;
+    _summaryRefreshTimer?.cancel();
+    final channel = _tasksRealtime;
+    if (channel != null) Supabase.instance.client.removeChannel(channel);
     super.dispose();
   }
 
