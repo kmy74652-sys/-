@@ -28,6 +28,8 @@ class _PerformanceAnalyticsScreenState
   List<_Branch> _branches = [];
   _Delivery _delivery = _Delivery();
   Map<String, int> _reportStatusCounts = {};
+  int _reportRequiredTasks = 0;
+  int _reportReadyTasks = 0;
   RealtimeChannel? _realtime;
   Timer? _refreshTimer;
   int _loadToken = 0;
@@ -133,7 +135,7 @@ class _PerformanceAnalyticsScreenState
         db
             .from('tasks')
             .select(
-              'id,title,description,assigned_to,position_code,branch_id,priority,status,due_at,assigned_at,received_at,opened_at',
+              'id,title,description,assigned_to,position_code,branch_id,priority,status,due_at,assigned_at,received_at,opened_at,report_required',
             )
             .isFilter('deleted_at', null)
             .order('due_at')
@@ -156,7 +158,8 @@ class _PerformanceAnalyticsScreenState
             .limit(200),
         db
             .from('task_reports')
-            .select('id,task_id,submitted_by,status')
+            .select('id,task_id,submitted_by,status,updated_at')
+            .order('updated_at', ascending: false)
             .limit(2000),
         db
             .from('employee_role_reports')
@@ -198,6 +201,7 @@ class _PerformanceAnalyticsScreenState
       };
       final reportCounts = <String, int>{};
       final reportStatusCounts = <String, int>{};
+      final latestReportByTask = <String, String>{};
       for (final row in taskReports) {
         final task = taskById[_str(row['task_id'])];
         if (task == null ||
@@ -211,6 +215,7 @@ class _PerformanceAnalyticsScreenState
         final status = _str(row['status']);
         if (status.isNotEmpty) {
           reportStatusCounts[status] = (reportStatusCounts[status] ?? 0) + 1;
+          latestReportByTask.putIfAbsent(_str(row['task_id']), () => status);
         }
       }
       if (_taskSource != 'unified') {
@@ -262,6 +267,8 @@ class _PerformanceAnalyticsScreenState
         );
       }
       final overallDelivery = _Delivery();
+      var reportRequiredTasks = 0;
+      var reportReadyTasks = 0;
       for (final task in evaluationTasks) {
         final dueDate = DateTime.tryParse(_str(task['due_at']))?.toLocal();
         if (!_matchesTaskFilter(task)) continue;
@@ -269,6 +276,13 @@ class _PerformanceAnalyticsScreenState
         if (employee == null) continue;
         final status = _str(task['status']);
         final priority = _str(task['priority'], 'normal');
+        if (task['report_required'] == true) {
+          reportRequiredTasks++;
+          final reportStatus = latestReportByTask[_str(task['id'])];
+          if (reportStatus == 'submitted' || reportStatus == 'approved') {
+            reportReadyTasks++;
+          }
+        }
         final bucket = ['low', 'normal', 'high', 'urgent'].contains(priority)
             ? priority
             : 'normal';
@@ -323,6 +337,8 @@ class _PerformanceAnalyticsScreenState
           ..sort((a, b) => b.rate.compareTo(a.rate));
         _delivery = overallDelivery;
         _reportStatusCounts = reportStatusCounts;
+        _reportRequiredTasks = reportRequiredTasks;
+        _reportReadyTasks = reportReadyTasks;
         _employeeOptions = employeeOptions;
       });
     } catch (error) {
@@ -378,6 +394,9 @@ class _PerformanceAnalyticsScreenState
   int get _delayed => _employees.fold(0, (sum, e) => sum + e.delayed);
   int get _reports => _employees.fold(0, (sum, e) => sum + e.reports);
   double get _rate => _required == 0 ? 0 : _done * 100 / _required;
+  double get _reportCoverageRate => _reportRequiredTasks == 0
+      ? 0
+      : _reportReadyTasks * 100 / _reportRequiredTasks;
 
   @override
   Widget build(BuildContext context) => Directionality(
@@ -611,6 +630,12 @@ class _PerformanceAnalyticsScreenState
           '$_reports',
           'تقارير مهام وأدوار',
           Icons.assessment_outlined,
+        ),
+        _metric(
+          'تغطية تقارير المهام',
+          '${_reportCoverageRate.toStringAsFixed(1)}%',
+          '$_reportReadyTasks من $_reportRequiredTasks مهمة تقريرها جاهز للمراجعة أو معتمد',
+          Icons.fact_check_outlined,
         ),
         _metric(
           'بانتظار المراجعة',
