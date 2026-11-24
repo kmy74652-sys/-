@@ -196,10 +196,17 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
             const Divider(height: 16), _toolbar(),
             ..._unifiedSections(),
             const SizedBox(height: 12),
-            Row(textDirection: TextDirection.rtl, children: [
-              Expanded(child: FilledButton.icon(onPressed: _sending || (_sent && widget.onSave == null) ? null : _submit, icon: _sending ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)) : Icon(widget.onSave != null ? Icons.save_outlined : _sent ? Icons.check_circle_outline : Icons.send_outlined), label: Text(_sending ? 'جارٍ الحفظ...' : widget.onSave != null ? 'حفظ التعديلات' : _sent ? 'تم الإرسال' : 'حفظ الجدول وإرساله'))),
-              const SizedBox(width: 8), Expanded(child: OutlinedButton.icon(onPressed: _exportPdf, icon: const Icon(Icons.picture_as_pdf_outlined), label: const Text('تصدير PDF'))),
-            ]),
+            SafeArea(
+              top: false,
+              minimum: const EdgeInsets.only(bottom: 12),
+              child: Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: Row(textDirection: TextDirection.rtl, children: [
+                  Expanded(child: FilledButton.icon(onPressed: _sending || (_sent && widget.onSave == null) ? null : _submit, icon: _sending ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)) : Icon(widget.onSave != null ? Icons.save_outlined : _sent ? Icons.check_circle_outline : Icons.send_outlined), label: Text(_sending ? 'جارٍ الحفظ...' : widget.onSave != null ? 'حفظ التعديلات' : _sent ? 'تم الإرسال' : 'حفظ الجدول وإرساله'))),
+                  const SizedBox(width: 8), Expanded(child: OutlinedButton.icon(onPressed: _exportPdf, icon: const Icon(Icons.picture_as_pdf_outlined), label: const Text('تصدير PDF'))),
+                ]),
+              ),
+            ),
           ],
         ]),
       ),
