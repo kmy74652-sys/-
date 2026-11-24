@@ -175,7 +175,7 @@ class _ReportDesignerScreenState extends State<ReportDesignerScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => Directionality(
-        textDirection: TextDirection.rtl,
+        textDirection: Directionality.of(context),
         child: AlertDialog(
           title: const Text('حذف قالب التقرير؟'),
           content: Text(
@@ -332,7 +332,7 @@ class _ReportDesignerScreenState extends State<ReportDesignerScreen> {
     final leave = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => Directionality(
-        textDirection: TextDirection.rtl,
+        textDirection: Directionality.of(context),
         child: AlertDialog(
           title: const Text('تغييرات غير محفوظة'),
           content: const Text(
@@ -661,7 +661,7 @@ class _ReportDesignerScreenState extends State<ReportDesignerScreen> {
       if (await _confirmExit() && mounted) context.pop();
     },
     child: Directionality(
-      textDirection: TextDirection.rtl,
+      textDirection: Directionality.of(context),
       child: AppShell(
         title: 'مصمم التقارير',
         subtitle: 'مكتبة قوالب النماذج وإصداراتها',
@@ -1242,7 +1242,7 @@ class _ReportDesignerScreenState extends State<ReportDesignerScreen> {
     await showDialog<void>(
       context: context,
       builder: (dialogContext) => Directionality(
-        textDirection: TextDirection.rtl,
+        textDirection: Directionality.of(context),
         child: AlertDialog(
           title: Row(
             children: [
