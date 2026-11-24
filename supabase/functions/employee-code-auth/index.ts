@@ -598,9 +598,31 @@ async function createEmployee(body: Record<string, unknown>, request: Request, c
       .limit(1)
       .maybeSingle();
     if (linkedMembershipError) return response({ error: 'employee_auth_lookup_failed' }, 503);
-    if (linkedMembership) return response({ error: 'employee_auth_exists' }, 409);
-    authUser = existingAuth.user;
-    createdAuthUser = false;
+    if (linkedMembership) {
+      const sameOrganization = linkedMembership.organization_id === owner.institutionId;
+      const previousEmployeeNo = linkedMembership.employee_no?.trim() ?? '';
+      if (!sameOrganization || !previousEmployeeNo || previousEmployeeNo === employeeNo) {
+        return response({ error: 'employee_auth_exists' }, 409);
+      }
+      const repairedEmail = `employee-${owner.institutionId}-${previousEmployeeNo}@employee.invalid`;
+      const { error: repairError } = await clients.adminClient.auth.admin.updateUserById(existingAuth.user.id, {
+        email: repairedEmail,
+        email_confirm: true,
+      });
+      if (repairError) return response({ error: 'employee_auth_exists' }, 409);
+      const retry = await clients.adminClient.auth.admin.createUser({
+        email: syntheticEmail,
+        password: randomReplacementPassword(),
+        email_confirm: true,
+        user_metadata: { employee_no: employeeNo, organization_id: owner.institutionId },
+      });
+      authUser = retry.data.user;
+      if (!authUser) return response({ error: 'employee_auth_create_failed' }, 400);
+      createdAuthUser = true;
+    } else {
+      authUser = existingAuth.user;
+      createdAuthUser = false;
+    }
   }
   if (!authUser) return response({ error: 'employee_auth_create_failed' }, 400);
 
