@@ -277,6 +277,11 @@ class _ReportsScreenState extends State<ReportsScreen> {
           _roleReportRows = [];
           _roleReportError = 'تعذر تحميل تقارير الأدوار اليومية. تحقق من الاتصال وسياسات الوصول ثم حدّث القائمة.';
         }
+        if (_stream == 'tasks' &&
+            _rows.isEmpty &&
+            (_submissionRows.isNotEmpty || _roleReportRows.isNotEmpty)) {
+          _stream = _submissionRows.isNotEmpty ? 'submissions' : 'role_reports';
+        }
       }
       _error = null;
     } catch (_) {
@@ -840,6 +845,34 @@ class _ReportsScreenState extends State<ReportsScreen> {
             textAlign: TextAlign.right,
           ),
         ),
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(8),
+            child: Wrap(
+              alignment: WrapAlignment.end,
+              spacing: 6,
+              runSpacing: 6,
+              children: [
+                ChoiceChip(
+                  label: const Text('تقارير المهام'),
+                  selected: _stream == 'tasks',
+                  onSelected: (_) => setState(() => _stream = 'tasks'),
+                ),
+                ChoiceChip(
+                  label: const Text('التقارير المستقلة'),
+                  selected: _stream == 'submissions',
+                  onSelected: (_) => setState(() => _stream = 'submissions'),
+                ),
+                ChoiceChip(
+                  label: const Text('تقارير الأدوار اليومية'),
+                  selected: _stream == 'role_reports',
+                  onSelected: (_) => setState(() => _stream = 'role_reports'),
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
         if (_stream == 'tasks') ...[
           const Text(
             'مراجعة تقارير المهام',
