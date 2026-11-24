@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../home/unified_task_table_editor.dart';
 import '../../shared/app_shell.dart';
 import '../../shared/form_widgets.dart';
 
@@ -23,6 +24,7 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
       _reportTemplates = [];
   Map<String, Map<String, dynamic>> _reportByTask = {};
   Map<String, Map<String, dynamic>> _draftByTask = {};
+  final Set<String> _expandedUnifiedTasks = <String>{};
   String _taskFilter = 'all', _reportFilter = 'all';
 
   @override
@@ -64,6 +66,64 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
     final parsed = DateTime.tryParse(_s(value));
     if (parsed == null) return 'غير محدد';
     return DateFormat('dd/MM/yyyy HH:mm').format(parsed.toLocal());
+  }
+
+  String _descriptionValue(String text, String label) => _lineValue(text, '$label:');
+
+  UnifiedTaskTableDraft _unifiedDraftFromTask(Map<String, dynamic> task) {
+    final description = _s(task['description']);
+    final rowMatch = RegExp(r'^صف الجدول:\s*(.*?)\s*\|\s*(.*?)\s*\|\s*(.*?)\s*$', multiLine: true).firstMatch(description);
+    final row = UnifiedTaskRowData(
+      time: rowMatch?.group(1)?.trim() ?? _descriptionValue(description, 'الوقت المحدد'),
+      task: rowMatch?.group(2)?.trim() ?? _s(task['title']).replaceFirst(RegExp(r'^الجدول الموحد - '), '').trim(),
+      output: rowMatch?.group(3)?.trim() ?? _descriptionValue(description, 'المخرج المطلوب'),
+    );
+    final hours = _descriptionValue(description, 'ساعات الدوام');
+    String hoursValue(String label) {
+      final match = label.isEmpty
+          ? RegExp(r'^([^·]+)').firstMatch(hours)
+          : RegExp('$label\\s*:\\s*([^·]+)').firstMatch(hours);
+      return match?.group(1)?.trim() ?? '';
+    }
+    return UnifiedTaskTableDraft(
+      employee: _employeeName(_s(task['assigned_to'])),
+      employeeUserId: _s(task['assigned_to']),
+      role: _descriptionValue(description, 'المسمى الوظيفي'),
+      branch: _branchName(_s(task['branch_id']).isEmpty ? null : _s(task['branch_id'])),
+      branchId: _s(task['branch_id']).isEmpty ? null : _s(task['branch_id']),
+      startDate: _descriptionValue(description, 'تاريخ بدء التطبيق'),
+      purpose: _descriptionValue(description, 'الهدف من الوظيفة'),
+      reportNotes: _descriptionValue(description, 'ملاحظات وتعليمات إضافية'),
+      rows: [row],
+      responsibilities: _descriptionValue(description, 'المسؤوليات').split('،').where((v) => v.trim().isNotEmpty).map((v) => v.trim()).toList(),
+      authorities: _descriptionValue(description, 'الصلاحيات').split('،').where((v) => v.trim().isNotEmpty).map((v) => v.trim()).toList(),
+      instructions: _descriptionValue(description, 'التعليمات').split('،').where((v) => v.trim().isNotEmpty).map((v) => v.trim()).toList(),
+      workType: hoursValue(''),
+      workDays: '',
+      weeklyException: _descriptionValue(description, 'الاستثناء الأسبوعي'),
+      firstPeriod: hoursValue('الفترة الأولى'),
+      breakPeriod: hoursValue('الاستراحة'),
+      secondPeriod: hoursValue('الفترة الثانية'),
+      kpis: _descriptionValue(description, 'مؤشرات الأداء').split('؛').where((v) => v.trim().isNotEmpty).map((v) => v.trim()).toList(),
+    );
+  }
+
+  String _unifiedDescription(UnifiedTaskTableDraft draft) {
+    final row = draft.rows.isEmpty ? const UnifiedTaskRowData(time: '', task: 'مهمة', output: '') : draft.rows.first;
+    return [
+      'الجدول الموحد الرسمي: ${draft.role}',
+      'صف الجدول: ${row.time.isEmpty ? 'غير محدد' : row.time} | ${row.task} | ${row.output.isEmpty ? '—' : row.output}',
+      'المسمى الوظيفي: ${draft.role}',
+      if (draft.branch.isNotEmpty) 'الفرع: ${draft.branch}',
+      if (draft.startDate.isNotEmpty) 'تاريخ بدء التطبيق: ${draft.startDate}',
+      'ساعات الدوام: ${draft.workType} · ${draft.workDays} · الفترة الأولى: ${draft.firstPeriod.isEmpty ? '—' : draft.firstPeriod} · الاستراحة: ${draft.breakPeriod.isEmpty ? '—' : draft.breakPeriod} · الفترة الثانية: ${draft.secondPeriod.isEmpty ? '—' : draft.secondPeriod} · الاستثناء الأسبوعي: ${draft.weeklyException}',
+      if (draft.purpose.isNotEmpty) 'الهدف من الوظيفة: ${draft.purpose}',
+      if (draft.reportNotes.isNotEmpty) 'ملاحظات وتعليمات إضافية: ${draft.reportNotes}',
+      if (draft.responsibilities.isNotEmpty) 'المسؤوليات: ${draft.responsibilities.join('، ')}',
+      if (draft.authorities.isNotEmpty) 'الصلاحيات: ${draft.authorities.join('، ')}',
+      if (draft.instructions.isNotEmpty) 'التعليمات: ${draft.instructions.join('، ')}',
+      if (draft.kpis.isNotEmpty) 'مؤشرات الأداء: ${draft.kpis.join('؛ ')}',
+    ].join('\n');
   }
 
   List<Map<String, String>> _descriptionRows(String text) {
@@ -397,6 +457,60 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
         _taskFilter = 'all';
         _reportFilter = 'all';
       });
+
+  Future<void> _openUnifiedEditor(Map<String, dynamic> task) async {
+    if (_orgId == null || _busy) return;
+    final initial = _unifiedDraftFromTask(task);
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      builder: (sheetContext) => Padding(
+        padding: EdgeInsets.only(bottom: MediaQuery.of(sheetContext).viewInsets.bottom),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(12),
+          child: UnifiedTaskTableEditor(
+            initialDraft: initial,
+            onSend: (_) async {},
+            onSave: (draft) async {
+              setState(() => _busy = true);
+              try {
+                await _db.rpc('admin_update_unified_task', params: {
+                  'p_organization_id': _orgId,
+                  'p_task_id': task['id'],
+                  'p_title': 'الجدول الموحد - ${draft.role} · ${draft.rows.isEmpty ? task['title'] : draft.rows.first.task}',
+                  'p_description': _unifiedDescription(draft),
+                  'p_due_at': task['due_at'],
+                  'p_assigned_to': draft.employeeUserId,
+                  'p_branch_id': draft.branchId,
+                  'p_role_code': _roleCode(draft.role),
+                });
+                if (sheetContext.mounted) Navigator.of(sheetContext).pop();
+                _message('تم حفظ الجدول الموحد وتحديث المهمة لدى الموظف.');
+                await _load();
+              } catch (e) {
+                _message('تعذر حفظ الجدول الموحد: ${e.toString().replaceFirst('Exception: ', '')}');
+              } finally {
+                if (mounted) setState(() => _busy = false);
+              }
+            },
+            employees: _employees.map((e) => UnifiedEmployeeOption(name: _s(e['display_name'], _s(e['employee_no'])), userId: _s(e['user_id']))).toList(),
+            branches: _branches.map((b) => UnifiedBranchOption(id: _s(b['id']), name: _s(b['name'], _s(b['code'])))).toList(),
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _roleCode(String role) => const {
+        'صاحب المؤسسة': 'owner',
+        'المدير التنفيذي': 'admin_followup',
+        'المحاسب': 'accountant',
+        'أمين المخزن': 'warehouse_keeper',
+        'أمين مخزن': 'warehouse_keeper',
+        'عمال التحميل': 'warehouse_worker',
+        'عامل تحميل': 'warehouse_worker',
+      }[role.trim()] ?? role.trim();
 
   Future<void> _saveTask({Map<String, dynamic>? existing}) async {
     final title = TextEditingController(text: _s(existing?['title']));
@@ -815,8 +929,10 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
                       ? const Text('لا توجد مهام مطابقة للفلاتر المحددة.', textAlign: TextAlign.right)
                       : Column(
                           children: _visibleTasks
-                              .map(
-                                (t) => ListTile(
+                              .map((t) {
+                                final taskId = _s(t['id']);
+                                final expanded = _expandedUnifiedTasks.contains(taskId);
+                                return ListTile(
                                   contentPadding: EdgeInsets.zero,
                                   title: Text(
                                     _s(t['title'], 'مهمة'),
@@ -837,7 +953,7 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
                                           fontWeight: FontWeight.w700,
                                         ),
                                       ),
-                                      if (widget.unifiedOnly)
+                                      if (expanded && widget.unifiedOnly)
                                         Text(
                                           t['report_form_snapshot_id'] != null
                                               ? 'قالب التقرير: مرتبط وثابت لهذه المهمة'
@@ -854,10 +970,25 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
                                         'الموعد: ${_localDateTime(t['due_at'])}',
                                         textAlign: TextAlign.right,
                                       ),
-                                      if (_s(t['description']).trim().isNotEmpty)
+                                      if (expanded && _s(t['description']).trim().isNotEmpty)
                                         Text(
                                           _s(t['description']),
                                           textAlign: TextAlign.right,
+                                        ),
+                                      if (widget.unifiedOnly)
+                                        Align(
+                                          alignment: Alignment.centerRight,
+                                          child: TextButton.icon(
+                                            onPressed: () => setState(() {
+                                              if (expanded) {
+                                                _expandedUnifiedTasks.remove(taskId);
+                                              } else {
+                                                _expandedUnifiedTasks.add(taskId);
+                                              }
+                                            }),
+                                            icon: Icon(expanded ? Icons.expand_less : Icons.expand_more, size: 18),
+                                            label: Text(expanded ? 'إخفاء التفاصيل' : 'إظهار التفاصيل'),
+                                          ),
                                         ),
                                     ],
                                   ),
@@ -872,6 +1003,12 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
                                   trailing: Row(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
+                                      if (widget.unifiedOnly)
+                                        IconButton(
+                                          tooltip: 'تعديل من الجدول الموحد',
+                                          onPressed: _busy ? null : () => _openUnifiedEditor(t),
+                                          icon: const Icon(Icons.table_chart_outlined),
+                                        ),
                                       IconButton(
                                         tooltip: 'تعديل المهمة أو صف الجدول',
                                         onPressed: _busy ? null : () => _saveTask(existing: t),
@@ -888,8 +1025,8 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
                                   onTap: () => _message(
                                     'حالة التقرير: ${_reportStatus(t)}',
                                   ),
-                                ),
-                              )
+                                );
+                              })
                               .toList(),
                         ),
                 ),

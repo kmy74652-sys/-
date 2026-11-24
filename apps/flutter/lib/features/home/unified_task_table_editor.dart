@@ -8,8 +8,10 @@ import '../../core/theme.dart';
 import '../../shared/app_customizer.dart';
 
 class UnifiedTaskTableEditor extends StatefulWidget {
-  const UnifiedTaskTableEditor({super.key, required this.onSend, this.employees = const [], this.branches = const [], this.reports = const []});
+  const UnifiedTaskTableEditor({super.key, required this.onSend, this.onSave, this.initialDraft, this.employees = const [], this.branches = const [], this.reports = const []});
   final Future<void> Function(UnifiedTaskTableDraft draft) onSend;
+  final Future<void> Function(UnifiedTaskTableDraft draft)? onSave;
+  final UnifiedTaskTableDraft? initialDraft;
   final List<UnifiedEmployeeOption> employees;
   final List<UnifiedBranchOption> branches;
   final List<UnifiedReportOption> reports;
@@ -50,6 +52,57 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
     super.initState();
     AppCustomizer.instance.load();
     _startDate.text = _formatDate(DateTime.now());
+    _applyInitialDraft(widget.initialDraft);
+  }
+
+  void _applyInitialDraft(UnifiedTaskTableDraft? draft) {
+    if (draft == null) return;
+    _employee.text = draft.employee;
+    _role.text = draft.role;
+    _branch.text = draft.branch;
+    _startDate.text = draft.startDate.isEmpty ? _startDate.text : draft.startDate;
+    _purpose.text = draft.purpose;
+    _reportNotes.text = draft.reportNotes;
+    _workType = draft.workType.isEmpty ? _workType : draft.workType;
+    _days = draft.workDays.isEmpty ? _days : draft.workDays;
+    _exception = draft.weeklyException.isEmpty ? _exception : draft.weeklyException;
+    _firstPeriod.text = draft.firstPeriod;
+    _breakPeriod.text = draft.breakPeriod;
+    _secondPeriod.text = draft.secondPeriod;
+    _reportTemplateId = draft.reportTemplateId;
+    _reportVersionId = draft.reportVersionId;
+    _replaceRows(_rows, draft.rows);
+    _replaceRows(_exceptionRows, const []);
+    _replaceList(_responsibilities, draft.responsibilities);
+    _replaceList(_authorities, draft.authorities);
+    _replaceList(_instructions, draft.instructions);
+    _replaceKpis(draft.kpis);
+  }
+
+  void _replaceRows(List<_UnifiedRow> target, List<UnifiedTaskRowData> source) {
+    for (final row in target) row.dispose();
+    target
+      ..clear()
+      ..addAll(source.isEmpty ? [_UnifiedRow('', '', '')] : source.map((row) => _UnifiedRow(row.time, row.task, row.output)));
+  }
+
+  void _replaceList(List<TextEditingController> target, List<String> source) {
+    for (final controller in target) controller.dispose();
+    target
+      ..clear()
+      ..addAll((source.isEmpty ? [''] : source).map((value) => TextEditingController(text: value)));
+  }
+
+  void _replaceKpis(List<String> source) {
+    for (final row in _kpis) {
+      for (final controller in row) controller.dispose();
+    }
+    _kpis
+      ..clear()
+      ..addAll((source.isEmpty ? [''] : source).map((value) {
+        final parts = value.split(':');
+        return [TextEditingController(text: parts.first.trim()), TextEditingController(text: parts.length > 1 ? parts.sublist(1).join(':').trim() : '')];
+      }));
   }
 
   @override
@@ -144,7 +197,7 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
             ..._unifiedSections(),
             const SizedBox(height: 12),
             Row(textDirection: TextDirection.rtl, children: [
-              Expanded(child: FilledButton.icon(onPressed: _sending || _sent ? null : _submit, icon: _sending ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)) : Icon(_sent ? Icons.check_circle_outline : Icons.send_outlined), label: Text(_sending ? 'جارٍ الإرسال...' : _sent ? 'تم الإرسال' : 'حفظ الجدول وإرساله'))),
+              Expanded(child: FilledButton.icon(onPressed: _sending || (_sent && widget.onSave == null) ? null : _submit, icon: _sending ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)) : Icon(widget.onSave != null ? Icons.save_outlined : _sent ? Icons.check_circle_outline : Icons.send_outlined), label: Text(_sending ? 'جارٍ الحفظ...' : widget.onSave != null ? 'حفظ التعديلات' : _sent ? 'تم الإرسال' : 'حفظ الجدول وإرساله'))),
               const SizedBox(width: 8), Expanded(child: OutlinedButton.icon(onPressed: _exportPdf, icon: const Icon(Icons.picture_as_pdf_outlined), label: const Text('تصدير PDF'))),
             ]),
           ],
@@ -626,7 +679,7 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
     }
     setState(() => _sending = true);
     try {
-      await widget.onSend(UnifiedTaskTableDraft(
+      final draft = UnifiedTaskTableDraft(
         employee: _employee.text.trim(),
         employeeUserId: widget.employees
             .where((item) => item.name == _employee.text.trim())
@@ -659,7 +712,12 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
             .toList(),
         reportTemplateId: _reportTemplateId,
         reportVersionId: _reportVersionId,
-      ));
+      );
+      if (widget.onSave != null) {
+        await widget.onSave!(draft);
+      } else {
+        await widget.onSend(draft);
+      }
       if (mounted) setState(() => _sent = true);
       if (mounted) messenger.showSnackBar(const SnackBar(content: Text('تم حفظ الجدول الموحد وإرساله للموظف بنجاح.', textAlign: TextAlign.right)));
     } catch (error) {

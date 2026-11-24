@@ -85,3 +85,13 @@
 - لم تُعدّل جداول Supabase أو RPC أو سياسات RLS أو الصلاحيات، وبقيت قيم `UnifiedTaskTableDraft` متوافقة مع مسار الإرسال الحالي.
 - التحقق المحلي: `git diff --check` ناجح؛ Flutter/Dart غير متاحين محليًا، لذا يعتمد التحقق النهائي على CI.
 - الخطوة التالية: commit ورفع التعديل ثم تشغيل CI الكامل وبناء APK.
+
+
+## تعديل الجداول الموحدة من شاشة الإدارة وطي البطاقات — مكتمل برمجيًا
+
+- تم تعديل `apps/flutter/lib/features/admin/task_management_screen.dart` لإضافة زر «تعديل من الجدول الموحد» بجانب التعديل العام، وفتح `UnifiedTaskTableEditor` ببيانات المهمة الموحدة المحفوظة.
+- تم جعل تفاصيل بطاقة الجداول الموحدة مطوية افتراضيًا، مع زر «إظهار التفاصيل / إخفاء التفاصيل» يعرض الوصف الكامل وقالب التقرير عند الطلب، مع إبقاء الملخص الأساسي ظاهرًا.
+- تم تعديل `apps/flutter/lib/features/home/unified_task_table_editor.dart` لدعم `initialDraft` و`onSave` حتى يستخدم نفس واجهة الجدول الموحد في وضع التعديل دون إنشاء مهمة جديدة.
+- تمت إضافة migration `supabase/migrations/20261124192000_admin_update_unified_task.sql` لدالة `admin_update_unified_task` بصلاحية الإدارة والتحقق من أن السجل جدول موحد، مع تحديث الموظف والفرع والدور والوصف والموعد دون تعديل الجداول أو RLS.
+- تم تطبيق الـ migration بنجاح على مشروع Supabase الإنتاجي `fjmryqhdwxsocdzswnkq`.
+- الخطوة التالية: `git diff --check`، commit ورفع التعديل، ثم CI الكامل وبناء APK.
