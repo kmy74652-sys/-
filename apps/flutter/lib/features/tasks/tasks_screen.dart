@@ -547,6 +547,116 @@ class _TasksScreenState extends State<TasksScreen>
     );
   }
 
+  String _officialTwoWordPreview(String text) {
+    final clean = text.trim();
+    if (clean.isEmpty || clean == '—') return '—';
+    final words = clean.split(RegExp(r'\s+'));
+    return words.length <= 2 ? clean : '${words.take(2).join(' ')}...';
+  }
+
+  Future<void> _showOfficialTextCard({
+    required String section,
+    required String time,
+    required String text,
+  }) async {
+    final clean = text.trim();
+    if (clean.isEmpty || clean == '—') return;
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+        clipBehavior: Clip.antiAlias,
+        child: Directionality(
+          textDirection: TextDirection.rtl,
+          child: Container(
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8FBFA),
+              border: Border.all(color: const Color(0xFFD8E4E0)),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Container(
+                  padding: const EdgeInsets.fromLTRB(18, 16, 18, 14),
+                  color: AppColors.navy,
+                  child: Row(
+                    children: [
+                      const Icon(Icons.description_outlined, color: Colors.white),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          section,
+                          textAlign: TextAlign.right,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 17,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(18, 16, 18, 8),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      const Icon(Icons.schedule_outlined, size: 17, color: AppColors.muted),
+                      const SizedBox(width: 5),
+                      Text(
+                        'الوقت: ${time.trim().isEmpty ? 'غير محدد' : time.trim()}',
+                        textAlign: TextAlign.right,
+                        style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700),
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  margin: const EdgeInsets.fromLTRB(18, 4, 18, 14),
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: const Color(0xFFE0EAE7)),
+                  ),
+                  child: Text(
+                    clean,
+                    textAlign: TextAlign.right,
+                    style: const TextStyle(fontSize: 16, height: 1.65, color: AppColors.navy),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(18, 0, 18, 16),
+                  child: FilledButton.icon(
+                    onPressed: () => Navigator.of(dialogContext).pop(),
+                    icon: const Icon(Icons.close),
+                    label: const Text('إغلاق'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _officialTextCell({
+    required String section,
+    required String time,
+    required String text,
+  }) {
+    final preview = _officialTwoWordPreview(text);
+    return InkWell(
+      onTap: preview == '—'
+          ? null
+          : () => _showOfficialTextCard(section: section, time: time, text: text),
+      child: _officialCell(preview, singleLine: true),
+    );
+  }
+
   Widget _officialTableCard(List<Map<String, dynamic>> tasks) {
     final firstDescription = '${tasks.first['description'] ?? ''}';
     String value(String label) {
@@ -751,8 +861,16 @@ class _TasksScreenState extends State<TasksScreen>
                   (row) => TableRow(
                     children: [
                       _officialCell(row['time'] ?? '—', singleLine: true),
-                      _officialCell(row['title'] ?? '—'),
-                      _officialCell(row['output'] ?? '—'),
+                      _officialTextCell(
+                        section: 'المهمة والمسؤولية',
+                        time: row['time'] ?? '—',
+                        text: row['title'] ?? '—',
+                      ),
+                      _officialTextCell(
+                        section: 'المخرج المطلوب',
+                        time: row['time'] ?? '—',
+                        text: row['output'] ?? '—',
+                      ),
                       Container(
                         constraints: const BoxConstraints(minHeight: 48),
                         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 7),
