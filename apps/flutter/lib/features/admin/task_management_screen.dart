@@ -26,6 +26,7 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
   Map<String, Map<String, dynamic>> _draftByTask = {};
   final Set<String> _expandedUnifiedTasks = <String>{};
   String _taskFilter = 'all', _reportFilter = 'all';
+  bool _filtersExpanded = false;
 
   @override
   void initState() {
@@ -418,38 +419,43 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
   List<Map<String, dynamic>> get _managedTasks =>
       _tasks.where((task) => _isUnifiedTask(task) == widget.unifiedOnly).toList();
 
+  int get _activeFilterCount =>
+      (_taskFilter == 'all' ? 0 : 1) + (_reportFilter == 'all' ? 0 : 1);
+
+  String get _filterSummary {
+    final values = <String>[];
+    if (_taskFilter != 'all') {
+      values.add(const {
+        'pending': 'جديدة',
+        'received': 'مستلمة',
+        'in_progress': 'قيد التنفيذ',
+        'submitted': 'للمراجعة',
+        'needs_revision': 'تحتاج تصحيحًا',
+        'completed_approved': 'معتمدة',
+      }[_taskFilter] ?? _taskFilter);
+    }
+    if (_reportFilter != 'all') values.add(_reportFilter);
+    return values.join(' · ');
+  }
+
   Widget _filterChip({required String value, required String label, required String group, required VoidCallback onSelected}) =>
-      SizedBox(
-        width: double.infinity,
-        child: ChoiceChip(
-          label: Text(label, textAlign: TextAlign.center),
-          selected: (group == 'task' ? _taskFilter : _reportFilter) == value,
-          onSelected: (_) => setState(onSelected),
+      ChoiceChip(
+        label: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          child: Text(label, textAlign: TextAlign.center, softWrap: false),
         ),
+        labelPadding: EdgeInsets.zero,
+        selected: (group == 'task' ? _taskFilter : _reportFilter) == value,
+        onSelected: (_) => setState(onSelected),
       );
 
   Widget _filterRow(List<Widget> chips) {
-    final padded = [...chips];
-    while (padded.length < 3) {
-      padded.add(const SizedBox.shrink());
-    }
-    if (chips.length == 1) {
-      return Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [SizedBox(width: 132, child: chips.single)],
-      );
-    }
-    return Row(
+    return Wrap(
       textDirection: Directionality.of(context),
-      children: [
-        for (final chip in padded)
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsetsDirectional.only(end: 6),
-              child: chip,
-            ),
-          ),
-      ],
+      alignment: WrapAlignment.end,
+      spacing: 8,
+      runSpacing: 8,
+      children: chips,
     );
   }
 
@@ -865,16 +871,79 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
                     ],
                   ),
                 ),
-                SectionCard(
-                  title: 'تصفية المتابعة',
-                  trailing: TextButton.icon(
-                    onPressed: _resetFilters,
-                    icon: const Icon(Icons.restart_alt, size: 18),
-                    label: const Text('إعادة تعيين'),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Row(
+                          textDirection: TextDirection.rtl,
+                          children: [
+                            Expanded(
+                              child: InkWell(
+                                borderRadius: BorderRadius.circular(10),
+                                onTap: () => setState(() => _filtersExpanded = !_filtersExpanded),
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(vertical: 4),
+                                  child: Row(
+                                    textDirection: TextDirection.rtl,
+                                    children: [
+                                      AnimatedRotation(
+                                        turns: _filtersExpanded ? .5 : 0,
+                                        duration: const Duration(milliseconds: 220),
+                                        child: const Icon(Icons.expand_more, color: AppColors.navy),
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.end,
+                                          children: [
+                                            Row(
+                                              mainAxisAlignment: MainAxisAlignment.end,
+                                              children: [
+                                                Text(
+                                                  _filtersExpanded ? 'إخفاء' : 'إظهار',
+                                                  style: const TextStyle(fontSize: 11, color: AppColors.muted),
+                                                ),
+                                                const SizedBox(width: 7),
+                                                const Text(
+                                                  'تصفية المتابعة',
+                                                  style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: AppColors.navy),
+                                                ),
+                                              ],
+                                            ),
+                                            if (!_filtersExpanded && _activeFilterCount > 0)
+                                              Text(
+                                                'نشط: $_activeFilterCount · $_filterSummary',
+                                                textAlign: TextAlign.right,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: const TextStyle(fontSize: 11, color: AppColors.green, fontWeight: FontWeight.w700),
+                                              ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                            TextButton.icon(
+                              onPressed: _resetFilters,
+                              icon: const Icon(Icons.restart_alt, size: 18),
+                              label: const Text('إعادة تعيين'),
+                            ),
+                          ],
+                        ),
+                        AnimatedSize(
+                          duration: const Duration(milliseconds: 260),
+                          curve: Curves.easeOutCubic,
+                          alignment: Alignment.topCenter,
+                          child: !_filtersExpanded
+                              ? const SizedBox.shrink()
+                              : Column(
+                                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                                  children: [
                       const Text(
                         'حالة المهمة',
                         textAlign: TextAlign.right,
@@ -919,6 +988,10 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
                         _filterChip(value: 'بدون تقرير', label: 'بدون تقرير', group: 'report', onSelected: () => _reportFilter = 'بدون تقرير'),
                       ]),
                     ],
+                  ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
                 SectionCard(
