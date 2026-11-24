@@ -771,7 +771,7 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
                           _filterChip(value: 'all', label: 'الكل', group: 'task', onSelected: () => _taskFilter = 'all'),
                           _filterChip(value: 'pending', label: 'جديدة', group: 'task', onSelected: () => _taskFilter = 'pending'),
                           _filterChip(value: 'received', label: 'مستلمة', group: 'task', onSelected: () => _taskFilter = 'received'),
-                      ),
+                      ]),
                       const SizedBox(height: 6),
                       _filterRow([
                         _filterChip(value: 'in_progress', label: 'قيد التنفيذ', group: 'task', onSelected: () => _taskFilter = 'in_progress'),
