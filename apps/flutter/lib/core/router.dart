@@ -69,6 +69,11 @@ void initializeRouter() {
         builder: (context, state) => const TaskManagementScreen(),
       ),
       GoRoute(
+        path: '/admin/unified-task-management',
+        builder: (context, state) =>
+            const TaskManagementScreen(unifiedOnly: true),
+      ),
+      GoRoute(
         path: '/admin/report-designer',
         builder: (context, state) => const ReportDesignerScreen(),
       ),

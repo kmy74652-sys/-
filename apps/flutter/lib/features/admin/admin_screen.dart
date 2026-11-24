@@ -300,6 +300,13 @@ class _AdminScreenState extends State<AdminScreen> {
                 _can('tasks.manage'),
               ),
               _nav(
+                'إدارة الجداول الموحدة وتقاريرها',
+                'unified-task-management',
+                Icons.table_chart_outlined,
+                _can('tasks.manage') || _can('tasks.review'),
+                note: 'متابعة الجداول المرسلة واعتماد إنجاز الموظفين',
+              ),
+              _nav(
                 'تقارير الموظفين',
                 'reports',
                 Icons.assessment_outlined,
@@ -417,6 +424,7 @@ class _AdminScreenState extends State<AdminScreen> {
             final route = switch (section) {
               'performance-analytics' => '/admin/performance',
               'task-management' => '/admin/tasks',
+              'unified-task-management' => '/admin/unified-task-management',
               'report-designer' => '/admin/report-designer',
               'app-customizer' => '/admin/customizer',
               _ => null,

@@ -5,7 +5,8 @@ import '../../shared/app_shell.dart';
 import '../../shared/form_widgets.dart';
 
 class TaskManagementScreen extends StatefulWidget {
-  const TaskManagementScreen({super.key});
+  const TaskManagementScreen({super.key, this.unifiedOnly = false});
+  final bool unifiedOnly;
   @override
   State<TaskManagementScreen> createState() => _TaskManagementScreenState();
 }
@@ -36,6 +37,8 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
       v == null ? fallback : v.toString();
 
   bool _isUnifiedTask(Map<String, dynamic> task) =>
+      _s(task['title']).startsWith('الجدول الموحد -') ||
+      _s(task['description']).contains('الجدول الموحد:') ||
       _s(task['description']).contains('الوقت المحدد:');
 
   String _lineValue(String text, String label) {
@@ -92,7 +95,7 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
         _db
             .from('tasks')
             .select(
-              'id,title,description,branch_id,assigned_to,due_at,priority,status,report_required,report_flow,updated_at,deleted_at',
+              'id,title,description,branch_id,assigned_to,due_at,priority,status,report_required,report_flow,report_form_snapshot_id,updated_at,deleted_at',
             )
             .eq('organization_id', org)
             .isFilter('deleted_at', null)
@@ -242,7 +245,7 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
 
   Map<String, int> get _reportSummary {
     final summary = <String, int>{};
-    for (final task in _tasks) {
+    for (final task in _managedTasks) {
       final status = _reportStatus(task);
       summary[status] = (summary[status] ?? 0) + 1;
     }
@@ -250,7 +253,7 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
   }
 
   List<Map<String, dynamic>> get _visibleTasks => _tasks.where((task) {
-    if (_isUnifiedTask(task)) return false;
+    if (_isUnifiedTask(task) != widget.unifiedOnly) return false;
     final rawTaskStatus = _s(task['status']);
     final taskMatches = _taskFilter == 'all' ||
         (_taskFilter == 'pending' && ['pending', 'new'].contains(rawTaskStatus)) ||
@@ -259,6 +262,9 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
     final reportMatches = _reportFilter == 'all' || _reportStatus(task) == _reportFilter;
     return taskMatches && reportMatches;
   }).toList();
+
+  List<Map<String, dynamic>> get _managedTasks =>
+      _tasks.where((task) => _isUnifiedTask(task) == widget.unifiedOnly).toList();
 
   Widget _filterChip({required String value, required String label, required String group, required VoidCallback onSelected}) =>
       ChoiceChip(
@@ -578,8 +584,10 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
 
   @override
   Widget build(BuildContext context) => AppShell(
-    title: 'إدارة المهام',
-    subtitle: 'الإنشاء المباشر والمتابعة والتقارير',
+    title: widget.unifiedOnly ? 'إدارة الجداول الموحدة' : 'إدارة المهام',
+    subtitle: widget.unifiedOnly
+        ? 'الجداول المرسلة للموظفين وتقاريرها واعتماد إنجازها'
+        : 'الإنشاء المباشر والمتابعة والتقارير',
     child: _loading
         ? const Center(child: CircularProgressIndicator())
         : RefreshIndicator(
@@ -595,11 +603,17 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
                     spacing: 8,
                     runSpacing: 8,
                     children: [
-                      FilledButton.icon(
-                        onPressed: _busy ? null : () => _saveTask(),
-                        icon: const Icon(Icons.add),
-                        label: const Text('إنشاء مهمة'),
-                      ),
+                      if (!widget.unifiedOnly)
+                        FilledButton.icon(
+                          onPressed: _busy ? null : () => _saveTask(),
+                          icon: const Icon(Icons.add),
+                          label: const Text('إنشاء مهمة'),
+                        ),
+                      if (widget.unifiedOnly)
+                        const Text(
+                          'هذه الشاشة مخصصة للجداول التي أُرسلت من الجدول الموحد فقط. إنشاء جدول جديد يتم من مساره المستقل.',
+                          textAlign: TextAlign.right,
+                        ),
                     ],
                   ),
                 ),
@@ -645,7 +659,9 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
                   ),
                 ),
                 SectionCard(
-                    title: 'المهام المرسلة (${_visibleTasks.length} من ${_tasks.where((task) => !_isUnifiedTask(task)).length})',
+                    title: widget.unifiedOnly
+                        ? 'الجداول الموحدة المرسلة (${_visibleTasks.length} من ${_managedTasks.length})'
+                        : 'المهام المرسلة (${_visibleTasks.length} من ${_managedTasks.length})',
                   child: _visibleTasks.isEmpty
                       ? const Text('لا توجد مهام مطابقة للفلاتر المحددة.', textAlign: TextAlign.right)
                       : Column(
@@ -672,6 +688,19 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
                                           fontWeight: FontWeight.w700,
                                         ),
                                       ),
+                                      if (widget.unifiedOnly)
+                                        Text(
+                                          t['report_form_snapshot_id'] != null
+                                              ? 'قالب التقرير: مرتبط وثابت لهذه المهمة'
+                                              : 'قالب التقرير: غير مرتبط',
+                                          textAlign: TextAlign.right,
+                                          style: TextStyle(
+                                            color: t['report_form_snapshot_id'] != null
+                                                ? Colors.green
+                                                : Colors.red,
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        ),
                                       Text(
                                         'الموعد: ${_s(t['due_at'], 'غير محدد')}',
                                         textAlign: TextAlign.right,
