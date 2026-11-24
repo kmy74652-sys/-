@@ -11,3 +11,12 @@
 تم التحقق من وجود الدوال الأربع الجديدة في الإنتاج عبر SQL. لم يتم حذف بيانات أو جداول، ولم يتم إضعاف RLS؛ الحفظ والترحيل النهائي يتمان عبر دوال `security definer` مع تحقق صريح من الموظف والمؤسسة والصلاحيات والمهلة.
 
 الخطوة التالية: commit ورفع التعديلات، ثم تشغيل CI حتى نجاح التحليل والاختبارات وبناء APK/AAB.
+
+
+## نتيجة CI لإصلاح التقارير المستقلة — مكتملة
+
+نجح CI رقم `45395625081` للـ commit `d1848c0` بالكامل: تنسيق Dart، static analysis، اختبارات unit/widget، بناء APK، بناء AAB، ونشر أصول الإصدار. تحقق رابط APK بإجابة HTTP 200 وحجم تقريبي 65.4 MB، وتحقق رابط AAB بإجابة HTTP 200 وحجم تقريبي 67.8 MB. التحذيرات تخص تقادم Node.js 20 وsetup-java v4 في GitHub Actions ولم تؤثر على البناء.
+
+APK مباشر: https://github.com/kmy74652-sys/-/releases/download/latest/alshaeri-latest.apk
+AAB: https://github.com/kmy74652-sys/-/releases/download/latest/alshaeri-latest.aab
+CI: https://github.com/kmy74652-sys/-/actions/runs/45395625081
