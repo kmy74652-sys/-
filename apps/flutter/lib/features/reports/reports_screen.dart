@@ -774,8 +774,31 @@ class _ReportsScreenState extends State<ReportsScreen> {
 
   String _displayValue(Object? value) {
     if (value == null) return '—';
-    if (value is Map && value['strokes'] is List) {
-      return value['acknowledged'] == true ? 'تم التوقيع والموافقة' : 'توقيع مرفق';
+    if (value is String) {
+      final raw = value.trim();
+      final parsedDate = DateTime.tryParse(raw);
+      if (parsedDate != null) {
+        final local = parsedDate.toLocal();
+        String two(int number) => number.toString().padLeft(2, '0');
+        return '${two(local.day)}/${two(local.month)}/${local.year} · '
+            '${two(local.hour)}:${two(local.minute)}';
+      }
+      try {
+        final decoded = jsonDecode(raw);
+        if (decoded is Map || decoded is List) return _displayValue(decoded);
+      } catch (_) {}
+      return value;
+    }
+    if (value is Map &&
+        (value['strokes'] is List ||
+            value['signature_attachment_id'] != null ||
+            value['signed_at'] != null)) {
+      final signedAt = value['signed_at']?.toString().trim() ?? '';
+      final dateLabel = signedAt.isEmpty ? '' : ' · ${_displayValue(signedAt)}';
+      final signedLabel = value['acknowledged'] == true
+          ? 'تم التوقيع والموافقة'
+          : 'تم التوقيع';
+      return '$signedLabel$dateLabel';
     }
     if (value is Map || value is List) {
       try {
@@ -785,6 +808,23 @@ class _ReportsScreenState extends State<ReportsScreen> {
       }
     }
     return value.toString();
+  }
+
+  String _taskReportFieldLabel(Map<String, dynamic> row, Object? key) {
+    final snapshotId = row['report_form_snapshot_id']?.toString();
+    final schema = snapshotId == null ? null : _snapshotsById[snapshotId]?['schema'];
+    if (schema is List) {
+      for (final rawField in schema) {
+        if (rawField is! Map) continue;
+        final field = Map<String, dynamic>.from(rawField);
+        final fieldKey = field['key'] ?? field['field_key'];
+        if ('$fieldKey' == '$key') {
+          final label = field['label']?.toString().trim() ?? '';
+          if (label.isNotEmpty) return label;
+        }
+      }
+    }
+    return key.toString();
   }
 
   String _submissionFieldLabel(Map<String, dynamic> row, Object? key) {
@@ -1557,7 +1597,10 @@ class _ReportsScreenState extends State<ReportsScreen> {
           if (row['values'] is Map)
             for (final entry in (row['values'] as Map).entries)
               ListTile(
-                title: Text(entry.key.toString(), textAlign: TextAlign.right),
+                title: Text(
+                  _taskReportFieldLabel(row, entry.key),
+                  textAlign: TextAlign.right,
+                ),
                 subtitle: Text(
                   _displayValue(entry.value),
                   textAlign: TextAlign.right,
