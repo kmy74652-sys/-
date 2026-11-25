@@ -31,38 +31,6 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
   RealtimeChannel? _taskChannel;
   String _formInputKey(String snapshot, String field) => '$snapshot:$field';
 
-  List<Map<String, String>> _descriptionBlocks(String value) {
-    final text = value.trim();
-    final matches = RegExp(
-      r'^وصف المهمة (\d+):\s*$',
-      multiLine: true,
-    ).allMatches(text).toList();
-    if (matches.isEmpty) {
-      final body = text
-          .split('\n')
-          .where((line) => !line.trim().startsWith('صف الجدول:'))
-          .join('\n')
-          .trim();
-      return body.isEmpty ? const [] : [{'title': 'الوصف', 'body': body}];
-    }
-    final blocks = <Map<String, String>>[];
-    for (var i = 0; i < matches.length; i++) {
-      final match = matches[i];
-      final start = match.end;
-      final end = i + 1 < matches.length ? matches[i + 1].start : text.length;
-      final body = text
-          .substring(start, end)
-          .split('\n')
-          .where((line) => !line.trim().startsWith('صف الجدول:'))
-          .join('\n')
-          .trim();
-      if (body.isNotEmpty) {
-        blocks.add({'title': 'وصف المهمة ${match.group(1)}', 'body': body});
-      }
-    }
-    return blocks.isEmpty ? [{'title': 'الوصف', 'body': text}] : blocks;
-  }
-
   List<Map<String, String>> _unifiedRows(String value) {
     final rows = <Map<String, String>>[];
     final pattern = RegExp(
@@ -1491,47 +1459,6 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
             ),
           ),
         );
-    }
-  }
-
-  Future<void> _timeline() async {
-    try {
-      final rows = await Supabase.instance.client.rpc(
-        'mobile_task_timeline',
-        params: {'p_task_id': widget.taskId},
-      );
-      if (!mounted) return;
-      showModalBottomSheet<void>(
-        context: context,
-        isScrollControlled: true,
-        builder: (context) => SafeArea(
-          child: ListView(
-            padding: const EdgeInsets.all(16),
-            children: [
-              const Text(
-                'سجل المهمة',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-              ),
-              for (final row in (rows as List))
-                ListTile(
-                  title: Text(
-                    '${row['action_type'] ?? row['new_status'] ?? ''}',
-                    textAlign: TextAlign.right,
-                  ),
-                  subtitle: Text(
-                    '${row['actor_name'] ?? ''} · ${row['created_at'] ?? ''}\n${row['notes'] ?? ''}',
-                    textAlign: TextAlign.right,
-                  ),
-                ),
-            ],
-          ),
-        ),
-      );
-    } catch (_) {
-      if (mounted)
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('تعذر تحميل سجل المهمة.')));
     }
   }
 
