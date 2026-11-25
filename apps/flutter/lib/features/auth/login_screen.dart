@@ -209,7 +209,6 @@ class _LoginScreenState extends State<LoginScreen> {
                       onSubmitted: (_) => _login(),
                       decoration: const InputDecoration(
                         labelText: 'رمز الدخول',
-                        hintText: 'من 3 إلى 30 محرفًا دون مسافات',
                         prefixIcon: Icon(Icons.lock_outline),
                       ),
                     ),
