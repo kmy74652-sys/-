@@ -491,6 +491,46 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
     return type == 'date' ? date : '$date · ${two(local.hour)}:${two(local.minute)}';
   }
 
+  String _snapshotDisplayValue(Map<String, dynamic> field, Object? value) {
+    final type = '${field['type'] ?? ''}';
+    if (value == null || '$value'.trim().isEmpty) return '—';
+    if (type == 'date' || type == 'datetime') {
+      return _automaticDateLabel('$value', type);
+    }
+    if (type == 'signature') {
+      Map<String, dynamic> signature = {};
+      if (value is Map) {
+        signature = _obj(value);
+      } else {
+        try {
+          signature = _obj(jsonDecode('$value'));
+        } catch (_) {}
+      }
+      final strokes = signature['strokes'] is List
+          ? (signature['strokes'] as List).whereType<String>().length
+          : 0;
+      final hasAttachment = '${signature['signature_attachment_id'] ?? ''}'
+          .trim()
+          .isNotEmpty;
+      final signedAt = '${signature['signed_at'] ?? ''}'.trim();
+      if (strokes == 0 && !hasAttachment && signedAt.isEmpty) {
+        return 'لم يتم التوقيع';
+      }
+      final signedLabel = signedAt.isEmpty
+          ? 'تم التوقيع'
+          : 'تم التوقيع · ${_localDateTime(signedAt)}';
+      return signature['acknowledged'] == true
+          ? '$signedLabel · تمت الموافقة'
+          : signedLabel;
+    }
+    if (value is Map || value is List) {
+      try {
+        return jsonEncode(value);
+      } catch (_) {}
+    }
+    return '$value';
+  }
+
   String _operationError(Object error, String fallback) {
     final message = error is PostgrestException
         ? error.message
@@ -1707,7 +1747,10 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                                         textAlign: TextAlign.right,
                                       ),
                                       subtitle: Text(
-                                        '${savedValues[field['key']] ?? '—'}',
+                                        _snapshotDisplayValue(
+                                          field,
+                                          savedValues[field['key']],
+                                        ),
                                         textAlign: TextAlign.right,
                                       ),
                                     )
