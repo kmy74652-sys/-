@@ -114,10 +114,14 @@ class _IndependentReportsScreenState extends State<IndependentReportsScreen> {
         final answerMap = answers is Map ? answers : const <dynamic, dynamic>{};
         for (final field in form.fields) {
           final existing = answerMap[field.key];
-          final value =
+          var value =
               existing == null && field.config['default_value'] != null
               ? field.config['default_value']
               : existing;
+          if (field.type == 'datetime' &&
+              (value == null || value.toString().trim().isEmpty)) {
+            value = DateTime.now().toLocal().toIso8601String();
+          }
           controllers.putIfAbsent(field.key, TextEditingController.new).text =
               _raw(value);
         }
@@ -312,8 +316,9 @@ class _IndependentReportsScreenState extends State<IndependentReportsScreen> {
         return 'أدخل الاختيارات المتعددة للحقل «${field.label}» بصيغة صحيحة.';
       }
     }
-    if (field.type == 'date' && DateTime.tryParse(raw) == null) {
-      return 'استخدم تاريخًا صحيحًا في الحقل «${field.label}».';
+    if ((field.type == 'date' || field.type == 'datetime') &&
+        DateTime.tryParse(raw) == null) {
+      return 'استخدم تاريخًا صحيحًا في الحقل ${field.label}.';
     }
     if (field.type == 'date_range' || field.type == 'table') {
       try {
@@ -530,6 +535,9 @@ class _IndependentReportsScreenState extends State<IndependentReportsScreen> {
     if (field.type == 'table') {
       return _tableEditor(field, controller, locked);
     }
+    if (field.type == 'datetime') {
+      return _automaticDateTimeEditor(controller);
+    }
     if (field.type == 'signature') {
       return _signatureEditor(field, controller, locked);
     }
@@ -561,6 +569,38 @@ class _IndependentReportsScreenState extends State<IndependentReportsScreen> {
       decoration: InputDecoration(
         hintText: _hint(field.type),
         border: const OutlineInputBorder(),
+      ),
+    );
+  }
+
+  Widget _automaticDateTimeEditor(TextEditingController controller) {
+    final parsed = DateTime.tryParse(controller.text)?.toLocal();
+    final value = parsed == null
+        ? controller.text
+        : '${parsed.year.toString().padLeft(4, '0')}/'
+              '${parsed.month.toString().padLeft(2, '0')}/'
+              '${parsed.day.toString().padLeft(2, '0')} - '
+              '${parsed.hour.toString().padLeft(2, '0')}:'
+              '${parsed.minute.toString().padLeft(2, '0')}';
+    return InputDecorator(
+      decoration: const InputDecoration(
+        border: OutlineInputBorder(),
+        prefixIcon: Icon(Icons.schedule_outlined),
+        suffixIcon: Tooltip(
+          message: 'يُعبّأ تلقائيًا ولا يمكن تعديله يدويًا',
+          child: Icon(Icons.lock_outline),
+        ),
+      ),
+      child: Directionality(
+        textDirection: TextDirection.ltr,
+        child: Text(
+          value.isEmpty ? 'يُعبّأ تلقائيًا عند فتح التقرير' : value,
+          textAlign: TextAlign.right,
+          style: TextStyle(
+            color: value.isEmpty ? Colors.black54 : AppColors.navy,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
       ),
     );
   }

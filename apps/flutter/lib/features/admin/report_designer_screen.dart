@@ -1232,7 +1232,19 @@ class _ReportDesignerScreenState extends State<ReportDesignerScreen> {
         decoration: BoxDecoration(border: Border.all(color: const Color(0xffdce4e8)), borderRadius: BorderRadius.circular(8)),
         child: Row(children: [for (final column in columns.take(3)) Expanded(child: Padding(padding: const EdgeInsets.all(4), child: Text(column['label'].toString(), textAlign: TextAlign.center, style: const TextStyle(fontSize: 12))))]),
       );
-    } else if (type == 'date' || type == 'datetime' || type == 'date_range') {
+    } else if (type == 'datetime') {
+      control = const InputDecorator(
+        decoration: InputDecoration(
+          border: OutlineInputBorder(),
+          prefixIcon: Icon(Icons.schedule_outlined),
+          suffixIcon: Icon(Icons.lock_outline),
+        ),
+        child: Text(
+          'يُعبّأ تلقائيًا عند فتح التقرير — للقراءة فقط',
+          textAlign: TextAlign.right,
+        ),
+      );
+    } else if (type == 'date' || type == 'date_range') {
       control = const TextField(enabled: false, decoration: InputDecoration(hintText: 'اختر التاريخ', suffixIcon: Icon(Icons.calendar_today_outlined)));
     } else if (type == 'calculated' || type == 'system_reference') {
       control = const InputDecorator(decoration: InputDecoration(border: OutlineInputBorder()), child: Text('يُعبّأ تلقائيًا', textAlign: TextAlign.right));
