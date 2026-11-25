@@ -439,12 +439,52 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
     return value;
   }
 
+  DateTime? _parseFlexibleDate(String value) {
+    final normalized = value
+        .replaceAll('٠', '0')
+        .replaceAll('١', '1')
+        .replaceAll('٢', '2')
+        .replaceAll('٣', '3')
+        .replaceAll('٤', '4')
+        .replaceAll('٥', '5')
+        .replaceAll('٦', '6')
+        .replaceAll('٧', '7')
+        .replaceAll('٨', '8')
+        .replaceAll('٩', '9')
+        .trim();
+    final parsed = DateTime.tryParse(normalized);
+    if (parsed != null) return parsed;
+    final match = RegExp(
+      r'^(\d{1,2})[/-](\d{1,2})[/-](\d{4})(?:\s*[·T ]\s*(\d{1,2}):?(\d{2})?)?',
+    ).firstMatch(normalized);
+    if (match == null) return null;
+    return DateTime.tryParse(
+      '${match.group(3)}-${match.group(2)!.padLeft(2, '0')}-${match.group(1)!.padLeft(2, '0')}'
+      '${match.group(4) == null ? '' : 'T${match.group(4)!.padLeft(2, '0')}:${(match.group(5) ?? '00').padLeft(2, '0')}'}',
+    );
+  }
+
+  String? _canonicalDateValue(String value, String type) {
+    final parsed = _parseFlexibleDate(value);
+    if (parsed == null) return null;
+    if (type == 'date') {
+      final local = parsed.toLocal();
+      return '${local.year.toString().padLeft(4, '0')}-'
+          '${local.month.toString().padLeft(2, '0')}-'
+          '${local.day.toString().padLeft(2, '0')}';
+    }
+    return parsed.toUtc().toIso8601String();
+  }
+
   Object? _snapshotValue(Map<String, dynamic> field, String snapshotId) {
     final key = '${field['key'] ?? ''}';
     final raw = _formInputs[_formInputKey(snapshotId, key)]?.text.trim() ?? '';
     final type = '${field['type'] ?? ''}';
     if (type == 'calculated') return _calculatedValue(field, snapshotId);
     if (raw.isEmpty) return null;
+    if (type == 'date' || type == 'datetime') {
+      return _canonicalDateValue(raw, type) ?? raw;
+    }
     if ([
       'table',
       'multiselect',
@@ -605,7 +645,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
     if ((type == 'boolean' || type == 'checkbox') && v is! bool)
       return 'اختر نعم أو لا في «$label».';
     if ((type == 'date' || type == 'datetime') &&
-        (v is! String || DateTime.tryParse(v) == null))
+        (v is! String || _parseFlexibleDate(v) == null))
       return 'أدخل تاريخًا صالحًا في «$label».';
     if (type == 'date_range') {
       final r = _obj(v);
@@ -1302,13 +1342,12 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
           'نوع الحقل «$type» غير مدعوم في Flutter؛ أكمل هذا النموذج من التطبيق المدعوم.',
         ),
       );
-    if (type == 'datetime' &&
-        _obj(field['config'])['auto_now'] == true &&
+    if ((type == 'date' || type == 'datetime') &&
         (controller?.text.isEmpty ?? true))
       controller?.text = DateTime.now().toUtc().toIso8601String();
     return TextField(
       controller: controller,
-      readOnly: type == 'datetime' && _obj(field['config'])['auto_now'] == true,
+      readOnly: type == 'date' || type == 'datetime',
       maxLines:
           ['textarea', 'long_text', 'notes', 'decision_notes'].contains(type)
           ? 4
