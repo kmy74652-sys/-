@@ -133,6 +133,14 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
     'urgent': 'عاجلة',
   }['$value'] ?? 'عادية';
 
+  String _localDateTime(Object? value) {
+    final parsed = DateTime.tryParse('${value ?? ''}');
+    if (parsed == null) return 'غير محدد';
+    final local = parsed.toLocal();
+    String two(int number) => number.toString().padLeft(2, '0');
+    return '${two(local.day)}/${two(local.month)}/${local.year} · ${two(local.hour)}:${two(local.minute)}';
+  }
+
   @override
   void initState() {
     super.initState();
@@ -143,6 +151,22 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
           event: PostgresChangeEvent.all,
           schema: 'public',
           table: 'tasks',
+          callback: (_) {
+            if (mounted) _load();
+          },
+        )
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'task_reports',
+          callback: (_) {
+            if (mounted) _load();
+          },
+        )
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'task_report_drafts',
           callback: (_) {
             if (mounted) _load();
           },
@@ -1555,42 +1579,13 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                     ),
                     if (_task?['due_at'] != null)
                       Text(
-                        'موعد الاستحقاق: ${_task!['due_at']}',
+                        'موعد الاستحقاق: ${_localDateTime(_task!['due_at'])}',
                         textAlign: TextAlign.right,
                       ),
                   ],
                 ),
               ),
               _unifiedTable('${_task?['description'] ?? ''}'),
-              if ('${_task?['description'] ?? ''}'.trim().isNotEmpty)
-                SectionCard(
-                  title: 'بيانات المهمة',
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      for (final block in _descriptionBlocks('${_task!['description']}'))
-                        Card(
-                          margin: const EdgeInsets.only(bottom: 8),
-                          color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                          child: Padding(
-                            padding: const EdgeInsets.all(12),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                Text(
-                                  block['title']!,
-                                  textAlign: TextAlign.right,
-                                  style: const TextStyle(fontWeight: FontWeight.bold),
-                                ),
-                                const SizedBox(height: 6),
-                                Text(block['body']!, textAlign: TextAlign.right),
-                              ],
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
               if ('${_task?['task_instructions'] ?? ''}'.trim().isNotEmpty)
                 SectionCard(
                   title: 'تعليمات التنفيذ',
@@ -1798,7 +1793,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                   if (['in_progress', 'on_hold'].contains(_task?['status']))
                     FilledButton(
                       onPressed: _saving ? null : _submitTaskForReview,
-                      child: const Text('إرسال المهمة للمراجعة'),
+                      child: const Text('تم الإنجاز · إرسال للمراجعة'),
                     ),
                   if (['report_submitted', 'submitted'].contains(_task?['status']))
                     const Chip(
@@ -1810,11 +1805,6 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                       avatar: Icon(Icons.verified_outlined, size: 17),
                       label: Text('مكتملة ومعتمدة'),
                     ),
-                  OutlinedButton.icon(
-                    onPressed: _timeline,
-                    icon: const Icon(Icons.history),
-                    label: const Text('سجل المهمة'),
-                  ),
                   OutlinedButton.icon(
                     onPressed: () => context.pop(),
                     icon: const Icon(Icons.arrow_back),
