@@ -31,6 +31,7 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
   Map<String, Map<String, dynamic>> _draftByTask = {};
   final Set<String> _expandedUnifiedTasks = <String>{};
   String _taskFilter = 'all', _reportFilter = 'all';
+  String _employeeFilter = 'all';
   bool _filtersExpanded = false;
   bool _canManageActions = false;
 
@@ -439,14 +440,18 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
             !['approved', 'completed', 'completed_approved'].contains(rawTaskStatus)) ||
         rawTaskStatus == _taskFilter;
     final reportMatches = _reportFilter == 'all' || _reportStatus(task) == _reportFilter;
-    return taskMatches && reportMatches;
+    final employeeMatches = _employeeFilter == 'all' ||
+        _s(task['assigned_to']) == _employeeFilter;
+    return taskMatches && reportMatches && employeeMatches;
   }).toList();
 
   List<Map<String, dynamic>> get _managedTasks =>
       _tasks.where((task) => _isUnifiedTask(task) == widget.unifiedOnly).toList();
 
   int get _activeFilterCount =>
-      (_taskFilter == 'all' ? 0 : 1) + (_reportFilter == 'all' ? 0 : 1);
+      (_taskFilter == 'all' ? 0 : 1) +
+      (_reportFilter == 'all' ? 0 : 1) +
+      (_employeeFilter == 'all' ? 0 : 1);
 
   String get _filterSummary {
     final values = <String>[];
@@ -462,6 +467,9 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
       }[_taskFilter] ?? _taskFilter);
     }
     if (_reportFilter != 'all') values.add(_reportFilter);
+    if (_employeeFilter != 'all') {
+      values.add(_employeeName(_employeeFilter));
+    }
     return values.join(' · ');
   }
 
@@ -489,6 +497,7 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
   void _resetFilters() => setState(() {
         _taskFilter = 'all';
         _reportFilter = 'all';
+        _employeeFilter = 'all';
       });
 
   Future<void> _openUnifiedEditor(Map<String, dynamic> task) async {
@@ -968,9 +977,41 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
                           alignment: Alignment.topCenter,
                           child: !_filtersExpanded
                               ? const SizedBox.shrink()
-                              : Column(
-                                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                                  children: [
+                                  : Column(
+                                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                                      children: [
+                      if (_employees.isNotEmpty) ...[
+                        DropdownButtonFormField<String>(
+                          value: _employeeFilter,
+                          isExpanded: true,
+                          decoration: const InputDecoration(
+                            labelText: 'عرض حسب الموظف',
+                            prefixIcon: Icon(Icons.person_outline),
+                            border: OutlineInputBorder(),
+                            isDense: true,
+                          ),
+                          items: [
+                            const DropdownMenuItem(
+                              value: 'all',
+                              child: Text('كل الموظفين'),
+                            ),
+                            ..._employees.map(
+                              (employee) => DropdownMenuItem<String>(
+                                value: _s(employee['user_id']),
+                                child: Text(
+                                  _s(employee['display_name'], _s(employee['employee_no'], 'موظف')),
+                                  overflow: TextOverflow.ellipsis,
+                                  textDirection: TextDirection.rtl,
+                                ),
+                              ),
+                            ),
+                          ],
+                          onChanged: (value) => setState(
+                            () => _employeeFilter = value ?? 'all',
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                      ],
                       const Text(
                         'حالة المهمة',
                         textAlign: TextAlign.right,

@@ -40,6 +40,9 @@ class _TasksScreenState extends State<TasksScreen>
   bool _officialHeaderCollapsed = false;
   String? _organizationId;
   bool _canEditOfficialTasks = false;
+  bool _canFilterEmployees = false;
+  String _employeeFilter = 'all';
+  List<Map<String, dynamic>> _employees = [];
 
   static const Map<String, String> _statusLabels = {
     'pending': 'جديدة',
@@ -121,7 +124,7 @@ class _TasksScreenState extends State<TasksScreen>
         final page = await client
             .from('tasks')
             .select(
-              'id,organization_id,title,description,due_at,priority,status,report_required,report_form_snapshot_id,assigned_at,received_at,opened_at,created_at,updated_at',
+              'id,organization_id,title,description,due_at,priority,status,report_required,report_form_snapshot_id,assigned_to,assigned_at,received_at,opened_at,created_at,updated_at',
             )
             .isFilter('deleted_at', null)
             .order('due_at')
@@ -186,15 +189,39 @@ class _TasksScreenState extends State<TasksScreen>
                 .map((role) => '${role['code'] ?? ''}')
                 .toSet()
           : <String>{};
+      final permissions = profile['permissions'] is List
+          ? (profile['permissions'] as List).map((value) => '$value').toSet()
+          : <String>{};
       final organization = (profile['institutionId'] ??
               profile['institution_id'] ??
               profile['organization_id'])
           ?.toString();
+      var employees = <Map<String, dynamic>>[];
+      final canFilter = permissions.contains('tasks.manage') ||
+          permissions.contains('tasks.review') ||
+          permissions.contains('reports.read_all');
+      if (canFilter && organization != null && organization.isNotEmpty) {
+        try {
+          final rows = await Supabase.instance.client
+              .from('organization_memberships')
+              .select('id,user_id,display_name,employee_no')
+              .eq('organization_id', organization)
+              .eq('is_active', true)
+              .order('display_name');
+          employees = rows
+              .whereType<Map>()
+              .map((row) => Map<String, dynamic>.from(row))
+              .where((row) => '${row['user_id'] ?? ''}'.isNotEmpty)
+              .toList();
+        } catch (_) {}
+      }
       if (!mounted) return;
       setState(() {
         _organizationId = organization;
         _canEditOfficialTasks =
             roles.contains('owner') || roles.contains('admin_followup');
+        _canFilterEmployees = canFilter;
+        _employees = employees;
       });
     } catch (_) {
       // Keep the edit affordance hidden; Supabase remains the final authority.
@@ -255,7 +282,9 @@ class _TasksScreenState extends State<TasksScreen>
       final priority = '${task['priority'] ?? 'normal'}';
       return (query.isEmpty || text.contains(query)) &&
           _matchesStatus(task, now) &&
-          (_priorityFilter == 'all' || priority == _priorityFilter);
+          (_priorityFilter == 'all' || priority == _priorityFilter) &&
+          (_employeeFilter == 'all' ||
+              '${task['assigned_to'] ?? ''}' == _employeeFilter);
     }).toList();
   }
 
@@ -265,6 +294,7 @@ class _TasksScreenState extends State<TasksScreen>
       _searchController.clear();
       _statusFilter = 'all';
       _priorityFilter = 'all';
+      _employeeFilter = 'all';
     });
   }
 
@@ -390,6 +420,39 @@ class _TasksScreenState extends State<TasksScreen>
                       ),
                       onChanged: (value) => setState(() => _search = value),
                     ),
+                    if (_canFilterEmployees && _employees.isNotEmpty) ...[
+                      const SizedBox(height: 8),
+                      DropdownButtonFormField<String>(
+                        value: _employeeFilter,
+                        isExpanded: true,
+                        decoration: const InputDecoration(
+                          labelText: 'عرض حسب الموظف',
+                          prefixIcon: Icon(Icons.person_outline),
+                          border: OutlineInputBorder(),
+                          isDense: true,
+                        ),
+                        items: [
+                          const DropdownMenuItem(
+                            value: 'all',
+                            child: Text('كل الموظفين'),
+                          ),
+                          ..._employees.map(
+                            (employee) => DropdownMenuItem<String>(
+                              value: '${employee['user_id']}',
+                              child: Text(
+                                '${employee['display_name'] ?? 'موظف'}'
+                                '${employee['employee_no'] == null ? '' : ' · ${employee['employee_no']}' }',
+                                overflow: TextOverflow.ellipsis,
+                                textDirection: TextDirection.rtl,
+                              ),
+                            ),
+                          ),
+                        ],
+                        onChanged: (value) => setState(
+                          () => _employeeFilter = value ?? 'all',
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 8),
                     Row(
                       textDirection: TextDirection.rtl,

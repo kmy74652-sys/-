@@ -35,6 +35,8 @@ class _ReportsScreenState extends State<ReportsScreen> {
   bool _canReviewRoleReports = false;
   bool _canReviewSubmissions = false;
   bool _canApproveSubmissions = false;
+  bool _canFilterEmployees = false;
+  String _employeeFilter = 'all';
   final Set<String> _saving = {};
   String _filter = 'all';
   String _stream = 'tasks';
@@ -72,6 +74,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
   void _resetFilters() {
     setState(() {
       _filter = 'all';
+      _employeeFilter = 'all';
       _search = '';
       _searchController.clear();
     });
@@ -124,6 +127,11 @@ class _ReportsScreenState extends State<ReportsScreen> {
       _canApproveSubmissions = permissions.contains(
         'report_submissions.approve',
       );
+      _canFilterEmployees = permissions.contains('tasks.manage') ||
+          permissions.contains('tasks.review') ||
+          permissions.contains('reports.read_all') ||
+          permissions.contains('report_submissions.review') ||
+          permissions.contains('report_submissions.approve');
       if (!_canRead) {
         _rows = [];
         _submissionRows = [];
@@ -181,7 +189,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
           final submissions = await _client
               .from('report_submissions')
               .select(
-                'id,form_id,employee_name,branch_name,report_date,answers,status,review_note,reviewed_by_name,approved_by_name,created_at,submitted_at,form:report_form_templates(title)',
+                'id,form_id,employee_id,employee_name,branch_name,report_date,answers,status,review_note,reviewed_by_name,approved_by_name,created_at,submitted_at,form:report_form_templates(title)',
               )
               .order('report_date', ascending: false)
               .limit(200);
@@ -784,6 +792,20 @@ class _ReportsScreenState extends State<ReportsScreen> {
     return _submissionFieldLabels[formId]?[key.toString()] ?? key.toString();
   }
 
+  bool _matchesEmployee(Map<String, dynamic> row) {
+    if (!_canFilterEmployees || _employeeFilter == 'all') return true;
+    final selectedName = _employeeNames[_employeeFilter];
+    final ids = <String?>[
+      row['employee_user_id']?.toString(),
+      row['submitted_by']?.toString(),
+      row['employee_id']?.toString(),
+      _tasksById[row['task_id']?.toString()]?['assigned_to']?.toString(),
+    ];
+    return ids.contains(_employeeFilter) ||
+        (selectedName != null &&
+            row['employee_name']?.toString() == selectedName);
+  }
+
   @override
   Widget build(BuildContext context) => AppShell(
     title: 'تقارير الموظفين',
@@ -806,14 +828,17 @@ class _ReportsScreenState extends State<ReportsScreen> {
   Widget _buildReportList() {
     final rows = _rows
         .where((row) => _filter == 'all' || row['status'] == _filter)
+        .where(_matchesEmployee)
         .where(_matchesSearch)
         .toList();
     final submissions = _submissionRows
         .where((row) => _filter == 'all' || row['status'] == _filter)
+        .where(_matchesEmployee)
         .where(_matchesSearch)
         .toList();
     final roleReports = _roleReportRows
         .where((row) => _filter == 'all' || row['status'] == _filter)
+        .where(_matchesEmployee)
         .where(_matchesSearch)
         .toList();
     final exportRows = _stream == 'tasks'
@@ -950,7 +975,9 @@ class _ReportsScreenState extends State<ReportsScreen> {
                 children: [
                   Expanded(
                     child: Text(
-                      _filter == 'all' ? 'الفلاتر' : 'الفلاتر · نشط: 1',
+                      (_filter == 'all' && _employeeFilter == 'all')
+                          ? 'الفلاتر'
+                          : 'الفلاتر · نشط: ${(_filter == 'all' ? 0 : 1) + (_employeeFilter == 'all' ? 0 : 1)}',
                       textAlign: TextAlign.right,
                       style: const TextStyle(fontWeight: FontWeight.w800),
                     ),
@@ -972,34 +999,71 @@ class _ReportsScreenState extends State<ReportsScreen> {
                     ? const SizedBox.shrink()
                     : Padding(
                         padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
-                        child: Wrap(
-                          alignment: WrapAlignment.end,
-                          spacing: 6,
-                          children:
-                              (_stream == 'tasks'
-                                      ? <(String, String)>[
-                                          ('all', 'الكل'),
-                                          ('submitted', 'بانتظار المراجعة'),
-                                          ('approved', 'معتمدة'),
-                                          ('returned', 'معادة'),
-                                          ('rejected', 'مرفوضة'),
-                                        ]
-                                      : <(String, String)>[
-                                          ('all', 'الكل'),
-                                          ('submitted', 'بانتظار المراجعة'),
-                                          if (_stream == 'submissions')
-                                            ('reviewed', 'بانتظار الاعتماد'),
-                                          ('approved', 'معتمدة'),
-                                          ('returned', 'معادة'),
-                                        ])
-                                  .map(
-                                    (item) => ChoiceChip(
-                                      label: Text(item.$2),
-                                      selected: _filter == item.$1,
-                                      onSelected: (_) => setState(() => _filter = item.$1),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            if (_canFilterEmployees && _employeeNames.isNotEmpty) ...[
+                              DropdownButtonFormField<String>(
+                                value: _employeeFilter,
+                                isExpanded: true,
+                                decoration: const InputDecoration(
+                                  labelText: 'عرض التقارير حسب الموظف',
+                                  prefixIcon: Icon(Icons.person_outline),
+                                  border: OutlineInputBorder(),
+                                  isDense: true,
+                                ),
+                                items: [
+                                  const DropdownMenuItem(
+                                    value: 'all',
+                                    child: Text('كل الموظفين'),
+                                  ),
+                                  ..._employeeNames.entries.map(
+                                    (entry) => DropdownMenuItem<String>(
+                                      value: entry.key,
+                                      child: Text(
+                                        entry.value,
+                                        overflow: TextOverflow.ellipsis,
+                                        textDirection: TextDirection.rtl,
+                                      ),
                                     ),
-                                  )
-                                  .toList(),
+                                  ),
+                                ],
+                                onChanged: (value) => setState(
+                                  () => _employeeFilter = value ?? 'all',
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                            ],
+                            Wrap(
+                              alignment: WrapAlignment.end,
+                              spacing: 6,
+                              children:
+                                  (_stream == 'tasks'
+                                          ? <(String, String)>[
+                                              ('all', 'الكل'),
+                                              ('submitted', 'بانتظار المراجعة'),
+                                              ('approved', 'معتمدة'),
+                                              ('returned', 'معادة'),
+                                              ('rejected', 'مرفوضة'),
+                                            ]
+                                          : <(String, String)>[
+                                              ('all', 'الكل'),
+                                              ('submitted', 'بانتظار المراجعة'),
+                                              if (_stream == 'submissions')
+                                                ('reviewed', 'بانتظار الاعتماد'),
+                                              ('approved', 'معتمدة'),
+                                              ('returned', 'معادة'),
+                                            ])
+                                      .map(
+                                        (item) => ChoiceChip(
+                                          label: Text(item.$2),
+                                          selected: _filter == item.$1,
+                                          onSelected: (_) => setState(() => _filter = item.$1),
+                                        ),
+                                      )
+                                      .toList(),
+                            ),
+                          ],
                         ),
                       ),
               ),
