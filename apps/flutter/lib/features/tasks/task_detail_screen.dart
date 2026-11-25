@@ -1879,6 +1879,19 @@ class _SignatureCaptureState extends State<SignatureCapture> {
     paths = [...widget.strokes];
   }
 
+  @override
+  void didUpdateWidget(covariant SignatureCapture oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final changed = oldWidget.strokes.length != widget.strokes.length ||
+        oldWidget.strokes.asMap().entries.any(
+          (entry) => entry.value != widget.strokes[entry.key],
+        );
+    if (changed) {
+      paths = [...widget.strokes];
+      active = [];
+    }
+  }
+
   String _encode(List<Offset> p) => p.isEmpty
       ? ''
       : 'M ${p.first.dx.toStringAsFixed(1)} ${p.first.dy.toStringAsFixed(1)}' +
