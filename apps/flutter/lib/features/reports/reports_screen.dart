@@ -863,16 +863,9 @@ class _ReportsScreenState extends State<ReportsScreen> {
             fontWeight: FontWeight.bold,
           ),
         ),
-        const Padding(
-          padding: EdgeInsets.symmetric(vertical: 6),
-          child: Text(
-            'تظهر هنا تقارير المهام المرتبطة بالجدول الموحد أو المهام الإدارية. يرفع الموظف التقرير من داخل المهمة، وتتم المراجعة والاعتماد من نفس المسار.',
-            textAlign: TextAlign.right,
-          ),
-        ),
         Card(
           child: Padding(
-            padding: const EdgeInsets.all(8),
+            padding: const EdgeInsets.all(6),
             child: Wrap(
               alignment: WrapAlignment.end,
               spacing: 6,
@@ -881,16 +874,25 @@ class _ReportsScreenState extends State<ReportsScreen> {
                 ChoiceChip(
                   label: const Text('تقارير المهام'),
                   selected: _stream == 'tasks',
+                  visualDensity: VisualDensity.compact,
+                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  labelPadding: const EdgeInsets.symmetric(horizontal: 4),
                   onSelected: (_) => setState(() => _stream = 'tasks'),
                 ),
                 ChoiceChip(
                   label: const Text('التقارير المستقلة'),
                   selected: _stream == 'submissions',
+                  visualDensity: VisualDensity.compact,
+                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  labelPadding: const EdgeInsets.symmetric(horizontal: 4),
                   onSelected: (_) => setState(() => _stream = 'submissions'),
                 ),
                 ChoiceChip(
                   label: const Text('تقارير الأدوار اليومية'),
                   selected: _stream == 'role_reports',
+                  visualDensity: VisualDensity.compact,
+                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  labelPadding: const EdgeInsets.symmetric(horizontal: 4),
                   onSelected: (_) => setState(() => _stream = 'role_reports'),
                 ),
               ],
@@ -908,13 +910,6 @@ class _ReportsScreenState extends State<ReportsScreen> {
               fontWeight: FontWeight.bold,
             ),
           ),
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 6),
-            child: Text(
-              'تُستخدم صلاحيات tasks.review / tasks.manage للمراجعة؛ وتتحقق قاعدة البيانات من صلاحية المستخدم وحالة التقرير عند الحفظ.',
-              textAlign: TextAlign.right,
-            ),
-          ),
         ] else if (_stream == 'submissions') ...[
           const Text(
             'التقارير المستقلة',
@@ -925,13 +920,6 @@ class _ReportsScreenState extends State<ReportsScreen> {
               fontWeight: FontWeight.bold,
             ),
           ),
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 6),
-            child: Text(
-              'محمد يراجع التقرير أولاً، ثم عبدالرحمن يعتمد التقرير نهائياً. تُطبّق تحديثات الحالة عبر صلاحيات قاعدة البيانات.',
-              textAlign: TextAlign.right,
-            ),
-          ),
         ] else ...[
           const Text(
             'تقارير الأدوار اليومية المستقلة',
@@ -940,13 +928,6 @@ class _ReportsScreenState extends State<ReportsScreen> {
               color: AppColors.navy,
               fontSize: 18,
               fontWeight: FontWeight.bold,
-            ),
-          ),
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 6),
-            child: Text(
-              'هذه التقارير مستقلة عن المهام ومصمم التقارير. تتطلب المراجعة tasks.review أو reports.read_all وتتحقق قاعدة البيانات من الصلاحية.',
-              textAlign: TextAlign.right,
             ),
           ),
         ],
