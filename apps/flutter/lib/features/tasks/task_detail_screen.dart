@@ -324,12 +324,15 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
             ),
           );
       }
-    } catch (_) {
+    } catch (error) {
       if (mounted)
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
+          SnackBar(
             content: Text(
-              'تعذر تحديث المهمة. تحقق من حالة المهمة أو صلاحيات الحساب.',
+              _operationError(
+                error,
+                'تعذر تحديث المهمة. تحقق من حالة المهمة أو صلاحيات الحساب.',
+              ),
             ),
           ),
         );
@@ -399,12 +402,15 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
             ),
           );
       }
-    } catch (_) {
+    } catch (error) {
       if (mounted)
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
+          SnackBar(
             content: Text(
-              'تعذر إرسال التقرير. راجع الحقول المطلوبة أو تحقق من الاتصال.',
+              _operationError(
+                error,
+                'تعذر إرسال التقرير. ابدأ تنفيذ المهمة أولاً ثم راجع الحقول المطلوبة أو الاتصال.',
+              ),
             ),
           ),
         );
@@ -474,6 +480,34 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
           '${local.day.toString().padLeft(2, '0')}';
     }
     return parsed.toUtc().toIso8601String();
+  }
+
+  String _automaticDateLabel(String value, String type) {
+    final parsed = _parseFlexibleDate(value);
+    if (parsed == null) return value;
+    final local = parsed.toLocal();
+    String two(int number) => number.toString().padLeft(2, '0');
+    final date = '${two(local.day)}/${two(local.month)}/${local.year}';
+    return type == 'date' ? date : '$date · ${two(local.hour)}:${two(local.minute)}';
+  }
+
+  String _operationError(Object error, String fallback) {
+    final message = error is PostgrestException
+        ? error.message
+        : error.toString().replaceFirst('Exception: ', '').trim();
+    if (message.contains('permission_denied')) {
+      return 'لا تملك صلاحية تنفيذ هذا الإجراء على المهمة.';
+    }
+    if (message.contains('task_not_found')) {
+      return 'المهمة غير موجودة أو لم تعد مسندة إلى حسابك.';
+    }
+    if (message.contains('invalid_progress_status')) {
+      return 'لا يمكن تغيير الحالة من المرحلة الحالية. حدّث الشاشة وحاول مرة أخرى.';
+    }
+    if (message.contains('task_report_required')) {
+      return 'أكمل التقرير المطلوب وأرسله قبل إنهاء المهمة.';
+    }
+    return message.isEmpty ? fallback : '$fallback\n$message';
   }
 
   Object? _snapshotValue(Map<String, dynamic> field, String snapshotId) {
@@ -964,12 +998,15 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
             ),
           );
       }
-    } catch (_) {
+    } catch (error) {
       if (mounted)
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
+          SnackBar(
             content: Text(
-              'تعذر إرسال النموذج. راجع الحقول المطلوبة أو الاتصال.',
+              _operationError(
+                error,
+                'تعذر إرسال النموذج. ابدأ تنفيذ المهمة أولاً ثم راجع الحقول المطلوبة أو الاتصال.',
+              ),
             ),
           ),
         );
@@ -1086,6 +1123,12 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
         '${field['label'] ?? field['key'] ?? 'حقل'}${field['required'] == true ? ' *' : ''}';
     final controller =
         _formInputs[_formInputKey(snapshotId, '${field['key'] ?? ''}')];
+    if ((type == 'date' || type == 'datetime') &&
+        controller != null &&
+        controller.text.trim().isNotEmpty) {
+      final display = _automaticDateLabel(controller.text, type);
+      if (display != controller.text) controller.text = display;
+    }
     final options = field['options'] is List
         ? (field['options'] as List).map((v) => '$v').toList()
         : <String>[];
@@ -1610,6 +1653,12 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                         form['schema'] as List,
                       );
                       final status = form['status'];
+                      final canSubmitTaskReport = [
+                        'in_progress',
+                        'on_hold',
+                        'needs_revision',
+                        'returned',
+                      ].contains('${_task?['status']}');
                       final locked =
                           status == 'submitted' || status == 'approved';
                       final savedValues = Map<String, dynamic>.from(
@@ -1683,7 +1732,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                                     child: const Text('حفظ المسودة'),
                                   ),
                                   FilledButton(
-                                    onPressed: _saving
+                                    onPressed: _saving || !canSubmitTaskReport
                                         ? null
                                         : () => _submitSnapshot(
                                             snapshotId,
@@ -1692,6 +1741,15 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                                     child: const Text('إرسال النموذج'),
                                   ),
                                 ],
+                              ),
+                            if (!locked && !canSubmitTaskReport)
+                              const Padding(
+                                padding: EdgeInsets.only(top: 8),
+                                child: Text(
+                                  'ابدأ تنفيذ المهمة أولاً حتى تتمكن من إرسال التقرير للمراجعة.',
+                                  textAlign: TextAlign.right,
+                                  style: TextStyle(color: Colors.deepOrange),
+                                ),
                               ),
                           ],
                         ),
@@ -1729,9 +1787,24 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                           ),
                         ),
                       FilledButton(
-                        onPressed: _saving ? null : _submitReport,
+                        onPressed: _saving ||
+                                ![
+                                  'in_progress',
+                                  'on_hold',
+                                  'needs_revision',
+                                  'returned',
+                                ].contains('${_task?['status']}')
+                            ? null
+                            : _submitReport,
                         child: const Text('إرسال التقرير للمراجعة'),
                       ),
+                      if (!["in_progress", "on_hold", "needs_revision", "returned"]
+                          .contains('${_task?['status']}'))
+                        const Text(
+                          'ابدأ تنفيذ المهمة أولاً حتى تتمكن من إرسال التقرير للمراجعة.',
+                          textAlign: TextAlign.right,
+                          style: TextStyle(color: Colors.deepOrange),
+                        ),
                     ],
                   ),
                 ),
