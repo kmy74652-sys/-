@@ -23,6 +23,9 @@ class _IndependentReportsScreenState extends State<IndependentReportsScreen> {
   List<_ReportForm> _forms = [];
   Map<String, Map<String, dynamic>> _submissions = {};
   String? _branchId;
+  String _employeeName = 'غير محدد';
+  String _employeeNo = '';
+  String _employeeRole = 'الموظف / المحاسب';
   bool _loading = true;
   String? _error;
   String? _notice;
@@ -47,6 +50,18 @@ class _IndependentReportsScreenState extends State<IndependentReportsScreen> {
     return '${date.year.toString().padLeft(4, '0')}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
   }
 
+  String _firstText(
+    Map<String, dynamic> values,
+    List<String> keys, {
+    String fallback = '',
+  }) {
+    for (final key in keys) {
+      final value = values[key]?.toString().trim() ?? '';
+      if (value.isNotEmpty) return value;
+    }
+    return fallback;
+  }
+
   Future<void> _load() async {
     if (mounted)
       setState(() {
@@ -62,6 +77,20 @@ class _IndependentReportsScreenState extends State<IndependentReportsScreen> {
       if (employee is! Map)
         throw Exception('لا يوجد ملف موظف نشط مرتبط بالحساب.');
       final profile = Map<String, dynamic>.from(employee);
+      _employeeName = _firstText(
+        profile,
+        const ['display_name', 'full_name', 'name'],
+        fallback: 'غير محدد',
+      );
+      _employeeNo = _firstText(
+        profile,
+        const ['employee_no', 'employee_number'],
+      );
+      _employeeRole = _firstText(
+        profile,
+        const ['job_title', 'role_name', 'role'],
+        fallback: 'الموظف / المحاسب',
+      );
       _branchId = _defaultBranch(profile);
       if (_branchId == null)
         throw Exception(
@@ -382,6 +411,68 @@ class _IndependentReportsScreenState extends State<IndependentReportsScreen> {
     ),
   );
 
+  Widget _reportHeader(_ReportForm form, String status) {
+    final employeeLabel = _employeeNo.isEmpty
+        ? _employeeName
+        : '$_employeeName · $_employeeNo';
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.canvas,
+        border: Border.all(color: AppColors.navy.withOpacity(.18)),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            form.title,
+            textAlign: TextAlign.right,
+            softWrap: true,
+            style: const TextStyle(
+              color: AppColors.navy,
+              fontSize: 17,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          if (form.description.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Text(form.description, textAlign: TextAlign.right, softWrap: true),
+          ],
+          const SizedBox(height: 10),
+          Wrap(
+            alignment: WrapAlignment.end,
+            spacing: 6,
+            runSpacing: 6,
+            children: [
+              Chip(
+                avatar: const Icon(Icons.person_outline, size: 18),
+                label: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxWidth: MediaQuery.sizeOf(context).width - 96,
+                  ),
+                  child: Text(
+                    '$_employeeRole: $employeeLabel',
+                    softWrap: true,
+                  ),
+                ),
+                backgroundColor: const Color(0xFFFFF3D6),
+              ),
+              Chip(
+                avatar: const Icon(Icons.event_outlined, size: 18),
+                label: Text('التاريخ: $_today'),
+              ),
+              Chip(
+                avatar: const Icon(Icons.flag_outlined, size: 18),
+                label: Text('الحالة: ${_status(status)}'),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _formCard(_ReportForm form) {
     final current = _submissions[form.id];
     final status = current?['status']?.toString() ?? 'draft';
@@ -394,22 +485,7 @@ class _IndependentReportsScreenState extends State<IndependentReportsScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text(
-              form.title,
-              textAlign: TextAlign.right,
-              style: const TextStyle(
-                color: AppColors.navy,
-                fontSize: 17,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            if (form.description.isNotEmpty)
-              Text(form.description, textAlign: TextAlign.right),
-            Text(
-              'التاريخ: $_today · الحالة: ${_status(status)}',
-              textAlign: TextAlign.right,
-              style: const TextStyle(color: Colors.black54, fontSize: 12),
-            ),
+            _reportHeader(form, status),
             if ((current?['review_note'] ?? '').toString().trim().isNotEmpty)
               _message(
                 'ملاحظة الإدارة: ${current?['review_note']}',
@@ -418,7 +494,7 @@ class _IndependentReportsScreenState extends State<IndependentReportsScreen> {
             for (final field in form.fields) ...[
               const SizedBox(height: 10),
               Text(
-                '${field.label}${field.required ? ' *' : ''}',
+                field.label,
                 textAlign: TextAlign.right,
                 style: const TextStyle(fontWeight: FontWeight.bold),
               ),
