@@ -1001,7 +1001,7 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
                                 child: Text(
                                   _s(employee['display_name'], _s(employee['employee_no'], 'موظف')),
                                   overflow: TextOverflow.ellipsis,
-                                  textDirection: TextDirection.rtl,
+                                  textDirection: Directionality.of(context),
                                 ),
                               ),
                             ),
