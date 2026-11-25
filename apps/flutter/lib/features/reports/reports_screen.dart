@@ -1,9 +1,10 @@
 import 'dart:convert';
-import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/theme.dart';
@@ -406,88 +407,136 @@ class _ReportsScreenState extends State<ReportsScreen> {
     );
   }
 
-  String _csvCell(Object? value) {
-    var text = value is Map || value is List
-        ? jsonEncode(value)
-        : (value?.toString() ?? '');
-    text = text.replaceAll('"', '""');
-    return '"$text"';
+  String _readableExportText(List<Map<String, dynamic>> rows) {
+    final buffer = StringBuffer('تقارير الموظفين\n\n');
+    for (var index = 0; index < rows.length; index++) {
+      final row = rows[index];
+      buffer
+        ..writeln('تقرير ${index + 1}')
+        ..writeln('العنوان: ${_label(row)}')
+        ..writeln('الموظف: ${_employeeForTask(row)}')
+        ..writeln('التاريخ: ${_formattedDate(row['submitted_at'] ?? row['report_date'])}')
+        ..writeln('الحالة: ${_statusLabel(row['status']?.toString() ?? '')}');
+      final values = row['values'] ?? row['answers'];
+      if (values is Map) {
+        for (final entry in values.entries) {
+          buffer.writeln('${entry.key}: ${_displayValue(entry.value)}');
+        }
+      }
+      buffer.writeln();
+    }
+    return buffer.toString();
   }
 
-  String _csvFor(List<Map<String, dynamic>> rows) {
-    final columns = switch (_stream) {
-      'role_reports' => <String>[
-        'report_title',
-        'role_code',
-        'branch_id',
-        'employee_user_id',
-        'report_date',
-        'status',
-        'submitted_at',
-        'review_note',
-        'values',
-      ],
-      'submissions' => <String>[
-        'employee_name',
-        'branch_name',
-        'report_date',
-        'status',
-        'review_note',
-        'answers',
-      ],
-      _ => <String>[
-        'id',
-        'task_id',
-        'report_form_snapshot_id',
-        'status',
-        'submitted_at',
-        'review_note',
-        'values',
-      ],
-    };
-    return <String>[
-      columns.map(_csvCell).join(','),
-      ...rows.map(
-        (row) => columns.map((column) => _csvCell(row[column])).join(','),
-      ),
-    ].join('\n');
-  }
-
-  Future<void> _copyCsv(List<Map<String, dynamic>> rows) async {
+  Future<void> _copyReports(List<Map<String, dynamic>> rows) async {
     if (rows.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('لا توجد تقارير مطابقة للتصدير.')),
       );
       return;
     }
-    await Clipboard.setData(ClipboardData(text: _csvFor(rows)));
+    await Clipboard.setData(
+      ClipboardData(text: _readableExportText(rows)),
+    );
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('تم نسخ ${rows.length} تقرير إلى الحافظة بصيغة CSV.'),
+          content: Text('تم نسخ ${rows.length} تقرير إلى الحافظة بصيغة مقروءة.'),
         ),
       );
     }
   }
 
-  Future<void> _saveCsv(List<Map<String, dynamic>> rows) async {
+  Future<void> _savePdf(List<Map<String, dynamic>> rows) async {
     if (rows.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('لا توجد تقارير مطابقة للتصدير.')),
       );
       return;
     }
-    final bytes = Uint8List.fromList(utf8.encode('\uFEFF${_csvFor(rows)}'));
+    final regularFont = pw.Font.ttf(
+      (await rootBundle.load('assets/fonts/NotoSansArabic-Regular.ttf')),
+    );
+    final boldFont = pw.Font.ttf(
+      (await rootBundle.load('assets/fonts/NotoSansArabic-Bold.ttf')),
+    );
+    final document = pw.Document(
+      theme: pw.ThemeData.withFont(base: regularFont, bold: boldFont),
+    );
+    document.addPage(
+      pw.MultiPage(
+        margin: const pw.EdgeInsets.all(28),
+        build: (context) => [
+          pw.Directionality(
+            textDirection: pw.TextDirection.rtl,
+            child: pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+              children: [
+                pw.Text(
+                  'تقارير الموظفين',
+                  textAlign: pw.TextAlign.right,
+                  style: pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold),
+                ),
+                pw.SizedBox(height: 6),
+                pw.Text(
+                  'تاريخ التصدير: ${_formattedDate(DateTime.now().toIso8601String())}',
+                  textAlign: pw.TextAlign.right,
+                ),
+                pw.SizedBox(height: 14),
+                for (var index = 0; index < rows.length; index++)
+                  pw.Container(
+                    margin: const pw.EdgeInsets.only(bottom: 12),
+                    padding: const pw.EdgeInsets.all(10),
+                    decoration: pw.BoxDecoration(
+                      border: pw.Border.all(color: PdfColors.grey400),
+                      borderRadius: pw.BorderRadius.circular(6),
+                    ),
+                    child: pw.Column(
+                      crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+                      children: [
+                        pw.Text(
+                          '${index + 1}. ${_label(rows[index])}',
+                          textAlign: pw.TextAlign.right,
+                          style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+                        ),
+                        pw.Text(
+                          'الموظف: ${_employeeForTask(rows[index])}',
+                          textAlign: pw.TextAlign.right,
+                        ),
+                        pw.Text(
+                          'التاريخ: ${_formattedDate(rows[index]['submitted_at'] ?? rows[index]['report_date'])}',
+                          textAlign: pw.TextAlign.right,
+                        ),
+                        pw.Text(
+                          'الحالة: ${_statusLabel(rows[index]['status']?.toString() ?? '')}',
+                          textAlign: pw.TextAlign.right,
+                        ),
+                        if ((rows[index]['values'] ?? rows[index]['answers']) is Map)
+                          for (final entry in ((rows[index]['values'] ?? rows[index]['answers']) as Map).entries)
+                            pw.Text(
+                              '${entry.key}: ${_displayValue(entry.value)}',
+                              textAlign: pw.TextAlign.right,
+                            ),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+    final bytes = await document.save();
     final path = await FilePicker.saveFile(
-      dialogTitle: 'حفظ تقارير NEXORA بصيغة CSV',
-      fileName: 'nexora-reports-${DateTime.now().millisecondsSinceEpoch}.csv',
+      dialogTitle: 'حفظ تقارير NEXORA بصيغة PDF',
+      fileName: 'nexora-reports-${DateTime.now().millisecondsSinceEpoch}.pdf',
       type: FileType.custom,
-      allowedExtensions: ['csv'],
+      allowedExtensions: ['pdf'],
       bytes: bytes,
     );
     if (mounted && path != null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('تم حفظ ${rows.length} تقرير في ملف CSV.')),
+        SnackBar(content: Text('تم حفظ ${rows.length} تقرير في ملف PDF.')),
       );
     }
   }
@@ -1118,14 +1167,14 @@ class _ReportsScreenState extends State<ReportsScreen> {
             spacing: 8,
             children: [
               TextButton.icon(
-                onPressed: () => _saveCsv(exportRows),
+                onPressed: () => _savePdf(exportRows),
                 icon: const Icon(Icons.download_outlined),
-                label: const Text('حفظ CSV كملف'),
+                label: const Text('حفظ PDF كملف'),
               ),
               TextButton.icon(
-                onPressed: () => _copyCsv(exportRows),
+                onPressed: () => _copyReports(exportRows),
                 icon: const Icon(Icons.content_copy_outlined),
-                label: const Text('نسخ CSV إلى الحافظة'),
+                label: const Text('نسخ التقارير'),
               ),
             ],
           ),
