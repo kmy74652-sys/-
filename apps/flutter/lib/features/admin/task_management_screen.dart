@@ -21,6 +21,7 @@ class TaskManagementScreen extends StatefulWidget {
 class _TaskManagementScreenState extends State<TaskManagementScreen> {
   final _db = Supabase.instance.client;
   bool _loading = true, _busy = false;
+  bool _canReviewActions = false;
   String? _error;
   String? _orgId;
   List<Map<String, dynamic>> _tasks = [],
@@ -255,6 +256,11 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
           );
       _canManageActions = permissions is List &&
           permissions.map((e) => e.toString()).contains('tasks.manage');
+      _canReviewActions = permissions is List &&
+          permissions.map((e) => e.toString()).any(
+                (permission) =>
+                    permission == 'tasks.review' || permission == 'tasks.manage',
+              );
       if (!allowed) {
         if (mounted) {
           setState(() {
@@ -313,7 +319,7 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
           ? <Map<String, dynamic>>[]
           : _rows(await _db
                 .from('task_reports')
-                .select('task_id,status,submitted_at,review_note,updated_at')
+                .select('id,task_id,report_form_snapshot_id,status,submitted_at,review_note,updated_at')
                 .inFilter('task_id', taskIds)
                 .order('updated_at', ascending: false)
                 .limit(500));
@@ -865,6 +871,101 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
     }
   }
 
+  Future<void> _reviewTaskReport(
+    Map<String, dynamic> task,
+    String decision,
+  ) async {
+    if (!_canReviewActions || _busy) return;
+    final taskId = _s(task['id']);
+    final report = _reportByTask[taskId];
+    final reportId = _s(report?['id']);
+    if (taskId.isEmpty || (decision != 'returned' && reportId.isEmpty)) {
+      _message('لا يوجد تقرير صالح للمراجعة لهذه المهمة.');
+      return;
+    }
+    final isReturn = decision == 'returned';
+    final noteController = TextEditingController(
+      text: _s(report?['review_note']),
+    );
+    final note = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(isReturn ? 'إعادة التقرير للموظف' : 'اعتماد التقرير'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              isReturn
+                  ? 'اكتب سبب الإعادة ليتمكن الموظف من تعديل التقرير وإرساله مرة أخرى.'
+                  : 'يمكنك إضافة ملاحظة للمراجعة (اختياري).',
+              textAlign: TextAlign.right,
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: noteController,
+              autofocus: true,
+              maxLines: 4,
+              textAlign: TextAlign.right,
+              decoration: const InputDecoration(
+                border: OutlineInputBorder(),
+                hintText: 'ملاحظة المراجعة',
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('إلغاء'),
+          ),
+          FilledButton(
+            onPressed: () {
+              final value = noteController.text.trim();
+              if (isReturn && value.isEmpty) return;
+              Navigator.pop(dialogContext, value);
+            },
+            child: Text(isReturn ? 'تأكيد الإعادة' : 'تأكيد الاعتماد'),
+          ),
+        ],
+      ),
+    );
+    noteController.dispose();
+    if (note == null || !mounted) return;
+    if (isReturn && note.trim().isEmpty) {
+      _message('اكتب سبب إعادة التقرير.');
+      return;
+    }
+    setState(() => _busy = true);
+    try {
+      final snapshotId = _s(report?['report_form_snapshot_id']);
+      if (snapshotId.isNotEmpty && reportId.isNotEmpty) {
+        await _db.rpc(
+          'mobile_review_task_form_report',
+          params: {
+            'p_report_id': reportId,
+            'p_decision': decision,
+            'p_note': note.trim().isEmpty ? null : note.trim(),
+          },
+        );
+      } else {
+        await _db.rpc(
+          'mobile_review_task',
+          params: {
+            'p_task_id': taskId,
+            'p_decision': decision,
+            'p_note': note.trim().isEmpty ? null : note.trim(),
+          },
+        );
+      }
+      _message(isReturn ? 'تمت إعادة التقرير للموظف.' : 'تم اعتماد التقرير.');
+      await _load();
+    } catch (e) {
+      _message('تعذر تنفيذ المراجعة: ${e.toString().replaceFirst('Exception: ', '')}');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   void _message(String text) {
     if (mounted)
       ScaffoldMessenger.of(
@@ -1097,6 +1198,40 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
                                           fontWeight: FontWeight.w700,
                                         ),
                                       ),
+                                      if (_s(_reportByTask[taskId]?['review_note'])
+                                          .trim()
+                                          .isNotEmpty)
+                                        Text(
+                                          'ملاحظة الإدارة: ${_s(_reportByTask[taskId]?['review_note'])}',
+                                          textAlign: TextAlign.right,
+                                          style: const TextStyle(color: Colors.deepOrange),
+                                        ),
+                                      if (_canReviewActions &&
+                                          _reportStatus(t) == 'مرسل للمراجعة')
+                                        Padding(
+                                          padding: const EdgeInsets.only(top: 8),
+                                          child: Wrap(
+                                            alignment: WrapAlignment.end,
+                                            spacing: 8,
+                                            runSpacing: 8,
+                                            children: [
+                                              FilledButton.icon(
+                                                onPressed: _busy
+                                                    ? null
+                                                    : () => _reviewTaskReport(t, 'approved'),
+                                                icon: const Icon(Icons.verified_outlined, size: 18),
+                                                label: const Text('اعتماد التقرير'),
+                                              ),
+                                              OutlinedButton.icon(
+                                                onPressed: _busy
+                                                    ? null
+                                                    : () => _reviewTaskReport(t, 'returned'),
+                                                icon: const Icon(Icons.undo_outlined, size: 18),
+                                                label: const Text('إعادة للموظف'),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
                                       if (expanded && widget.unifiedOnly)
                                         Text(
                                           t['report_form_snapshot_id'] != null
