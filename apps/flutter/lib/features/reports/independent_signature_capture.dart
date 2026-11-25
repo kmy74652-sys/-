@@ -56,7 +56,7 @@ class _IndependentSignatureCaptureState
     ),
     child: GestureDetector(
       behavior: HitTestBehavior.opaque,
-      onPanStart: widget.enabled
+      onPanDown: widget.enabled
           ? (details) => setState(() => _active = [details.localPosition])
           : null,
       onPanUpdate: widget.enabled
@@ -79,6 +79,9 @@ class _IndependentSignatureCaptureState
                 setState(() => _active = []);
               }
             }
+          : null,
+      onPanCancel: widget.enabled
+          ? () => setState(() => _active = [])
           : null,
       child: CustomPaint(
         painter: _IndependentSignaturePainter([

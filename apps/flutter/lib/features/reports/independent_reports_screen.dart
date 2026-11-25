@@ -316,6 +316,17 @@ class _IndependentReportsScreenState extends State<IndependentReportsScreen> {
         return 'أدخل الاختيارات المتعددة للحقل «${field.label}» بصيغة صحيحة.';
       }
     }
+    if (field.type == 'signature') {
+      try {
+        final decoded = jsonDecode(raw);
+        final strokes = decoded is Map ? decoded['strokes'] : null;
+        if (strokes is! List || strokes.isEmpty) {
+          return 'وقّع داخل مربع التوقيع للحقل ${field.label}.';
+        }
+      } catch (_) {
+        return 'أدخل توقيعًا صالحًا في الحقل ${field.label}.';
+      }
+    }
     if ((field.type == 'date' || field.type == 'datetime') &&
         DateTime.tryParse(raw) == null) {
       return 'استخدم تاريخًا صحيحًا في الحقل ${field.label}.';
