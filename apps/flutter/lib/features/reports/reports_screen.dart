@@ -360,7 +360,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
     'submitted' => 'بانتظار المراجعة',
     'reviewed' => 'بانتظار الاعتماد',
     'approved' => 'معتمد نهائياً',
-    'rejected' => 'مرفوض — يحتاج استكمالًا',
+    'rejected' => 'مرفوضة',
     'returned' => 'معاد للموظف',
     'draft' => 'مسودة',
     _ => 'حالة التقرير: $status',

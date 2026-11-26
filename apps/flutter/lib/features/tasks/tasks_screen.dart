@@ -49,7 +49,7 @@ class _TasksScreenState extends State<TasksScreen>
     'in_progress': 'قيد التنفيذ',
     'submitted': 'بانتظار المراجعة',
     'approved': 'معتمدة / مكتملة',
-    'rejected': 'تحتاج استكمالًا / معادة',
+    'rejected': 'مرفوضة',
     'late': 'متأخرة',
   };
   static const Map<String, String> _priorityLabels = {

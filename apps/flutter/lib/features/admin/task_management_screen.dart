@@ -397,7 +397,7 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
         'report_submitted': 'بانتظار المراجعة',
         'approved': 'معتمدة',
         'completed_approved': 'معتمدة',
-        'rejected': 'معادة',
+        'rejected': 'مرفوضة',
         'needs_revision': 'تحتاج تصحيحًا',
         'cancelled': 'ملغاة',
         'late': 'متأخرة',
