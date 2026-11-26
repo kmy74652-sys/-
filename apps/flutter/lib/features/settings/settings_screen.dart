@@ -23,6 +23,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _activityAllowed = false;
   bool _brandBusy = false;
   bool _identityExpanded = true;
+  bool _createEmployeeExpanded = true;
   String? _error;
   String _organizationId = '';
   String? _logoUrl;
@@ -771,32 +772,46 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          const Text(
-                            'إنشاء حساب موظف',
-                            textAlign: TextAlign.right,
-                            style: TextStyle(fontWeight: FontWeight.bold),
+                          Row(
+                            textDirection: TextDirection.rtl,
+                            children: [
+                              const Expanded(
+                                child: Text(
+                                  'إنشاء حساب موظف',
+                                  textAlign: TextAlign.right,
+                                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17),
+                                ),
+                              ),
+                              IconButton(
+                                tooltip: _createEmployeeExpanded ? 'إخفاء النموذج' : 'إظهار النموذج',
+                                onPressed: () => setState(() => _createEmployeeExpanded = !_createEmployeeExpanded),
+                                icon: Icon(_createEmployeeExpanded ? Icons.visibility_outlined : Icons.visibility_off_outlined),
+                              ),
+                            ],
                           ),
-                          TextField(
+                          if (_createEmployeeExpanded) ...[
+                            const Divider(height: 20),
+                            TextField(
                             controller: _name,
                             decoration: const InputDecoration(
                               labelText: 'الاسم',
                             ),
-                          ),
-                          TextField(
+                            ),
+                            TextField(
                             controller: _number,
                             keyboardType: TextInputType.number,
                             decoration: const InputDecoration(
                               labelText: 'الرقم الوظيفي',
                             ),
-                          ),
-                          TextField(
+                            ),
+                            TextField(
                             controller: _code,
                             obscureText: true,
                             decoration: const InputDecoration(
-                              labelText: 'رمز الدخول الأولي (3–30 محرفًا)',
+                              labelText: 'رمز الدخول',
                             ),
-                          ),
-                          DropdownButtonFormField<String>(
+                            ),
+                            DropdownButtonFormField<String>(
                             value: _role,
                             decoration: const InputDecoration(
                               labelText: 'الدور',
@@ -821,8 +836,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             ],
                             onChanged: (v) =>
                                 setState(() => _role = v ?? _role),
-                          ),
-                          DropdownButtonFormField<String>(
+                            ),
+                            DropdownButtonFormField<String>(
                             value: _branches.any((b) => b['id'] == _branchId)
                                 ? _branchId
                                 : null,
@@ -836,14 +851,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                     child: Text('${b['name']}'),
                                   ),
                                 )
-                                .toList(),
+                            .toList(),
                             onChanged: (v) =>
                                 setState(() => _branchId = v ?? ''),
-                          ),
-                          FilledButton(
+                            ),
+                            FilledButton(
                             onPressed: _create,
                             child: const Text('إنشاء الحساب'),
-                          ),
+                            ),
+                          ],
                         ],
                       ),
                     ),
