@@ -33,7 +33,7 @@ class AppCustomizer extends ChangeNotifier {
 
   static const defaults = <String, String>{
     'appName': 'NEXORA', 'organizationName': 'مؤسسة الشاعري للتجارة العامة', 'tagline': 'Smart Business Management',
-    'home': 'الرئيسية', 'tasks': 'المهام', 'employees': 'الموظفون', 'workSection': 'العمل والمتابعة', 'unifiedTable': 'الجدول الموحد لإنشاء المهام', 'taskManagement': 'إدارة المهام', 'reports': 'التقارير', 'dailyReports': 'التقارير اليومية المصممة', 'employeeReports': 'تقارير الموظف', 'adminSections': 'أقسام الإدارة', 'totalTasks': 'إجمالي المهام', 'inProgress': 'قيد التنفيذ', 'submitted': 'بانتظار المراجعة', 'lateTasks': 'مهام متأخرة',
+    'home': 'الرئيسية', 'tasks': 'المهام', 'employees': 'الموظفون', 'activity': 'سجل النشاط', 'report-designer': 'مصمم التقارير', 'customizer': 'تخصيص الواجهات', 'hr': 'الموارد البشرية', 'workSection': 'العمل والمتابعة', 'unifiedTable': 'الجدول الموحد لإنشاء المهام', 'taskManagement': 'إدارة مهام الجداول الموحدة', 'reports': 'تقارير الموظفين', 'performance': 'إحصائيات ومقارنة الأداء', 'dailyReports': 'التقارير اليومية المصممة', 'employeeReports': 'تقارير الموظف', 'adminSections': 'أقسام الإدارة', 'settings': 'الإعدادات', 'totalTasks': 'إجمالي المهام', 'inProgress': 'قيد التنفيذ', 'submitted': 'بانتظار المراجعة', 'lateTasks': 'مهام متأخرة',
   };
 
   Future<void> load() => _loaded ? Future<void>.value() : (_loadFuture ??= _loadOnce());

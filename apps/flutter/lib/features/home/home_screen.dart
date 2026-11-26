@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/theme.dart';
+import '../../shared/app_customizer.dart';
 import '../../shared/app_shell.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -433,12 +434,16 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   @override
-  Widget build(BuildContext context) => AppShell(
+  Widget build(BuildContext context) => AnimatedBuilder(
+    animation: AppCustomizer.instance,
+    builder: (context, _) => AppShell(
     title: 'الرئيسية',
     subtitle: _name == null || _name!.isEmpty
         ? 'بوابة العمل والتواصل الإداري'
         : 'مرحبًا ${_name!}',
-    child: RefreshIndicator(
+    child: Container(
+      color: Color(AppCustomizer.instance.backgroundColor),
+      child: RefreshIndicator(
       onRefresh: _load,
       child: ListView(
         physics: const AlwaysScrollableScrollPhysics(),
@@ -489,15 +494,24 @@ class _HomeScreenState extends State<HomeScreen> {
             ],
             const SizedBox(height: 8),
             _settingsPanel(),
+            for (final card in AppCustomizer.instance.customCards) ...[
+              const SizedBox(height: 10),
+              _customCard(card),
+            ],
           ],
         ],
       ),
+      ),
+    ),
     ),
   );
 
   Widget _unifiedTaskTableSection() {
+    if (!AppCustomizer.instance.isVisible('unifiedTable')) {
+      return const SizedBox.shrink();
+    }
     return SectionCard(
-      title: 'الجدول الموحد لإنشاء المهام',
+      title: AppCustomizer.instance.label('unifiedTable'),
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
         onTap: _manageTasks ? () => context.push('/admin/unified-tasks') : null,
@@ -506,12 +520,12 @@ class _HomeScreenState extends State<HomeScreen> {
           child: Row(
             textDirection: TextDirection.rtl,
             children: [
-              const Icon(Icons.table_chart_outlined,
-                  color: AppColors.green, size: 30),
+              Icon(Icons.table_chart_outlined,
+                  color: Color(AppCustomizer.instance.primaryColor), size: 30),
               const SizedBox(width: 9),
-              const Expanded(
+              Expanded(
                 child: Text(
-                  'افتح الجدول الموحد لإنشاء المهام وإرسالها للموظف',
+                  'افتح ${AppCustomizer.instance.label('unifiedTable')} لإنشاء المهام وإرسالها للموظف',
                   textAlign: TextAlign.right,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
@@ -527,10 +541,13 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _settingsPanel() {
+    if (!AppCustomizer.instance.isVisible('adminSections')) {
+      return const SizedBox.shrink();
+    }
     final visible = _adminModules.where((item) => _allowed(item.key)).toList();
     if (visible.isEmpty) return const SizedBox.shrink();
     return SectionCard(
-      title: 'الإعدادات',
+      title: AppCustomizer.instance.label('settings'),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -542,8 +559,8 @@ class _HomeScreenState extends State<HomeScreen> {
               child: Row(
                 textDirection: TextDirection.rtl,
                 children: [
-                  const Icon(Icons.settings_outlined,
-                      color: AppColors.green, size: 30),
+                  Icon(Icons.settings_outlined,
+                      color: Color(AppCustomizer.instance.primaryColor), size: 30),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
@@ -580,9 +597,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _metricGrid() => LayoutBuilder(
     builder: (context, constraints) {
-      final visibleMetrics = _metrics
-          .where((item) => item.key != 'reports_pending' || _manageTasks)
-          .toList();
+      final visibleMetrics = _metrics.where(_metricVisible).toList();
       final width = constraints.maxWidth;
       if (width < 560) {
         const gap = 7.0;
@@ -619,9 +634,11 @@ class _HomeScreenState extends State<HomeScreen> {
   );
 
   Widget _metricCard(_Metric item, bool compact) => Material(
-    color: item.background,
+    color: AppCustomizer.instance.statsStyle == 'white'
+        ? Colors.white
+        : item.background,
     shape: RoundedRectangleBorder(
-      borderRadius: BorderRadius.circular(15),
+      borderRadius: BorderRadius.circular(AppCustomizer.instance.radius),
       side: BorderSide(color: item.foreground.withOpacity(0.15)),
     ),
     child: InkWell(
@@ -677,7 +694,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
               Text(
-                item.title,
+                AppCustomizer.instance.label(item.labelKey),
                 textAlign: TextAlign.center,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
@@ -696,7 +713,11 @@ class _HomeScreenState extends State<HomeScreen> {
   );
 
   Widget _moduleGroup(String title, List<_Module> modules) {
-    final visible = modules.where((item) => _allowed(item.key)).toList();
+    final groupKey = title == 'العمل والمتابعة' ? 'workSection' : title;
+    if (!AppCustomizer.instance.isVisible(groupKey)) {
+      return const SizedBox.shrink();
+    }
+    final visible = modules.where(_moduleVisible).toList();
     if (visible.isEmpty) return const SizedBox.shrink();
     return Padding(
       padding: const EdgeInsets.only(bottom: 13),
@@ -706,7 +727,7 @@ class _HomeScreenState extends State<HomeScreen> {
           Padding(
             padding: const EdgeInsets.fromLTRB(4, 0, 4, 7),
             child: Text(
-              title,
+              AppCustomizer.instance.label(groupKey),
               textAlign: TextAlign.right,
               style: const TextStyle(
                 color: AppColors.navy,
@@ -740,6 +761,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _moduleCard(_Module item) => Card(
     clipBehavior: Clip.antiAlias,
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(AppCustomizer.instance.radius),
+    ),
     child: InkWell(
       onTap: () => context.go(_moduleRoute(item)),
       child: SizedBox(
@@ -749,7 +773,8 @@ class _HomeScreenState extends State<HomeScreen> {
           child: Row(
             textDirection: TextDirection.rtl,
             children: [
-              Icon(item.icon, size: 27, color: AppColors.green),
+              Icon(item.icon,
+                  size: 27, color: Color(AppCustomizer.instance.primaryColor)),
               const SizedBox(width: 7),
               Expanded(
                 child: Column(
@@ -757,15 +782,17 @@ class _HomeScreenState extends State<HomeScreen> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     Text(
-                      item.key == 'tasks' && _manageTasks
-                          ? 'إدارة مهام الجداول الموحدة'
-                          : item.title,
+                      AppCustomizer.instance.label(item.labelKey),
                       textAlign: TextAlign.right,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
+                      style: TextStyle(
                         color: AppColors.navy,
-                        fontSize: 13,
+                        fontSize: AppCustomizer.instance.fontSize == 'large'
+                            ? 15
+                            : AppCustomizer.instance.fontSize == 'small'
+                                ? 11
+                                : 13,
                         fontWeight: FontWeight.w800,
                       ),
                     ),
@@ -775,9 +802,13 @@ class _HomeScreenState extends State<HomeScreen> {
                       textAlign: TextAlign.right,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
+                      style: TextStyle(
                         color: Color(0xFF4E596C),
-                        fontSize: 10.5,
+                        fontSize: AppCustomizer.instance.fontSize == 'large'
+                            ? 12
+                            : AppCustomizer.instance.fontSize == 'small'
+                                ? 9
+                                : 10.5,
                         height: 1.4,
                       ),
                     ),
@@ -790,12 +821,40 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
     ),
   );
+
+  bool _metricVisible(_Metric item) {
+    if (item.key == 'reports_pending' && !_manageTasks) return false;
+    return AppCustomizer.instance.isVisible(item.labelKey);
+  }
+
+  bool _moduleVisible(_Module item) {
+    if (!_allowed(item.key)) return false;
+    return AppCustomizer.instance.isVisible(item.labelKey);
+  }
+
+  Widget _customCard(Map<String, dynamic> card) => Card(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppCustomizer.instance.radius),
+        ),
+        child: ListTile(
+          leading: Icon(
+            Icons.dashboard_outlined,
+            color: Color(AppCustomizer.instance.primaryColor),
+          ),
+          title: Text('${card['title'] ?? ''}', textAlign: TextAlign.right),
+          subtitle: Text(
+            '${card['description'] ?? ''}',
+            textAlign: TextAlign.right,
+          ),
+        ),
+      );
 }
 
 class _Module {
   const _Module(this.key, this.title, this.subtitle, this.icon, this.route);
   final String key, title, subtitle, route;
   final IconData icon;
+  String get labelKey => key == 'tasks' ? 'taskManagement' : key;
 }
 
 class _Metric {
@@ -809,4 +868,12 @@ class _Metric {
   final String key, title;
   final IconData icon;
   final Color background, foreground;
+  String get labelKey => switch (key) {
+        'all' => 'totalTasks',
+        'in_progress' => 'inProgress',
+        'submitted' => 'submitted',
+        'late' => 'lateTasks',
+        'reports_pending' => 'reports',
+        _ => key,
+      };
 }

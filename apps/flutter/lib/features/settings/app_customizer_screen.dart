@@ -31,7 +31,7 @@ class _AppCustomizerScreenState extends State<AppCustomizerScreen>
   @override
   void initState() {
     super.initState();
-    _tabs = TabController(length: 4, vsync: this);
+    _tabs = TabController(length: 5, vsync: this);
     _loadPermission();
   }
 
@@ -105,6 +105,7 @@ class _AppCustomizerScreenState extends State<AppCustomizerScreen>
                           controller: _tabs,
                           isScrollable: true,
                           tabs: const [
+                            Tab(text: 'معاينة الرئيسية'),
                             Tab(text: 'التسميات'),
                             Tab(text: 'الترتيب والإظهار'),
                             Tab(text: 'المظهر والألوان'),
@@ -116,6 +117,7 @@ class _AppCustomizerScreenState extends State<AppCustomizerScreen>
                         child: TabBarView(
                           controller: _tabs,
                           children: [
+                            _homePreviewTab(),
                             _labelsTab(),
                             _layoutTab(),
                             _themeTab(),
@@ -140,6 +142,181 @@ class _AppCustomizerScreenState extends State<AppCustomizerScreen>
                     ],
                   ),
       );
+
+  Widget _homePreviewTab() => ListView(
+        padding: const EdgeInsets.all(12),
+        children: [
+          _intro('تخصيص الصفحة الرئيسية من المعاينة', 'عدّل العناوين والتفاصيل مباشرة داخل البطاقات، واختر ألوان الصفحة وخلفيتها وشكل البطاقات من نفس المعاينة.'),
+          _homePreviewCanvas(),
+          const SizedBox(height: 12),
+          SectionCard(
+            title: 'المظهر العام',
+            child: Column(
+              children: [
+                _homeColorChoices(),
+                _homeBackgroundChoices(),
+                Row(children: [
+                  const Text('استدارة البطاقات'),
+                  Expanded(child: Slider(value: _store.radius, min: 8, max: 30, divisions: 11, label: _store.radius.round().toString(), onChanged: (value) => setState(() => _store.setTheme(newRadius: value)))),
+                ]),
+                DropdownButtonFormField<String>(
+                  value: _store.fontSize,
+                  decoration: const InputDecoration(labelText: 'حجم الخط'),
+                  items: const [DropdownMenuItem(value: 'small', child: Text('صغير')), DropdownMenuItem(value: 'medium', child: Text('متوسط')), DropdownMenuItem(value: 'large', child: Text('كبير'))],
+                  onChanged: (value) => setState(() => _store.setTheme(newFontSize: value)),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+          FilledButton.icon(onPressed: _save, icon: const Icon(Icons.save_outlined), label: const Text('حفظ وتطبيق الصفحة الرئيسية')),
+        ],
+      );
+
+  Widget _homePreviewCanvas() => AnimatedBuilder(
+        animation: _store,
+        builder: (_, __) => Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(color: Color(_store.backgroundColor), borderRadius: BorderRadius.circular(_store.radius), border: Border.all(color: Color(_store.primaryColor).withOpacity(.2))),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            Row(textDirection: TextDirection.rtl, children: [
+              Expanded(child: _editableHomeLabel('appName', bold: true)),
+              Switch(value: _store.isVisible('appName'), onChanged: (value) => setState(() => _store.setVisibility('appName', value))),
+            ]),
+            _editableHomeLabel('organizationName'),
+            const Divider(),
+            _homePreviewCard('totalTasks', Icons.task_alt, '12', _store.primaryColor),
+            _homePreviewCard('inProgress', Icons.timelapse, '5', _store.accentColor),
+            _homePreviewCard('submitted', Icons.pending_actions_outlined, '3', 0xFF68419A),
+            _homePreviewCard('lateTasks', Icons.schedule, '2', 0xFFAB2B37),
+            _homePreviewSection('workSection', [
+              _homePreviewModule('taskManagement', Icons.task_alt, 'متابعة المهام والتقارير الناتجة من الجداول الموحدة'),
+              _homePreviewModule('reports', Icons.description_outlined, 'التقارير المرفوعة للمراجعة والاعتماد'),
+              _homePreviewModule('performance', Icons.query_stats, 'ترتيب الموظفين ومقارنة الفروع'),
+            ]),
+            _homePreviewSection('unifiedTable', [
+              _homePreviewModule('unifiedTable', Icons.table_chart_outlined, 'إنشاء المهام وإرسالها للموظفين'),
+            ]),
+            _homePreviewSection('adminSections', [
+              _homePreviewModule('employees', Icons.people_outline, 'ملفات الموظفين وبياناتهم الأساسية'),
+              _homePreviewModule('settings', Icons.settings_outlined, 'إعدادات الحساب والتطبيق'),
+            ]),
+            for (final card in _store.customCards) _homeCustomCardPreview(card),
+          ]),
+        ),
+      );
+
+  Widget _editableHomeLabel(String key, {bool bold = false}) => TextField(
+        controller: _controller(key),
+        onChanged: (value) => _store.setLabel(key, value),
+        textAlign: TextAlign.right,
+        style: TextStyle(fontWeight: bold ? FontWeight.bold : FontWeight.normal),
+        decoration: const InputDecoration(isDense: true, border: InputBorder.none),
+      );
+
+  Widget _homePreviewCard(String key, IconData icon, String value, int color) => Visibility(
+        visible: _store.isVisible(key),
+        replacement: _hiddenHomeItem(key),
+        child: Card(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(_store.radius)),
+          color: _store.statsStyle == 'white' ? Colors.white : Color(color).withOpacity(.12),
+          child: Row(textDirection: TextDirection.rtl, children: [
+            Icon(icon, color: Color(color)),
+            const SizedBox(width: 8),
+            Expanded(child: _editableHomeLabel(key, bold: true)),
+            Text(value, style: TextStyle(fontSize: _store.fontSize == 'large' ? 24 : 18, fontWeight: FontWeight.bold, color: Color(color))),
+            Switch(value: _store.isVisible(key), onChanged: (value) => setState(() => _store.setVisibility(key, value))),
+          ]),
+        ),
+      );
+
+  Widget _homePreviewSection(String key, List<Widget> children) => Visibility(
+        visible: _store.isVisible(key),
+        replacement: _hiddenHomeItem(key),
+        child: Card(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(_store.radius)),
+          child: Padding(padding: const EdgeInsets.all(8), child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            Row(textDirection: TextDirection.rtl, children: [Expanded(child: _editableHomeLabel(key, bold: true)), Switch(value: _store.isVisible(key), onChanged: (value) => setState(() => _store.setVisibility(key, value)))]),
+            ...children,
+          ])),
+        ),
+      );
+
+  Widget _homePreviewModule(String key, IconData icon, String description) => Visibility(
+        visible: _store.isVisible(key),
+        replacement: _hiddenHomeItem(key),
+        child: ListTile(
+          dense: true,
+          contentPadding: EdgeInsets.zero,
+          leading: Icon(icon, color: Color(_store.primaryColor)),
+          title: _editableHomeLabel(key, bold: true),
+          subtitle: Text(description, textAlign: TextAlign.right),
+          trailing: Switch(value: _store.isVisible(key), onChanged: (value) => setState(() => _store.setVisibility(key, value))),
+        ),
+      );
+
+  Widget _hiddenHomeItem(String key) => Card(
+        color: Colors.grey.shade100,
+        child: ListTile(
+          title: Text('${_store.label(key)} (مخفي)', textAlign: TextAlign.right),
+          trailing: IconButton(
+            tooltip: 'إظهار',
+            icon: const Icon(Icons.visibility_outlined),
+            onPressed: () => setState(() => _store.setVisibility(key, true)),
+          ),
+        ),
+      );
+
+  Widget _homeCustomCardPreview(Map<String, dynamic> card) => Card(
+        child: Padding(
+          padding: const EdgeInsets.all(8),
+          child: Column(
+            children: [
+              TextField(
+                textAlign: TextAlign.right,
+                controller: _customCardController(card, 'title'),
+                onChanged: (value) {
+                  card['title'] = value;
+                  _store.notifyListeners();
+                },
+                decoration: const InputDecoration(labelText: 'عنوان البطاقة'),
+              ),
+              TextField(
+                textAlign: TextAlign.right,
+                controller: _customCardController(card, 'description'),
+                onChanged: (value) {
+                  card['description'] = value;
+                  _store.notifyListeners();
+                },
+                decoration: const InputDecoration(labelText: 'تفاصيل البطاقة'),
+              ),
+            ],
+          ),
+        ),
+      );
+
+  TextEditingController _customCardController(
+    Map<String, dynamic> card,
+    String field,
+  ) {
+    final key = 'custom:${identityHashCode(card)}:$field';
+    return _controllers.putIfAbsent(
+      key,
+      () => TextEditingController(text: '${card[field] ?? ''}'),
+    );
+  }
+
+  Widget _homeColorChoices() => Wrap(spacing: 8, runSpacing: 8, children: [
+        _colorChoice('كحلي وذهبي', 0xFF0B3458, 0xFFDBA62A),
+        _colorChoice('أخضر هادئ', 0xFF146B50, 0xFFDBA62A),
+        _colorChoice('أزرق حديث', 0xFF164C80, 0xFF53A7D8),
+      ]);
+
+  Widget _homeBackgroundChoices() => Padding(padding: const EdgeInsets.only(top: 10), child: Wrap(spacing: 8, children: [
+        ActionChip(label: const Text('خلفية فاتحة'), onPressed: () => setState(() => _store.setTheme(background: 0xFFF5F7FD))),
+        ActionChip(label: const Text('خلفية بيضاء'), onPressed: () => setState(() => _store.setTheme(background: Colors.white.value))),
+        ActionChip(label: const Text('خلفية هادئة'), onPressed: () => setState(() => _store.setTheme(background: 0xFFEAF4F0))),
+      ]));
 
   Widget _labelsTab() => ListView(
         padding: const EdgeInsets.all(12),
@@ -213,9 +390,9 @@ class _AppCustomizerScreenState extends State<AppCustomizerScreen>
             child: Column(
               children: [
                 _toggle('عرض أقسام الإدارة', 'adminSections'),
-                _toggle('الموظفون', 'adminEmployees'),
-                _toggle('سجل النشاط', 'adminActivity'),
-                _toggle('الأداء', 'adminPerformance'),
+                _toggle('الموظفون', 'employees'),
+                _toggle('سجل النشاط', 'activity'),
+                _toggle('الأداء', 'performance'),
               ],
             ),
           ),
