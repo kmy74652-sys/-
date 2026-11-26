@@ -452,34 +452,41 @@ class _HrScreenState extends State<HrScreen> {
         .toList(),
     onChanged: _busy ? null : (v) => setState(() => _memberId = v),
   );
-  Widget _card(String title, List<Widget> children) => Card(
-    child: Padding(
-      padding: const EdgeInsets.all(14),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text(
-            title,
-            textAlign: TextAlign.right,
-            style: const TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: AppColors.navy,
-            ),
-          ),
-          const SizedBox(height: 10),
-          ...children,
-        ],
-      ),
+  Widget _card(String title, List<Widget> children) => SectionCard(
+    title: title,
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: children,
     ),
   );
   Widget _entry(String title, String detail) => Card(
-    child: ListTile(
-      title: Text(title, textAlign: TextAlign.right),
-      subtitle: Text(
-        detail,
-        textAlign: TextAlign.right,
+    child: Padding(
+      padding: const EdgeInsets.all(14),
+      child: Row(
         textDirection: TextDirection.rtl,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: AppColors.navy.withAlpha(22),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Icon(Icons.description_outlined, color: AppColors.navy),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(title, textAlign: TextAlign.right, style: const TextStyle(fontWeight: FontWeight.w700)),
+                const SizedBox(height: 4),
+                Text(detail, textAlign: TextAlign.right, textDirection: TextDirection.rtl),
+              ],
+            ),
+          ),
+        ],
       ),
     ),
   );

@@ -73,4 +73,14 @@ ThemeData appTheme() => ThemeData(
       side: const BorderSide(color: AppColors.border),
     ),
   ),
+  expansionTileTheme: ExpansionTileThemeData(
+    tilePadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+    childrenPadding: const EdgeInsets.fromLTRB(14, 0, 14, 12),
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+    collapsedShape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+    iconColor: AppColors.navy,
+    collapsedIconColor: AppColors.navy,
+    textColor: AppColors.navy,
+    collapsedTextColor: AppColors.navy,
+  ),
 );

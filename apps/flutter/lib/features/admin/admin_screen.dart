@@ -405,17 +405,11 @@ class _AdminScreenState extends State<AdminScreen> {
     final id = branch['id'].toString();
     final active = branch['is_active'] == true;
     final currentName = branch['name']?.toString() ?? '';
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(10),
-        child: Column(
+    return SectionCard(
+      title: currentName,
+      child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text(
-              currentName,
-              textAlign: TextAlign.right,
-              style: const TextStyle(fontWeight: FontWeight.bold),
-            ),
             Text(
               'الكود: ${_text(branch['code'])} · المستوى: ${_text(branch['branch_level'], 'غير محدد')} · ${active ? 'نشط' : 'مؤرشف'}',
               textAlign: TextAlign.right,
@@ -483,7 +477,6 @@ class _AdminScreenState extends State<AdminScreen> {
               ),
           ],
         ),
-      ),
     );
   }
 

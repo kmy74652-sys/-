@@ -1260,10 +1260,26 @@ class SectionCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Row(
+            textDirection: TextDirection.rtl,
             children: [
+              Container(
+                width: 34,
+                height: 34,
+                decoration: BoxDecoration(
+                  color: AppColors.navy.withAlpha(22),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(
+                  Icons.view_agenda_outlined,
+                  size: 19,
+                  color: AppColors.navy,
+                ),
+              ),
+              const SizedBox(width: 10),
               Expanded(
                 child: Text(
                   title,
+                  textAlign: TextAlign.right,
                   style: const TextStyle(
                     fontSize: 17,
                     fontWeight: FontWeight.w800,
@@ -1274,7 +1290,7 @@ class SectionCard extends StatelessWidget {
               if (trailing != null) trailing!,
             ],
           ),
-          const SizedBox(height: 12),
+          const Divider(height: 22),
           child,
         ],
       ),
