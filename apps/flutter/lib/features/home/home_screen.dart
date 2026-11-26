@@ -639,6 +639,10 @@ class _HomeScreenState extends State<HomeScreen> {
                 context.go('/reports?status=submitted');
                 return;
               }
+              if (item.key == 'submitted') {
+                context.go('/tasks?status=submitted');
+                return;
+              }
               final route = _manageTasks ? '/admin/tasks' : '/tasks';
               final status = switch (item.key) {
                 'in_progress' => 'in_progress',
