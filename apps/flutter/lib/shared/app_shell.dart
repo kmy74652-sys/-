@@ -887,21 +887,23 @@ class _BrandHeaderState extends State<_BrandHeader> {
       future: _branding,
       builder: (context, snapshot) {
         final branding = snapshot.data ?? OrganizationBranding.fallback;
+        final controlSize = compact ? 36.0 : 42.0;
+        final controlGap = compact ? 3.0 : 6.0;
         return Container(
           width: double.infinity,
           padding: EdgeInsets.symmetric(horizontal: compact ? 10 : 14, vertical: 8),
           decoration: const BoxDecoration(color: Colors.white),
           child: Row(
             children: [
-              _BrandLogo(url: branding.logoUrl, width: compact ? 50 : 58, height: compact ? 58 : 66),
-              const SizedBox(width: 10),
+              _BrandLogo(url: branding.logoUrl, width: compact ? 44 : 58, height: compact ? 52 : 66),
+              SizedBox(width: compact ? 6 : 10),
               Expanded(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    Text(AppCustomizer.instance.label('appName'), maxLines: 1, overflow: TextOverflow.ellipsis,
-                      style: TextStyle(color: _navy, fontSize: compact ? 18 : 21, height: 1.15, fontWeight: FontWeight.w900)),
+                    Text(AppCustomizer.instance.label('appName'), maxLines: 1, overflow: TextOverflow.fade,
+                      style: TextStyle(color: _navy, fontSize: compact ? 17 : 21, height: 1.15, fontWeight: FontWeight.w900)),
                     const SizedBox(height: 2),
                     Text(
                       AppCustomizer.instance.label('organizationName'),
@@ -927,12 +929,12 @@ class _BrandHeaderState extends State<_BrandHeader> {
                   ],
                 ),
               ),
-              const SizedBox(width: 8),
+              SizedBox(width: compact ? 4 : 8),
               IconButton(
                 tooltip: 'لوحة التنقل',
                 onPressed: widget.onMenu,
                 style: IconButton.styleFrom(
-                  fixedSize: const Size(42, 42),
+                  fixedSize: Size.square(controlSize),
                   backgroundColor: const Color(0xFFF4F8FB),
                   foregroundColor: _navy,
                   side: const BorderSide(color: Color(0xFFD5E0EA)),
@@ -940,12 +942,12 @@ class _BrandHeaderState extends State<_BrandHeader> {
                 ),
                 icon: const Icon(Icons.menu_rounded, size: 23),
               ),
-              const SizedBox(width: 6),
+              SizedBox(width: controlGap),
               IconButton(
                 tooltip: 'بحث عام',
                 onPressed: widget.onSearch,
                 style: IconButton.styleFrom(
-                  fixedSize: const Size(42, 42),
+                  fixedSize: Size.square(controlSize),
                   backgroundColor: const Color(0xFFF4F8FB),
                   foregroundColor: _navy,
                   side: const BorderSide(color: Color(0xFFD5E0EA)),
@@ -953,18 +955,18 @@ class _BrandHeaderState extends State<_BrandHeader> {
                 ),
                 icon: const Icon(Icons.search, size: 23),
               ),
-              const SizedBox(width: 6),
+              SizedBox(width: controlGap),
               IconButton(
                 tooltip: 'تبديل الحساب: تسجيل الخروج',
                 onPressed: widget.onAccount,
-                style: IconButton.styleFrom(fixedSize: const Size(42, 42), backgroundColor: const Color(0xFFF4F8FB), foregroundColor: _navy, side: const BorderSide(color: Color(0xFFD5E0EA)), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+                style: IconButton.styleFrom(fixedSize: Size.square(controlSize), backgroundColor: const Color(0xFFF4F8FB), foregroundColor: _navy, side: const BorderSide(color: Color(0xFFD5E0EA)), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
                 icon: const Icon(Icons.account_circle_outlined, size: 23),
               ),
-              const SizedBox(width: 6),
+              SizedBox(width: controlGap),
               IconButton(
                 tooltip: 'التنبيهات',
                 onPressed: widget.onNotifications,
-                style: IconButton.styleFrom(fixedSize: const Size(42, 42), backgroundColor: _navy, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+                style: IconButton.styleFrom(fixedSize: Size.square(controlSize), backgroundColor: _navy, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
                 icon: Stack(clipBehavior: Clip.none, children: [
                   const Icon(Icons.notifications_none, size: 24),
                   if (widget.unreadCount > 0) Positioned(top: -8, left: -9, child: Container(
@@ -1111,7 +1113,7 @@ class _PageTitleBar extends StatelessWidget {
                   SingleChildScrollView(
                     scrollDirection: Axis.horizontal,
                     child: Row(
-                      textDirection: TextDirection.ltr,
+                      textDirection: TextDirection.rtl,
                       children: [
                         for (var i = 0; i < breadcrumbs.length; i++) ...[
                           if (i > 0)

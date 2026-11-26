@@ -1434,21 +1434,21 @@ class _PerformanceAnalyticsScreenState
       priority;
   String _statusName(String status) =>
       const {
-        'completed_approved': 'مكتملة ومعتمدة',
+        'completed_approved': 'معتمدة',
         'approved': 'معتمدة',
         'cancelled': 'ملغاة',
-        'report_submitted': 'التقرير مقدم',
-        'submitted': 'مرسل للمراجعة',
+        'report_submitted': 'بانتظار المراجعة',
+        'submitted': 'بانتظار المراجعة',
         'pending': 'لم يبدأ',
-        'needs_revision': 'يحتاج تعديل',
-        'returned': 'معاد للتعديل',
+        'needs_revision': 'مرفوضة',
+        'returned': 'مرفوضة',
         'late': 'متأخرة',
         'in_progress': 'قيد التنفيذ',
         'received': 'تم الاستلام',
         'new': 'جديدة',
         'on_hold': 'معلقة',
       }[status] ??
-      (status.isEmpty ? 'غير محددة' : status);
+      'غير محددة';
 
   Widget _messageCard(
     String title,

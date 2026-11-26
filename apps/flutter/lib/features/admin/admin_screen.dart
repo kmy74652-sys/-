@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../shared/app_shell.dart';
+import '../../shared/ui_labels.dart';
 import '../../core/theme.dart';
 
 class AdminScreen extends StatefulWidget {
@@ -238,7 +239,16 @@ class _AdminScreenState extends State<AdminScreen> {
     );
     if (widget.embedded) return content;
     return AppShell(
-      title: 'لوحة إدارة المؤسسة',
+      title: _section == 'overview'
+          ? 'لوحة إدارة المؤسسة'
+          : const {
+              'tasks': 'مهام الجداول الموحدة',
+              'reports': 'تقارير الموظفين',
+              'branches': 'إدارة الفروع',
+              'employees': 'إدارة الموظفين',
+              'activity': 'سجل النشاط',
+              'performance': 'تحليلات الأداء',
+            }[_section] ?? 'الإدارة',
       subtitle: _name.isEmpty
           ? 'إدارة وفق صلاحيات الحساب وسياسات RLS'
           : 'مرحبًا $_name',
@@ -374,7 +384,7 @@ class _AdminScreenState extends State<AdminScreen> {
                         dense: true,
                         contentPadding: EdgeInsets.zero,
                         title: Text(
-                          _text(a['action']),
+                          uiActivityLabel(_text(a['action'], 'نشاط إداري')),
                           textAlign: TextAlign.right,
                         ),
                         subtitle: Text(

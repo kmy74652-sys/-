@@ -9,6 +9,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/theme.dart';
 import '../../shared/app_shell.dart';
+import '../../shared/ui_labels.dart';
 
 class ReportsScreen extends StatefulWidget {
   const ReportsScreen({super.key, this.initialFilter});
@@ -356,15 +357,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
         : 'مهمة ${_safeId(row['task_id'])}';
   }
 
-  String _statusLabel(String status) => switch (status) {
-    'submitted' => 'بانتظار المراجعة',
-    'reviewed' => 'بانتظار الاعتماد',
-    'approved' => 'معتمد نهائياً',
-    'rejected' => 'مرفوضة',
-    'returned' => 'معاد للموظف',
-    'draft' => 'مسودة',
-    _ => 'حالة التقرير: $status',
-  };
+  String _statusLabel(String status) => UiLabels.reportStatus(status);
 
   Widget _statusBadge(String status) {
     final color = switch (status) {

@@ -7,6 +7,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/theme.dart';
 import '../../shared/app_shell.dart';
+import '../../shared/ui_labels.dart';
 import 'independent_signature_capture.dart';
 
 class IndependentReportsScreen extends StatefulWidget {
@@ -1036,14 +1037,7 @@ class _IndependentReportsScreenState extends State<IndependentReportsScreen> {
     );
   }
 
-  String _status(String status) => switch (status) {
-    'draft' => 'مسودة',
-    'submitted' => 'بانتظار المراجعة',
-    'reviewed' => 'بانتظار الاعتماد',
-    'approved' => 'معتمد نهائيًا',
-    'returned' => 'معاد للتعديل',
-    _ => status,
-  };
+  String _status(String status) => UiLabels.reportStatus(status);
 
   String _hint(String type) =>
       const {

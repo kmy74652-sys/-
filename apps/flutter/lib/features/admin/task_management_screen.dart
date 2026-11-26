@@ -1044,10 +1044,12 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
                                 return Card(
                                   margin: const EdgeInsets.only(bottom: 8),
                                   child: ListTile(
-                                  contentPadding: EdgeInsets.zero,
+                                  contentPadding: const EdgeInsets.all(8),
                                   title: Text(
                                     _s(t['title'], 'مهمة'),
                                     textAlign: TextAlign.right,
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
                                   ),
                                   subtitle: Column(
                                     crossAxisAlignment: CrossAxisAlignment.end,
@@ -1145,30 +1147,32 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
                                     ),
                                   ),
                                   isThreeLine: true,
-                                  trailing: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      if (widget.unifiedOnly && _canManageActions)
-                                        IconButton(
-                                          tooltip: 'تعديل من الجدول الموحد',
-                                          onPressed: _busy ? null : () => _openUnifiedEditor(t),
-                                          icon: const Icon(Icons.table_chart_outlined),
-                                        ),
-                                      if (_canManageActions)
-                                        IconButton(
-                                          tooltip: 'تعديل المهمة أو صف الجدول',
-                                          onPressed: _busy ? null : () => _saveTask(existing: t),
-                                          icon: const Icon(Icons.edit_outlined),
-                                        ),
-                                      if (_canManageActions)
-                                        IconButton(
-                                          tooltip: 'حذف المهمة',
-                                          onPressed: _busy ? null : () => _deleteTask(t),
-                                          color: Colors.red,
-                                          icon: const Icon(Icons.delete_outline),
-                                        ),
-                                    ],
-                                  ),
+                                  trailing: _canManageActions
+                                      ? PopupMenuButton<String>(
+                                          tooltip: 'إجراءات المهمة',
+                                          onSelected: (value) {
+                                            if (_busy) return;
+                                            if (value == 'table') _openUnifiedEditor(t);
+                                            if (value == 'edit') _saveTask(existing: t);
+                                            if (value == 'delete') _deleteTask(t);
+                                          },
+                                          itemBuilder: (context) => [
+                                            if (widget.unifiedOnly)
+                                              const PopupMenuItem(
+                                                value: 'table',
+                                                child: Text('تعديل من الجدول الموحد'),
+                                              ),
+                                            const PopupMenuItem(
+                                              value: 'edit',
+                                              child: Text('تعديل الموعد والأولوية'),
+                                            ),
+                                            const PopupMenuItem(
+                                              value: 'delete',
+                                              child: Text('حذف المهمة'),
+                                            ),
+                                          ],
+                                        )
+                                      : null,
                                   onTap: () => _message(
                                     'حالة التقرير: ${_reportStatus(t)}',
                                   ),

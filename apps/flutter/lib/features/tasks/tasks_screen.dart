@@ -53,9 +53,11 @@ class _TasksScreenState extends State<TasksScreen>
     'late': 'متأخرة',
   };
   static const Map<String, String> _priorityLabels = {
+    'low': 'منخفضة',
     'normal': 'عادية',
-    'important': 'مهمة',
+    'high': 'عالية',
     'urgent': 'عاجلة',
+    'important': 'مهمة',
     'critical': 'حرجة',
   };
 

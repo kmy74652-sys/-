@@ -750,7 +750,7 @@ class _HomeScreenState extends State<HomeScreen> {
     child: InkWell(
       onTap: () => context.go(_moduleRoute(item)),
       child: SizedBox(
-        height: 92,
+        height: 112,
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
           child: Row(
@@ -765,14 +765,14 @@ class _HomeScreenState extends State<HomeScreen> {
                   children: [
                     Text(
                       item.key == 'tasks' && _manageTasks
-                          ? 'إدارة المهام'
+                          ? 'إدارة مهام الجداول الموحدة'
                           : item.title,
                       textAlign: TextAlign.right,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                         color: AppColors.navy,
-                        fontSize: 13.5,
+                        fontSize: 13,
                         fontWeight: FontWeight.w800,
                       ),
                     ),
@@ -784,8 +784,8 @@ class _HomeScreenState extends State<HomeScreen> {
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                         color: Color(0xFF4E596C),
-                        fontSize: 10,
-                        height: 1.2,
+                        fontSize: 10.5,
+                        height: 1.4,
                       ),
                     ),
                   ],
