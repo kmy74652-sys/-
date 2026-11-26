@@ -22,49 +22,11 @@ class _HomeScreenState extends State<HomeScreen> {
   Map<String, int>? _summary;
   Set<String> _permissions = {};
   Set<String> _roles = {};
-  bool _adminExpanded = false;
   RealtimeChannel? _tasksRealtime;
   Timer? _summaryRefreshTimer;
   int _request = 0;
   static const _homeCachePrefix = '@nexora/home-cache/v1/';
 
-  static const _groups = <(String, List<_Module>)>[
-    (
-      'العمل والمتابعة',
-      [
-        _Module(
-          'tasks',
-          'إدارة مهام الجداول الموحدة',
-          'متابعة المهام والتقارير الناتجة من الجداول الموحدة',
-          Icons.task_alt,
-          '/tasks',
-        ),
-        _Module(
-          'reports',
-          'تقارير الموظفين',
-          'التقارير المرفوعة للمراجعة والاعتماد',
-          Icons.description_outlined,
-          '/reports',
-        ),
-        _Module(
-          'performance',
-          'إحصائيات ومقارنة الأداء',
-          'ترتيب الموظفين ومقارنة الفروع',
-          Icons.query_stats,
-          '/admin/performance',
-        ),
-      ],
-    ),
-  ];
-  static const _adminModules = <_Module>[
-    _Module('employees', 'الموظفون', 'ملفات الموظفين وبياناتهم الأساسية', Icons.people_outline, '/admin?section=employees'),
-    _Module('branches', 'الفروع', 'إدارة الفروع والحالة التشغيلية', Icons.account_tree_outlined, '/admin?section=branches'),
-    _Module('activity', 'سجل النشاط', 'متابعة العمليات الإدارية الأخيرة', Icons.history, '/admin?section=activity'),
-    _Module('report-designer', 'مصمم التقارير', 'إدارة قوالب التقارير وإصداراتها', Icons.dashboard_customize_outlined, '/admin/report-designer'),
-    _Module('customizer', 'تخصيص الواجهات', 'إعدادات العرض والتخصيص المؤسسي', Icons.palette_outlined, '/admin/customizer'),
-    _Module('hr', 'الموارد البشرية', 'اتفاقيات الموظفين وبيانات الموارد البشرية', Icons.badge_outlined, '/hr'),
-    _Module('settings', 'الإعدادات', 'إعدادات الحساب والتطبيق', Icons.settings_outlined, '/settings'),
-  ];
   static const _metrics = <_Metric>[
     _Metric(
       'all',
@@ -104,9 +66,6 @@ class _HomeScreenState extends State<HomeScreen> {
   ];
 
   bool get _manageTasks => _permissions.contains('tasks.manage');
-  bool get _employeeManager =>
-      _roles.any((r) => r == 'owner' || r == 'admin_followup') &&
-      _permissions.contains('employees.manage');
   bool _allowed(String key) {
     switch (key) {
       case 'tasks':
@@ -116,40 +75,9 @@ class _HomeScreenState extends State<HomeScreen> {
             ? (_permissions.contains('reports.read_all') ||
                   _permissions.contains('tasks.review'))
             : _permissions.contains('tasks.execute');
-      case 'employees':
-        return _employeeManager ||
-            (_manageTasks && _permissions.contains('employees.read'));
-      case 'branches':
-        return _manageTasks &&
-            (_permissions.contains('branches.manage') ||
-                _permissions.contains('branches.read_all'));
-      case 'performance':
-        return _manageTasks &&
-            (_permissions.contains('tasks.review') ||
-                _permissions.contains('reports.read_all'));
-      case 'activity':
-        return _manageTasks && _permissions.contains('audit.read');
-      case 'customizer':
-        return _manageTasks && _permissions.contains('customizer.manage');
-      case 'report-designer':
-        return _manageTasks && _permissions.contains('report_forms.manage');
-      case 'agreements':
-        return true;
-      case 'hr':
-        return _employeeManager &&
-            _permissions.contains('employee_hr.read_all');
-      case 'permissions':
-      case 'settings':
-        return _employeeManager;
       default:
         return false;
     }
-  }
-
-  String _moduleRoute(_Module item) {
-    if (item.key == 'tasks') return _manageTasks ? '/admin/tasks' : '/tasks';
-    if (item.key == 'reports' && !_manageTasks) return '/reports/independent';
-    return item.route;
   }
 
   @override
@@ -484,104 +412,11 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: LinearProgressIndicator(),
               ),
             _metricGrid(),
-            for (final group in _groups) ...[
-              const SizedBox(height: 14),
-              _moduleGroup(group.$1, group.$2),
-              if (group.$1 == 'العمل والمتابعة' && _manageTasks) ...[
-                const SizedBox(height: 10),
-                _unifiedTaskTableSection(),
-              ],
-            ],
-            const SizedBox(height: 8),
-            _settingsPanel(),
           ],
         ],
       ),
     ),
   );
-
-  Widget _unifiedTaskTableSection() {
-    return SectionCard(
-      title: 'الجدول الموحد لإنشاء المهام',
-      child: InkWell(
-        borderRadius: BorderRadius.circular(12),
-        onTap: _manageTasks ? () => context.push('/admin/unified-tasks') : null,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          child: Row(
-            textDirection: TextDirection.rtl,
-            children: [
-              const Icon(Icons.table_chart_outlined,
-                  color: AppColors.green, size: 30),
-              const SizedBox(width: 9),
-              const Expanded(
-                child: Text(
-                  'افتح الجدول الموحد لإنشاء المهام وإرسالها للموظف',
-                  textAlign: TextAlign.right,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(fontWeight: FontWeight.w700),
-                ),
-              ),
-              const Icon(Icons.chevron_left),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _settingsPanel() {
-    final visible = _adminModules.where((item) => _allowed(item.key)).toList();
-    if (visible.isEmpty) return const SizedBox.shrink();
-    return SectionCard(
-      title: 'الإعدادات',
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          InkWell(
-            borderRadius: BorderRadius.circular(12),
-            onTap: () => setState(() => _adminExpanded = !_adminExpanded),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 2),
-              child: Row(
-                textDirection: TextDirection.rtl,
-                children: [
-                  const Icon(Icons.settings_outlined,
-                      color: AppColors.green, size: 30),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      _adminExpanded
-                          ? 'إخفاء الإعدادات وأقسام الإدارة'
-                          : 'إظهار الإعدادات وأقسام الإدارة (${visible.length})',
-                      textAlign: TextAlign.right,
-                      style: const TextStyle(fontWeight: FontWeight.w800),
-                    ),
-                  ),
-                  AnimatedRotation(
-                    turns: _adminExpanded ? .5 : 0,
-                    duration: const Duration(milliseconds: 180),
-                    child: const Icon(Icons.expand_more),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          AnimatedSize(
-            duration: const Duration(milliseconds: 220),
-            curve: Curves.easeOut,
-            child: !_adminExpanded
-                ? const SizedBox.shrink()
-                : Padding(
-                    padding: const EdgeInsets.only(top: 12),
-                    child: _moduleGrid(visible),
-                  ),
-          ),
-        ],
-      ),
-    );
-  }
 
   Widget _metricGrid() => LayoutBuilder(
     builder: (context, constraints) {
@@ -700,107 +535,6 @@ class _HomeScreenState extends State<HomeScreen> {
     ),
   );
 
-  Widget _moduleGroup(String title, List<_Module> modules) {
-    final visible = modules.where((item) => _allowed(item.key)).toList();
-    if (visible.isEmpty) return const SizedBox.shrink();
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 13),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(4, 0, 4, 7),
-            child: Text(
-              title,
-              textAlign: TextAlign.right,
-              style: const TextStyle(
-                color: AppColors.navy,
-                fontSize: 15,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-          ),
-          _moduleGrid(visible),
-        ],
-      ),
-    );
-  }
-
-  Widget _moduleGrid(List<_Module> modules) => LayoutBuilder(
-    builder: (context, constraints) {
-      const gap = 8.0;
-      final columns = constraints.maxWidth >= 560 ? 3 : 2;
-      final cardWidth = (constraints.maxWidth - gap * (columns - 1)) / columns;
-      return Wrap(
-        textDirection: TextDirection.rtl,
-        spacing: gap,
-        runSpacing: gap,
-        children: [
-          for (final item in modules)
-            SizedBox(width: cardWidth, child: _moduleCard(item)),
-        ],
-      );
-    },
-  );
-
-  Widget _moduleCard(_Module item) => Card(
-    clipBehavior: Clip.antiAlias,
-    child: InkWell(
-      onTap: () => context.go(_moduleRoute(item)),
-      child: SizedBox(
-        height: 112,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
-          child: Row(
-            textDirection: TextDirection.rtl,
-            children: [
-              Icon(item.icon, size: 27, color: AppColors.green),
-              const SizedBox(width: 7),
-              Expanded(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Text(
-                      item.key == 'tasks' && _manageTasks
-                          ? 'إدارة مهام الجداول الموحدة'
-                          : item.title,
-                      textAlign: TextAlign.right,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: AppColors.navy,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      item.subtitle,
-                      textAlign: TextAlign.right,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: Color(0xFF4E596C),
-                        fontSize: 10.5,
-                        height: 1.4,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    ),
-  );
-}
-
-class _Module {
-  const _Module(this.key, this.title, this.subtitle, this.icon, this.route);
-  final String key, title, subtitle, route;
-  final IconData icon;
 }
 
 class _Metric {

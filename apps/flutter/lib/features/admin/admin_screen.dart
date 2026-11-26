@@ -280,12 +280,6 @@ class _AdminScreenState extends State<AdminScreen> {
                   !['completed_approved', 'cancelled'].contains(t['status'])),
         )
         .length;
-    final canReports = _can('reports.read_all') || _can('tasks.review');
-    final canEmployees =
-        _can('employees.read') ||
-        (_can('employees.manage') && (_permissions.contains('tasks.manage')));
-    final canBranches = _can('branches.read_all') || _can('branches.manage');
-    final canActivity = _can('audit.read');
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -303,61 +297,6 @@ class _AdminScreenState extends State<AdminScreen> {
               ],
             ),
           ),
-        const SizedBox(height: 10),
-        SectionCard(
-          title: 'أقسام الإدارة',
-          child: Column(
-            children: [
-              _nav('المهام والتكليفات', 'tasks', Icons.task_alt, true),
-              _nav(
-                'إدارة مهام الجداول الموحدة',
-                'task-management',
-                Icons.assignment_add,
-                _can('tasks.manage'),
-              ),
-              _nav(
-                'إدارة الجداول الموحدة وتقاريرها',
-                'unified-task-management',
-                Icons.table_chart_outlined,
-                _can('tasks.manage') || _can('tasks.review'),
-                note: 'متابعة الجداول المرسلة واعتماد إنجاز الموظفين',
-              ),
-              _nav(
-                'تقارير الموظفين',
-                'reports',
-                Icons.assessment_outlined,
-                canReports,
-              ),
-              _nav(
-                'الفروع',
-                'branches',
-                Icons.account_tree_outlined,
-                canBranches,
-              ),
-              _nav('الموظفون', 'employees', Icons.people_outline, canEmployees),
-              _nav('سجل النشاط', 'activity', Icons.history, canActivity),
-              _nav('الأداء', 'performance', Icons.query_stats, canReports),
-              _nav(
-                'تحليلات الأداء المتقدمة',
-                'performance-analytics',
-                Icons.query_stats,
-                canReports,
-              ),
-              _nav(
-                'مصمم التقارير والجداول',
-                'report-designer',
-                Icons.design_services_outlined,
-                _can('report_forms.manage') || _can('task_library.manage'),
-              ),
-              _nav(
-                'مصمم الواجهات والتخصيص الشامل',
-                'app-customizer',
-                Icons.dashboard_customize_outlined,
-                _can('tasks.manage'),
-              ),
-            ],
-          ),
-        ),
         const SizedBox(height: 10),
         SectionCard(
           title: 'الفروع والنشاط الحديث',
@@ -422,38 +361,6 @@ class _AdminScreenState extends State<AdminScreen> {
       ),
     ),
   );
-  Widget _nav(
-    String title,
-    String section,
-    IconData icon,
-    bool allowed, {
-    String? note,
-  }) => ListTile(
-    contentPadding: EdgeInsets.zero,
-    leading: Icon(icon, color: allowed ? AppColors.green : AppColors.muted),
-    title: Text(title, textAlign: TextAlign.right),
-    subtitle: note == null ? null : Text(note, textAlign: TextAlign.right),
-    trailing: Icon(allowed ? Icons.chevron_left : Icons.lock_outline),
-    enabled: allowed,
-    onTap: allowed
-        ? () {
-            final route = switch (section) {
-              'performance-analytics' => '/admin/performance',
-              'task-management' => '/admin/tasks',
-              'unified-task-management' => '/admin/unified-task-management',
-              'report-designer' => '/admin/report-designer',
-              'app-customizer' => '/admin/customizer',
-              _ => null,
-            };
-            if (route != null) {
-              context.push(route);
-            } else {
-              setState(() => _section = section);
-            }
-          }
-        : null,
-  );
-
   Widget _sectionContent() {
     final title =
         {

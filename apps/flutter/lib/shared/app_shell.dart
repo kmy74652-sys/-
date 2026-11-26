@@ -344,22 +344,23 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
           (_can('reports.read_all') || _can('tasks.review')) ||
       (!_managesTasks && _can('tasks.execute'));
 
-  bool get _canAdministration =>
-      _managesTasks &&
-      (_can('tasks.review') ||
-          _can('reports.read_all') ||
-          _can('employees.read') ||
-          _can('branches.read_all') ||
-          _can('audit.read'));
+  bool get _canBranches =>
+      _managesTasks && (_can('branches.read_all') || _can('branches.manage'));
+
+  bool get _canActivity => _managesTasks && _can('audit.read');
+
+  bool get _canPerformance =>
+      _managesTasks && (_can('tasks.review') || _can('reports.read_all'));
+
+  bool get _canReportDesigner =>
+      _managesTasks && _can('report_forms.manage');
+
+  bool get _canCustomizer => _managesTasks && _can('customizer.manage');
 
   bool get _canHr =>
       (_roles.contains('owner') || _roles.contains('admin_followup')) &&
       _can('employees.manage') &&
       _can('employee_hr.read_all');
-
-  bool get _canSettings =>
-      (_roles.contains('owner') || _roles.contains('admin_followup')) &&
-      _can('employees.manage');
 
   List<_NavigationItem> _navigationItems() {
     final items = <_NavigationItem>[
@@ -388,6 +389,16 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
         const _NavigationItem('الموظفون', '/admin?section=employees', Icons.people_outline),
       );
     }
+    if (_canBranches) {
+      items.add(
+        const _NavigationItem('الفروع', '/admin?section=branches', Icons.account_tree_outlined),
+      );
+    }
+    if (_canActivity) {
+      items.add(
+        const _NavigationItem('سجل النشاط', '/admin?section=activity', Icons.history),
+      );
+    }
     if (_managesTasks) {
       items.add(
         const _NavigationItem(
@@ -397,23 +408,36 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
         ),
       );
     }
-    if (_canAdministration) {
+    if (_canPerformance) {
       items.add(
         const _NavigationItem(
-          'الإدارة والتحليلات',
-          '/admin',
-          Icons.analytics_outlined,
+          'تحليلات الأداء',
+          '/admin/performance',
+          Icons.query_stats,
+        ),
+      );
+    }
+    if (_canReportDesigner) {
+      items.add(
+        const _NavigationItem(
+          'مصمم التقارير',
+          '/admin/report-designer',
+          Icons.dashboard_customize_outlined,
+        ),
+      );
+    }
+    if (_canCustomizer) {
+      items.add(
+        const _NavigationItem(
+          'تخصيص الواجهات',
+          '/admin/customizer',
+          Icons.palette_outlined,
         ),
       );
     }
     if (_canHr) {
       items.add(
         const _NavigationItem('الموارد البشرية', '/hr', Icons.badge_outlined),
-      );
-    }
-    if (_canSettings) {
-      items.add(
-        const _NavigationItem('الإعدادات', '/settings', Icons.settings_outlined),
       );
     }
     return items;
