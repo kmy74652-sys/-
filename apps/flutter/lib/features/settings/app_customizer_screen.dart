@@ -35,7 +35,7 @@ class _AppCustomizerScreenState extends State<AppCustomizerScreen>
   @override
   void initState() {
     super.initState();
-    _tabs = TabController(length: 6, vsync: this);
+    _tabs = TabController(length: 7, vsync: this);
     _loadPermission();
   }
 
@@ -109,6 +109,7 @@ class _AppCustomizerScreenState extends State<AppCustomizerScreen>
                           controller: _tabs,
                           isScrollable: true,
                           tabs: const [
+                            Tab(text: 'المعاينة المباشرة'),
                             Tab(text: 'معاينة الرئيسية'),
                             Tab(text: 'التسميات'),
                             Tab(text: 'الترتيب والإظهار'),
@@ -122,6 +123,7 @@ class _AppCustomizerScreenState extends State<AppCustomizerScreen>
                         child: TabBarView(
                           controller: _tabs,
                           children: [
+                            _livePreviewTab(),
                             _homePreviewTab(),
                             _labelsTab(),
                             _layoutTab(),
@@ -147,6 +149,114 @@ class _AppCustomizerScreenState extends State<AppCustomizerScreen>
                       ),
                     ],
                   ),
+      );
+
+  Widget _livePreviewTab() => AnimatedBuilder(
+        animation: _store,
+        builder: (context, _) => ListView(
+              padding: const EdgeInsets.all(12),
+              children: [
+                _intro(
+                  'المعاينة المباشرة',
+                  'شاهد شكل التطبيق بعد التخصيص قبل الحفظ. أي تعديل على الاسم أو الألوان أو الإظهار ينعكس هنا مباشرة.',
+                ),
+                Card(
+                  clipBehavior: Clip.antiAlias,
+                  elevation: 2,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(18),
+                    side: BorderSide(color: Color(_store.primaryColor).withOpacity(.22)),
+                  ),
+                  child: Container(
+                    color: Color(_store.backgroundColor),
+                    child: Column(
+                      children: [
+                        const IgnorePointer(
+                          child: _PreviewHeader(),
+                        ),
+                        const _PreviewDivider(),
+                        const IgnorePointer(
+                          child: _PreviewTitleBar(),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.all(10),
+                          child: Column(
+                            children: [
+                              Row(
+                                children: [
+                                  Expanded(child: _liveStatCard('إجمالي المهام', '12', Icons.task_alt, _store.primaryColor)),
+                                  const SizedBox(width: 8),
+                                  Expanded(child: _liveStatCard('قيد التنفيذ', '5', Icons.timelapse, _store.accentColor)),
+                                ],
+                              ),
+                              Row(
+                                children: [
+                                  Expanded(child: _liveStatCard('بانتظار المراجعة', '3', Icons.pending_actions_outlined, 0xFF68419A)),
+                                  const SizedBox(width: 8),
+                                  Expanded(child: _liveStatCard('مهام متأخرة', '2', Icons.schedule, 0xFFAB2B37)),
+                                ],
+                              ),
+                              _livePreviewSection('العمل والمتابعة', [
+                                _liveActionTile('إدارة مهام الجداول الموحدة', Icons.task_alt_outlined),
+                                _liveActionTile('المهام المستقلة', Icons.assignment_outlined),
+                                _liveActionTile('تقارير الموظفين', Icons.description_outlined),
+                              ]),
+                            ],
+                          ),
+                        ),
+                        const _PreviewBottomBar(),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                const Text(
+                  'هذه معاينة تفاعلية للتصميم. الأزرار فيها للعرض فقط، والتغييرات الفعلية تُحفظ من زر الحفظ أسفل المصمم.',
+                  textAlign: TextAlign.right,
+                  style: TextStyle(fontSize: 12, color: Colors.black54),
+                ),
+              ],
+            ),
+      );
+
+  Widget _liveStatCard(String title, String value, IconData icon, int color) => Card(
+        margin: const EdgeInsets.only(bottom: 8),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(_store.radius)),
+        color: Color(color).withOpacity(.12),
+        child: Padding(
+          padding: const EdgeInsets.all(10),
+          child: Column(
+            children: [
+              Icon(icon, color: Color(color)),
+              Text(value, style: TextStyle(fontSize: _store.fontSize == 'large' ? 24 : 19, fontWeight: FontWeight.w900, color: Color(color))),
+              Text(title, textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.w700)),
+            ],
+          ),
+        ),
+      );
+
+  Widget _livePreviewSection(String title, List<Widget> children) => Card(
+        margin: const EdgeInsets.only(top: 4),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(_store.radius)),
+        child: Padding(
+          padding: const EdgeInsets.all(10),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(title, textAlign: TextAlign.right, style: TextStyle(fontSize: _store.fontSize == 'large' ? 19 : 16, fontWeight: FontWeight.w900, color: Color(_store.primaryColor))),
+              const Divider(),
+              ...children,
+            ],
+          ),
+        ),
+      );
+
+  Widget _liveActionTile(String title, IconData icon) => ListTile(
+        dense: true,
+        contentPadding: EdgeInsets.zero,
+        leading: Icon(icon, color: Color(_store.primaryColor)),
+        title: Text(title, textAlign: TextAlign.right, style: const TextStyle(fontWeight: FontWeight.w700)),
+        trailing: Icon(Icons.chevron_left, color: Color(_store.primaryColor)),
       );
 
   Widget _homePreviewTab() => ListView(
@@ -1067,6 +1177,124 @@ class _AppCustomizerScreenState extends State<AppCustomizerScreen>
     if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم حفظ وتطبيق التغييرات.')));
   }
 
+}
+
+class _PreviewHeader extends StatelessWidget {
+  const _PreviewHeader();
+
+  @override
+  Widget build(BuildContext context) {
+    final store = AppCustomizer.instance;
+    return FutureBuilder<OrganizationBranding>(
+      future: OrganizationBrandingStore.instance.forSession(),
+      builder: (context, snapshot) {
+        final logoUrl = snapshot.data?.logoUrl;
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          color: Colors.white,
+          child: Row(
+            children: [
+              if (logoUrl != null && logoUrl.isNotEmpty)
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(10),
+                  child: Image.network(logoUrl, width: 48, height: 48, fit: BoxFit.contain, errorBuilder: (_, __, ___) => const _PreviewLogoFallback()),
+                )
+              else
+                const _PreviewLogoFallback(),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              children: [
+                Text(store.label('appName'), textAlign: TextAlign.center, style: const TextStyle(color: Color(0xFF0B3458), fontSize: 19, fontWeight: FontWeight.w900)),
+                Text(store.label('organizationName'), textAlign: TextAlign.center, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xFF0B3458), fontSize: 11, fontWeight: FontWeight.w700)),
+                Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                  Container(width: 14, height: 1, color: const Color(0xFFDBA62A)),
+                  const SizedBox(width: 5),
+                  Flexible(child: Text(store.label('tagline'), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xFF9A6814), fontSize: 10, fontWeight: FontWeight.w800))),
+                  const SizedBox(width: 5),
+                  Container(width: 14, height: 1, color: const Color(0xFFDBA62A)),
+                ]),
+              ],
+            ),
+          ),
+              const Icon(Icons.notifications_none, color: Color(0xFF0B3458)),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _PreviewLogoFallback extends StatelessWidget {
+  const _PreviewLogoFallback();
+
+  @override
+  Widget build(BuildContext context) => const CircleAvatar(
+        radius: 24,
+        backgroundColor: Color(0xFF0B3458),
+        child: Icon(Icons.business_outlined, color: Color(0xFFDBA62A)),
+      );
+}
+
+class _PreviewTitleBar extends StatelessWidget {
+  const _PreviewTitleBar();
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.fromLTRB(12, 10, 12, 4),
+        child: Row(
+          children: [
+            const Expanded(child: Text('الرئيسية', textAlign: TextAlign.right, style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: Color(0xFF0B3458)))),
+            Text(DateTime.now().toString().substring(0, 16), style: const TextStyle(fontSize: 10, color: Colors.black54)),
+          ],
+        ),
+      );
+}
+
+class _PreviewDivider extends StatelessWidget {
+  const _PreviewDivider();
+
+  @override
+  Widget build(BuildContext context) => const Divider(height: 1, thickness: 1);
+}
+
+class _PreviewBottomBar extends StatelessWidget {
+  const _PreviewBottomBar();
+
+  @override
+  Widget build(BuildContext context) => Container(
+        height: 58,
+        decoration: const BoxDecoration(
+          color: Color(0xFF0B3458),
+          border: Border(top: BorderSide(color: Color(0xFFDBA62A), width: 2)),
+        ),
+        child: const Row(
+          mainAxisAlignment: MainAxisAlignment.spaceAround,
+          children: [
+            _PreviewNavItem(Icons.settings_outlined, 'الإعدادات'),
+            _PreviewNavItem(Icons.task_alt_outlined, 'المهام'),
+            _PreviewNavItem(Icons.home_outlined, 'الرئيسية', selected: true),
+          ],
+        ),
+      );
+}
+
+class _PreviewNavItem extends StatelessWidget {
+  const _PreviewNavItem(this.icon, this.label, {this.selected = false});
+
+  final IconData icon;
+  final String label;
+  final bool selected;
+
+  @override
+  Widget build(BuildContext context) => Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(icon, color: selected ? const Color(0xFFDBA62A) : Colors.white70, size: 21),
+          Text(label, style: TextStyle(color: selected ? const Color(0xFFDBA62A) : Colors.white70, fontSize: 10)),
+        ],
+      );
 }
 
 class _ProfileLoader {
