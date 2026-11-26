@@ -1232,7 +1232,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
               overflow: TextOverflow.ellipsis,
             ),
             Text(
-              'التاريخ: ${_formattedDate(row['report_date'])} · الدور: ${row['role_code'] ?? 'غير محدد'}',
+              'التاريخ: ${_formattedDate(row['report_date'])} · الدور: ${uiRoleLabel('${row['role_code'] ?? ''}').isEmpty ? 'غير محدد' : uiRoleLabel('${row['role_code'] ?? ''}')}',
               textAlign: TextAlign.right,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
@@ -1507,7 +1507,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(
-              'الموظف: ${row['employee_name'] ?? 'غير محدد'} · الدور: ${row['role_code'] ?? 'غير محدد'}\nالتاريخ: ${_formattedDate(row['report_date'])}',
+              'الموظف: ${row['employee_name'] ?? 'غير محدد'} · الدور: ${uiRoleLabel('${row['role_code'] ?? ''}').isEmpty ? 'غير محدد' : uiRoleLabel('${row['role_code'] ?? ''}')}\nالتاريخ: ${_formattedDate(row['report_date'])}',
               textAlign: TextAlign.right,
             ),
             const SizedBox(height: 5),

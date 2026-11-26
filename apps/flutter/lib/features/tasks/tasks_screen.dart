@@ -9,6 +9,7 @@ import '../../core/theme.dart';
 import '../../core/offline_queue.dart';
 import '../../core/task_cache.dart';
 import '../../shared/app_shell.dart';
+import '../../shared/ui_labels.dart';
 
 class TasksScreen extends StatefulWidget {
   const TasksScreen({super.key, this.initialStatus});
@@ -1291,7 +1292,7 @@ class _TasksScreenState extends State<TasksScreen>
                   Text('${task['title'] ?? 'مهمة'}', textAlign: TextAlign.right, style: const TextStyle(fontWeight: FontWeight.w800, color: AppColors.navy)),
                   const SizedBox(height: 3),
                   Text('التاريخ: $date', textAlign: TextAlign.right, style: const TextStyle(fontSize: 12, color: AppColors.muted)),
-                  Text('المهمة: ${_statusLabels[status] ?? task['status'] ?? 'جديدة'} · التقرير: ${_reportStatusLabel(report?['status'])}', textAlign: TextAlign.right, style: const TextStyle(fontSize: 12)),
+                  Text('المهمة: ${_statusLabels[status] ?? uiStatusLabel(status)} · التقرير: ${_reportStatusLabel(report?['status'])}', textAlign: TextAlign.right, style: const TextStyle(fontSize: 12)),
                 ],
               ),
             ),

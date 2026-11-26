@@ -5,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../core/notifications_repository.dart';
 import '../core/notifications_runtime.dart';
 import '../core/theme.dart';
+import 'ui_labels.dart';
 import 'app_customizer.dart';
 import 'organization_branding.dart';
 
@@ -154,7 +155,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
           results.add(_GlobalSearchResult(
             type: 'القوالب',
             title: '${data['title'] ?? 'قالب تقرير'}',
-            subtitle: 'الدور: ${data['role_code'] ?? '—'} · السجل: ${data['id'] ?? '—'}',
+            subtitle: 'الدور: ${uiRoleLabel('${data['role_code'] ?? ''}')} · السجل: ${data['id'] ?? '—'}',
             icon: Icons.article_outlined,
             route: '/admin/report-designer',
           ));

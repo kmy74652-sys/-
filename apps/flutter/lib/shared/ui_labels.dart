@@ -8,19 +8,32 @@ String uiStatusLabel(String value) => const {
       'submitted': 'بانتظار المراجعة',
       'needs_revision': 'مرفوضة',
       'returned': 'مرفوضة',
+      'rejected': 'مرفوضة',
       'completed': 'مكتملة',
       'approved': 'معتمدة',
       'completed_approved': 'معتمدة',
       'late': 'متأخرة',
       'cancelled': 'ملغاة',
-    }[value.trim()] ?? value;
+      'active': 'نشطة',
+      'inactive': 'غير نشطة',
+      'expired': 'منتهية',
+      'terminated': 'منتهية',
+      'draft': 'مسودة',
+      'reviewed': 'تمت مراجعتها',
+      'present': 'حاضر',
+      'absent': 'غائب',
+      'leave': 'إجازة',
+      'holiday': 'عطلة',
+    }[value.trim()] ?? 'غير محددة';
 
 String uiPriorityLabel(String value) => const {
       'low': 'منخفضة',
       'normal': 'عادية',
       'high': 'عالية',
       'urgent': 'عاجلة',
-    }[value.trim()] ?? value;
+      'important': 'مهمة',
+      'critical': 'حرجة',
+    }[value.trim()] ?? 'غير محددة';
 
 String uiRoleLabel(String value) => const {
       'owner': 'صاحب المؤسسة',
@@ -28,7 +41,18 @@ String uiRoleLabel(String value) => const {
       'accountant': 'المحاسب',
       'warehouse_keeper': 'أمين المخازن',
       'warehouse_worker': 'عمال التحميل',
-    }[value.trim()] ?? value;
+      'manager': 'مدير',
+      'supervisor': 'مشرف',
+      'employee': 'موظف',
+      'admin': 'مسؤول النظام',
+    }[value.trim()] ?? 'غير محدد';
+
+String uiCurrencyLabel(String value) => const {
+      'YER': 'ريال يمني',
+      'SAR': 'ريال سعودي',
+      'USD': 'دولار أمريكي',
+      'EUR': 'يورو',
+    }[value.trim().toUpperCase()] ?? 'عملة غير محددة';
 
 String uiActivityLabel(String value) => const {
       'started': 'بدأ التنفيذ',

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../shared/app_shell.dart';
+import '../../shared/ui_labels.dart';
 import '../../core/theme.dart';
 
 class HrScreen extends StatefulWidget {
@@ -165,6 +166,8 @@ class _HrScreenState extends State<HrScreen> {
       (value as List).map((e) => Map<String, dynamic>.from(e as Map)).toList();
   String _value(dynamic value) =>
       value == null || value.toString().isEmpty ? '—' : value.toString();
+  String _statusLabel(dynamic value) =>
+      uiStatusLabel(_value(value));
   String _memberName(dynamic id) {
     for (final m in _members) {
       if (m['id'] == id) return _value(m['display_name']);
@@ -499,7 +502,7 @@ class _HrScreenState extends State<HrScreen> {
       return _card('إضافة عقد موظف', [
         _memberPicker(),
         _field('contractNo', 'رقم العقد'),
-        _field('contractType', 'نوع العقد', hint: 'employment'),
+        _field('contractType', 'نوع العقد', hint: 'دوام وظيفي'),
         _field('startDate', 'تاريخ البداية', hint: 'YYYY-MM-DD'),
         _field('endDate', 'تاريخ النهاية (اختياري)', hint: 'YYYY-MM-DD'),
         _field(
@@ -528,7 +531,7 @@ class _HrScreenState extends State<HrScreen> {
         _field(
           'attendanceStatus',
           'الحالة',
-          hint: 'present / absent / late / leave / holiday',
+          hint: 'حاضر / غائب / متأخر / إجازة / عطلة',
         ),
         _field('checkIn', 'وقت الدخول (اختياري)', hint: '08:00'),
         _field('checkOut', 'وقت الخروج (اختياري)', hint: '17:00'),
@@ -551,7 +554,7 @@ class _HrScreenState extends State<HrScreen> {
               (p) => DropdownMenuItem(
                 value: p['id'].toString(),
                 child: Text(
-                  '${_value(p['period_start'])} إلى ${_value(p['period_end'])} · ${_value(p['status'])}',
+                  '${_value(p['period_start'])} إلى ${_value(p['period_end'])} · ${_statusLabel(p['status'])}',
                   textDirection: TextDirection.rtl,
                 ),
               ),
@@ -587,7 +590,7 @@ class _HrScreenState extends State<HrScreen> {
           .map(
             (r) => _entry(
               '${_value(r['contract_no'])} — ${_memberName(r['membership_id'])}',
-              '${_value(r['start_date'])} إلى ${_value(r['end_date'])} · ${_value(r['status'])} · ${_value(r['base_salary'])} ${_value(r['salary_currency'])}',
+              '${_value(r['start_date'])} إلى ${_value(r['end_date'])} · ${_statusLabel(r['status'])} · ${_value(r['base_salary'])} ${uiCurrencyLabel(_value(r['salary_currency']))}',
             ),
           )
           .toList();
@@ -605,7 +608,7 @@ class _HrScreenState extends State<HrScreen> {
           .map(
             (r) => _entry(
               '${_value(r['work_date'])} — ${_memberName(r['membership_id'])}',
-              '${_value(r['status'])} · دخول ${_value(r['check_in_at'])} · خروج ${_value(r['check_out_at'])} · ${_value(r['note'])}',
+              '${_statusLabel(r['status'])} · دخول ${_value(r['check_in_at'])} · خروج ${_value(r['check_out_at'])} · ${_value(r['note'])}',
             ),
           )
           .toList();
@@ -614,7 +617,7 @@ class _HrScreenState extends State<HrScreen> {
       return Card(
         child: ExpansionTile(
           title: Text(
-            '${_value(r['period_start'])} إلى ${_value(r['period_end'])} · ${_value(r['status'])}',
+            '${_value(r['period_start'])} إلى ${_value(r['period_end'])} · ${_statusLabel(r['status'])}',
             textAlign: TextAlign.right,
           ),
           subtitle: Text(

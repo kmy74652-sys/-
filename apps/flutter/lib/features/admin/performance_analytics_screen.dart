@@ -5,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/theme.dart';
 import '../../shared/app_shell.dart';
+import '../../shared/ui_labels.dart';
 
 class PerformanceAnalyticsScreen extends StatefulWidget {
   const PerformanceAnalyticsScreen({super.key});
@@ -36,14 +37,6 @@ class _PerformanceAnalyticsScreenState
   RealtimeChannel? _realtime;
   Timer? _refreshTimer;
   int _loadToken = 0;
-
-  static const _roleNames = <String, String>{
-    'owner': 'صاحب المؤسسة',
-    'admin_followup': 'المدير التنفيذي',
-    'accountant': 'المحاسب',
-    'warehouse_keeper': 'أمين المخازن',
-    'warehouse_worker': 'عمال التحميل',
-  };
 
   @override
   void initState() {
@@ -271,7 +264,7 @@ class _PerformanceAnalyticsScreenState
           userId: userId,
           name: _str(member['display_name'], 'موظف'),
           roleCode: role,
-          roleName: _roleNames[role] ?? role,
+          roleName: uiRoleLabel(role),
           branchName: branchId.isEmpty
               ? 'كل الفروع'
               : (branchNames[branchId] ?? 'فرع غير محدد'),
