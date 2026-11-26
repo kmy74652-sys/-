@@ -55,7 +55,7 @@ class ReportPdfTheme {
       pw.Text(title, textDirection: pw.TextDirection.rtl, textAlign: pw.TextAlign.right, style: pw.TextStyle(fontSize: 19, fontWeight: pw.FontWeight.bold, color: heading)),
       if (details.isNotEmpty) pw.Text(details.join('   |   '), textDirection: pw.TextDirection.rtl, textAlign: pw.TextAlign.right, style: const pw.TextStyle(fontSize: 8)),
     ];
-    final row = pw.Row(textDirection: pw.TextDirection.rtl, crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+    final row = pw.Row(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
       if (settings.reportLogoPosition == 'right' && logo != null) pw.Container(width: settings.reportLogoSize, height: settings.reportLogoSize, child: pw.Image(logo!, fit: pw.BoxFit.contain)),
       pw.Expanded(child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.stretch, children: content)),
       if (settings.reportLogoPosition == 'left' && logo != null) pw.Container(width: settings.reportLogoSize, height: settings.reportLogoSize, child: pw.Image(logo!, fit: pw.BoxFit.contain)),

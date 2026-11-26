@@ -511,7 +511,7 @@ class _AppCustomizerScreenState extends State<AppCustomizerScreen>
   });
 
   Future<void> _pickReportLogo() async {
-    final result = await FilePicker.platform.pickFiles(type: FileType.image, withData: true);
+    final result = await FilePicker.pickFiles(type: FileType.image, withData: true);
     final file = result?.files.single;
     if (file?.bytes == null) return;
     setState(() { _logoBusy = true; _pendingLogoBytes = file!.bytes; _pendingLogoMime = file.extension == 'png' ? 'image/png' : file.extension == 'webp' ? 'image/webp' : 'image/jpeg'; });
