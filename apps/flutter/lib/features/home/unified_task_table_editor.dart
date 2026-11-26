@@ -516,6 +516,7 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
                                 Expanded(child: TextFormField(initialValue: '${field['label'] ?? ''}', textAlign: TextAlign.right, decoration: const InputDecoration(labelText: 'اسم الحقل', isDense: true), onChanged: (value) { field['label'] = value; _customReportSchemas[schemaKey] = schema; })),
                                 IconButton(onPressed: () { schema.removeAt(index); _customReportSchemas[unifiedTaskReportKey(row)] = schema; refresh(); }, icon: const Icon(Icons.delete_outline, color: Colors.red), tooltip: 'حذف الحقل'),
                               ]),
+                              Align(alignment: Alignment.centerRight, child: Text('المفتاح: ${field['key']}', textAlign: TextAlign.right, style: const TextStyle(fontSize: 11, color: Colors.black54))),
                               const SizedBox(height: 6),
                               Row(children: [
                                 Expanded(child: DropdownButtonFormField<String>(value: const ['text', 'textarea', 'number', 'money', 'percentage', 'date', 'select', 'checkbox', 'rating', 'attachment', 'calculated'].contains(type) ? type : 'text', decoration: const InputDecoration(labelText: 'نوع الحقل', isDense: true), items: const [
@@ -526,6 +527,21 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
                               ]),
                               if (field['type'] == 'select')
                                 TextFormField(initialValue: (field['options'] as List? ?? const []).join('، '), textAlign: TextAlign.right, decoration: const InputDecoration(labelText: 'خيارات القائمة (افصل بينها بفاصلة)', isDense: true), onChanged: (value) { field['options'] = value.split(RegExp(r'[,،]')).map((item) => item.trim()).where((item) => item.isNotEmpty).toList(); _customReportSchemas[schemaKey] = schema; }),
+                              if (field['type'] == 'calculated')
+                                TextFormField(
+                                  initialValue: '${(field['config'] as Map?)?['formula'] ?? ''}',
+                                  textAlign: TextAlign.right,
+                                  decoration: const InputDecoration(
+                                    labelText: 'قاعدة الحساب / المعادلة',
+                                    hintText: '{collected_amount} - {outstanding_amount}',
+                                    helperText: 'استخدم مفاتيح الحقول بين { } والعمليات + - * / والأقواس.',
+                                    isDense: true,
+                                  ),
+                                  onChanged: (value) {
+                                    field['config'] = {'formula': value.trim()};
+                                    _customReportSchemas[schemaKey] = schema;
+                                  },
+                                ),
                             ],
                           ),
                         ),
