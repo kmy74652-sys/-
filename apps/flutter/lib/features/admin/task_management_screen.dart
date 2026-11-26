@@ -394,31 +394,6 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
   List<Map<String, dynamic>> get _managedTasks =>
       _tasks.where((task) => _isUnifiedTask(task) == widget.unifiedOnly).toList();
 
-  int get _activeFilterCount =>
-      (_taskFilter == 'all' ? 0 : 1) +
-      (_reportFilter == 'all' ? 0 : 1) +
-      (_employeeFilter == 'all' ? 0 : 1);
-
-  String get _filterSummary {
-    final values = <String>[];
-    if (_taskFilter != 'all') {
-      values.add(const {
-        'pending': 'جديدة',
-        'received': 'مستلمة',
-        'in_progress': 'قيد التنفيذ',
-        'submitted': 'للمراجعة',
-        'needs_revision': 'تحتاج تصحيحًا',
-        'completed_approved': 'معتمدة',
-        'late': 'متأخرة',
-      }[_taskFilter] ?? _taskFilter);
-    }
-    if (_reportFilter != 'all') values.add(_reportFilter);
-    if (_employeeFilter != 'all') {
-      values.add(_employeeName(_employeeFilter));
-    }
-    return values.join(' · ');
-  }
-
   Widget _filterChip({required String value, required String label, required String group, required VoidCallback onSelected}) =>
       ChoiceChip(
         label: Padding(
@@ -439,6 +414,16 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
       children: chips,
     );
   }
+
+  Widget _filterField({required String label, required List<Widget> chips}) =>
+      InputDecorator(
+        decoration: InputDecoration(
+          labelText: label,
+          border: const OutlineInputBorder(),
+          contentPadding: const EdgeInsets.fromLTRB(12, 16, 12, 12),
+        ),
+        child: _filterRow(chips),
+      );
 
   void _resetFilters() => setState(() {
         _taskFilter = 'all';
@@ -914,60 +899,18 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         Row(
-                          textDirection: Directionality.of(context),
+                          textDirection: TextDirection.rtl,
                           children: [
-                            Expanded(
-                              child: InkWell(
-                                borderRadius: BorderRadius.circular(10),
-                                onTap: () => setState(() => _filtersExpanded = !_filtersExpanded),
-                                child: Padding(
-                                  padding: const EdgeInsets.symmetric(vertical: 4),
-                                  child: Row(
-                                    textDirection: Directionality.of(context),
-                                    children: [
-                                      AnimatedRotation(
-                                        turns: _filtersExpanded ? .5 : 0,
-                                        duration: const Duration(milliseconds: 220),
-                                        child: const Icon(Icons.expand_more, color: AppColors.navy),
-                                      ),
-                                      const SizedBox(width: 4),
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.end,
-                                          children: [
-                                            Row(
-                                              mainAxisAlignment: MainAxisAlignment.end,
-                                              children: [
-                                                Text(
-                                                  _filtersExpanded ? 'إخفاء' : 'إظهار',
-                                                  style: const TextStyle(fontSize: 11, color: AppColors.muted),
-                                                ),
-                                                const SizedBox(width: 7),
-                                                const Text(
-                                                  'تصفية المتابعة',
-                                                  style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: AppColors.navy),
-                                                ),
-                                              ],
-                                            ),
-                                            if (!_filtersExpanded && _activeFilterCount > 0)
-                                              Text(
-                                                'نشط: $_activeFilterCount · $_filterSummary',
-                                                textAlign: TextAlign.right,
-                                                overflow: TextOverflow.ellipsis,
-                                                style: const TextStyle(fontSize: 11, color: AppColors.green, fontWeight: FontWeight.w700),
-                                              ),
-                                          ],
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
+                            IconButton(
+                              tooltip: _filtersExpanded ? 'إخفاء الفلاتر' : 'إظهار الفلاتر',
+                              onPressed: () => setState(() => _filtersExpanded = !_filtersExpanded),
+                              icon: Icon(_filtersExpanded ? Icons.expand_less : Icons.expand_more),
                             ),
-                            TextButton.icon(
+                            const Spacer(),
+                            IconButton(
+                              tooltip: 'إعادة تعيين الفلاتر',
                               onPressed: _resetFilters,
-                              icon: const Icon(Icons.restart_alt, size: 18),
-                              label: const Text('إعادة تعيين'),
+                              icon: const Icon(Icons.restart_alt),
                             ),
                           ],
                         ),
@@ -1012,48 +955,24 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
                         ),
                         const SizedBox(height: 12),
                       ],
-                      const Text(
-                        'حالة المهمة',
-                        textAlign: TextAlign.right,
-                        style: TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                      const SizedBox(height: 6),
-                      _filterRow([
+                      _filterField(label: 'حالة المهمة', chips: [
                           _filterChip(value: 'all', label: 'الكل', group: 'task', onSelected: () => _taskFilter = 'all'),
                           _filterChip(value: 'pending', label: 'جديدة', group: 'task', onSelected: () => _taskFilter = 'pending'),
                           _filterChip(value: 'received', label: 'مستلمة', group: 'task', onSelected: () => _taskFilter = 'received'),
-                      ]),
-                      const SizedBox(height: 6),
-                      _filterRow([
                         _filterChip(value: 'in_progress', label: 'قيد التنفيذ', group: 'task', onSelected: () => _taskFilter = 'in_progress'),
                         _filterChip(value: 'submitted', label: 'للمراجعة', group: 'task', onSelected: () => _taskFilter = 'submitted'),
                         _filterChip(value: 'needs_revision', label: 'تحتاج تصحيحًا', group: 'task', onSelected: () => _taskFilter = 'needs_revision'),
-                      ]),
-                      const SizedBox(height: 6),
-                      _filterRow([
                         _filterChip(value: 'completed_approved', label: 'معتمدة', group: 'task', onSelected: () => _taskFilter = 'completed_approved'),
                         _filterChip(value: 'late', label: 'متأخرة', group: 'task', onSelected: () => _taskFilter = 'late'),
                       ]),
                       const SizedBox(height: 12),
-                      const Text(
-                        'حالة التقرير',
-                        textAlign: TextAlign.right,
-                        style: TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                      const SizedBox(height: 6),
-                      _filterRow([
+                      _filterField(label: 'حالة التقرير', chips: [
                           _filterChip(value: 'all', label: 'الكل', group: 'report', onSelected: () => _reportFilter = 'all'),
                           _filterChip(value: 'لم يبدأ', label: 'لم يبدأ', group: 'report', onSelected: () => _reportFilter = 'لم يبدأ'),
                           _filterChip(value: 'مسودة', label: 'مسودة', group: 'report', onSelected: () => _reportFilter = 'مسودة'),
-                      ]),
-                      const SizedBox(height: 6),
-                      _filterRow([
                         _filterChip(value: 'مرسل للمراجعة', label: 'مرسل للمراجعة', group: 'report', onSelected: () => _reportFilter = 'مرسل للمراجعة'),
                         _filterChip(value: 'يحتاج تعديل', label: 'يحتاج تعديل', group: 'report', onSelected: () => _reportFilter = 'يحتاج تعديل'),
                         _filterChip(value: 'معتمد', label: 'معتمد', group: 'report', onSelected: () => _reportFilter = 'معتمد'),
-                      ]),
-                      const SizedBox(height: 6),
-                      _filterRow([
                         _filterChip(value: 'بدون تقرير', label: 'بدون تقرير', group: 'report', onSelected: () => _reportFilter = 'بدون تقرير'),
                       ]),
                     ],
