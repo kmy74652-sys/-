@@ -17,6 +17,7 @@ class PerformanceAnalyticsScreen extends StatefulWidget {
 class _PerformanceAnalyticsScreenState
     extends State<PerformanceAnalyticsScreen> {
   bool _loading = true;
+  bool _overviewExpanded = false;
   String? _error;
   String _search = '';
   String _sort = 'completion';
@@ -615,10 +616,24 @@ class _PerformanceAnalyticsScreenState
 
   Widget _overviewCard() => SectionCard(
     title: 'المؤشرات العامة',
-    child: Wrap(
-      spacing: 9,
-      runSpacing: 9,
-      children: [
+    trailing: TextButton.icon(
+      onPressed: () => setState(() => _overviewExpanded = !_overviewExpanded),
+      icon: Icon(
+        _overviewExpanded ? Icons.expand_less : Icons.expand_more,
+        size: 20,
+      ),
+      label: Text(_overviewExpanded ? 'إخفاء' : 'إظهار'),
+    ),
+    child: AnimatedSize(
+      duration: const Duration(milliseconds: 220),
+      curve: Curves.easeInOut,
+      alignment: Alignment.topCenter,
+      child: _overviewExpanded
+          ? Wrap(
+              alignment: WrapAlignment.center,
+              spacing: 9,
+              runSpacing: 9,
+              children: [
         _metric(
           'معدل إنجاز المهام',
           '${_rate.toStringAsFixed(1)}%',
@@ -673,9 +688,56 @@ class _PerformanceAnalyticsScreenState
           'تحتاج تعديل الموظف',
           Icons.replay_outlined,
         ),
-      ],
+              ],
+            )
+          : _overviewSummary(),
     ),
   );
+
+  Widget _overviewSummary() => Wrap(
+    alignment: WrapAlignment.center,
+    spacing: 7,
+    runSpacing: 7,
+    children: [
+      _compactMetric(
+        'الإنجاز',
+        '${_rate.toStringAsFixed(0)}% ($_done/$_required)',
+        Icons.task_alt,
+      ),
+      _compactMetric('المتأخرة', '$_delayed', Icons.schedule),
+      _compactMetric('التقارير', '$_reports', Icons.assessment_outlined),
+      _compactMetric(
+        'المراجعة',
+        '${_reportStatusCounts['submitted'] ?? 0}',
+        Icons.pending_actions_outlined,
+      ),
+    ],
+  );
+
+  Widget _compactMetric(String title, String value, IconData icon) =>
+      Container(
+        constraints: const BoxConstraints(minWidth: 112),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF7FAF9),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: const Color(0xFFDDE8E4)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 18, color: AppColors.green),
+            const SizedBox(width: 6),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(value, style: const TextStyle(fontWeight: FontWeight.w900, color: AppColors.navy)),
+                Text(title, style: const TextStyle(fontSize: 11, color: AppColors.muted)),
+              ],
+            ),
+          ],
+        ),
+      );
 
   Widget _reportStatusCard() {
     final items = <(String, String, Color)>[
