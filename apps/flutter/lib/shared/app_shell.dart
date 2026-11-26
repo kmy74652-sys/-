@@ -834,10 +834,10 @@ class _BrandHeaderState extends State<_BrandHeader> {
                 onPressed: widget.onSearch,
                 style: IconButton.styleFrom(
                   fixedSize: Size.square(controlSize),
-                  backgroundColor: const Color(0xFFF4F8FB),
                   foregroundColor: _navy,
-                  side: const BorderSide(color: Color(0xFFD5E0EA)),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  backgroundColor: Colors.transparent,
+                  shadowColor: Colors.transparent,
+                  shape: const CircleBorder(),
                 ),
                 icon: const Icon(Icons.search, size: 23),
               ),
@@ -845,7 +845,7 @@ class _BrandHeaderState extends State<_BrandHeader> {
               IconButton(
                 tooltip: 'تبديل الحساب: تسجيل الخروج',
                 onPressed: widget.onAccount,
-                style: IconButton.styleFrom(fixedSize: Size.square(controlSize), backgroundColor: const Color(0xFFF4F8FB), foregroundColor: _navy, side: const BorderSide(color: Color(0xFFD5E0EA)), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+                style: IconButton.styleFrom(fixedSize: Size.square(controlSize), backgroundColor: Colors.transparent, foregroundColor: _navy, shadowColor: Colors.transparent, shape: const CircleBorder()),
                 icon: const Icon(Icons.account_circle_outlined, size: 23),
               ),
               SizedBox(width: controlGap),

@@ -31,7 +31,7 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
   Map<String, Map<String, dynamic>> _reportByTask = {};
   Map<String, Map<String, dynamic>> _draftByTask = {};
   final Set<String> _expandedUnifiedTasks = <String>{};
-  String _taskFilter = 'all', _reportFilter = 'all';
+  String _taskFilter = 'pending', _reportFilter = 'all';
   String _employeeFilter = 'all';
   bool _filtersExpanded = false;
   bool _canManageActions = false;
