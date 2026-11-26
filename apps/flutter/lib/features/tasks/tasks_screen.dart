@@ -48,7 +48,7 @@ class _TasksScreenState extends State<TasksScreen>
     'pending': 'جديدة',
     'in_progress': 'قيد التنفيذ',
     'submitted': 'بانتظار المراجعة',
-    'approved': 'معتمدة / مكتملة',
+    'approved': 'معتمدة',
     'rejected': 'مرفوضة',
     'late': 'متأخرة',
   };
