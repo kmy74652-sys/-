@@ -110,15 +110,27 @@ class _SettingsScreenState extends State<SettingsScreen> {
           .select('name,settings')
           .eq('id', _organizationId)
           .maybeSingle();
-      _brandName.text = '${brand?['name'] ?? ''}';
+      var organizationName = '${brand?['name'] ?? ''}'.trim();
       final settings = Map<String, dynamic>.from(
         brand?['settings'] as Map? ?? {},
       );
       final branding = Map<String, dynamic>.from(
         settings['branding'] as Map? ?? {},
       );
-      _tagline.text = '${branding['tagline'] ?? ''}';
-      _logoUrl = branding['logo_url'] as String?;
+      var tagline = '${branding['tagline'] ?? ''}'.trim();
+      var logoUrl = branding['logo_url'] as String?;
+      // قد تمنع RLS قراءة صف organizations مباشرة رغم أن ترويسة التطبيق
+      // قادرة على قراءة الهوية من المصدر المخصص للجلسة. لا نترك حقل الاسم
+      // فارغًا لأن RPC الحفظ يرفضه عمدًا.
+      if (organizationName.isEmpty || tagline.isEmpty || logoUrl == null) {
+        final sessionBranding = await OrganizationBrandingStore.instance.forSession();
+        if (organizationName.isEmpty) organizationName = sessionBranding.name.trim();
+        if (tagline.isEmpty) tagline = sessionBranding.tagline.trim();
+        logoUrl ??= sessionBranding.logoUrl;
+      }
+      _brandName.text = organizationName;
+      _tagline.text = tagline;
+      _logoUrl = logoUrl;
       return true;
     } catch (_) {
       _error = 'تعذر تحميل الإعدادات. تحقق من الصلاحيات والاتصال.';
@@ -502,6 +514,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Future<void> _saveBrand() async {
     if (!_owner || _organizationId.isEmpty || _brandBusy) return;
+    if (_brandName.text.trim().length < 2) {
+      setState(() => _error = 'أدخل اسم المؤسسة قبل حفظ الهوية.');
+      return;
+    }
     setState(() {
       _brandBusy = true;
       _error = null;
