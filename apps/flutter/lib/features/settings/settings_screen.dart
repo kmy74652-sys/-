@@ -22,6 +22,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _branchManagementAllowed = false;
   bool _activityAllowed = false;
   bool _brandBusy = false;
+  bool _identityExpanded = true;
   String? _error;
   String _organizationId = '';
   String? _logoUrl;
@@ -612,6 +613,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
+  Future<void> _removeLogo() async {
+    if (!_owner || _brandBusy) return;
+    setState(() {
+      _pendingLogoBytes = null;
+      _pendingLogoMime = null;
+      _logoUrl = null;
+    });
+    await _saveBrand();
+  }
+
   @override
   Widget build(BuildContext context) => AppShell(
     title: 'الموظفون والإعدادات',
@@ -649,68 +660,53 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          const Text(
-                            'هوية المؤسسة',
-                            textAlign: TextAlign.right,
-                            style: TextStyle(fontWeight: FontWeight.bold),
+                          Row(
+                            textDirection: TextDirection.rtl,
+                            children: [
+                              const Expanded(
+                                child: Text(
+                                  'هوية المؤسسة',
+                                  textAlign: TextAlign.right,
+                                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17),
+                                ),
+                              ),
+                              IconButton(
+                                tooltip: _identityExpanded ? 'إخفاء الهوية' : 'إظهار الهوية',
+                                onPressed: () => setState(() => _identityExpanded = !_identityExpanded),
+                                icon: Icon(_identityExpanded ? Icons.visibility_outlined : Icons.visibility_off_outlined),
+                              ),
+                            ],
                           ),
-                          const SizedBox(height: 12),
-                          Container(
-                            height: 150,
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: AppColors.canvas,
-                              borderRadius: BorderRadius.circular(16),
-                              border: Border.all(color: AppColors.border),
+                          if (_identityExpanded) ...[
+                            const Divider(height: 20),
+                            Container(
+                              height: 150,
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: AppColors.canvas,
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(color: AppColors.border),
+                              ),
+                              child: _pendingLogoBytes != null
+                                  ? Image.memory(_pendingLogoBytes!, fit: BoxFit.contain)
+                                  : (_logoUrl != null && _logoUrl!.isNotEmpty
+                                        ? Image.network(_logoUrl!, fit: BoxFit.contain, errorBuilder: (_, __, ___) => const Icon(Icons.business_outlined, size: 64))
+                                        : const Icon(Icons.business_outlined, size: 64)),
                             ),
-                            child: _pendingLogoBytes != null
-                                ? Image.memory(
-                                    _pendingLogoBytes!,
-                                    fit: BoxFit.contain,
-                                  )
-                                : (_logoUrl != null && _logoUrl!.isNotEmpty
-                                      ? Image.network(
-                                          _logoUrl!,
-                                          fit: BoxFit.contain,
-                                          errorBuilder: (_, __, ___) => const Icon(
-                                            Icons.business_outlined,
-                                            size: 64,
-                                          ),
-                                        )
-                                      : const Icon(
-                                          Icons.business_outlined,
-                                          size: 64,
-                                        )),
-                          ),
-                          const SizedBox(height: 12),
-                          TextField(
-                            controller: _brandName,
-                            decoration: const InputDecoration(
-                              labelText: 'اسم المؤسسة',
+                            const SizedBox(height: 12),
+                            TextField(controller: _brandName, decoration: const InputDecoration(labelText: 'اسم المؤسسة')),
+                            TextField(controller: _tagline, decoration: const InputDecoration(labelText: 'العبارة التعريفية')),
+                            Row(
+                              textDirection: TextDirection.rtl,
+                              children: [
+                                Expanded(child: OutlinedButton.icon(onPressed: _brandBusy ? null : _pickLogo, icon: const Icon(Icons.add_photo_alternate_outlined), label: const Text('إضافة الشعار'))),
+                                const SizedBox(width: 8),
+                                IconButton(tooltip: 'حذف الشعار', onPressed: _brandBusy || (_logoUrl == null && _pendingLogoBytes == null) ? null : _removeLogo, icon: const Icon(Icons.delete_outline, color: Colors.red)),
+                              ],
                             ),
-                          ),
-                          TextField(
-                            controller: _tagline,
-                            decoration: const InputDecoration(
-                              labelText: 'العبارة التعريفية',
-                            ),
-                          ),
-                          OutlinedButton.icon(
-                            onPressed: _brandBusy ? null : _pickLogo,
-                            icon: const Icon(Icons.image_outlined),
-                            label: const Text(
-                              'اختيار شعار (JPEG أو PNG أو WebP، حتى 5 ميجابايت)',
-                            ),
-                          ),
-                          if (_brandBusy) const LinearProgressIndicator(),
-                          FilledButton(
-                            onPressed: _brandBusy ? null : _saveBrand,
-                            child: Text(
-                              _brandBusy
-                                  ? 'جارٍ رفع الشعار وحفظ الهوية…'
-                                  : 'حفظ الهوية',
-                            ),
-                          ),
+                            if (_brandBusy) const LinearProgressIndicator(),
+                            FilledButton(onPressed: _brandBusy ? null : _saveBrand, child: Text(_brandBusy ? 'جارٍ حفظ الهوية…' : 'حفظ الهوية')),
+                          ],
                         ],
                       ),
                     ),
