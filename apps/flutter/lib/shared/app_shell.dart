@@ -337,7 +337,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     if (_canCustomizer) {
       items.add(
         const _NavigationItem(
-          'تخصيص الواجهات',
+          'مصمم الواجهات والتحكم الشامل',
           '/admin/customizer',
           Icons.palette_outlined,
         ),
