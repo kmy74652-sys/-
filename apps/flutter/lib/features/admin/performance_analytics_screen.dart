@@ -30,8 +30,6 @@ class _PerformanceAnalyticsScreenState
   List<_Employee> _employees = [];
   List<_Branch> _branches = [];
   Map<String, int> _reportStatusCounts = {};
-  int _reportRequiredTasks = 0;
-  int _reportReadyTasks = 0;
   RealtimeChannel? _realtime;
   Timer? _refreshTimer;
   int _loadToken = 0;
@@ -196,7 +194,6 @@ class _PerformanceAnalyticsScreenState
       final reportCounts = <String, int>{};
       final approvedReportCounts = <String, int>{};
       final reportStatusCounts = <String, int>{};
-      final latestReportByTask = <String, String>{};
       for (final row in taskReports) {
         final task = taskById[_str(row['task_id'])];
         if (task == null ||
@@ -214,7 +211,6 @@ class _PerformanceAnalyticsScreenState
         final status = _str(row['status']);
         if (status.isNotEmpty) {
           reportStatusCounts[status] = (reportStatusCounts[status] ?? 0) + 1;
-          latestReportByTask.putIfAbsent(_str(row['task_id']), () => status);
         }
       }
       if (_taskSource != 'unified') {
@@ -270,8 +266,6 @@ class _PerformanceAnalyticsScreenState
           approvedReports: approvedReportCounts[userId] ?? 0,
         );
       }
-      var reportRequiredTasks = 0;
-      var reportReadyTasks = 0;
       for (final task in evaluationTasks) {
         final dueDate = DateTime.tryParse(_str(task['due_at']))?.toLocal();
         if (!_matchesTaskFilter(task)) continue;
@@ -279,13 +273,6 @@ class _PerformanceAnalyticsScreenState
         if (employee == null) continue;
         final status = _str(task['status']);
         final priority = _str(task['priority'], 'normal');
-        if (task['report_required'] == true) {
-          reportRequiredTasks++;
-          final reportStatus = latestReportByTask[_str(task['id'])];
-          if (reportStatus == 'submitted' || reportStatus == 'approved') {
-            reportReadyTasks++;
-          }
-        }
         final bucket = ['low', 'normal', 'high', 'urgent'].contains(priority)
             ? priority
             : 'normal';
@@ -336,8 +323,6 @@ class _PerformanceAnalyticsScreenState
         _branches = branchMap.values.toList()
           ..sort((a, b) => b.rate.compareTo(a.rate));
         _reportStatusCounts = reportStatusCounts;
-        _reportRequiredTasks = reportRequiredTasks;
-        _reportReadyTasks = reportReadyTasks;
         _employeeOptions = employeeOptions;
       });
     } catch (error) {
@@ -393,15 +378,6 @@ class _PerformanceAnalyticsScreenState
     }
     return list;
   }
-
-  int get _required => _employees.fold(0, (sum, e) => sum + e.totalRequired);
-  int get _done => _employees.fold(0, (sum, e) => sum + e.totalDone);
-  int get _delayed => _employees.fold(0, (sum, e) => sum + e.delayed);
-  int get _reports => _employees.fold(0, (sum, e) => sum + e.reports);
-  double get _rate => _required == 0 ? 0 : _done * 100 / _required;
-  double get _reportCoverageRate => _reportRequiredTasks == 0
-      ? 0
-      : _reportReadyTasks * 100 / _reportRequiredTasks;
 
   @override
   Widget build(BuildContext context) => Directionality(
@@ -638,78 +614,6 @@ class _PerformanceAnalyticsScreenState
       ],
     ),
   );
-
-  Widget _metric(String title, String value, String caption, IconData icon) =>
-      SizedBox(
-        width: 155,
-        child: Card(
-          color: const Color(0xFFF7FAF9),
-          child: Padding(
-            padding: const EdgeInsets.all(12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Icon(icon, color: AppColors.green),
-                const SizedBox(height: 6),
-                Text(
-                  value,
-                  style: const TextStyle(
-                    fontSize: 23,
-                    fontWeight: FontWeight.w900,
-                    color: AppColors.navy,
-                  ),
-                ),
-                Text(
-                  title,
-                  textAlign: TextAlign.right,
-                  style: const TextStyle(fontWeight: FontWeight.w700),
-                ),
-                Text(
-                  caption,
-                  textAlign: TextAlign.right,
-                  style: const TextStyle(fontSize: 11, color: AppColors.muted),
-                ),
-              ],
-            ),
-          ),
-        ),
-      );
-
-  Widget _latency(String title, int? milliseconds, int samples) {
-    final label = milliseconds == null
-        ? 'لا توجد بيانات'
-        : _duration(milliseconds);
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF7FAF9),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: [
-          Text(
-            title,
-            textAlign: TextAlign.right,
-            style: const TextStyle(fontWeight: FontWeight.w700),
-          ),
-          const SizedBox(height: 7),
-          Text(
-            label,
-            style: const TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w900,
-              color: AppColors.green,
-            ),
-          ),
-          Text(
-            '$samples عينة',
-            style: const TextStyle(fontSize: 11, color: AppColors.muted),
-          ),
-        ],
-      ),
-    );
-  }
 
   String _duration(int ms) {
     final mins = ms ~/ 60000;

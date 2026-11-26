@@ -187,7 +187,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
       context: context,
       builder: (dialogContext) => StatefulBuilder(
         builder: (context, setDialogState) => Directionality(
-          textDirection: TextDirection.rtl,
+          textDirection: Directionality.of(context),
           child: AlertDialog(
             title: const Text('بحث عام داخل التطبيق'),
             content: SizedBox(
@@ -326,8 +326,6 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
   bool _can(String permission) => _permissions.contains(permission);
 
   bool get _managesTasks => _can('tasks.manage');
-
-  bool get _canCustomizer => _managesTasks && _can('customizer.manage');
 
   @override
   void dispose() {

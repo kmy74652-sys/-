@@ -121,7 +121,6 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
-        textDirection: TextDirection.rtl,
         children: [
           Icon(icon, size: 19, color: color ?? Colors.blueGrey.shade600),
           const SizedBox(width: 8),
@@ -1018,7 +1017,6 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
                                         crossAxisAlignment: CrossAxisAlignment.stretch,
                                         children: [
                                           Row(
-                                            textDirection: TextDirection.rtl,
                                             crossAxisAlignment: CrossAxisAlignment.start,
                                             children: [
                                               CircleAvatar(
