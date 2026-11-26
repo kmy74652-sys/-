@@ -618,7 +618,7 @@ class _AppCustomizerScreenState extends State<AppCustomizerScreen>
   Widget _unifiedTableTab() => ListView(
         padding: const EdgeInsets.all(12),
         children: [
-          _intro('تخصيص الجدول الموحد من المعاينة', 'اضغط على العناوين لتعديلها مباشرة، واستخدم أدوات كل قسم لإظهاره أو إخفائه وتحريكه دون مغادرة المعاينة.'),
+          _intro('تخصيص الجدول الموحد من المعاينة', 'اضغط على العناوين لتعديلها مباشرة، واستخدم أدوات كل قسم لإظهاره أو إخفائه وتحريكه دون مغادرة المعاينة. سيُستخدم نفس الترتيب والمحتوى عند تصدير PDF الجدول الموحد.'),
           _previewControls(),
           const SizedBox(height: 10),
           _devicePreview(),

@@ -928,6 +928,56 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
           pw.SizedBox(height: 8),
         ],
       );
+      final store = AppCustomizer.instance;
+      final sections = <String, pw.Widget>{
+        'employee': _pdfInfoTable(),
+        'purpose': pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.stretch, children: [
+          _pdfHeading(store.unifiedLabel('purpose')),
+          pw.Text(_pdfSafeText(_purpose.text.trim().isEmpty ? 'لا يوجد' : _purpose.text), textDirection: pw.TextDirection.rtl),
+        ]),
+        'hours': pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.stretch, children: [
+          _pdfHeading(store.unifiedLabel('hours')),
+          pw.Text(_pdfSafeText('نوع الدوام: $_workType   -   الأيام: $_days   -   الفترة الأولى: ${_firstPeriod.text.trim().isEmpty ? 'لا يوجد' : _firstPeriod.text}   -   الاستراحة: ${_breakPeriod.text.trim().isEmpty ? 'لا يوجد' : _breakPeriod.text}   -   الفترة الثانية: ${_secondPeriod.text.trim().isEmpty ? 'لا يوجد' : _secondPeriod.text}   -   الاستثناء: $_exception'), textDirection: pw.TextDirection.rtl),
+        ]),
+        'daily': pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.stretch, children: [
+          _pdfHeading(store.unifiedLabel('daily')),
+          _pdfScheduleTable(rows),
+        ]),
+        'exception': pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.stretch, children: [
+          _pdfHeading(store.unifiedLabel('exception')),
+          _pdfScheduleTable([..._exceptionRows].map((row) => [_pdfSafeText(row.time.text), _pdfSafeText(row.task.text), _pdfSafeText(row.output.text), 'جديدة']).toList()),
+        ]),
+        'lists': pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.stretch, children: [
+          listSection('المسؤوليات الأساسية', _responsibilities),
+          listSection('الصلاحيات وحدود المسؤولية', _authorities),
+          listSection('التوصيات والتعليمات الإدارية', _instructions),
+        ]),
+        'kpi': pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.stretch, children: [
+          _pdfHeading(store.unifiedLabel('kpi')),
+          _pdfKpiTable(),
+        ]),
+        'report': pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.stretch, children: [
+          _pdfHeading(store.unifiedLabel('report')),
+          pw.Text(_pdfSafeText(_selectedReport == null ? 'لا يوجد' : '${_selectedReport!.title} - الإصدار ${_selectedReport!.versionNumber} - ${_selectedReport!.fieldCount} حقول (${_selectedReport!.requiredFieldCount} إلزامية)'), textDirection: pw.TextDirection.rtl),
+        ]),
+        'notes': pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.stretch, children: [
+          _pdfHeading(store.unifiedLabel('notes')),
+          pw.Text(_pdfSafeText(_reportNotes.text.trim().isEmpty ? 'لا يوجد' : _reportNotes.text), textDirection: pw.TextDirection.rtl),
+        ]),
+        'approval': pw.Table(
+          border: reportTheme.tableBorder,
+          children: [pw.TableRow(children: [
+            _pdfCell('إقرار الموظف\nالاسم والتوقيع: يترك للتوقيع'),
+            _pdfCell('مراجعة المسؤول المباشر\nالاسم والتوقيع: يترك للتوقيع'),
+            _pdfCell('اعتماد المدير\nالاسم والتوقيع: يترك للتوقيع'),
+          ])],
+        ),
+      };
+      final orderedSections = store.unifiedSectionOrder
+          .where(store.isUnifiedVisible)
+          .where(sections.containsKey)
+          .map((key) => sections[key]!)
+          .toList();
       document.addPage(
         pw.MultiPage(
           pageFormat: PdfPageFormat.a4,
@@ -935,37 +985,10 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
           build: (context) => [
             reportTheme.header('الجدول الموحد لإنشاء وتنفيذ المهام', employee: _employee.text, branch: _branch.text),
             pw.SizedBox(height: 12),
-            _pdfInfoTable(),
-            pw.SizedBox(height: 12),
-            _pdfHeading('الهدف من الوظيفة'),
-            pw.Text(_pdfSafeText(_purpose.text.trim().isEmpty ? 'لا يوجد' : _purpose.text), textDirection: pw.TextDirection.rtl),
-            pw.SizedBox(height: 10),
-            _pdfHeading('ساعات الدوام والاستثناء الأسبوعي'),
-            pw.Text(_pdfSafeText('نوع الدوام: $_workType   |   الأيام: $_days   |   الفترة الأولى: ${_firstPeriod.text.trim().isEmpty ? 'لا يوجد' : _firstPeriod.text}   |   الاستراحة: ${_breakPeriod.text.trim().isEmpty ? 'لا يوجد' : _breakPeriod.text}   |   الفترة الثانية: ${_secondPeriod.text.trim().isEmpty ? 'لا يوجد' : _secondPeriod.text}   |   الاستثناء: $_exception'), textDirection: pw.TextDirection.rtl),
-            pw.SizedBox(height: 12),
-            _pdfHeading('الجدول الزمني اليومي'),
-            _pdfScheduleTable(rows),
-            pw.SizedBox(height: 12),
-            listSection('المسؤوليات الأساسية', _responsibilities),
-            listSection('الصلاحيات وحدود المسؤولية', _authorities),
-            listSection('التوصيات والتعليمات الإدارية', _instructions),
-            _pdfHeading('مؤشرات تقييم الأداء'),
-            _pdfKpiTable(),
-            pw.SizedBox(height: 12),
-            _pdfHeading('قالب التقرير اليومي'),
-            pw.Text(_pdfSafeText(_selectedReport == null ? 'لا يوجد' : '${_selectedReport!.title} - الإصدار ${_selectedReport!.versionNumber} - ${_selectedReport!.fieldCount} حقول (${_selectedReport!.requiredFieldCount} إلزامية)'), textDirection: pw.TextDirection.rtl),
-            pw.SizedBox(height: 6),
-            _pdfHeading('ملاحظات وتعليمات إضافية'),
-            pw.Text(_pdfSafeText(_reportNotes.text.trim().isEmpty ? 'لا يوجد' : _reportNotes.text), textDirection: pw.TextDirection.rtl),
-            pw.SizedBox(height: 20),
-            pw.Table(
-              border: reportTheme.tableBorder,
-              children: [pw.TableRow(children: [
-                _pdfCell('إقرار الموظف\nالاسم والتوقيع: يترك للتوقيع'),
-                _pdfCell('مراجعة المسؤول المباشر\nالاسم والتوقيع: يترك للتوقيع'),
-                _pdfCell('اعتماد المدير\nالاسم والتوقيع: يترك للتوقيع'),
-              ])],
-            ),
+            for (final section in orderedSections) ...[
+              section,
+              pw.SizedBox(height: 12),
+            ],
             reportTheme.footer(),
           ],
         ),
@@ -985,13 +1008,30 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
     child: pw.Text(_pdfSafeText(title), textDirection: pw.TextDirection.rtl, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, color: PdfColor.fromHex('#123B5D'))),
   );
 
-  pw.Widget _pdfInfoTable() => pw.Table(
-    border: pw.TableBorder.all(color: PdfColor.fromHex('#B8CEC5')),
-    children: [
-      pw.TableRow(children: [_pdfCell('الموظف / المجموعة\n${_employee.text.trim().isEmpty ? '—' : _employee.text.trim()}'), _pdfCell('المسمى الوظيفي\n${_role.text.trim().isEmpty ? '—' : _role.text.trim()}')]),
-      pw.TableRow(children: [_pdfCell('الفرع\n${_branch.text.trim().isEmpty ? '—' : _branch.text.trim()}'), _pdfCell('تاريخ بدء التطبيق\n${_startDate.text.trim().isEmpty ? '—' : _startDate.text.trim()}')]),
-    ],
-  );
+  pw.Widget _pdfInfoTable() {
+    final store = AppCustomizer.instance;
+    final fields = <String, String>{
+      'employeeField': '${store.unifiedLabel('employeeField')}\n${_employee.text.trim().isEmpty ? '—' : _employee.text.trim()}',
+      'roleField': '${store.unifiedLabel('roleField')}\n${_role.text.trim().isEmpty ? '—' : _role.text.trim()}',
+      'branchField': '${store.unifiedLabel('branchField')}\n${_branch.text.trim().isEmpty ? '—' : _branch.text.trim()}',
+      'startDate': '${store.unifiedLabel('startDate')}\n${_startDate.text.trim().isEmpty ? '—' : _startDate.text.trim()}',
+    };
+    final visible = fields.keys.where(store.isUnifiedFieldVisible).toList()
+      ..sort((a, b) {
+        final left = store.unifiedFieldLayout(a);
+        final right = store.unifiedFieldLayout(b);
+        final row = (left['row'] as int).compareTo(right['row'] as int);
+        return row == 0 ? (left['column'] as int).compareTo(right['column'] as int) : row;
+      });
+    if (visible.isEmpty) return pw.SizedBox();
+    final rows = <pw.TableRow>[];
+    for (var index = 0; index < visible.length; index += 2) {
+      final right = _pdfCell(fields[visible[index]]!);
+      final left = index + 1 < visible.length ? _pdfCell(fields[visible[index + 1]]!) : _pdfCell('');
+      rows.add(pw.TableRow(children: [right, left]));
+    }
+    return pw.Table(border: pw.TableBorder.all(color: PdfColor.fromHex('#B8CEC5')), children: rows);
+  }
 
   pw.Widget _pdfScheduleTable(List<List<String>> rows) {
     final header = ['الحالة', 'المخرج المطلوب', 'المهمة والمسؤولية', 'الوقت'];
