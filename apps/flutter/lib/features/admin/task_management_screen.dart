@@ -94,24 +94,27 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
     'urgent': 'عاجلة',
   }[_s(value, 'normal')] ?? _s(value, 'عادية');
 
-  String _detailDate(dynamic value) {
+  String _detailDate(dynamic value, String emptyLabel) {
     final parsed = DateTime.tryParse(_s(value));
-    return parsed == null ? 'غير مسجل' : _localDateTime(value);
+    return parsed == null ? emptyLabel : _localDateTime(value);
   }
 
   String _sentAt(Map<String, dynamic> task) =>
-      _detailDate(task['assigned_at'] ?? task['created_at']);
+      _detailDate(task['assigned_at'] ?? task['created_at'], 'لم ترسل');
 
   String _completedAt(Map<String, dynamic> task) =>
-      _detailDate(_reportByTask[_s(task['id'])]?['submitted_at']);
+      _detailDate(_reportByTask[_s(task['id'])]?['submitted_at'], 'لم تنجز');
 
   String _approvedAt(Map<String, dynamic> task) {
     final report = _reportByTask[_s(task['id'])];
     if (_s(report?['status']) != 'approved' &&
         !{'approved', 'completed_approved'}.contains(_s(task['status']))) {
-      return 'غير مسجل';
+      return 'لم تعتمد';
     }
-    return _detailDate(report?['reviewed_at'] ?? report?['updated_at']);
+    return _detailDate(
+      report?['reviewed_at'] ?? report?['updated_at'],
+      'لم تعتمد',
+    );
   }
 
   String _descriptionValue(String text, String label) => _lineValue(text, '$label:');
@@ -871,26 +874,21 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
               children: [
                 if (_error != null) Text(_error!, textAlign: TextAlign.right),
                 if (_busy) const LinearProgressIndicator(),
-                SectionCard(
-                  title: 'إجراءات الإدارة',
-                  child: Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      if (!widget.unifiedOnly)
+                if (!widget.unifiedOnly)
+                  SectionCard(
+                    title: 'إجراءات الإدارة',
+                    child: Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
                         FilledButton.icon(
                           onPressed: _busy ? null : () => _saveTask(),
                           icon: const Icon(Icons.add),
                           label: const Text('إنشاء مهمة'),
                         ),
-                      if (widget.unifiedOnly)
-                        const Text(
-                          'هذه الشاشة مخصصة للجداول التي أُرسلت من الجدول الموحد فقط. إنشاء جدول جديد يتم من مساره المستقل.',
-                          textAlign: TextAlign.right,
-                        ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
                 Card(
                   child: Padding(
                     padding: const EdgeInsets.all(16),
@@ -1005,15 +1003,15 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
                                     crossAxisAlignment: CrossAxisAlignment.end,
                                     children: [
                                       Text(
-                                        'الحالة: ${_status(_s(t['status']))}',
+                                        '📌 ${_status(_s(t['status']))}',
                                         textAlign: TextAlign.right,
                                       ),
                                       Text(
-                                        'الأولوية: ${_priority(t['priority'])}',
+                                        '🚩 ${_priority(t['priority'])}',
                                         textAlign: TextAlign.right,
                                       ),
                                       Text(
-                                        'الموعد: ${_localDateTime(t['due_at'])}',
+                                        '⏰ ${_localDateTime(t['due_at'])}',
                                         textAlign: TextAlign.right,
                                       ),
                                       if (_canReviewActions &&
@@ -1052,15 +1050,15 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
                                           textAlign: TextAlign.right,
                                         ),
                                         Text(
-                                          'تاريخ إرسال المهمة: ${_sentAt(t)}',
+                                          '📤 ${_sentAt(t)}',
                                           textAlign: TextAlign.right,
                                         ),
                                         Text(
-                                          'تاريخ إنجاز المهمة: ${_completedAt(t)}',
+                                          '✅ ${_completedAt(t)}',
                                           textAlign: TextAlign.right,
                                         ),
                                         Text(
-                                          'تاريخ اعتماد المهمة: ${_approvedAt(t)}',
+                                          '☑️ ${_approvedAt(t)}',
                                           textAlign: TextAlign.right,
                                         ),
                                         Text(
