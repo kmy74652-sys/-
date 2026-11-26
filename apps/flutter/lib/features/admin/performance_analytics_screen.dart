@@ -949,6 +949,11 @@ class _PerformanceAnalyticsScreenState
                 selected: _evaluationMode == 'least',
                 onSelected: (_) => setState(() => _evaluationMode = 'least'),
               ),
+              ChoiceChip(
+                label: const Text('عرض الكل'),
+                selected: _evaluationMode == 'all',
+                onSelected: (_) => setState(() => _evaluationMode = 'all'),
+              ),
             ],
           ),
           const SizedBox(height: 6),
@@ -969,11 +974,23 @@ class _PerformanceAnalyticsScreenState
             ],
           ),
           const SizedBox(height: 10),
-          _unifiedEvaluationTile(
-            subject: selected,
-            emptyMessage: emptyMessage,
-            isBest: _evaluationMode == 'best',
-          ),
+          if (_evaluationMode == 'all')
+            subjects.isEmpty
+                ? const Text(
+                    'لا توجد بيانات للتقييم ضمن الفلاتر الحالية.',
+                    textAlign: TextAlign.right,
+                  )
+                : Column(
+                    children: subjects
+                        .map(_allEvaluationTile)
+                        .toList(),
+                  )
+          else
+            _unifiedEvaluationTile(
+              subject: selected,
+              emptyMessage: emptyMessage,
+              isBest: _evaluationMode == 'best',
+            ),
         ],
       ),
     );
@@ -1028,6 +1045,47 @@ class _PerformanceAnalyticsScreenState
     ),
   );
   }
+
+  Widget _allEvaluationTile(_EvaluationSubject subject) => Padding(
+    padding: const EdgeInsets.only(bottom: 7),
+    child: Container(
+      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 9),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF7FAF9),
+        borderRadius: BorderRadius.circular(11),
+        border: Border.all(color: const Color(0xFFDDE8E4)),
+      ),
+      child: Row(
+        children: [
+          Text(
+            '${subject.rate.toStringAsFixed(0)}%',
+            style: const TextStyle(
+              fontWeight: FontWeight.w900,
+              color: AppColors.navy,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(
+                  subject.name,
+                  textAlign: TextAlign.right,
+                  style: const TextStyle(fontWeight: FontWeight.w800),
+                ),
+                Text(
+                  'مهام ${subject.doneTasks}/${subject.totalTasks} · تقارير ${subject.approvedReports}/${subject.totalReports}',
+                  textAlign: TextAlign.right,
+                  style: const TextStyle(fontSize: 11, color: AppColors.muted),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
 
   Widget _branchCards() => SectionCard(
     title: 'الأداء حسب الفرع',
