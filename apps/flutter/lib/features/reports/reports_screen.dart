@@ -472,7 +472,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                 ),
                 pw.SizedBox(height: 6),
                 pw.Text(
-                  'تاريخ التصدير: ${_formattedDate(DateTime.now().toIso8601String())}',
+                  _pdfSafeText('تاريخ التصدير: ${_formattedDate(DateTime.now().toIso8601String())}'),
                   textAlign: pw.TextAlign.right,
                 ),
                 pw.SizedBox(height: 14),
@@ -488,26 +488,26 @@ class _ReportsScreenState extends State<ReportsScreen> {
                       crossAxisAlignment: pw.CrossAxisAlignment.stretch,
                       children: [
                         pw.Text(
-                          '${index + 1}. ${_label(rows[index])}',
+                          _pdfSafeText('${index + 1}. ${_label(rows[index])}'),
                           textAlign: pw.TextAlign.right,
                           style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
                         ),
                         pw.Text(
-                          'الموظف: ${_employeeForTask(rows[index])}',
+                          _pdfSafeText('الموظف: ${_employeeForTask(rows[index])}'),
                           textAlign: pw.TextAlign.right,
                         ),
                         pw.Text(
-                          'التاريخ: ${_formattedDate(rows[index]['submitted_at'] ?? rows[index]['report_date'])}',
+                          _pdfSafeText('التاريخ: ${_formattedDate(rows[index]['submitted_at'] ?? rows[index]['report_date'])}'),
                           textAlign: pw.TextAlign.right,
                         ),
                         pw.Text(
-                          'الحالة: ${_statusLabel(rows[index]['status']?.toString() ?? '')}',
+                          _pdfSafeText('الحالة: ${_statusLabel(rows[index]['status']?.toString() ?? '')}'),
                           textAlign: pw.TextAlign.right,
                         ),
                         if ((rows[index]['values'] ?? rows[index]['answers']) is Map)
                           for (final entry in ((rows[index]['values'] ?? rows[index]['answers']) as Map).entries)
                             pw.Text(
-                              '${entry.key}: ${_displayValue(entry.value)}',
+                              _pdfSafeText('${entry.key}: ${_displayValue(entry.value)}'),
                               textAlign: pw.TextAlign.right,
                             ),
                       ],
@@ -850,6 +850,14 @@ class _ReportsScreenState extends State<ReportsScreen> {
       }
     }
     return value.toString();
+  }
+
+  String _pdfSafeText(String value) {
+    final cleaned = value.replaceAllMapped(
+      RegExp(r'[^\x20-\x7E\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF\u200C\u200D\n\r\t]'),
+      (_) => ' ',
+    );
+    return cleaned.replaceAll(RegExp(r'[ \t]{2,}'), ' ').trim();
   }
 
   String _taskReportFieldLabel(Map<String, dynamic> row, Object? key) {

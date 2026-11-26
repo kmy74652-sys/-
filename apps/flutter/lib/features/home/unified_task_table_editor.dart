@@ -757,7 +757,7 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
         theme: pw.ThemeData.withFont(base: font, bold: boldFont),
       );
       final rows = [..._rows, ..._exceptionRows]
-          .map((row) => [row.time.text.trim(), row.task.text.trim(), row.output.text.trim(), 'جديدة'])
+          .map((row) => [_pdfSafeText(row.time.text), _pdfSafeText(row.task.text), _pdfSafeText(row.output.text), 'جديدة'])
           .toList();
       final listSection = (String title, List<TextEditingController> values) => pw.Column(
         crossAxisAlignment: pw.CrossAxisAlignment.stretch,
@@ -792,10 +792,10 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
             _pdfInfoTable(),
             pw.SizedBox(height: 12),
             _pdfHeading('الهدف من الوظيفة'),
-            pw.Text(_purpose.text.trim().isEmpty ? '—' : _purpose.text.trim(), textDirection: pw.TextDirection.rtl),
+            pw.Text(_pdfSafeText(_purpose.text.trim().isEmpty ? 'لا يوجد' : _purpose.text), textDirection: pw.TextDirection.rtl),
             pw.SizedBox(height: 10),
             _pdfHeading('ساعات الدوام والاستثناء الأسبوعي'),
-            pw.Text('نوع الدوام: $_workType   |   الأيام: $_days   |   الفترة الأولى: ${_firstPeriod.text.trim().isEmpty ? '—' : _firstPeriod.text.trim()}   |   الاستراحة: ${_breakPeriod.text.trim().isEmpty ? '—' : _breakPeriod.text.trim()}   |   الفترة الثانية: ${_secondPeriod.text.trim().isEmpty ? '—' : _secondPeriod.text.trim()}   |   الاستثناء: $_exception', textDirection: pw.TextDirection.rtl),
+            pw.Text(_pdfSafeText('نوع الدوام: $_workType   |   الأيام: $_days   |   الفترة الأولى: ${_firstPeriod.text.trim().isEmpty ? 'لا يوجد' : _firstPeriod.text}   |   الاستراحة: ${_breakPeriod.text.trim().isEmpty ? 'لا يوجد' : _breakPeriod.text}   |   الفترة الثانية: ${_secondPeriod.text.trim().isEmpty ? 'لا يوجد' : _secondPeriod.text}   |   الاستثناء: $_exception'), textDirection: pw.TextDirection.rtl),
             pw.SizedBox(height: 12),
             _pdfHeading('الجدول الزمني اليومي'),
             _pdfScheduleTable(rows),
@@ -807,17 +807,17 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
             _pdfKpiTable(),
             pw.SizedBox(height: 12),
             _pdfHeading('قالب التقرير اليومي'),
-            pw.Text(_selectedReport == null ? '—' : '${_selectedReport!.title} · الإصدار ${_selectedReport!.versionNumber} · ${_selectedReport!.fieldCount} حقول (${_selectedReport!.requiredFieldCount} إلزامية)', textDirection: pw.TextDirection.rtl),
+            pw.Text(_pdfSafeText(_selectedReport == null ? 'لا يوجد' : '${_selectedReport!.title} - الإصدار ${_selectedReport!.versionNumber} - ${_selectedReport!.fieldCount} حقول (${_selectedReport!.requiredFieldCount} إلزامية)'), textDirection: pw.TextDirection.rtl),
             pw.SizedBox(height: 6),
             _pdfHeading('ملاحظات وتعليمات إضافية'),
-            pw.Text(_reportNotes.text.trim().isEmpty ? '—' : _reportNotes.text.trim(), textDirection: pw.TextDirection.rtl),
+            pw.Text(_pdfSafeText(_reportNotes.text.trim().isEmpty ? 'لا يوجد' : _reportNotes.text), textDirection: pw.TextDirection.rtl),
             pw.SizedBox(height: 20),
             pw.Table(
               border: pw.TableBorder.all(color: PdfColor.fromHex('#B8CEC5')),
               children: [pw.TableRow(children: [
-                _pdfCell('إقرار الموظف\nالاسم والتوقيع: __________________'),
-                _pdfCell('مراجعة المسؤول المباشر\nالاسم والتوقيع: __________________'),
-                _pdfCell('اعتماد المدير\nالاسم والتوقيع: __________________'),
+                _pdfCell('إقرار الموظف\nالاسم والتوقيع: يترك للتوقيع'),
+                _pdfCell('مراجعة المسؤول المباشر\nالاسم والتوقيع: يترك للتوقيع'),
+                _pdfCell('اعتماد المدير\nالاسم والتوقيع: يترك للتوقيع'),
               ])],
             ),
           ],
@@ -835,7 +835,7 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
     margin: const pw.EdgeInsets.only(bottom: 6),
     padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 5),
     color: PdfColor.fromHex('#EAF4F0'),
-    child: pw.Text(title, textDirection: pw.TextDirection.rtl, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, color: PdfColor.fromHex('#123B5D'))),
+    child: pw.Text(_pdfSafeText(title), textDirection: pw.TextDirection.rtl, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, color: PdfColor.fromHex('#123B5D'))),
   );
 
   pw.Widget _pdfInfoTable() => pw.Table(
@@ -904,7 +904,7 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
   pw.Widget _pdfTableCell(String value, {bool bold = false}) => pw.Padding(
     padding: const pw.EdgeInsets.all(6),
     child: pw.Text(
-      value.trim().isEmpty ? '—' : value.trim(),
+      _pdfSafeText(value.trim().isEmpty ? 'لا يوجد' : value),
       textDirection: pw.TextDirection.rtl,
       textAlign: pw.TextAlign.right,
       style: pw.TextStyle(
@@ -916,8 +916,16 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
 
   pw.Widget _pdfCell(String text) => pw.Padding(
     padding: const pw.EdgeInsets.all(8),
-    child: pw.Text(text, textDirection: pw.TextDirection.rtl, textAlign: pw.TextAlign.right),
+    child: pw.Text(_pdfSafeText(text), textDirection: pw.TextDirection.rtl, textAlign: pw.TextAlign.right),
   );
+
+  String _pdfSafeText(String value) {
+    final cleaned = value.replaceAllMapped(
+      RegExp(r'[^\x20-\x7E\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF\u200C\u200D\n\r\t]'),
+      (_) => ' ',
+    );
+    return cleaned.replaceAll(RegExp(r'[ \t]{2,}'), ' ').trim();
+  }
 }
 
 class _UnifiedRow {
