@@ -562,19 +562,10 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
       }[role.trim()] ?? role.trim();
 
   Future<void> _saveTask({Map<String, dynamic>? existing}) async {
+    final isUnifiedExisting = existing != null && _isUnifiedTask(existing);
     final title = TextEditingController(text: _s(existing?['title']));
     final description = TextEditingController(text: _s(existing?['description']));
     final descriptionCards = <TextEditingController>[description];
-    final time = TextEditingController(
-      text: existing == null
-          ? ''
-          : _lineValue(_s(existing['description']), 'الوقت المحدد:'),
-    );
-    final output = TextEditingController(
-      text: existing == null
-          ? ''
-          : _lineValue(_s(existing['description']), 'المخرج المطلوب:'),
-    );
     final parsedDue = DateTime.tryParse(_s(existing?['due_at']));
     DateTime dueDate = parsedDue?.toLocal() ?? defaultDueDate();
     String priority = _s(existing?['priority'], 'normal');
@@ -597,42 +588,34 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
           note: 'اكتب عنوانًا واضحًا يصف النتيجة المطلوبة من الموظف.',
           children: [
             TextField(controller: title, textDirection: Directionality.of(ctx), textInputAction: TextInputAction.next, decoration: formDecoration('عنوان المهمة *', hint: 'مثال: مراجعة مخزون الفرع الرئيسي')),
-            for (var i = 0; i < descriptionCards.length; i++)
-              Card(
-                margin: const EdgeInsets.only(top: 8),
-                child: Padding(
-                  padding: const EdgeInsets.all(10),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              'وصف المهمة ${i + 1}',
-                              textAlign: TextAlign.right,
-                              style: const TextStyle(fontWeight: FontWeight.bold),
+            if (!isUnifiedExisting) ...[
+              for (var i = 0; i < descriptionCards.length; i++)
+                Card(
+                  margin: const EdgeInsets.only(top: 8),
+                  child: Padding(
+                    padding: const EdgeInsets.all(10),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                'وصف المهمة ${i + 1}',
+                                textAlign: TextAlign.right,
+                                style: const TextStyle(fontWeight: FontWeight.bold),
+                              ),
                             ),
-                          ),
-                          if (descriptionCards.length > 1)
-                            IconButton(
-                              tooltip: 'حذف حقل الوصف',
-                              onPressed: () => set(() {
-                                descriptionCards.removeAt(i).dispose();
-                              }),
-                              icon: const Icon(Icons.remove_circle_outline, color: Colors.red),
-                            ),
-                        ],
-                      ),
-                      if (existing != null && _isUnifiedTask(existing) && i == 0) ...[
-                        _descriptionTable(descriptionCards[i].text),
-                        const SizedBox(height: 8),
-                        Text(
-                          'يتم تعديل الوقت والمخرج المطلوب من قسم «بيانات صف الجدول الموحد» أدناه، مع الحفاظ على بقية بيانات الصف كاملة.',
-                          textAlign: TextAlign.right,
-                          style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
+                            if (descriptionCards.length > 1)
+                              IconButton(
+                                tooltip: 'حذف حقل الوصف',
+                                onPressed: () => set(() {
+                                  descriptionCards.removeAt(i).dispose();
+                                }),
+                                icon: const Icon(Icons.remove_circle_outline, color: Colors.red),
+                              ),
+                          ],
                         ),
-                      ] else
                         TextField(
                           controller: descriptionCards[i],
                           textDirection: Directionality.of(ctx),
@@ -643,41 +626,21 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
                             hint: i == 0 ? 'ما المطلوب تنفيذه؟' : 'أضف تفصيلًا أو نتيجة متوقعة أخرى',
                           ),
                         ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
-              ),
-            Align(
-              alignment: Alignment.centerRight,
-              child: TextButton.icon(
-                onPressed: () => set(() => descriptionCards.add(TextEditingController())),
-                icon: const Icon(Icons.add_box_outlined),
-                label: const Text('إضافة حقل جديد'),
-              ),
-            ),
-          ],
-        ),
-        if (existing != null && _isUnifiedTask(existing))
-          FormSection(
-            title: 'بيانات صف الجدول الموحد',
-            icon: Icons.table_chart_outlined,
-            note: 'تعديل هذه القيم ينعكس مباشرة على المهمة الظاهرة للموظف وكشف المهام.',
-            children: [
-              TextField(
-                controller: time,
-                textDirection: Directionality.of(ctx),
-                decoration: formDecoration('الوقت / الفترة'),
-              ),
-              const SizedBox(height: 8),
-              TextField(
-                controller: output,
-                textDirection: Directionality.of(ctx),
-                minLines: 2,
-                maxLines: 4,
-                decoration: formDecoration('المخرج المطلوب'),
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton.icon(
+                  onPressed: () => set(() => descriptionCards.add(TextEditingController())),
+                  icon: const Icon(Icons.add_box_outlined),
+                  label: const Text('إضافة حقل جديد'),
+                ),
               ),
             ],
-          ),
+          ],
+        ),
         FormSection(
           title: 'الموعد والأولوية',
           icon: Icons.event_available_outlined,
@@ -786,33 +749,25 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
     if (ok != true) {
       title.dispose();
       description.dispose();
-      time.dispose();
-      output.dispose();
       return;
     }
 
     setState(() => _busy = true);
     try {
       final dueIso = dueToIso(dueDate);
-      var descriptionText = descriptionCards
-          .asMap()
-          .entries
-          .where((entry) => entry.value.text.trim().isNotEmpty)
-          .map((entry) => 'وصف المهمة ${entry.key + 1}:\n${entry.value.text.trim()}')
-          .join('\n\n');
-      if (existing != null && _isUnifiedTask(existing)) {
-        final original = descriptionCards.first.text.trim();
-        descriptionText = _replaceLine(
-          _replaceLine(original, 'الوقت المحدد:', time.text),
-          'المخرج المطلوب:',
-          output.text,
-        );
-      }
+      final descriptionText = isUnifiedExisting
+          ? _s(existing?['description'])
+          : descriptionCards
+              .asMap()
+              .entries
+              .where((entry) => entry.value.text.trim().isNotEmpty)
+              .map((entry) => 'وصف المهمة ${entry.key + 1}:\n${entry.value.text.trim()}')
+              .join('\n\n');
       final safeDescription = descriptionText.trim().isEmpty
           ? 'المهمة: ${title.text.trim()}'
           : descriptionText.trim();
       if (existing != null) {
-        await _db.rpc('admin_update_task', params: {'p_organization_id': _orgId, 'p_task_id': existing['id'], 'p_title': title.text.trim(), 'p_description': safeDescription, 'p_due_at': dueIso});
+        await _db.rpc('admin_update_task', params: {'p_organization_id': _orgId, 'p_task_id': existing['id'], 'p_title': title.text.trim(), 'p_description': safeDescription, 'p_due_at': dueIso, 'p_priority': priority});
       } else {
         await _db.rpc('create_task_with_report_form', params: {'p_organization_id': _orgId, 'p_title': title.text.trim(), 'p_description': safeDescription, 'p_due_at': dueIso, 'p_priority': priority, 'p_branch_id': branchId, 'p_role_code': role, 'p_template_id': null, 'p_assigned_to': assignee, 'p_report_template_id': reportTemplateId, 'p_report_version_id': reportVersionId, 'p_report_required': reportRequired});
       }
@@ -825,8 +780,6 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
       for (final card in descriptionCards) {
         card.dispose();
       }
-      time.dispose();
-      output.dispose();
       if (mounted) setState(() => _busy = false);
     }
   }
