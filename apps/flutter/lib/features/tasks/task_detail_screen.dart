@@ -1106,16 +1106,11 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
           pageFormat: PdfPageFormat.a4,
           margin: const pw.EdgeInsets.all(28),
           build: (_) => [
-            pw.Directionality(
-              textDirection: pw.TextDirection.rtl,
-              child: pw.Column(
-                crossAxisAlignment: pw.CrossAxisAlignment.stretch,
-                children: [
-                  reportTheme.header('تقرير المهمة', status: status),
-                  pw.Text('المهمة: $title', textDirection: pw.TextDirection.rtl, textAlign: pw.TextAlign.right, style: pw.TextStyle(fontSize: reportTheme.fontSize)),
-                  pw.Text('النموذج: $reportTitle', textDirection: pw.TextDirection.rtl, textAlign: pw.TextAlign.right, style: pw.TextStyle(fontSize: reportTheme.fontSize)),
-                  pw.SizedBox(height: 16),
-                  pw.Table(
+            reportTheme.header('تقرير المهمة', status: status),
+            pw.Text(reportPdfSafeText('المهمة: $title'), textDirection: pw.TextDirection.rtl, textAlign: pw.TextAlign.right, style: pw.TextStyle(fontSize: reportTheme.fontSize)),
+            pw.Text(reportPdfSafeText('النموذج: $reportTitle'), textDirection: pw.TextDirection.rtl, textAlign: pw.TextAlign.right, style: pw.TextStyle(fontSize: reportTheme.fontSize)),
+            pw.SizedBox(height: 16),
+            pw.Table(
                     border: reportTheme.tableBorder,
                     columnWidths: const {
                       0: pw.FlexColumnWidth(1),
@@ -1135,11 +1130,8 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                           _pdfTableCell('${field['label'] ?? field['key']}'),
                         ]),
                     ],
-                  ),
-                  reportTheme.footer(),
-                ],
-              ),
             ),
+            reportTheme.footer(),
           ],
         ),
       );
@@ -1163,7 +1155,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
   pw.Widget _pdfTableCell(String value, {bool bold = false}) => pw.Padding(
         padding: const pw.EdgeInsets.all(8),
         child: pw.Text(
-          value.trim().isEmpty ? 'لا يوجد' : value,
+          reportPdfSafeText(value.trim().isEmpty ? 'لا يوجد' : value),
           textDirection: pw.TextDirection.rtl,
           textAlign: pw.TextAlign.right,
           style: pw.TextStyle(

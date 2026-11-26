@@ -6,6 +6,11 @@ import 'package:pdf/widgets.dart' as pw;
 import 'app_customizer.dart';
 import 'organization_branding.dart';
 
+String reportPdfSafeText(String value) => value
+    .replaceAll('·', ' - ')
+    .replaceAll('\uFFFD', '')
+    .replaceAll(RegExp(r'[\u0000-\u0008\u000B\u000C\u000E-\u001F]'), ' ');
+
 class ReportPdfTheme {
   ReportPdfTheme(this.settings, {this.logo});
 
@@ -46,14 +51,14 @@ class ReportPdfTheme {
     if (settings.reportShowNumber && number != null && number.trim().isNotEmpty) details.add('رقم التقرير: $number');
     if (settings.reportShowExportDate) details.add('تاريخ التصدير: ${DateTime.now().toLocal().toString().split('.').first}');
     final content = <pw.Widget>[
-      pw.Text(settings.reportCompanyName, textDirection: pw.TextDirection.rtl, textAlign: pw.TextAlign.right, style: pw.TextStyle(fontSize: 15, fontWeight: pw.FontWeight.bold, color: primary)),
-      if (settings.reportBranchName.trim().isNotEmpty) pw.Text(settings.reportBranchName, textDirection: pw.TextDirection.rtl, textAlign: pw.TextAlign.right),
+      pw.Text(reportPdfSafeText(settings.reportCompanyName), textDirection: pw.TextDirection.rtl, textAlign: pw.TextAlign.right, style: pw.TextStyle(fontSize: 15, fontWeight: pw.FontWeight.bold, color: primary)),
+      if (settings.reportBranchName.trim().isNotEmpty) pw.Text(reportPdfSafeText(settings.reportBranchName), textDirection: pw.TextDirection.rtl, textAlign: pw.TextAlign.right),
       if ([settings.reportPhone, settings.reportEmail, settings.reportAddress].any((v) => v.trim().isNotEmpty))
-        pw.Text([settings.reportPhone, settings.reportEmail, settings.reportAddress].where((v) => v.trim().isNotEmpty).join(' · '), textDirection: pw.TextDirection.rtl, textAlign: pw.TextAlign.right, style: const pw.TextStyle(fontSize: 8)),
-      if (settings.reportHeaderText.trim().isNotEmpty) pw.Text(settings.reportHeaderText, textDirection: pw.TextDirection.rtl, textAlign: pw.TextAlign.right),
+        pw.Text(reportPdfSafeText([settings.reportPhone, settings.reportEmail, settings.reportAddress].where((v) => v.trim().isNotEmpty).join(' - ')), textDirection: pw.TextDirection.rtl, textAlign: pw.TextAlign.right, style: const pw.TextStyle(fontSize: 8)),
+      if (settings.reportHeaderText.trim().isNotEmpty) pw.Text(reportPdfSafeText(settings.reportHeaderText), textDirection: pw.TextDirection.rtl, textAlign: pw.TextAlign.right),
       pw.SizedBox(height: 5),
-      pw.Text(title, textDirection: pw.TextDirection.rtl, textAlign: pw.TextAlign.right, style: pw.TextStyle(fontSize: 19, fontWeight: pw.FontWeight.bold, color: heading)),
-      if (details.isNotEmpty) pw.Text(details.join('   |   '), textDirection: pw.TextDirection.rtl, textAlign: pw.TextAlign.right, style: const pw.TextStyle(fontSize: 8)),
+      pw.Text(reportPdfSafeText(title), textDirection: pw.TextDirection.rtl, textAlign: pw.TextAlign.right, style: pw.TextStyle(fontSize: 19, fontWeight: pw.FontWeight.bold, color: heading)),
+      if (details.isNotEmpty) pw.Text(reportPdfSafeText(details.join('   -   ')), textDirection: pw.TextDirection.rtl, textAlign: pw.TextAlign.right, style: const pw.TextStyle(fontSize: 8)),
     ];
     final row = pw.Row(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
       if (settings.reportLogoPosition == 'right' && logo != null) pw.Container(width: settings.reportLogoSize, height: settings.reportLogoSize, child: pw.Image(logo!, fit: pw.BoxFit.contain)),
@@ -69,7 +74,7 @@ class ReportPdfTheme {
   pw.TableBorder get tableBorder => settings.reportTableStyle == 'simple' ? pw.TableBorder.symmetric(inside: pw.BorderSide(color: PdfColors.grey300, width: .5)) : pw.TableBorder.all(color: primary, width: .7);
   pw.BoxDecoration get tableHeaderDecoration => pw.BoxDecoration(color: settings.reportTableStyle == 'colored' ? PdfColor.fromHex('#DCEFE8') : PdfColor.fromHex('#EAF4F0'));
 
-  pw.Widget footer() => settings.reportShowFooter && settings.reportFooterText.trim().isNotEmpty ? pw.Padding(padding: const pw.EdgeInsets.only(top: 12), child: pw.Text(settings.reportFooterText, textAlign: pw.TextAlign.center, textDirection: pw.TextDirection.rtl, style: pw.TextStyle(fontSize: 8, color: heading))) : pw.SizedBox();
+  pw.Widget footer() => settings.reportShowFooter && settings.reportFooterText.trim().isNotEmpty ? pw.Padding(padding: const pw.EdgeInsets.only(top: 12), child: pw.Text(reportPdfSafeText(settings.reportFooterText), textAlign: pw.TextAlign.center, textDirection: pw.TextDirection.rtl, style: pw.TextStyle(fontSize: 8, color: heading))) : pw.SizedBox();
 
   static Future<pw.Font> regularFont() async => pw.Font.ttf(await rootBundle.load('assets/fonts/NotoSansArabic-Regular.ttf'));
   static Future<pw.Font> boldFont() async => pw.Font.ttf(await rootBundle.load('assets/fonts/NotoSansArabic-Bold.ttf'));
