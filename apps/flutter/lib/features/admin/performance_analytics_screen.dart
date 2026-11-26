@@ -1048,42 +1048,55 @@ class _PerformanceAnalyticsScreenState
 
   Widget _allEvaluationTile(_EvaluationSubject subject) => Padding(
     padding: const EdgeInsets.only(bottom: 7),
-    child: Container(
-      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 9),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF7FAF9),
-        borderRadius: BorderRadius.circular(11),
-        border: Border.all(color: const Color(0xFFDDE8E4)),
-      ),
-      child: Row(
-        children: [
-          Text(
-            '${subject.rate.toStringAsFixed(0)}%',
-            style: const TextStyle(
-              fontWeight: FontWeight.w900,
-              color: AppColors.navy,
-            ),
+    child: Builder(
+      builder: (context) {
+        final rateColor = subject.rate < 30
+            ? Colors.red.shade700
+            : subject.rate < 60
+                ? Colors.orange.shade800
+                : AppColors.green;
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 9),
+          decoration: BoxDecoration(
+            color: rateColor.withOpacity(0.06),
+            borderRadius: BorderRadius.circular(11),
+            border: Border.all(color: rateColor.withOpacity(0.28)),
           ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Text(
-                  subject.name,
-                  textAlign: TextAlign.right,
-                  style: const TextStyle(fontWeight: FontWeight.w800),
+          child: Row(
+            children: [
+              Text(
+                '${subject.rate.toStringAsFixed(0)}%',
+                style: TextStyle(fontWeight: FontWeight.w900, color: rateColor),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      subject.name,
+                      textAlign: TextAlign.right,
+                      style: const TextStyle(fontWeight: FontWeight.w800),
+                    ),
+                    Text(
+                      'مهام ${subject.doneTasks}/${subject.totalTasks} · تقارير ${subject.approvedReports}/${subject.totalReports}',
+                      textAlign: TextAlign.right,
+                      style: const TextStyle(fontSize: 11, color: AppColors.muted),
+                    ),
+                    const SizedBox(height: 5),
+                    LinearProgressIndicator(
+                      value: (subject.rate / 100).clamp(0.0, 1.0),
+                      minHeight: 5,
+                      color: rateColor,
+                      backgroundColor: const Color(0xFFE6ECEA),
+                    ),
+                  ],
                 ),
-                Text(
-                  'مهام ${subject.doneTasks}/${subject.totalTasks} · تقارير ${subject.approvedReports}/${subject.totalReports}',
-                  textAlign: TextAlign.right,
-                  style: const TextStyle(fontSize: 11, color: AppColors.muted),
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     ),
   );
 
