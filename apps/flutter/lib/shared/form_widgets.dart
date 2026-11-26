@@ -67,7 +67,7 @@ Future<bool?> showFormSheet(
               const Divider(height: 1),
               Expanded(child: ListView(padding: const EdgeInsets.fromLTRB(14, 14, 14, 8), keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag, children: builder(ctx, set))),
               Container(
-                padding: const EdgeInsets.fromLTRB(14, 10, 14, 12),
+                padding: EdgeInsets.fromLTRB(14, 10, 14, 12 + MediaQuery.viewPaddingOf(ctx).bottom),
                 decoration: const BoxDecoration(color: Colors.white, border: Border(top: BorderSide(color: AppColors.border))),
                 child: Row(children: [
                   Expanded(child: OutlinedButton(style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)), onPressed: () => Navigator.pop(sheet, false), child: const Text('إلغاء'))),
