@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/notifications_repository.dart';
@@ -665,7 +668,6 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     final path = location.path;
     final selected = _selectedIndex(path);
     final tabs = _tabs();
-    final breadcrumbs = _breadcrumbs(location);
     return AnimatedBuilder(
       animation: AppCustomizer.instance,
       builder: (context, _) {
@@ -695,8 +697,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
                   ),
                   _PageTitleBar(
                     title: widget.title,
-                    subtitle: widget.subtitle,
-                    breadcrumbs: breadcrumbs,
+                    showDateTime: path == '/',
                     onBack: _backRoute(path) == null
                         ? null
                         : () => _navigate(_backRoute(path)!),
@@ -911,32 +912,53 @@ class _Breadcrumb {
   final String? route;
 }
 
-class _PageTitleBar extends StatelessWidget {
+class _PageTitleBar extends StatefulWidget {
   const _PageTitleBar({
     required this.title,
-    this.subtitle,
-    this.breadcrumbs = const [],
+    this.showDateTime = false,
     this.onBack,
   });
 
   final String title;
-  final String? subtitle;
-  final List<_Breadcrumb> breadcrumbs;
+  final bool showDateTime;
   final VoidCallback? onBack;
 
-  static const _orgName = 'مؤسسة الشاعري للتجارة العامة';
+  @override
+  State<_PageTitleBar> createState() => _PageTitleBarState();
+}
+
+class _PageTitleBarState extends State<_PageTitleBar> {
+  Timer? _clockTimer;
+  DateTime _now = DateTime.now();
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.showDateTime) {
+      _clockTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+        if (mounted) setState(() => _now = DateTime.now());
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _clockTimer?.cancel();
+    super.dispose();
+  }
+
+  String get _dateTimeLabel =>
+      DateFormat('yyyy/MM/dd - HH:mm', 'ar').format(_now);
 
   @override
   Widget build(BuildContext context) {
-    final sub = subtitle?.trim() ?? '';
-    final showSub = sub.isNotEmpty && sub != _orgName && sub != title;
     return Container(
       width: double.infinity,
       padding: EdgeInsets.fromLTRB(
-        onBack == null ? 16 : 6,
+        widget.onBack == null ? 16 : 6,
         8,
         16,
-        breadcrumbs.length > 1 ? 7 : 8,
+        8,
       ),
       decoration: const BoxDecoration(
         color: Color(0xFFF9FBFD),
@@ -947,10 +969,10 @@ class _PageTitleBar extends StatelessWidget {
       ),
       child: Row(
         children: [
-          if (onBack != null)
+          if (widget.onBack != null)
             IconButton(
               tooltip: 'رجوع',
-              onPressed: onBack,
+              onPressed: widget.onBack,
               visualDensity: VisualDensity.compact,
               icon: const Icon(
                 Icons.arrow_back,
@@ -960,7 +982,7 @@ class _PageTitleBar extends StatelessWidget {
             ),
           Container(
             width: 4,
-            height: showSub ? 34 : 22,
+            height: widget.showDateTime ? 34 : 22,
             margin: const EdgeInsetsDirectional.only(end: 10),
             decoration: BoxDecoration(
               color: const Color(0xFFDBA62A),
@@ -973,7 +995,7 @@ class _PageTitleBar extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  title,
+                  widget.title,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
@@ -983,9 +1005,9 @@ class _PageTitleBar extends StatelessWidget {
                     fontWeight: FontWeight.w900,
                   ),
                 ),
-                if (showSub)
+                if (widget.showDateTime)
                   Text(
-                    sub,
+                    _dateTimeLabel,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
@@ -994,45 +1016,6 @@ class _PageTitleBar extends StatelessWidget {
                       height: 1.3,
                     ),
                   ),
-                if (breadcrumbs.length > 1) ...[
-                  const SizedBox(height: 5),
-                  SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: Row(
-                      textDirection: TextDirection.rtl,
-                      children: [
-                        for (var i = 0; i < breadcrumbs.length; i++) ...[
-                          if (i > 0)
-                            const Padding(
-                              padding: EdgeInsets.symmetric(horizontal: 5),
-                              child: Icon(
-                                Icons.chevron_left,
-                                size: 15,
-                                color: Color(0xFF8A98A8),
-                              ),
-                            ),
-                          InkWell(
-                            onTap: breadcrumbs[i].route == null
-                                ? null
-                                : () => context.go(breadcrumbs[i].route!),
-                            child: Text(
-                              breadcrumbs[i].label,
-                              style: TextStyle(
-                                color: breadcrumbs[i].route == null
-                                    ? const Color(0xFF637188)
-                                    : const Color(0xFF0B568C),
-                                fontSize: 10.5,
-                                fontWeight: breadcrumbs[i].route == null
-                                    ? FontWeight.w700
-                                    : FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                ],
               ],
             ),
           ),
