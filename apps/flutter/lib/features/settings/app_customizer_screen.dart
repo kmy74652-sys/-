@@ -1,8 +1,3 @@
-import 'dart:convert';
-import 'dart:io';
-import 'dart:typed_data';
-
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -276,8 +271,7 @@ class _AppCustomizerScreenState extends State<AppCustomizerScreen>
                 textAlign: TextAlign.right,
                 controller: _customCardController(card, 'title'),
                 onChanged: (value) {
-                  card['title'] = value;
-                  _store.notifyListeners();
+                  _store.updateCustomCard(card, 'title', value);
                 },
                 decoration: const InputDecoration(labelText: 'عنوان البطاقة'),
               ),
@@ -285,8 +279,7 @@ class _AppCustomizerScreenState extends State<AppCustomizerScreen>
                 textAlign: TextAlign.right,
                 controller: _customCardController(card, 'description'),
                 onChanged: (value) {
-                  card['description'] = value;
-                  _store.notifyListeners();
+                  _store.updateCustomCard(card, 'description', value);
                 },
                 decoration: const InputDecoration(labelText: 'تفاصيل البطاقة'),
               ),
@@ -469,19 +462,6 @@ class _AppCustomizerScreenState extends State<AppCustomizerScreen>
           ChoiceChip(label: const Text('أفقي'), selected: _previewLandscape, onSelected: (_) => setState(() => _previewLandscape = true)),
         ],
       );
-
-  Widget _slider(String title, double value, double min, double max, ValueChanged<double> onChanged) => Row(children: [SizedBox(width: 150, child: Text(title, textAlign: TextAlign.right)), Expanded(child: Slider(value: value.clamp(min, max).toDouble(), min: min, max: max, onChanged: onChanged))]);
-
-  Widget _fieldPlacementEditor(String key) {
-    final layout = _store.unifiedFieldLayout(key);
-    final span = '${layout['span'] ?? 'half'}';
-    final align = '${layout['align'] ?? 'right'}';
-    return Column(children: [
-      Row(children: [Expanded(child: Text(_store.unifiedLabel(key), textAlign: TextAlign.right)), IconButton(tooltip: 'يسار', icon: const Icon(Icons.arrow_back), onPressed: () => setState(() => _store.moveUnifiedField(key, dx: -1))), IconButton(tooltip: 'يمين', icon: const Icon(Icons.arrow_forward), onPressed: () => setState(() => _store.moveUnifiedField(key, dx: 1))), IconButton(tooltip: 'أعلى', icon: const Icon(Icons.arrow_upward), onPressed: () => setState(() => _store.moveUnifiedField(key, dy: -1))), IconButton(tooltip: 'أسفل', icon: const Icon(Icons.arrow_downward), onPressed: () => setState(() => _store.moveUnifiedField(key, dy: 1)))]),
-      Row(children: [Expanded(child: DropdownButtonFormField<String>(value: span, decoration: const InputDecoration(labelText: 'العرض'), items: const [DropdownMenuItem(value: 'full', child: Text('كامل')), DropdownMenuItem(value: 'half', child: Text('نصف')), DropdownMenuItem(value: 'third', child: Text('ثلث'))], onChanged: (v) => setState(() => _store.setUnifiedFieldLayout(key, span: v)))), const SizedBox(width: 8), Expanded(child: DropdownButtonFormField<String>(value: align, decoration: const InputDecoration(labelText: 'المحاذاة'), items: const [DropdownMenuItem(value: 'right', child: Text('يمين')), DropdownMenuItem(value: 'center', child: Text('وسط')), DropdownMenuItem(value: 'left', child: Text('يسار'))], onChanged: (v) => setState(() => _store.setUnifiedFieldLayout(key, align: v))))]),
-      const Divider(),
-    ]);
-  }
 
   Future<void> _saveUnified() async {
     for (final key in UnifiedTableCustomization.defaults.keys) {
@@ -839,39 +819,6 @@ class _AppCustomizerScreenState extends State<AppCustomizerScreen>
     }
     await _store.save();
     if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم حفظ وتطبيق التغييرات.')));
-  }
-
-  Future<void> _export() async {
-    await _save();
-    final path = await FilePicker.saveFile(
-      dialogTitle: 'تصدير إعدادات الواجهة',
-      fileName: 'nexora-ui-settings.json',
-      type: FileType.custom,
-      allowedExtensions: ['json'],
-      bytes: Uint8List.fromList(utf8.encode(const JsonEncoder.withIndent('  ').convert(_store.toJsonMap()))),
-    );
-    if (mounted && path != null) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم تصدير الإعدادات.')));
-  }
-
-  Future<void> _import() async {
-    final files = await FilePicker.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: ['json'],
-    );
-    if (files.isEmpty || files.first.path == null) return;
-    try {
-      final bytes = await File(files.first.path!).readAsBytes();
-      await _store.importJson(utf8.decode(bytes));
-      for (final entry in _controllers.entries) {
-        entry.value.text = entry.key.startsWith('unified:')
-            ? _store.unifiedLabel(entry.key.substring('unified:'.length))
-            : _store.label(entry.key);
-      }
-      if (mounted) setState(() {});
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم استيراد الإعدادات.')));
-    } catch (_) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('ملف JSON غير صالح.')));
-    }
   }
 
 }

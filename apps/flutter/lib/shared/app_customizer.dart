@@ -74,6 +74,7 @@ class AppCustomizer extends ChangeNotifier {
   void setVisibility(String key, bool value) { visibility[key] = value; notifyListeners(); }
   bool isVisible(String key) => visibility[key] ?? true;
   void addCard(String title, String description, int iconCode) { customCards.add({'title': title, 'description': description, 'icon': iconCode}); notifyListeners(); }
+  void updateCustomCard(Map<String, dynamic> card, String field, String value) { card[field] = value; notifyListeners(); }
   void moveCard(int oldIndex, int newIndex) { if (oldIndex < 0 || oldIndex >= customCards.length) return; newIndex = newIndex.clamp(0, customCards.length - 1).toInt(); final item = customCards.removeAt(oldIndex); customCards.insert(newIndex, item); notifyListeners(); }
   void setTheme({int? primary, int? accent, int? background, double? newRadius, String? newFontSize, String? newStatsStyle}) { if (primary != null) primaryColor = primary; if (accent != null) accentColor = accent; if (background != null) backgroundColor = background; if (newRadius != null) radius = newRadius; if (newFontSize != null) fontSize = newFontSize; if (newStatsStyle != null) statsStyle = newStatsStyle; notifyListeners(); }
   void setFieldStyle({String? style, int? fillColor, double? newRadius, double? newSpacing, String? labelSize}) { if (style != null) fieldStyle = style; if (fillColor != null) fieldFillColor = fillColor; if (newRadius != null) fieldRadius = newRadius; if (newSpacing != null) fieldSpacing = newSpacing; if (labelSize != null) fieldLabelSize = labelSize; notifyListeners(); }
