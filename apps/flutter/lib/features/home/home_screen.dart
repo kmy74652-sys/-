@@ -494,7 +494,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ],
             if (_manageTasks) ...[
               const SizedBox(height: 8),
-              _managementPanel(),
+              _settingsPanel(),
             ],
           ],
         ],
@@ -533,11 +533,11 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _managementPanel() {
+  Widget _settingsPanel() {
     final visible = _adminModules.where((item) => _allowed(item.key)).toList();
     if (visible.isEmpty) return const SizedBox.shrink();
     return SectionCard(
-      title: 'لوحة إدارة المؤسسة',
+      title: 'الإعدادات',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -549,14 +549,14 @@ class _HomeScreenState extends State<HomeScreen> {
               child: Row(
                 textDirection: TextDirection.rtl,
                 children: [
-                  const Icon(Icons.admin_panel_settings_outlined,
+                  const Icon(Icons.settings_outlined,
                       color: AppColors.green, size: 30),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
                       _adminExpanded
-                          ? 'إخفاء أقسام الإدارة'
-                          : 'إظهار أقسام الإدارة (${visible.length})',
+                          ? 'إخفاء الإعدادات وأقسام الإدارة'
+                          : 'إظهار الإعدادات وأقسام الإدارة (${visible.length})',
                       textAlign: TextAlign.right,
                       style: const TextStyle(fontWeight: FontWeight.w800),
                     ),
