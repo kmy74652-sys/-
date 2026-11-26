@@ -44,48 +44,34 @@ class ReportPdfTheme {
   double get fontSize => settings.reportFontSize;
 
   pw.Widget header(String title, {String? employee, String? branch, String? status, String? number}) {
-    final defaultOrder = const [
-      'company', 'branchName', 'phone', 'email', 'address', 'headerText',
-      'title', 'employee', 'taskBranch', 'status', 'number', 'exportDate',
-    ];
-    final order = <String>[
-      ...settings.reportHeaderOrder,
-      ...defaultOrder.where((key) => !settings.reportHeaderOrder.contains(key)),
-    ];
+    final defaultOrder = const ['company', 'branchName', 'phone', 'email', 'address', 'headerText', 'title', 'employee', 'taskBranch', 'status', 'number', 'exportDate'];
+    final order = <String>[...settings.reportHeaderOrder, ...defaultOrder.where((key) => !settings.reportHeaderOrder.contains(key))];
     final content = <pw.Widget>[];
-    pw.Widget line(String value, {double size = 10, bool bold = false, PdfColor? color}) => pw.Text(
-          reportPdfSafeText(value),
-          textDirection: pw.TextDirection.rtl,
-          textAlign: pw.TextAlign.right,
-          style: pw.TextStyle(fontSize: size, fontWeight: bold ? pw.FontWeight.bold : pw.FontWeight.normal, color: color),
-        );
+    pw.Widget line(String key, String value, {double size = 10, bool bold = false, PdfColor? color}) {
+      final layout = settings.reportHeaderLayout(key);
+      final align = layout['align'] == 'left' ? pw.TextAlign.left : layout['align'] == 'center' ? pw.TextAlign.center : pw.TextAlign.right;
+      final configuredSize = settings.reportHeaderLayouts.containsKey(key) ? (layout['size'] as num).toDouble() : size;
+      final x = (layout['x'] as num).toDouble();
+      final y = (layout['y'] as num).toDouble();
+      return pw.Container(
+        margin: pw.EdgeInsets.only(left: x > 0 ? x : 0, right: x < 0 ? -x : 0, top: y > 0 ? y : 0, bottom: y < 0 ? -y : 0),
+        child: pw.Text(reportPdfSafeText(value), textDirection: pw.TextDirection.rtl, textAlign: align, style: pw.TextStyle(fontSize: configuredSize, fontWeight: bold ? pw.FontWeight.bold : pw.FontWeight.normal, color: color)),
+      );
+    }
     for (final key in order) {
       switch (key) {
-        case 'company':
-          if (settings.reportCompanyName.trim().isNotEmpty) content.add(line(settings.reportCompanyName, size: 15, bold: true, color: primary));
-        case 'branchName':
-          if (settings.reportBranchName.trim().isNotEmpty) content.add(line(settings.reportBranchName));
-        case 'phone':
-          if (settings.reportPhone.trim().isNotEmpty) content.add(line('الهاتف: ${settings.reportPhone}', size: 8));
-        case 'email':
-          if (settings.reportEmail.trim().isNotEmpty) content.add(line('البريد الإلكتروني: ${settings.reportEmail}', size: 8));
-        case 'address':
-          if (settings.reportAddress.trim().isNotEmpty) content.add(line('العنوان: ${settings.reportAddress}', size: 8));
-        case 'headerText':
-          if (settings.reportHeaderText.trim().isNotEmpty) content.add(line(settings.reportHeaderText));
-        case 'title':
-          content.add(pw.SizedBox(height: 5));
-          content.add(line(title, size: 19, bold: true, color: heading));
-        case 'employee':
-          if (settings.reportShowEmployee && employee != null && employee.trim().isNotEmpty) content.add(line('الموظف: $employee', size: 8));
-        case 'taskBranch':
-          if (settings.reportShowBranch && branch != null && branch.trim().isNotEmpty) content.add(line('الفرع: $branch', size: 8));
-        case 'status':
-          if (settings.reportShowStatus && status != null && status.trim().isNotEmpty) content.add(line('الحالة: $status', size: 8));
-        case 'number':
-          if (settings.reportShowNumber && number != null && number.trim().isNotEmpty) content.add(line('رقم التقرير: $number', size: 8));
-        case 'exportDate':
-          if (settings.reportShowExportDate) content.add(line('تاريخ التصدير: ${DateTime.now().toLocal().toString().split('.').first}', size: 8));
+        case 'company': if (settings.reportCompanyName.trim().isNotEmpty) content.add(line(key, settings.reportCompanyName, size: 15, bold: true, color: primary));
+        case 'branchName': if (settings.reportBranchName.trim().isNotEmpty) content.add(line(key, settings.reportBranchName));
+        case 'phone': if (settings.reportPhone.trim().isNotEmpty) content.add(line(key, 'الهاتف: ${settings.reportPhone}', size: 8));
+        case 'email': if (settings.reportEmail.trim().isNotEmpty) content.add(line(key, 'البريد الإلكتروني: ${settings.reportEmail}', size: 8));
+        case 'address': if (settings.reportAddress.trim().isNotEmpty) content.add(line(key, 'العنوان: ${settings.reportAddress}', size: 8));
+        case 'headerText': if (settings.reportHeaderText.trim().isNotEmpty) content.add(line(key, settings.reportHeaderText));
+        case 'title': content.add(pw.SizedBox(height: 5)); content.add(line(key, title, size: 19, bold: true, color: heading));
+        case 'employee': if (settings.reportShowEmployee && employee != null && employee.trim().isNotEmpty) content.add(line(key, 'الموظف: $employee', size: 8));
+        case 'taskBranch': if (settings.reportShowBranch && branch != null && branch.trim().isNotEmpty) content.add(line(key, 'الفرع: $branch', size: 8));
+        case 'status': if (settings.reportShowStatus && status != null && status.trim().isNotEmpty) content.add(line(key, 'الحالة: $status', size: 8));
+        case 'number': if (settings.reportShowNumber && number != null && number.trim().isNotEmpty) content.add(line(key, 'رقم التقرير: $number', size: 8));
+        case 'exportDate': if (settings.reportShowExportDate) content.add(line(key, 'تاريخ التصدير: ${DateTime.now().toLocal().toString().split('.').first}', size: 8));
       }
     }
     final row = pw.Row(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
@@ -93,9 +79,7 @@ class ReportPdfTheme {
       pw.Expanded(child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.stretch, children: content)),
       if (settings.reportLogoPosition == 'left' && logo != null) pw.Container(width: settings.reportLogoSize, height: settings.reportLogoSize, child: pw.Image(logo!, fit: pw.BoxFit.contain)),
     ]);
-    final wrapped = settings.reportLogoPosition == 'center' && logo != null
-        ? pw.Column(children: [pw.Image(logo!, width: settings.reportLogoSize, height: settings.reportLogoSize, fit: pw.BoxFit.contain), pw.SizedBox(height: 4), row])
-        : row;
+    final wrapped = settings.reportLogoPosition == 'center' && logo != null ? pw.Column(children: [pw.Image(logo!, width: settings.reportLogoSize, height: settings.reportLogoSize, fit: pw.BoxFit.contain), pw.SizedBox(height: 4), row]) : row;
     return pw.Container(padding: const pw.EdgeInsets.only(bottom: 10), decoration: settings.reportHeaderStyle == 'minimal' ? null : pw.BoxDecoration(color: settings.reportHeaderStyle == 'band' ? PdfColor.fromHex('#EAF4F0') : PdfColors.white, border: settings.reportHeaderStyle == 'boxed' ? pw.Border.all(color: primary) : null), child: pw.Padding(padding: const pw.EdgeInsets.all(8), child: wrapped));
   }
 

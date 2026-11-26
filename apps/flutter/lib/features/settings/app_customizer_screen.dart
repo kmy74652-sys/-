@@ -30,6 +30,7 @@ class _AppCustomizerScreenState extends State<AppCustomizerScreen>
   List<Map<String, dynamic>> _currentTasks = const [];
   late final TabController _tabs;
   final Map<String, TextEditingController> _controllers = {};
+  String _selectedHeaderElement = 'company';
 
   @override
   void initState() {
@@ -498,6 +499,26 @@ class _AppCustomizerScreenState extends State<AppCustomizerScreen>
         ),
       );
 
+  Widget _reportHeaderLayoutEditor() {
+    final key = _selectedHeaderElement;
+    final layout = _store.reportHeaderLayout(key);
+    final align = '${layout['align']}';
+    final size = (layout['size'] as num).toDouble();
+    final x = (layout['x'] as num).toDouble();
+    final y = (layout['y'] as num).toDouble();
+    void update({String? nextAlign, double? nextSize, double? nextX, double? nextY}) {
+      setState(() => _store.setReportHeaderLayout(key, align: nextAlign, size: nextSize, x: nextX, y: nextY));
+    }
+    return SectionCard(title: 'تحكم تفصيلي في الترويسة', child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      const Text('اختر عنصرًا ثم عدّل مكانه وحجمه. ستظهر النتيجة في المعاينة وتُستخدم نفسها عند تصدير PDF.', textAlign: TextAlign.right),
+      DropdownButtonFormField<String>(value: key, decoration: const InputDecoration(labelText: 'العنصر المراد تعديله'), items: _store.reportHeaderOrder.map((item) => DropdownMenuItem(value: item, child: Text(_reportOrderLabel(item), textAlign: TextAlign.right))).toList(), onChanged: (value) => setState(() => _selectedHeaderElement = value ?? key)),
+      DropdownButtonFormField<String>(value: align, decoration: const InputDecoration(labelText: 'المحاذاة'), items: const [DropdownMenuItem(value: 'right', child: Text('يمين')), DropdownMenuItem(value: 'center', child: Text('وسط')), DropdownMenuItem(value: 'left', child: Text('يسار'))], onChanged: (value) => update(nextAlign: value)),
+      Row(children: [const SizedBox(width: 72, child: Text('حجم الخط')), Expanded(child: Slider(value: size, min: 7, max: 32, divisions: 25, label: size.round().toString(), onChanged: (value) => update(nextSize: value)))]),
+      Row(children: [const SizedBox(width: 72, child: Text('يمين / يسار')), Expanded(child: Slider(value: x, min: -40, max: 40, divisions: 80, label: x.round().toString(), onChanged: (value) => update(nextX: value)))]),
+      Row(children: [const SizedBox(width: 72, child: Text('أعلى / أسفل')), Expanded(child: Slider(value: y, min: -20, max: 20, divisions: 40, label: y.round().toString(), onChanged: (value) => update(nextY: value)))]),
+    ]));
+  }
+
   Widget _reportThemeTab() => ListView(
         padding: const EdgeInsets.all(12),
         children: [
@@ -519,6 +540,7 @@ class _AppCustomizerScreenState extends State<AppCustomizerScreen>
             _reportField('headerText', 'نص الترويسة الإضافي', _store.reportHeaderText, (v) => setState(() => _store.setReportTheme(headerText: v))),
           ])),
           _reportHeaderOrderEditor(),
+          _reportHeaderLayoutEditor(),
           SectionCard(title: 'ألوان وشكل الجدول', child: Column(children: [
             DropdownButtonFormField<String>(value: _store.reportTableStyle, decoration: const InputDecoration(labelText: 'شكل الجداول'), items: const [DropdownMenuItem(value: 'simple', child: Text('بسيط')), DropdownMenuItem(value: 'full', child: Text('حدود كاملة')), DropdownMenuItem(value: 'colored', child: Text('تصميم ملون'))], onChanged: (v) => setState(() => _store.setReportTheme(tableStyle: v))),
             Wrap(spacing: 8, children: [_reportColor('كحلي', 0xFF0B3458), _reportColor('أخضر', 0xFF146B50), _reportColor('أزرق', 0xFF164C80), _reportColor('عنابي', 0xFF7A2430)]),
@@ -544,31 +566,28 @@ class _AppCustomizerScreenState extends State<AppCustomizerScreen>
   List<Widget> _reportPreviewOrderedContent(Color primary) {
     final widgets = <Widget>[];
     for (final key in _store.reportHeaderOrder) {
+      final layout = _store.reportHeaderLayout(key);
+      final alignment = layout['align'] == 'left' ? TextAlign.left : layout['align'] == 'center' ? TextAlign.center : TextAlign.right;
+      final size = (layout['size'] as num).toDouble();
+      final x = (layout['x'] as num).toDouble();
+      final y = (layout['y'] as num).toDouble();
+      Widget text(String value, {bool bold = false, Color? color}) => Container(
+        margin: EdgeInsets.only(left: x > 0 ? x : 0, right: x < 0 ? -x : 0, top: y > 0 ? y : 0, bottom: y < 0 ? -y : 0),
+        child: Text(value, textAlign: alignment, style: TextStyle(fontSize: size, fontWeight: bold ? FontWeight.bold : FontWeight.normal, color: color)),
+      );
       switch (key) {
-        case 'company':
-          widgets.add(Text(_store.reportCompanyName, textAlign: TextAlign.right, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17, color: primary)));
-        case 'branchName':
-          if (_store.reportBranchName.isNotEmpty) widgets.add(Text(_store.reportBranchName, textAlign: TextAlign.right));
-        case 'phone':
-          if (_store.reportPhone.isNotEmpty) widgets.add(Text('الهاتف: ${_store.reportPhone}', textAlign: TextAlign.right));
-        case 'email':
-          if (_store.reportEmail.isNotEmpty) widgets.add(Text('البريد الإلكتروني: ${_store.reportEmail}', textAlign: TextAlign.right));
-        case 'address':
-          if (_store.reportAddress.isNotEmpty) widgets.add(Text('العنوان: ${_store.reportAddress}', textAlign: TextAlign.right));
-        case 'headerText':
-          if (_store.reportHeaderText.isNotEmpty) widgets.add(Text(_store.reportHeaderText, textAlign: TextAlign.right));
-        case 'title':
-          widgets.add(const Text('تقرير المهمة', textAlign: TextAlign.right, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)));
-        case 'employee':
-          if (_store.reportShowEmployee) widgets.add(const Text('الموظف: أحمد', textAlign: TextAlign.right));
-        case 'taskBranch':
-          if (_store.reportShowBranch) widgets.add(const Text('الفرع: الفرع الرئيسي', textAlign: TextAlign.right));
-        case 'status':
-          if (_store.reportShowStatus) widgets.add(const Text('الحالة: مكتملة', textAlign: TextAlign.right));
-        case 'number':
-          if (_store.reportShowNumber) widgets.add(const Text('رقم التقرير: 0001', textAlign: TextAlign.right));
-        case 'exportDate':
-          if (_store.reportShowExportDate) widgets.add(const Text('تاريخ التصدير: 26/11/2026', textAlign: TextAlign.right));
+        case 'company': widgets.add(text(_store.reportCompanyName, bold: true, color: primary));
+        case 'branchName': if (_store.reportBranchName.isNotEmpty) widgets.add(text(_store.reportBranchName));
+        case 'phone': if (_store.reportPhone.isNotEmpty) widgets.add(text('الهاتف: ${_store.reportPhone}'));
+        case 'email': if (_store.reportEmail.isNotEmpty) widgets.add(text('البريد الإلكتروني: ${_store.reportEmail}'));
+        case 'address': if (_store.reportAddress.isNotEmpty) widgets.add(text('العنوان: ${_store.reportAddress}'));
+        case 'headerText': if (_store.reportHeaderText.isNotEmpty) widgets.add(text(_store.reportHeaderText));
+        case 'title': widgets.add(text('تقرير المهمة', bold: true));
+        case 'employee': if (_store.reportShowEmployee) widgets.add(text('الموظف: أحمد'));
+        case 'taskBranch': if (_store.reportShowBranch) widgets.add(text('الفرع: الفرع الرئيسي'));
+        case 'status': if (_store.reportShowStatus) widgets.add(text('الحالة: مكتملة'));
+        case 'number': if (_store.reportShowNumber) widgets.add(text('رقم التقرير: 0001'));
+        case 'exportDate': if (_store.reportShowExportDate) widgets.add(text('تاريخ التصدير: 26/11/2026'));
       }
     }
     return widgets;
