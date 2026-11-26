@@ -187,6 +187,7 @@ class _AppCustomizerScreenState extends State<AppCustomizerScreen>
             _homePreviewCard('lateTasks', Icons.schedule, '2', 0xFFAB2B37),
             _homePreviewSection('workSection', [
               _homePreviewModule('taskManagement', Icons.task_alt, 'متابعة المهام والتقارير الناتجة من الجداول الموحدة'),
+              _homePreviewModule('independentTasks', Icons.assignment_outlined, 'عرض المهام اليومية المستقلة وتنفيذها ومتابعة حالتها'),
               _homePreviewModule('reports', Icons.description_outlined, 'التقارير المرفوعة للمراجعة والاعتماد'),
               _homePreviewModule('performance', Icons.query_stats, 'ترتيب الموظفين ومقارنة الفروع'),
             ]),
@@ -319,7 +320,7 @@ class _AppCustomizerScreenState extends State<AppCustomizerScreen>
           _labelGroup('الهيدر والهوية', ['appName', 'organizationName', 'tagline']),
           _labelGroup('الشريط السفلي', ['home', 'tasks', 'employees']),
           _labelGroup('الرئيسية والبطاقات', [
-            'workSection', 'unifiedTable', 'taskManagement', 'reports',
+            'workSection', 'unifiedTable', 'taskManagement', 'independentTasks', 'reports',
             'dailyReports', 'employeeReports', 'totalTasks', 'inProgress',
             'submitted', 'lateTasks'
           ]),
@@ -373,6 +374,7 @@ class _AppCustomizerScreenState extends State<AppCustomizerScreen>
                 _toggle('بطاقة الجدول الموحد', 'unifiedTable'),
                 _toggle('قسم العمل والمتابعة', 'workSection'),
                 _toggle('إدارة المهام', 'taskManagement'),
+                _toggle('المهام المستقلة', 'independentTasks'),
                 _toggle('التقارير', 'reports'),
                 _toggle('التقارير اليومية المصممة', 'dailyReports'),
                 _toggle('تقارير الموظف', 'employeeReports'),

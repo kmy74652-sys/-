@@ -41,6 +41,13 @@ class _HomeScreenState extends State<HomeScreen> {
           '/tasks',
         ),
         _Module(
+          'independentTasks',
+          'المهام المستقلة',
+          'عرض المهام اليومية المستقلة وتنفيذها ومتابعة حالتها',
+          Icons.assignment_outlined,
+          '/tasks',
+        ),
+        _Module(
           'reports',
           'تقارير الموظفين',
           'التقارير المرفوعة للمراجعة والاعتماد',
@@ -110,6 +117,8 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _allowed(String key) {
     switch (key) {
       case 'tasks':
+        return _manageTasks || _permissions.contains('tasks.execute');
+      case 'independentTasks':
         return _manageTasks || _permissions.contains('tasks.execute');
       case 'reports':
         return _manageTasks
@@ -854,7 +863,11 @@ class _Module {
   const _Module(this.key, this.title, this.subtitle, this.icon, this.route);
   final String key, title, subtitle, route;
   final IconData icon;
-  String get labelKey => key == 'tasks' ? 'taskManagement' : key;
+  String get labelKey => switch (key) {
+        'tasks' => 'taskManagement',
+        'independentTasks' => 'independentTasks',
+        _ => key,
+      };
 }
 
 class _Metric {
