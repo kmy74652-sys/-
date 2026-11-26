@@ -744,13 +744,14 @@ class _BrandHeaderState extends State<_BrandHeader> {
               Expanded(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.end,
+                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    Text(AppCustomizer.instance.label('appName'), maxLines: 1, overflow: TextOverflow.fade,
+                    Text(AppCustomizer.instance.label('appName'), textAlign: TextAlign.center, maxLines: 1, overflow: TextOverflow.fade,
                       style: TextStyle(color: _navy, fontSize: compact ? 17 : 21, height: 1.15, fontWeight: FontWeight.w900)),
                     const SizedBox(height: 2),
                     Text(
                       AppCustomizer.instance.label('organizationName'),
+                      textAlign: TextAlign.center,
                       maxLines: 2,
                       softWrap: true,
                       textWidthBasis: TextWidthBasis.parent,
@@ -762,7 +763,7 @@ class _BrandHeaderState extends State<_BrandHeader> {
                       ),
                     ),
                     const SizedBox(height: 3),
-                    Row(children: [
+                    Row(mainAxisAlignment: MainAxisAlignment.center, children: [
                       Container(width: 14, height: 1.2, color: _gold),
                       const SizedBox(width: 5),
                       Flexible(child: Text(AppCustomizer.instance.label('tagline'), maxLines: 1, overflow: TextOverflow.ellipsis,
