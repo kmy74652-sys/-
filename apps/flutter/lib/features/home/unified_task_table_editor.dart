@@ -8,8 +8,15 @@ import '../../core/theme.dart';
 import '../../shared/app_customizer.dart';
 import '../../shared/report_pdf_theme.dart';
 
+typedef AutomaticReportSchemaBuilder = List<Map<String, dynamic>> Function(
+  UnifiedTaskRowData row,
+  String purpose,
+  List<String> instructions,
+  List<String> kpis,
+);
+
 class UnifiedTaskTableEditor extends StatefulWidget {
-  const UnifiedTaskTableEditor({super.key, required this.onSend, this.onSave, this.initialDraft, this.employees = const [], this.branches = const [], this.reports = const [], this.onChanged});
+  const UnifiedTaskTableEditor({super.key, required this.onSend, this.onSave, this.initialDraft, this.employees = const [], this.branches = const [], this.reports = const [], this.onChanged, this.reportSchemaBuilder});
   final Future<void> Function(UnifiedTaskTableDraft draft) onSend;
   final Future<void> Function(UnifiedTaskTableDraft draft)? onSave;
   final UnifiedTaskTableDraft? initialDraft;
@@ -17,6 +24,7 @@ class UnifiedTaskTableEditor extends StatefulWidget {
   final List<UnifiedBranchOption> branches;
   final List<UnifiedReportOption> reports;
   final VoidCallback? onChanged;
+  final AutomaticReportSchemaBuilder? reportSchemaBuilder;
 
   @override
   State<UnifiedTaskTableEditor> createState() => _UnifiedTaskTableEditorState();
@@ -48,6 +56,7 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
   String _exception = 'الجمعة';
   String? _reportVersionId;
   String? _reportTemplateId;
+  final Map<String, List<Map<String, dynamic>>> _customReportSchemas = {};
 
   @override
   void initState() {
@@ -360,15 +369,56 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
     });
   }
 
+  List<UnifiedTaskRowData> _currentTaskRows() {
+    final rows = _rows
+        .where((row) => row.task.text.trim().isNotEmpty)
+        .map((row) => UnifiedTaskRowData(
+              time: row.time.text.trim(),
+              task: row.task.text.trim(),
+              output: row.output.text.trim(),
+              extras: row.extras,
+            ))
+        .toList();
+    rows.addAll(_exceptionRows
+        .where((row) => row.task.text.trim().isNotEmpty)
+        .map((row) => UnifiedTaskRowData(
+              time: '${_exception}: ${row.time.text.trim()}',
+              task: row.task.text.trim(),
+              output: row.output.text.trim(),
+              extras: row.extras,
+            )));
+    return rows;
+  }
+
+  List<Map<String, dynamic>> _automaticSchemaFor(UnifiedTaskRowData row) =>
+      _customReportSchemas[unifiedTaskReportKey(row)] ??
+      widget.reportSchemaBuilder?.call(
+            row,
+            _purpose.text.trim(),
+            _instructions
+                .map((value) => value.text.trim())
+                .where((value) => value.isNotEmpty)
+                .toList(),
+            _kpis
+                .where((value) => value.any((controller) => controller.text.trim().isNotEmpty))
+                .map((value) => '${value[0].text.trim()}: ${value[1].text.trim()}')
+                .toList(),
+          ) ??
+      [
+        {'key': 'actual_result', 'label': 'النتيجة الفعلية', 'type': 'textarea', 'required': true},
+        {'key': 'execution_status', 'label': 'حالة التنفيذ', 'type': 'select', 'required': true, 'options': ['مكتملة', 'مكتملة جزئيًا', 'تعذر التنفيذ']},
+      ];
+
   Widget _reportSelector() {
     final selected = _selectedReport;
+    final tasks = _currentTaskRows();
     return _section(
       AppCustomizer.instance.unifiedLabel('report'),
       Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           if (widget.reports.isEmpty)
-            const Text('سيُنشئ النظام تقريرًا تلقائيًا مناسبًا لكل مهمة عند الإرسال.', textAlign: TextAlign.right)
+            const Text('سيُنشئ النظام تقريرًا تلقائيًا مناسبًا لكل مهمة، ويمكنك معاينته وتعديله قبل الإرسال.', textAlign: TextAlign.right)
           else
             DropdownButtonFormField<String>(
               value: selected?.versionId,
@@ -393,15 +443,108 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
                   const SizedBox(height: 5),
                   Text('الإصدار ${selected.versionNumber} · ${selected.fieldCount} حقول · ${selected.requiredFieldCount} إلزامية', textAlign: TextAlign.right),
                   const SizedBox(height: 5),
-                  const Text('سيُنشئ النظام أيضًا نموذجًا تلقائيًا خاصًا بكل مهمة عند الإرسال، ولا يمكن للموظف تعديل بنيته.', textAlign: TextAlign.right, style: TextStyle(fontSize: 12)),
+                  const Text('يمكن معاينة التقرير الخاص بكل مهمة وتعديله قبل الإرسال.', textAlign: TextAlign.right, style: TextStyle(fontSize: 12)),
                   Align(alignment: Alignment.centerRight, child: TextButton.icon(onPressed: _previewSelectedReport, icon: const Icon(Icons.preview_outlined), label: const Text('معاينة التقرير'))),
                 ],
               ),
             ),
           ],
+          if (tasks.isNotEmpty)
+            Align(
+              alignment: Alignment.centerRight,
+              child: FilledButton.icon(
+                onPressed: () => _previewAutomaticReport(tasks),
+                icon: const Icon(Icons.fact_check_outlined),
+                label: const Text('معاينة وتعديل تقرير المهمة قبل الإرسال'),
+              ),
+            ),
         ],
       ),
     );
+  }
+
+  Future<void> _previewAutomaticReport(List<UnifiedTaskRowData> tasks) async {
+    var selectedIndex = 0;
+    final result = await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          final row = tasks[selectedIndex];
+          final schema = _automaticSchemaFor(row)
+              .map((field) => <String, dynamic>{
+                    ...field,
+                    if (field['options'] is List) 'options': [...field['options'] as List],
+                  })
+              .toList();
+          final schemaKey = unifiedTaskReportKey(row);
+          void refresh() => setDialogState(() {});
+          return AlertDialog(
+            title: const Text('معاينة وتعديل تقرير المهمة', textAlign: TextAlign.right),
+            content: SizedBox(
+              width: 620,
+              child: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    DropdownButtonFormField<int>(
+                      value: selectedIndex,
+                      isExpanded: true,
+                      decoration: const InputDecoration(labelText: 'المهمة', isDense: true),
+                      items: tasks.asMap().entries.map((entry) => DropdownMenuItem(
+                            value: entry.key,
+                            child: Text(entry.value.task, overflow: TextOverflow.ellipsis),
+                          )).toList(),
+                      onChanged: (value) {
+                        if (value == null) return;
+                        setDialogState(() => selectedIndex = value);
+                      },
+                    ),
+                    const SizedBox(height: 10),
+                    Text('حقول التقرير: ${schema.length}', textAlign: TextAlign.right, style: const TextStyle(fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 6),
+                    ...schema.asMap().entries.map((entry) {
+                      final index = entry.key;
+                      final field = entry.value;
+                      final type = '${field['type'] ?? 'text'}';
+                      return Card(
+                        margin: const EdgeInsets.only(bottom: 8),
+                        child: Padding(
+                          padding: const EdgeInsets.all(8),
+                          child: Column(
+                            children: [
+                              Row(children: [
+                                Expanded(child: TextFormField(initialValue: '${field['label'] ?? ''}', textAlign: TextAlign.right, decoration: const InputDecoration(labelText: 'اسم الحقل', isDense: true), onChanged: (value) { field['label'] = value; _customReportSchemas[schemaKey] = schema; })),
+                                IconButton(onPressed: () { schema.removeAt(index); _customReportSchemas[unifiedTaskReportKey(row)] = schema; refresh(); }, icon: const Icon(Icons.delete_outline, color: Colors.red), tooltip: 'حذف الحقل'),
+                              ]),
+                              const SizedBox(height: 6),
+                              Row(children: [
+                                Expanded(child: DropdownButtonFormField<String>(value: const ['text', 'textarea', 'number', 'money', 'percentage', 'date', 'select', 'checkbox', 'rating', 'attachment', 'calculated'].contains(type) ? type : 'text', decoration: const InputDecoration(labelText: 'نوع الحقل', isDense: true), items: const [
+                                  DropdownMenuItem(value: 'text', child: Text('نص')), DropdownMenuItem(value: 'textarea', child: Text('نص طويل')), DropdownMenuItem(value: 'number', child: Text('رقم')), DropdownMenuItem(value: 'money', child: Text('مبلغ')), DropdownMenuItem(value: 'percentage', child: Text('نسبة')), DropdownMenuItem(value: 'date', child: Text('تاريخ')), DropdownMenuItem(value: 'select', child: Text('قائمة')), DropdownMenuItem(value: 'checkbox', child: Text('اختيار')), DropdownMenuItem(value: 'rating', child: Text('تقييم')), DropdownMenuItem(value: 'attachment', child: Text('مرفق')), DropdownMenuItem(value: 'calculated', child: Text('محسوب')),
+                                ], onChanged: (value) { if (value != null) { field['type'] = value; _customReportSchemas[schemaKey] = schema; refresh(); } })),
+                                Checkbox(value: field['required'] == true, onChanged: (value) { field['required'] = value == true; _customReportSchemas[schemaKey] = schema; refresh(); }),
+                                const Text('إلزامي'),
+                              ]),
+                              if (field['type'] == 'select')
+                                TextFormField(initialValue: (field['options'] as List? ?? const []).join('، '), textAlign: TextAlign.right, decoration: const InputDecoration(labelText: 'خيارات القائمة (افصل بينها بفاصلة)', isDense: true), onChanged: (value) { field['options'] = value.split(RegExp(r'[,،]')).map((item) => item.trim()).where((item) => item.isNotEmpty).toList(); _customReportSchemas[schemaKey] = schema; }),
+                            ],
+                          ),
+                        ),
+                      );
+                    }),
+                    OutlinedButton.icon(onPressed: schema.length >= 30 ? null : () { schema.add({'key': 'custom_field_${schema.length + 1}', 'label': 'حقل جديد', 'type': 'text', 'required': false}); _customReportSchemas[unifiedTaskReportKey(row)] = schema; refresh(); }, icon: const Icon(Icons.add), label: Text(schema.length >= 30 ? 'بلغ الحد الأعلى للحقول' : 'إضافة حقل')),
+                  ],
+                ),
+              ),
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('إلغاء')),
+              FilledButton(onPressed: () { _customReportSchemas[unifiedTaskReportKey(row)] = schema; Navigator.pop(dialogContext, {'saved': true}); widget.onChanged?.call(); }, child: const Text('حفظ التعديلات')),
+            ],
+          );
+        },
+      ),
+    );
+    if (result != null && mounted) setState(() {});
   }
 
   void _previewSelectedReport() {
@@ -686,6 +829,9 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
       messenger.showSnackBar(const SnackBar(content: Text('أضف مهمة زمنية واحدة على الأقل قبل الإرسال.', textAlign: TextAlign.right)));
       return;
     }
+    final reportSchemasByTask = <String, List<Map<String, dynamic>>>{
+      for (final row in tasks) unifiedTaskReportKey(row): _automaticSchemaFor(row),
+    };
     setState(() => _sending = true);
     try {
       final draft = UnifiedTaskTableDraft(
@@ -721,6 +867,7 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
             .toList(),
         reportTemplateId: _reportTemplateId,
         reportVersionId: _reportVersionId,
+        reportSchemasByTask: reportSchemasByTask,
       );
       if (widget.onSave != null) {
         await widget.onSave!(draft);
@@ -946,6 +1093,7 @@ class UnifiedTaskTableDraft {
     required this.breakPeriod,
     required this.secondPeriod,
     required this.kpis,
+    required this.reportSchemasByTask,
     this.reportTemplateId,
     this.reportVersionId,
   });
@@ -954,6 +1102,7 @@ class UnifiedTaskTableDraft {
   final String workType, workDays, weeklyException, firstPeriod, breakPeriod, secondPeriod;
   final List<UnifiedTaskRowData> rows;
   final List<String> responsibilities, authorities, instructions, kpis;
+  final Map<String, List<Map<String, dynamic>>> reportSchemasByTask;
   final String? reportTemplateId, reportVersionId;
 }
 
@@ -962,6 +1111,13 @@ class UnifiedTaskRowData {
   final String time, task, output;
   final Map<String, String> extras;
 }
+
+String unifiedTaskReportKey(UnifiedTaskRowData row) => [
+      row.time,
+      row.task,
+      row.output,
+      ...row.extras.entries.map((entry) => '${entry.key}=${entry.value}'),
+    ].join('|');
 
 class UnifiedEmployeeOption {
   const UnifiedEmployeeOption({required this.name, required this.userId});

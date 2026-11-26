@@ -244,16 +244,18 @@ class _UnifiedTaskTableScreenState extends State<UnifiedTaskTableScreen> {
   }
 
   List<Map<String, dynamic>> _automaticReportSchema(
-    UnifiedTaskRowData row,
-    UnifiedTaskTableDraft draft,
-  ) {
+    UnifiedTaskRowData row, {
+    String purpose = '',
+    List<String> instructions = const [],
+    List<String> kpis = const [],
+  }) {
     final text = [
       row.task,
       row.output,
       ...row.extras.entries.map((entry) => '${entry.key} ${entry.value}'),
-      draft.purpose,
-      ...draft.instructions,
-      ...draft.kpis,
+      purpose,
+      ...instructions,
+      ...kpis,
     ].join(' ').toLowerCase();
     final fields = <Map<String, dynamic>>[];
     final keys = <String>{};
@@ -482,7 +484,13 @@ class _UnifiedTaskTableScreenState extends State<UnifiedTaskTableScreen> {
           'p_report_version_id': null,
           'p_report_required': true,
           'p_idempotency_key': dispatchKey,
-          'p_report_schema': _automaticReportSchema(row, draft),
+          'p_report_schema': draft.reportSchemasByTask[unifiedTaskReportKey(row)] ??
+              _automaticReportSchema(
+                row,
+                purpose: draft.purpose,
+                instructions: draft.instructions,
+                kpis: draft.kpis,
+              ),
         });
         _successfulDispatches.add(dispatchKey);
       }
@@ -564,6 +572,13 @@ class _UnifiedTaskTableScreenState extends State<UnifiedTaskTableScreen> {
                       ),
                       UnifiedTaskTableEditor(
                         onSend: _send,
+                        reportSchemaBuilder: (row, purpose, instructions, kpis) =>
+                            _automaticReportSchema(
+                              row,
+                              purpose: purpose,
+                              instructions: instructions,
+                              kpis: kpis,
+                            ),
                         onChanged: () { if (!_hasUnsavedChanges && mounted) setState(() => _hasUnsavedChanges = true); },
                         employees: _employees,
                         branches: _branches,
