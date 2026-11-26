@@ -404,60 +404,6 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     return '/';
   }
 
-  List<_Breadcrumb> _breadcrumbs(Uri uri) {
-    final path = uri.path;
-    if (path == '/') return const [_Breadcrumb('الرئيسية')];
-    if (path.startsWith('/tasks/')) {
-      return [
-        _Breadcrumb('الرئيسية', '/'),
-        _Breadcrumb(
-          'المهام والمتابعة',
-          _managesTasks ? '/admin/tasks' : '/tasks',
-        ),
-        _Breadcrumb('تفاصيل المهمة'),
-      ];
-    }
-    if (path == '/tasks') {
-      return const [_Breadcrumb('الرئيسية', '/'), _Breadcrumb('المهام والمتابعة')];
-    }
-    if (path == '/reports' || path == '/reports/independent') {
-      return const [_Breadcrumb('الرئيسية', '/'), _Breadcrumb('التقارير')];
-    }
-    if (path == '/admin' && uri.queryParameters['section'] == 'employees') {
-      return const [_Breadcrumb('الرئيسية', '/'), _Breadcrumb('الموظفون')];
-    }
-    if (path == '/admin') {
-      return const [_Breadcrumb('الرئيسية')];
-    }
-    if (path == '/admin/tasks') {
-      return const [_Breadcrumb('الرئيسية', '/'), _Breadcrumb('المهام والمتابعة')];
-    }
-    if (path == '/admin/unified-task-management') {
-      return const [_Breadcrumb('الرئيسية', '/'), _Breadcrumb('الجداول الموحدة')];
-    }
-    if (path == '/admin/performance') {
-      return const [
-        _Breadcrumb('الرئيسية', '/'),
-        _Breadcrumb('تحليلات الأداء'),
-      ];
-    }
-    if (path == '/admin/report-designer') {
-      return const [
-        _Breadcrumb('الرئيسية', '/'),
-        _Breadcrumb('مصمم التقارير'),
-      ];
-    }
-    if (path == '/admin/customizer') {
-      return const [_Breadcrumb('الرئيسية', '/'), _Breadcrumb('الإعدادات'), _Breadcrumb('تخصيص التطبيق')];
-    }
-    if (path == '/hr') {
-      return const [_Breadcrumb('الرئيسية', '/'), _Breadcrumb('الموارد البشرية')];
-    }
-    if (path == '/settings') {
-      return const [_Breadcrumb('الرئيسية', '/'), _Breadcrumb('الإعدادات')];
-    }
-    return const [_Breadcrumb('الرئيسية', '/')];
-  }
 
   Future<void> _signOut(BuildContext context) async {
     try {
@@ -522,7 +468,6 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (sheetContext) => Directionality(
-        textDirection: TextDirection.rtl,
         child: SizedBox(
           height: MediaQuery.sizeOf(sheetContext).height * 0.68,
           child: Column(
@@ -677,7 +622,6 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
           if (route != null) _navigate(route);
         },
         child: Directionality(
-        textDirection: TextDirection.rtl,
         child: Scaffold(
         backgroundColor: const Color(0xFFF5F7FD),
         body: SafeArea(
@@ -885,8 +829,8 @@ class _BrandLogo extends StatelessWidget {
   }
 }
 
-/// Slim page-title strip under the brand header: back button (on inner
-/// pages), page title and an optional one-line subtitle.
+/// Slim page-title strip under the brand header: back button on inner pages,
+/// page title, and the home date/time display.
 class _GlobalSearchResult {
   const _GlobalSearchResult({
     required this.type,
@@ -901,13 +845,6 @@ class _GlobalSearchResult {
   final String subtitle;
   final IconData icon;
   final String route;
-}
-
-class _Breadcrumb {
-  const _Breadcrumb(this.label, [this.route]);
-
-  final String label;
-  final String? route;
 }
 
 class _PageTitleBar extends StatefulWidget {
@@ -1087,7 +1024,6 @@ class SectionCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Row(
-            textDirection: TextDirection.rtl,
             children: [
               Container(
                 width: 34,
