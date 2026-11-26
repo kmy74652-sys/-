@@ -145,6 +145,10 @@ void initializeRouter() {
       ),
       GoRoute(
         path: '/admin',
+        redirect: (context, state) {
+          final section = state.uri.queryParameters['section'];
+          return section == null || section.isEmpty ? '/' : null;
+        },
         builder: (context, state) => AdminScreen(
           initialSection: state.uri.queryParameters['section'],
         ),

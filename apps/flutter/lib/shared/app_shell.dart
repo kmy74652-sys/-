@@ -415,7 +415,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
       case '/admin/unified-task-management':
       case '/admin/performance':
       case '/admin/report-designer':
-        return '/admin';
+        return '/';
       case '/admin/customizer':
         return '/settings';
       case '/admin':
@@ -450,7 +450,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
       return const [_Breadcrumb('الرئيسية', '/'), _Breadcrumb('الموظفون')];
     }
     if (path == '/admin') {
-      return const [_Breadcrumb('الرئيسية', '/'), _Breadcrumb('الإدارة والتحليلات')];
+      return const [_Breadcrumb('الرئيسية')];
     }
     if (path == '/admin/tasks') {
       return const [_Breadcrumb('الرئيسية', '/'), _Breadcrumb('المهام والمتابعة')];
@@ -461,14 +461,12 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     if (path == '/admin/performance') {
       return const [
         _Breadcrumb('الرئيسية', '/'),
-        _Breadcrumb('الإدارة والتحليلات', '/admin'),
         _Breadcrumb('تحليلات الأداء'),
       ];
     }
     if (path == '/admin/report-designer') {
       return const [
         _Breadcrumb('الرئيسية', '/'),
-        _Breadcrumb('الإدارة والتحليلات', '/admin'),
         _Breadcrumb('مصمم التقارير'),
       ];
     }
