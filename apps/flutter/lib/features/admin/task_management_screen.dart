@@ -396,35 +396,24 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
   List<Map<String, dynamic>> get _managedTasks =>
       _tasks.where((task) => _isUnifiedTask(task) == widget.unifiedOnly).toList();
 
-  Widget _filterChip({required String value, required String label, required String group, required VoidCallback onSelected}) =>
-      ChoiceChip(
-        label: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-          child: Text(label, textAlign: TextAlign.center, softWrap: false),
-        ),
-        labelPadding: EdgeInsets.zero,
-        selected: (group == 'task' ? _taskFilter : _reportFilter) == value,
-        onSelected: (_) => setState(onSelected),
-      );
-
-  Widget _filterRow(List<Widget> chips) {
-    return Wrap(
-      textDirection: Directionality.of(context),
-      alignment: WrapAlignment.end,
-      spacing: 8,
-      runSpacing: 8,
-      children: chips,
-    );
-  }
-
-  Widget _filterField({required String label, required List<Widget> chips}) =>
-      InputDecorator(
+  Widget _filterDropdown({
+    required String label,
+    required IconData icon,
+    required String value,
+    required List<DropdownMenuItem<String>> items,
+    required ValueChanged<String?> onChanged,
+  }) =>
+      DropdownButtonFormField<String>(
+        value: value,
+        isExpanded: true,
         decoration: InputDecoration(
           labelText: label,
+          prefixIcon: Icon(icon),
           border: const OutlineInputBorder(),
-          contentPadding: const EdgeInsets.fromLTRB(12, 16, 12, 12),
+          isDense: true,
         ),
-        child: _filterRow(chips),
+        items: items,
+        onChanged: (next) => setState(() => onChanged(next)),
       );
 
   void _resetFilters() => setState(() {
@@ -951,26 +940,38 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
                         ),
                         const SizedBox(height: 12),
                       ],
-                      _filterField(label: 'حالة المهمة', chips: [
-                          _filterChip(value: 'all', label: 'الكل', group: 'task', onSelected: () => _taskFilter = 'all'),
-                          _filterChip(value: 'pending', label: 'جديدة', group: 'task', onSelected: () => _taskFilter = 'pending'),
-                          _filterChip(value: 'received', label: 'مستلمة', group: 'task', onSelected: () => _taskFilter = 'received'),
-                        _filterChip(value: 'in_progress', label: 'قيد التنفيذ', group: 'task', onSelected: () => _taskFilter = 'in_progress'),
-                        _filterChip(value: 'submitted', label: 'للمراجعة', group: 'task', onSelected: () => _taskFilter = 'submitted'),
-                        _filterChip(value: 'needs_revision', label: 'تحتاج تصحيحًا', group: 'task', onSelected: () => _taskFilter = 'needs_revision'),
-                        _filterChip(value: 'completed_approved', label: 'معتمدة', group: 'task', onSelected: () => _taskFilter = 'completed_approved'),
-                        _filterChip(value: 'late', label: 'متأخرة', group: 'task', onSelected: () => _taskFilter = 'late'),
-                      ]),
+                      _filterDropdown(
+                        label: 'حالة المهمة',
+                        icon: Icons.task_alt_outlined,
+                        value: _taskFilter,
+                        items: const [
+                          DropdownMenuItem(value: 'all', child: Text('الكل')),
+                          DropdownMenuItem(value: 'pending', child: Text('جديدة')),
+                          DropdownMenuItem(value: 'received', child: Text('مستلمة')),
+                          DropdownMenuItem(value: 'in_progress', child: Text('قيد التنفيذ')),
+                          DropdownMenuItem(value: 'submitted', child: Text('للمراجعة')),
+                          DropdownMenuItem(value: 'needs_revision', child: Text('تحتاج تصحيحًا')),
+                          DropdownMenuItem(value: 'completed_approved', child: Text('معتمدة')),
+                          DropdownMenuItem(value: 'late', child: Text('متأخرة')),
+                        ],
+                        onChanged: (value) => _taskFilter = value ?? 'all',
+                      ),
                       const SizedBox(height: 12),
-                      _filterField(label: 'حالة التقرير', chips: [
-                          _filterChip(value: 'all', label: 'الكل', group: 'report', onSelected: () => _reportFilter = 'all'),
-                          _filterChip(value: 'لم يبدأ', label: 'لم يبدأ', group: 'report', onSelected: () => _reportFilter = 'لم يبدأ'),
-                          _filterChip(value: 'مسودة', label: 'مسودة', group: 'report', onSelected: () => _reportFilter = 'مسودة'),
-                        _filterChip(value: 'مرسل للمراجعة', label: 'مرسل للمراجعة', group: 'report', onSelected: () => _reportFilter = 'مرسل للمراجعة'),
-                        _filterChip(value: 'يحتاج تعديل', label: 'يحتاج تعديل', group: 'report', onSelected: () => _reportFilter = 'يحتاج تعديل'),
-                        _filterChip(value: 'معتمد', label: 'معتمد', group: 'report', onSelected: () => _reportFilter = 'معتمد'),
-                        _filterChip(value: 'بدون تقرير', label: 'بدون تقرير', group: 'report', onSelected: () => _reportFilter = 'بدون تقرير'),
-                      ]),
+                      _filterDropdown(
+                        label: 'حالة التقرير',
+                        icon: Icons.description_outlined,
+                        value: _reportFilter,
+                        items: const [
+                          DropdownMenuItem(value: 'all', child: Text('الكل')),
+                          DropdownMenuItem(value: 'لم يبدأ', child: Text('لم يبدأ')),
+                          DropdownMenuItem(value: 'مسودة', child: Text('مسودة')),
+                          DropdownMenuItem(value: 'مرسل للمراجعة', child: Text('مرسل للمراجعة')),
+                          DropdownMenuItem(value: 'يحتاج تعديل', child: Text('يحتاج تعديل')),
+                          DropdownMenuItem(value: 'معتمد', child: Text('معتمد')),
+                          DropdownMenuItem(value: 'بدون تقرير', child: Text('بدون تقرير')),
+                        ],
+                        onChanged: (value) => _reportFilter = value ?? 'all',
+                      ),
                     ],
                   ),
                         ),
