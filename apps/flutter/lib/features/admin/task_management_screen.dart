@@ -662,7 +662,7 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
     try {
       final dueIso = dueToIso(dueDate);
       final descriptionText = isUnifiedExisting
-          ? _s(existing!['description'])
+          ? _s(existing['description'])
           : descriptionCards
               .asMap()
               .entries
