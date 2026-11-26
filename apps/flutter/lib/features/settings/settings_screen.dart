@@ -18,6 +18,7 @@ class SettingsScreen extends StatefulWidget {
 class _SettingsScreenState extends State<SettingsScreen> {
   final _db = Supabase.instance.client;
   bool _busy = true, _allowed = false, _owner = false;
+  bool _branchManagementAllowed = false;
   bool _brandBusy = false;
   String? _error;
   String _organizationId = '';
@@ -75,6 +76,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
           .map((e) => e.toString())
           .toSet();
       _owner = roles.any((r) => r['code'] == 'owner');
+      _branchManagementAllowed =
+          permissions.contains('branches.manage') ||
+          permissions.contains('branches.read_all');
       // العقد الإداري يمنح هذه الوظائف للمالك والمدير التنفيذي المخوّل؛
       // لا نحصر الواجهة بالمالك ما دام الـBackend أعاد الصلاحية صراحة.
       _allowed = permissions.contains('employees.manage');
@@ -711,6 +715,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       ),
                       trailing: const Icon(Icons.chevron_left),
                       onTap: () => context.push('/admin/customizer'),
+                    ),
+                  ),
+                if (_allowed && _branchManagementAllowed)
+                  Card(
+                    child: ListTile(
+                      leading: const Icon(Icons.account_tree_outlined),
+                      title: const Text(
+                        'الفروع وإدارة الفروع',
+                        textAlign: TextAlign.right,
+                      ),
+                      subtitle: const Text(
+                        'إضافة الفروع وتعديلها وأرشفتها من مكان الموظفين والإعدادات',
+                        textAlign: TextAlign.right,
+                      ),
+                      trailing: const Icon(Icons.chevron_left),
+                      onTap: () => context.push('/admin?section=branches'),
                     ),
                   ),
                 if (_allowed)

@@ -58,7 +58,6 @@ class _HomeScreenState extends State<HomeScreen> {
   ];
   static const _adminModules = <_Module>[
     _Module('employees', 'الموظفون', 'ملفات الموظفين وبياناتهم الأساسية', Icons.people_outline, '/admin?section=employees'),
-    _Module('branches', 'الفروع', 'إدارة الفروع والحالة التشغيلية', Icons.account_tree_outlined, '/admin?section=branches'),
     _Module('activity', 'سجل النشاط', 'متابعة العمليات الإدارية الأخيرة', Icons.history, '/admin?section=activity'),
     _Module('report-designer', 'مصمم التقارير', 'إدارة قوالب التقارير وإصداراتها', Icons.dashboard_customize_outlined, '/admin/report-designer'),
     _Module('customizer', 'تخصيص الواجهات', 'إعدادات العرض والتخصيص المؤسسي', Icons.palette_outlined, '/admin/customizer'),
@@ -119,10 +118,6 @@ class _HomeScreenState extends State<HomeScreen> {
       case 'employees':
         return _employeeManager ||
             (_manageTasks && _permissions.contains('employees.read'));
-      case 'branches':
-        return _manageTasks &&
-            (_permissions.contains('branches.manage') ||
-                _permissions.contains('branches.read_all'));
       case 'performance':
         return _manageTasks &&
             (_permissions.contains('tasks.review') ||
