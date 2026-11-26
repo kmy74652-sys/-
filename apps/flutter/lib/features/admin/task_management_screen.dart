@@ -82,6 +82,39 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
     return DateFormat('dd/MM/yyyy HH:mm').format(parsed.toLocal());
   }
 
+  String _taskTitle(Map<String, dynamic> task) {
+    final raw = _s(task['title'], 'مهمة').trim();
+    final unified = RegExp(r'^الجدول الموحد\s*-\s*[^·]+·\s*(.+)$').firstMatch(raw);
+    return (unified?.group(1) ?? raw.replaceFirst(RegExp(r'^الجدول الموحد\s*-\s*'), '')).trim();
+  }
+
+  String _priority(dynamic value) => const {
+    'low': 'منخفضة',
+    'normal': 'عادية',
+    'high': 'عالية',
+    'urgent': 'عاجلة',
+  }[_s(value, 'normal')] ?? _s(value, 'عادية');
+
+  String _detailDate(dynamic value) {
+    final parsed = DateTime.tryParse(_s(value));
+    return parsed == null ? 'غير مسجل' : _localDateTime(value);
+  }
+
+  String _sentAt(Map<String, dynamic> task) =>
+      _detailDate(task['assigned_at'] ?? task['created_at']);
+
+  String _completedAt(Map<String, dynamic> task) =>
+      _detailDate(_reportByTask[_s(task['id'])]?['submitted_at']);
+
+  String _approvedAt(Map<String, dynamic> task) {
+    final report = _reportByTask[_s(task['id'])];
+    if (_s(report?['status']) != 'approved' &&
+        !{'approved', 'completed_approved'}.contains(_s(task['status']))) {
+      return 'غير مسجل';
+    }
+    return _detailDate(report?['reviewed_at'] ?? report?['updated_at']);
+  }
+
   String _descriptionValue(String text, String label) => _lineValue(text, '$label:');
 
   UnifiedTaskTableDraft _unifiedDraftFromTask(Map<String, dynamic> task) {
@@ -183,7 +216,7 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
         _db
             .from('tasks')
             .select(
-              'id,title,description,branch_id,assigned_to,due_at,priority,status,report_required,report_flow,report_form_snapshot_id,updated_at,deleted_at',
+              'id,title,description,branch_id,assigned_to,assigned_at,created_at,due_at,priority,status,report_required,report_flow,report_form_snapshot_id,updated_at,deleted_at',
             )
             .eq('organization_id', org)
             .isFilter('deleted_at', null)
@@ -226,7 +259,7 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
           ? <Map<String, dynamic>>[]
           : _rows(await _db
                 .from('task_reports')
-                .select('id,task_id,report_form_snapshot_id,status,submitted_at,review_note,updated_at')
+                .select('id,task_id,report_form_snapshot_id,status,submitted_at,reviewed_at,review_note,updated_at')
                 .inFilter('task_id', taskIds)
                 .order('updated_at', ascending: false)
                 .limit(500));
@@ -1046,7 +1079,7 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
                                   child: ListTile(
                                   contentPadding: const EdgeInsets.all(8),
                                   title: Text(
-                                    _s(t['title'], 'مهمة'),
+                                    _taskTitle(t),
                                     textAlign: TextAlign.right,
                                     maxLines: 2,
                                     overflow: TextOverflow.ellipsis,
@@ -1055,25 +1088,17 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
                                     crossAxisAlignment: CrossAxisAlignment.end,
                                     children: [
                                       Text(
-                                        '${_status(_s(t['status']))} · ${_branchName(_s(t['branch_id']).isEmpty ? null : _s(t['branch_id']))} · ${_employeeName(_s(t['assigned_to']))}',
+                                        'الحالة: ${_status(_s(t['status']))}',
                                         textAlign: TextAlign.right,
                                       ),
                                       Text(
-                                        'التقرير: ${_reportStatus(t)}',
+                                        'الأولوية: ${_priority(t['priority'])}',
                                         textAlign: TextAlign.right,
-                                        style: TextStyle(
-                                          color: _reportStatusColor(_reportStatus(t)),
-                                          fontWeight: FontWeight.w700,
-                                        ),
                                       ),
-                                      if (_s(_reportByTask[taskId]?['review_note'])
-                                          .trim()
-                                          .isNotEmpty)
-                                        Text(
-                                          'ملاحظة الإدارة: ${_s(_reportByTask[taskId]?['review_note'])}',
-                                          textAlign: TextAlign.right,
-                                          style: const TextStyle(color: Colors.deepOrange),
-                                        ),
+                                      Text(
+                                        'الموعد: ${_localDateTime(t['due_at'])}',
+                                        textAlign: TextAlign.right,
+                                      ),
                                       if (_canReviewActions &&
                                           _reportStatus(t) == 'مرسل للمراجعة')
                                         Padding(
@@ -1100,29 +1125,33 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
                                             ],
                                           ),
                                         ),
-                                      if (expanded && widget.unifiedOnly)
+                                      if (expanded) ...[
                                         Text(
-                                          t['report_form_snapshot_id'] != null
-                                              ? 'قالب التقرير: مرتبط وثابت لهذه المهمة'
-                                              : 'قالب التقرير: غير مرتبط',
-                                          textAlign: TextAlign.right,
-                                          style: TextStyle(
-                                            color: t['report_form_snapshot_id'] != null
-                                                ? Colors.green
-                                                : Colors.red,
-                                            fontWeight: FontWeight.w700,
-                                          ),
-                                        ),
-                                      Text(
-                                        'الموعد: ${_localDateTime(t['due_at'])}',
-                                        textAlign: TextAlign.right,
-                                      ),
-                                      if (expanded && _s(t['description']).trim().isNotEmpty)
-                                        Text(
-                                          _s(t['description']),
+                                          'اسم الموظف: ${_employeeName(_s(t['assigned_to']))}',
                                           textAlign: TextAlign.right,
                                         ),
-
+                                        Text(
+                                          'الفرع: ${_branchName(_s(t['branch_id']).isEmpty ? null : _s(t['branch_id']))}',
+                                          textAlign: TextAlign.right,
+                                        ),
+                                        Text(
+                                          'تاريخ إرسال المهمة: ${_sentAt(t)}',
+                                          textAlign: TextAlign.right,
+                                        ),
+                                        Text(
+                                          'تاريخ إنجاز المهمة: ${_completedAt(t)}',
+                                          textAlign: TextAlign.right,
+                                        ),
+                                        Text(
+                                          'تاريخ اعتماد المهمة: ${_approvedAt(t)}',
+                                          textAlign: TextAlign.right,
+                                        ),
+                                        Text(
+                                          'ملاحظة الإدارة: ${_s(_reportByTask[taskId]?['review_note']).trim().isEmpty ? 'لا توجد' : _s(_reportByTask[taskId]?['review_note'])}',
+                                          textAlign: TextAlign.right,
+                                          style: const TextStyle(color: Colors.deepOrange),
+                                        ),
+                                      ],
                                         Align(
                                           alignment: Alignment.centerRight,
                                           child: TextButton.icon(
