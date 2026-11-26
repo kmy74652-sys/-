@@ -8,7 +8,6 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../core/notifications_repository.dart';
 import '../core/notifications_runtime.dart';
 import '../core/theme.dart';
-import 'ui_labels.dart';
 import 'app_customizer.dart';
 import 'organization_branding.dart';
 
