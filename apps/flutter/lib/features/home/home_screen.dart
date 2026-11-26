@@ -1,7 +1,9 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/theme.dart';
@@ -24,6 +26,7 @@ class _HomeScreenState extends State<HomeScreen> {
   RealtimeChannel? _tasksRealtime;
   Timer? _summaryRefreshTimer;
   int _request = 0;
+  static const _homeCachePrefix = '@nexora/home-cache/v1/';
 
   static const _groups = <(String, List<_Module>)>[
     (
@@ -187,13 +190,17 @@ class _HomeScreenState extends State<HomeScreen> {
       if (mounted) context.go('/login');
       return;
     }
+    final uid = client.auth.currentUser?.id;
+    if (uid != null && _summary == null) await _restoreCache(uid);
     if (mounted)
       setState(() {
         _loading = true;
         _error = null;
-      });
+    });
     try {
-      final raw = await client.rpc('mobile_my_profile');
+      final raw = await client.rpc('mobile_my_profile').timeout(
+        const Duration(seconds: 10),
+      );
       final root = raw is Map ? raw : const <dynamic, dynamic>{};
       final employee = root['employee'];
       if (employee is! Map)
@@ -231,17 +238,89 @@ class _HomeScreenState extends State<HomeScreen> {
         branch,
         permissions.contains('tasks.manage'),
         permissions.contains('tasks.execute'),
-      );
+      ).timeout(const Duration(seconds: 12));
       if (ticket != _request || !mounted) return;
       setState(() {
         _summary = summary;
       });
+      if (uid != null) await _saveCache(uid);
     } catch (e) {
       if (ticket == _request && mounted)
-        setState(() => _error = e.toString().replaceFirst('Exception: ', ''));
+        setState(() => _error = _friendlyNetworkError(e));
     } finally {
       if (ticket == _request && mounted) setState(() => _loading = false);
     }
+  }
+
+  Future<void> _restoreCache(String uid) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString('$_homeCachePrefix$uid');
+      if (raw == null || raw.isEmpty) return;
+      final decoded = jsonDecode(raw);
+      if (decoded is! Map) return;
+      final map = Map<String, dynamic>.from(decoded);
+      final summary = map['summary'];
+      if (summary is! Map) return;
+      final cachedSummary = <String, int>{};
+      for (final entry in summary.entries) {
+        final value = entry.value;
+        if (value is num) cachedSummary[entry.key.toString()] = value.toInt();
+      }
+      if (cachedSummary.isEmpty || !mounted) return;
+      final permissions = map['permissions'];
+      final roles = map['roles'];
+      setState(() {
+        _name = map['name']?.toString();
+        _summary = cachedSummary;
+        _permissions = permissions is List
+            ? permissions.map((value) => value.toString()).toSet()
+            : <String>{};
+        _roles = roles is List
+            ? roles.map((value) => value.toString()).toSet()
+            : <String>{};
+        _loading = false;
+        _error = 'لا يوجد اتصال حاليًا. الأرقام المعروضة من آخر تحديث محفوظ.';
+      });
+    } catch (_) {
+      // Cache failures must never prevent the online load.
+    }
+  }
+
+  Future<void> _saveCache(String uid) async {
+    final summary = _summary;
+    if (summary == null) return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(
+        '$_homeCachePrefix$uid',
+        jsonEncode({
+          'savedAt': DateTime.now().toUtc().toIso8601String(),
+          'name': _name,
+          'permissions': _permissions.toList(),
+          'roles': _roles.toList(),
+          'summary': summary,
+        }),
+      );
+    } catch (_) {
+      // Online data remains valid even if local storage is unavailable.
+    }
+  }
+
+  String _friendlyNetworkError(Object error) {
+    final message = error.toString();
+    final networkError = message.contains('AuthRetryableFetchException') ||
+        message.contains('SocketFailed') ||
+        message.contains('Failed host lookup') ||
+        message.contains('SocketException') ||
+        message.contains('TimeoutException') ||
+        message.contains('statusCode: null');
+    if (networkError) {
+      return _summary == null
+          ? 'لا يوجد اتصال بالإنترنت. تحقق من الشبكة ثم اضغط إعادة المحاولة.'
+          : 'تعذر تحديث البيانات بسبب ضعف الاتصال. الأرقام المعروضة من آخر تحديث محفوظ.';
+    }
+    return message.replaceFirst('Exception: ', '');
   }
 
   String? _defaultBranch(Map<String, dynamic> profile) {
