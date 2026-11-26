@@ -30,7 +30,6 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   int _unreadCount = 0;
   Set<String> _permissions = <String>{};
-  Set<String> _roles = <String>{};
   bool _navigationLoading = true;
 
   Future<List<_GlobalSearchResult>> _globalSearch(String rawQuery) async {
@@ -308,18 +307,10 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
       final employee = raw is Map ? raw['employee'] : null;
       if (employee is Map) {
         final permissions = employee['permissions'];
-        final roles = employee['roles'];
         if (mounted) {
           setState(() {
             _permissions = permissions is List
                 ? permissions.map((value) => '$value').toSet()
-                : <String>{};
-            _roles = roles is List
-                ? roles
-                    .whereType<Map>()
-                    .map((role) => '${role['code'] ?? ''}')
-                    .where((code) => code.isNotEmpty)
-                    .toSet()
                 : <String>{};
             _navigationLoading = false;
           });
@@ -336,81 +327,12 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
 
   bool get _managesTasks => _can('tasks.manage');
 
-  bool get _canEmployees =>
-      _managesTasks && (_can('employees.read') || _can('employees.manage'));
-
-  bool get _canReports =>
-      _managesTasks &&
-          (_can('reports.read_all') || _can('tasks.review')) ||
-      (!_managesTasks && _can('tasks.execute'));
-
-  bool get _canPerformance =>
-      _managesTasks && (_can('tasks.review') || _can('reports.read_all'));
-
-  bool get _canReportDesigner =>
-      _managesTasks && _can('report_forms.manage');
-
   bool get _canCustomizer => _managesTasks && _can('customizer.manage');
-
-  bool get _canHr =>
-      (_roles.contains('owner') || _roles.contains('admin_followup')) &&
-      _can('employees.manage') &&
-      _can('employee_hr.read_all');
 
   List<_NavigationItem> _navigationItems() {
     final items = <_NavigationItem>[
       const _NavigationItem('الرئيسية', '/', Icons.home_outlined),
     ];
-    if (_managesTasks || _can('tasks.execute')) {
-      items.add(
-        _NavigationItem(
-          'المهام والمتابعة',
-          _managesTasks ? '/admin/tasks' : '/tasks',
-          Icons.task_alt_outlined,
-        ),
-      );
-    }
-    if (_canReports) {
-      items.add(
-        _NavigationItem(
-          'التقارير',
-          _managesTasks ? '/reports' : '/reports/independent',
-          Icons.description_outlined,
-        ),
-      );
-    }
-    if (_canEmployees) {
-      items.add(
-        const _NavigationItem('الموظفون', '/admin?section=employees', Icons.people_outline),
-      );
-    }
-    if (_managesTasks) {
-      items.add(
-        const _NavigationItem(
-          'الجداول الموحدة',
-          '/admin/unified-task-management',
-          Icons.table_chart_outlined,
-        ),
-      );
-    }
-    if (_canPerformance) {
-      items.add(
-        const _NavigationItem(
-          'تحليلات الأداء',
-          '/admin/performance',
-          Icons.query_stats,
-        ),
-      );
-    }
-    if (_canReportDesigner) {
-      items.add(
-        const _NavigationItem(
-          'مصمم التقارير',
-          '/admin/report-designer',
-          Icons.dashboard_customize_outlined,
-        ),
-      );
-    }
     if (_canCustomizer) {
       items.add(
         const _NavigationItem(
@@ -418,11 +340,6 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
           '/admin/customizer',
           Icons.palette_outlined,
         ),
-      );
-    }
-    if (_canHr) {
-      items.add(
-        const _NavigationItem('الموارد البشرية', '/hr', Icons.badge_outlined),
       );
     }
     return items;
