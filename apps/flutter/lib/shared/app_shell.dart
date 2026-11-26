@@ -468,6 +468,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (sheetContext) => Directionality(
+        textDirection: Directionality.of(sheetContext),
         child: SizedBox(
           height: MediaQuery.sizeOf(sheetContext).height * 0.68,
           child: Column(
@@ -622,6 +623,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
           if (route != null) _navigate(route);
         },
         child: Directionality(
+        textDirection: Directionality.of(context),
         child: Scaffold(
         backgroundColor: const Color(0xFFF5F7FD),
         body: SafeArea(
