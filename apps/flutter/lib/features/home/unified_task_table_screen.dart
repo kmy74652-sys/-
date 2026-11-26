@@ -261,6 +261,7 @@ class _UnifiedTaskTableScreenState extends State<UnifiedTaskTableScreen> {
     void add(String key, String label, String type, {
       bool required = false,
       List<String> options = const [],
+      Map<String, dynamic>? config,
     }) {
       if (keys.add(key)) {
         fields.add({
@@ -269,6 +270,7 @@ class _UnifiedTaskTableScreenState extends State<UnifiedTaskTableScreen> {
           'type': type,
           'required': required,
           if (options.isNotEmpty) 'options': options,
+          if (config != null) 'config': config,
         });
       }
     }
@@ -280,6 +282,8 @@ class _UnifiedTaskTableScreenState extends State<UnifiedTaskTableScreen> {
     if (_hasKeyword(text, ['مخزون', 'كمية', 'مستودع', 'صنف', 'أصناف'])) {
       add('system_quantity', 'الكمية في النظام', 'number', required: true);
       add('actual_quantity', 'الكمية الفعلية', 'number', required: true);
+      add('quantity_difference', 'الفرق', 'calculated',
+          config: const {'formula': '{actual_quantity} - {system_quantity}'});
       add('stock_condition', 'حالة المخزون', 'select', required: true,
           options: ['مطابق', 'يوجد فرق', 'تالف', 'غير متوفر']);
     }
@@ -287,33 +291,76 @@ class _UnifiedTaskTableScreenState extends State<UnifiedTaskTableScreen> {
       add('sales_total', 'إجمالي المبيعات', 'number', required: true);
       add('invoice_count', 'عدد الفواتير', 'number', required: true);
       add('returns_total', 'قيمة المرتجعات', 'number');
+      add('average_invoice', 'متوسط قيمة الفاتورة', 'calculated',
+          config: const {'formula': '{sales_total} / {invoice_count}'});
+      add('sales_evidence', 'كشف أو صورة المبيعات', 'attachment');
     }
     if (_hasKeyword(text, ['حضور', 'انصراف', 'دوام', 'تأخير'])) {
       add('attendance_time', 'وقت الحضور', 'text', required: true);
       add('departure_time', 'وقت الانصراف', 'text');
+      add('attendance_status', 'حالة الحضور', 'select', required: true,
+          options: ['حاضر', 'متأخر', 'غائب', 'خروج مبكر']);
       add('delay_reason', 'سبب التأخير', 'textarea');
+      add('attendance_evidence', 'إثبات الحضور', 'attachment');
     }
     if (_hasKeyword(text, ['صيانة', 'إصلاح', 'عطل'])) {
       add('issue_description', 'وصف العطل', 'textarea', required: true);
+      add('issue_cause', 'سبب العطل', 'text');
       add('action_taken', 'الإجراء المتخذ', 'textarea', required: true);
       add('parts_used', 'قطع الغيار المستخدمة', 'textarea');
+      add('repair_cost', 'تكلفة الإصلاح', 'money');
       add('repair_status', 'حالة الإصلاح', 'select', required: true,
           options: ['تم الإصلاح', 'يحتاج متابعة', 'لم يتم الإصلاح']);
+      add('before_repair', 'صورة قبل الإصلاح', 'attachment');
+      add('after_repair', 'صورة بعد الإصلاح', 'attachment');
     }
     if (_hasKeyword(text, ['فحص', 'تفتيش', 'مراجعة', 'تدقيق', 'مطابقة'])) {
       add('inspection_result', 'نتيجة الفحص', 'select', required: true,
           options: ['سليم', 'يحتاج معالجة', 'غير مطابق']);
+      add('checklist_completed', 'تم تنفيذ قائمة الفحص', 'checkbox', required: true);
+      add('compliance_percent', 'درجة الالتزام', 'percentage');
       add('findings', 'الملاحظات والنتائج', 'textarea');
+      add('corrective_action', 'الإجراء التصحيحي', 'textarea');
       add('evidence', 'مرفق الإثبات', 'attachment');
     }
     if (_hasKeyword(text, ['تنظيف', 'ترتيب', 'تجهيز', 'إنجاز'])) {
       add('completion_percent', 'نسبة الإنجاز', 'percentage', required: true);
+      add('work_checklist', 'تم تنفيذ الأعمال المطلوبة', 'checkbox', required: true);
+      add('place_status', 'حالة المكان', 'select', required: true,
+          options: ['جاهز', 'جاهز جزئيًا', 'غير جاهز']);
+      add('before_work', 'صورة قبل التنفيذ', 'attachment');
       add('completion_evidence', 'صورة الإنجاز', 'attachment');
     }
     if (_hasKeyword(text, ['عميل', 'اتصال', 'اتصالات', 'متابعة'])) {
       add('customer_name', 'اسم العميل', 'text', required: true);
+      add('customer_phone', 'رقم العميل', 'text');
       add('contact_result', 'نتيجة المتابعة', 'textarea', required: true);
       add('next_action', 'الإجراء التالي', 'textarea');
+      add('next_follow_up', 'موعد المتابعة القادمة', 'date');
+    }
+    if (_hasKeyword(text, ['محاسبة', 'حساب', 'مصروف', 'قبض', 'صرف', 'تحويل', 'تسوية'])) {
+      add('financial_amount', 'المبلغ', 'money', required: true);
+      add('transaction_type', 'نوع العملية', 'select', required: true,
+          options: ['قبض', 'صرف', 'تسوية', 'تحويل']);
+      add('document_number', 'رقم المستند', 'text');
+      add('account_party', 'الحساب أو الجهة', 'text');
+      add('reconciliation_status', 'حالة المطابقة', 'select', required: true,
+          options: ['مطابق', 'غير مطابق', 'يحتاج مراجعة']);
+      add('financial_document', 'صورة المستند المالي', 'attachment');
+      add('accountant_notes', 'ملاحظات المحاسب', 'textarea');
+    }
+    if (_hasKeyword(text, ['خطاب', 'معاملة', 'طلب', 'اعتماد', 'إجراء إداري'])) {
+      add('transaction_number', 'رقم المعاملة', 'text');
+      add('responsible_entity', 'الجهة المعنية', 'text');
+      add('administrative_status', 'حالة المعاملة', 'select', required: true,
+          options: ['جديدة', 'قيد المتابعة', 'مكتملة', 'متوقفة']);
+      add('administrative_action', 'الإجراء المتخذ', 'textarea');
+      add('next_action_date', 'تاريخ الإجراء التالي', 'date');
+      add('administrative_attachments', 'مرفقات المعاملة', 'attachment');
+    }
+    if (_hasKeyword(text, ['تقييم', 'جودة', 'رضا', 'أداء'])) {
+      add('quality_rating', 'التقييم', 'rating', required: true);
+      add('quality_notes', 'ملاحظات الجودة', 'textarea');
     }
     var extraIndex = 0;
     for (final entry in row.extras.entries) {
@@ -325,7 +372,7 @@ class _UnifiedTaskTableScreenState extends State<UnifiedTaskTableScreen> {
     }
     add('execution_date', 'تاريخ التنفيذ', 'date', required: true);
     add('notes', 'ملاحظات الموظف', 'textarea');
-    return fields;
+    return fields.length <= 30 ? fields : fields.take(30).toList();
   }
 
   Future<void> _send(UnifiedTaskTableDraft draft) async {

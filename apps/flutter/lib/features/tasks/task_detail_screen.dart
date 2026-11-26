@@ -1389,6 +1389,22 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
         },
       );
     }
+    if (type == 'rating') {
+      const ratings = ['1', '2', '3', '4', '5'];
+      return DropdownButtonFormField<String>(
+        value: ratings.contains(controller?.text) ? controller!.text : null,
+        decoration: InputDecoration(labelText: title),
+        items: ratings
+            .map((value) => DropdownMenuItem(value: value, child: Text('$value / 5')))
+            .toList(),
+        onChanged: (value) {
+          if (value != null) {
+            controller?.text = value;
+            setState(() {});
+          }
+        },
+      );
+    }
     if (type == 'boolean' || type == 'checkbox')
       return CheckboxListTile(
         value: controller?.text == 'true',
