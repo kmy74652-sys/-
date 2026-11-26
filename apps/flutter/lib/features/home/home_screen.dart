@@ -6,7 +6,6 @@ import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../../core/theme.dart';
 import '../../shared/app_shell.dart';
 
 class HomeScreen extends StatefulWidget {
