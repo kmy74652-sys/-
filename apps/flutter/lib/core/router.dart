@@ -154,6 +154,7 @@ void initializeRouter() {
         builder: (context, state) => _PermissionGate(
           permissions: {'tasks.manage'},
           child: TaskManagementScreen(
+            unifiedOnly: true,
             initialTaskFilter: state.uri.queryParameters['status'],
           ),
         ),

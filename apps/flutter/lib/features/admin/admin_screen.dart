@@ -300,7 +300,7 @@ class _AdminScreenState extends State<AdminScreen> {
             children: [
               _nav('المهام والتكليفات', 'tasks', Icons.task_alt, true),
               _nav(
-                'إدارة المهام وإنشاء التكليفات',
+                'إدارة مهام الجداول الموحدة',
                 'task-management',
                 Icons.assignment_add,
                 _can('tasks.manage'),
