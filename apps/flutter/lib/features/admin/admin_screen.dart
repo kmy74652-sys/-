@@ -353,11 +353,10 @@ class _AdminScreenState extends State<AdminScreen> {
                 if (_can('branches.manage')) ...[
                   const Divider(),
                   const Text('إضافة فرع جديد', textAlign: TextAlign.right),
-                  TextField(
+                  const Text(
+                    'سيتم إنشاء كود الفرع تلقائيًا بعد الحفظ.',
                     textAlign: TextAlign.right,
-                    textCapitalization: TextCapitalization.characters,
-                    decoration: const InputDecoration(labelText: 'كود الفرع'),
-                    onChanged: (v) => setState(() => _newBranchCode = v),
+                    style: TextStyle(color: Colors.black54),
                   ),
                   TextField(
                     textAlign: TextAlign.right,
@@ -367,7 +366,6 @@ class _AdminScreenState extends State<AdminScreen> {
                   FilledButton(
                     onPressed:
                         _branchBusy ||
-                            _newBranchCode.trim().isEmpty ||
                             _newBranchName.trim().isEmpty
                         ? null
                         : () => _manageBranch('create'),
@@ -554,6 +552,9 @@ class _AdminScreenState extends State<AdminScreen> {
     });
     try {
       final db = Supabase.instance.client;
+      final generatedBranchCode = _newBranchCode.trim().isEmpty
+          ? 'BR${DateTime.now().millisecondsSinceEpoch.toRadixString(36).toUpperCase()}'
+          : _newBranchCode.trim().toUpperCase();
       if (action == 'delete') {
         await db.rpc(
           'admin_delete_branch',
@@ -569,9 +570,7 @@ class _AdminScreenState extends State<AdminScreen> {
             'action': 'manage_branch',
             'branchAction': action,
             'branchId': branchId,
-            'code': action == 'create'
-                ? _newBranchCode.trim().toUpperCase()
-                : null,
+            'code': action == 'create' ? generatedBranchCode : null,
             'name': action == 'create'
                 ? _newBranchName.trim()
                 : action == 'update'
@@ -583,7 +582,7 @@ class _AdminScreenState extends State<AdminScreen> {
       if (!mounted) return;
       setState(() {
         _branchNotice = action == 'create'
-            ? 'تمت إضافة الفرع.'
+            ? 'تمت إضافة الفرع وإنشاء كوده تلقائيًا.'
             : action == 'update'
             ? 'تم تعديل اسم الفرع.'
             : action == 'archive'

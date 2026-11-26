@@ -59,7 +59,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     super.dispose();
   }
 
-  Future<void> _load() async {
+  Future<bool> _load() async {
     if (mounted)
       setState(() {
         _busy = true;
@@ -88,7 +88,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       _organizationId = '${employee['institutionId'] ?? ''}';
       if (!_allowed) {
         _people = [];
-        return;
+        return true;
       }
       final response = await _db.functions.invoke(
         'employee-code-auth',
@@ -117,8 +117,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
       );
       _tagline.text = '${branding['tagline'] ?? ''}';
       _logoUrl = branding['logo_url'] as String?;
+      return true;
     } catch (_) {
       _error = 'تعذر تحميل الإعدادات. تحقق من الصلاحيات والاتصال.';
+      return false;
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -374,6 +376,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
       );
       controller.clear();
       if (mounted) {
+        final refreshed = await _load();
+        if (mounted) {
+          setState(() {
+            _error = refreshed
+                ? null
+                : 'تم تغيير الرمز بنجاح، لكن تعذر تحديث قائمة الموظفين. أعد فتح الشاشة للتأكد.';
+          });
+        }
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
@@ -381,7 +391,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
           ),
         );
-        await _load();
       }
     } on FunctionException catch (error) {
       final details = '${error.details ?? ''}';
@@ -398,6 +407,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
           'فشل تحديث رمز الدخول في خدمة المصادقة.',
         String value when value.contains('access_code_status_update_failed') =>
           'تم تحديث الرمز لكن تعذر تحديث حالة العضوية؛ أعد تحميل الصفحة قبل المحاولة.',
+        _ when error.status == 503 =>
+          'تم إرسال طلب تغيير الرمز، لكن خدمة المصادقة لم تؤكد النتيجة. أعد تحميل الشاشة وتحقق من وقت آخر تحديث قبل المحاولة مرة أخرى.',
         _ => 'تعذر حفظ الرمز (${error.status}). تحقق من الاتصال والصلاحية ثم حاول مجددًا.',
       };
       if (mounted) setState(() => _error = message);
@@ -845,17 +856,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   Card(
                     child: ListTile(
                       leading: Icon(
-                        person['status'] == 'active'
+                        person['hasAuthAccount'] == true
                             ? Icons.verified_user_outlined
                             : Icons.person_off_outlined,
-                        color: AppColors.green,
+                        color: person['hasAuthAccount'] == true
+                            ? AppColors.green
+                            : Colors.grey,
                       ),
                       title: Text(
                         '${person['fullName'] ?? 'موظف'}',
                         textAlign: TextAlign.right,
                       ),
                       subtitle: Text(
-                        '${person['employeeNo'] ?? 'بدون رقم'} · ${person['status'] == 'active' ? 'نشط' : 'غير نشط'} · ${person['roleCode'] ?? 'دون دور'}',
+                        '${person['employeeNo'] ?? 'بدون رقم'} · ${person['status'] == 'active' ? 'نشط' : 'غير نشط'} · ${person['hasAuthAccount'] == true ? 'مصادق' : 'غير مصادق'} · ${person['roleCode'] ?? 'دون دور'}',
                         textAlign: TextAlign.right,
                       ),
                       trailing: PopupMenuButton<String>(
