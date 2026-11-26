@@ -18,7 +18,6 @@ class PerformanceAnalyticsScreen extends StatefulWidget {
 class _PerformanceAnalyticsScreenState
     extends State<PerformanceAnalyticsScreen> {
   bool _loading = true;
-  bool _overviewExpanded = false;
   String? _error;
   String _search = '';
   String _sort = 'completion';
@@ -30,7 +29,6 @@ class _PerformanceAnalyticsScreenState
   Map<String, String> _employeeOptions = {};
   List<_Employee> _employees = [];
   List<_Branch> _branches = [];
-  _Delivery _delivery = _Delivery();
   Map<String, int> _reportStatusCounts = {};
   int _reportRequiredTasks = 0;
   int _reportReadyTasks = 0;
@@ -272,7 +270,6 @@ class _PerformanceAnalyticsScreenState
           approvedReports: approvedReportCounts[userId] ?? 0,
         );
       }
-      final overallDelivery = _Delivery();
       var reportRequiredTasks = 0;
       var reportReadyTasks = 0;
       for (final task in evaluationTasks) {
@@ -315,11 +312,6 @@ class _PerformanceAnalyticsScreenState
           task['received_at'],
           task['opened_at'],
         );
-        overallDelivery.add(
-          task['assigned_at'],
-          task['received_at'],
-          task['opened_at'],
-        );
       }
       final employees = byUser.values
           .where((e) => e.tasks.isNotEmpty || e.reports > 0)
@@ -343,7 +335,6 @@ class _PerformanceAnalyticsScreenState
         _employees = employees;
         _branches = branchMap.values.toList()
           ..sort((a, b) => b.rate.compareTo(a.rate));
-        _delivery = overallDelivery;
         _reportStatusCounts = reportStatusCounts;
         _reportRequiredTasks = reportRequiredTasks;
         _reportReadyTasks = reportReadyTasks;
@@ -465,13 +456,9 @@ class _PerformanceAnalyticsScreenState
                     ),
                   _ledgerFilters(),
                   const SizedBox(height: 10),
-                  _overviewCard(),
-                  const SizedBox(height: 10),
                   _reportStatusCard(),
                   const SizedBox(height: 10),
                   _evaluationSection(),
-                  const SizedBox(height: 10),
-                  _deliveryCard(),
                   const SizedBox(height: 10),
                   _branchCards(),
                   const SizedBox(height: 10),
@@ -611,131 +598,6 @@ class _PerformanceAnalyticsScreenState
   String _dateOnly(DateTime value) =>
       '${value.year}/${value.month.toString().padLeft(2, '0')}/${value.day.toString().padLeft(2, '0')}';
 
-  Widget _overviewCard() => SectionCard(
-    title: 'المؤشرات العامة',
-    trailing: TextButton.icon(
-      onPressed: () => setState(() => _overviewExpanded = !_overviewExpanded),
-      icon: Icon(
-        _overviewExpanded ? Icons.expand_less : Icons.expand_more,
-        size: 20,
-      ),
-      label: Text(_overviewExpanded ? 'إخفاء' : 'إظهار'),
-    ),
-    child: AnimatedSize(
-      duration: const Duration(milliseconds: 220),
-      curve: Curves.easeInOut,
-      alignment: Alignment.topCenter,
-      child: _overviewExpanded
-          ? Wrap(
-              alignment: WrapAlignment.center,
-              spacing: 9,
-              runSpacing: 9,
-              children: [
-        _metric(
-          'معدل إنجاز المهام',
-          '${_rate.toStringAsFixed(1)}%',
-          '$_done من $_required مهمة',
-          Icons.task_alt,
-        ),
-        _metric(
-          'المهام المتأخرة',
-          '$_delayed',
-          'غير منجزة ومستحقة قبل الآن',
-          Icons.schedule,
-        ),
-        _metric(
-          'غير مكتملة',
-          '${_required - _done}',
-          'المهام المتبقية ضمن الفترة المحددة',
-          Icons.pending_actions_outlined,
-        ),
-        _metric(
-          'الموظفون النشطون',
-          '${_employees.length}',
-          'لديهم مهام أو تقارير',
-          Icons.people_alt_outlined,
-        ),
-        _metric(
-          'التقارير المقدمة',
-          '$_reports',
-          'تقارير مهام وأدوار',
-          Icons.assessment_outlined,
-        ),
-        _metric(
-          'تغطية تقارير المهام',
-          '${_reportCoverageRate.toStringAsFixed(1)}%',
-          '$_reportReadyTasks من $_reportRequiredTasks مهمة تقريرها جاهز للمراجعة أو معتمد',
-          Icons.fact_check_outlined,
-        ),
-        _metric(
-          'بانتظار المراجعة',
-          '${_reportStatusCounts['submitted'] ?? 0}',
-          'تحتاج قرار المدير',
-          Icons.pending_actions_outlined,
-        ),
-        _metric(
-          'تقارير معتمدة',
-          '${_reportStatusCounts['approved'] ?? 0}',
-          'تقارير مكتملة ومعتمدة',
-          Icons.verified_outlined,
-        ),
-        _metric(
-          'تقارير معادة',
-          '${_reportStatusCounts['returned'] ?? 0}',
-          'تحتاج تعديل الموظف',
-          Icons.replay_outlined,
-        ),
-              ],
-            )
-          : _overviewSummary(),
-    ),
-  );
-
-  Widget _overviewSummary() => Wrap(
-    alignment: WrapAlignment.center,
-    spacing: 7,
-    runSpacing: 7,
-    children: [
-      _compactMetric(
-        'الإنجاز',
-        '${_rate.toStringAsFixed(0)}% ($_done/$_required)',
-        Icons.task_alt,
-      ),
-      _compactMetric('المتأخرة', '$_delayed', Icons.schedule),
-      _compactMetric('التقارير', '$_reports', Icons.assessment_outlined),
-      _compactMetric(
-        'المراجعة',
-        '${_reportStatusCounts['submitted'] ?? 0}',
-        Icons.pending_actions_outlined,
-      ),
-    ],
-  );
-
-  Widget _compactMetric(String title, String value, IconData icon) =>
-      Container(
-        constraints: const BoxConstraints(minWidth: 112),
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-        decoration: BoxDecoration(
-          color: const Color(0xFFF7FAF9),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: const Color(0xFFDDE8E4)),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 18, color: AppColors.green),
-            const SizedBox(width: 6),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Text(value, style: const TextStyle(fontWeight: FontWeight.w900, color: AppColors.navy)),
-                Text(title, style: const TextStyle(fontSize: 11, color: AppColors.muted)),
-              ],
-            ),
-          ],
-        ),
-      );
-
   Widget _reportStatusCard() {
     final items = <(String, String, Color)>[
       ('submitted', 'بانتظار المراجعة', Colors.orange),
@@ -812,29 +674,6 @@ class _PerformanceAnalyticsScreenState
           ),
         ),
       );
-
-  Widget _deliveryCard() => SectionCard(
-    title: 'سرعة الاستلام والبدء',
-    child: Row(
-      children: [
-        Expanded(
-          child: _latency(
-            'من الإسناد إلى الاستلام',
-            _delivery.receivedAverage,
-            _delivery.receivedSamples,
-          ),
-        ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: _latency(
-            'من الاستلام إلى الفتح',
-            _delivery.openedAverage,
-            _delivery.openedSamples,
-          ),
-        ),
-      ],
-    ),
-  );
 
   Widget _latency(String title, int? milliseconds, int samples) {
     final label = milliseconds == null
