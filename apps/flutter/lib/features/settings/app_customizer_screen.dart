@@ -8,6 +8,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../shared/app_customizer.dart';
 import '../../shared/app_shell.dart';
+import '../../shared/ui_labels.dart';
 
 class AppCustomizerScreen extends StatefulWidget {
   const AppCustomizerScreen({super.key});
@@ -22,6 +23,8 @@ class _AppCustomizerScreenState extends State<AppCustomizerScreen>
   bool _allowed = false;
   String _previewDevice = 'phone';
   bool _previewLandscape = false;
+  bool _tasksLoading = true;
+  List<Map<String, dynamic>> _currentTasks = const [];
   late final TabController _tabs;
   final Map<String, TextEditingController> _controllers = {};
 
@@ -34,6 +37,7 @@ class _AppCustomizerScreenState extends State<AppCustomizerScreen>
 
   Future<void> _loadPermission() async {
     await _store.load();
+    await _loadCurrentTasks();
     try {
       final profile = await const _ProfileLoader().load();
       _allowed = profile;
@@ -41,6 +45,31 @@ class _AppCustomizerScreenState extends State<AppCustomizerScreen>
       _allowed = false;
     }
     if (mounted) setState(() => _loading = false);
+  }
+
+  Future<void> _loadCurrentTasks() async {
+    try {
+      final raw = await Supabase.instance.client.rpc('mobile_my_profile');
+      final employee = raw is Map ? raw['employee'] : null;
+      final organizationId = employee is Map
+          ? (employee['institutionId'] ?? employee['institution_id'] ?? employee['organization_id'])?.toString()
+          : null;
+      if (organizationId == null || organizationId.isEmpty) return;
+      final rows = await Supabase.instance.client
+          .from('tasks')
+          .select('id,title,status,priority,due_at,assigned_to')
+          .eq('organization_id', organizationId)
+          .isFilter('deleted_at', null)
+          .order('due_at')
+          .limit(8);
+      if (mounted) {
+        setState(() => _currentTasks = rows.whereType<Map>().map((row) => Map<String, dynamic>.from(row)).toList());
+      }
+    } catch (_) {
+      // The preview remains usable when current task data is unavailable.
+    } finally {
+      if (mounted) setState(() => _tasksLoading = false);
+    }
   }
 
   @override
@@ -238,68 +267,18 @@ class _AppCustomizerScreenState extends State<AppCustomizerScreen>
   Widget _unifiedTableTab() => ListView(
         padding: const EdgeInsets.all(12),
         children: [
-          _intro('تخصيص الجدول الموحد لإنشاء المهام', 'تحكم في ترتيب الأقسام والتسميات والأحجام وإعدادات العرض بعد الإرسال دون تغيير مسار الإرسال أو قاعدة البيانات.'),
-          SectionCard(title: 'الأقسام وترتيبها وإظهارها', child: Column(children: [
-            ..._store.unifiedSectionOrder.asMap().entries.map((entry) => ListTile(
-              dense: true,
-              title: Text(_store.unifiedLabel(entry.value), textAlign: TextAlign.right),
-              leading: Switch(value: _store.isUnifiedVisible(entry.value), onChanged: (v) => setState(() => _store.setUnifiedVisibility(entry.value, v))),
-              trailing: Row(mainAxisSize: MainAxisSize.min, children: [
-                IconButton(icon: const Icon(Icons.keyboard_arrow_up), onPressed: entry.key == 0 ? null : () => setState(() => _store.moveUnifiedSection(entry.key, entry.key - 1))),
-                IconButton(icon: const Icon(Icons.keyboard_arrow_down), onPressed: entry.key == _store.unifiedSectionOrder.length - 1 ? null : () => setState(() => _store.moveUnifiedSection(entry.key, entry.key + 1))),
-              ]),
-            )),
-          ])),
-          SectionCard(title: 'الحقول الداخلية', child: Column(children: [
-            for (final key in ['employeeField', 'roleField', 'branchField', 'startDate', 'time', 'task', 'output'])
-              SwitchListTile(title: Text(_store.unifiedLabel(key), textAlign: TextAlign.right), value: _store.isUnifiedFieldVisible(key), onChanged: (v) => setState(() => _store.setUnifiedFieldVisibility(key, v))),
-          ])),
-          SectionCard(title: 'موقع الحقول واتجاهها داخل الصف', child: Column(children: [
-            for (final key in ['employeeField', 'roleField', 'branchField', 'startDate', 'time', 'task', 'output']) _fieldPlacementEditor(key),
-          ])),
-          SectionCard(title: 'التسميات والنصوص الإرشادية', child: Column(children: [
-            for (final key in ['screenTitle', 'screenSubtitle', 'sent', 'back', 'employee', 'purpose', 'purposeHint', 'hours', 'daily', 'exception', 'report', 'lists', 'kpi', 'notes', 'approval', 'time', 'task', 'output', 'employeeField', 'roleField', 'branchField', 'startDate'])
-              Padding(padding: const EdgeInsets.only(bottom: 8), child: TextField(controller: _unifiedController(key), textDirection: TextDirection.rtl, decoration: InputDecoration(labelText: UnifiedTableCustomization.defaults[key] ?? key, suffixIcon: IconButton(icon: const Icon(Icons.restore), onPressed: () => setState(() => _unifiedController(key).text = UnifiedTableCustomization.defaults[key] ?? key))))),
-          ])),
-          SectionCard(title: 'الحجم والأبعاد والتنسيق', child: Column(children: [
-            _slider('مقياس الخط', _store.unifiedFontScale, .85, 1.35, (v) => setState(() => _store.setUnifiedLayout(fontScale: v))),
-            _slider('ارتفاع مربعات الإدخال', _store.unifiedInputHeight, 40, 110, (v) => setState(() => _store.setUnifiedLayout(inputHeight: v))),
-            _slider('ارتفاع صفوف الجدول', _store.unifiedRowHeight, 40, 120, (v) => setState(() => _store.setUnifiedLayout(rowHeight: v))),
-            _slider('استدارة البطاقات', _store.unifiedRadius, 6, 30, (v) => setState(() => _store.setUnifiedLayout(radius: v))),
-            _slider('المسافة بين العناصر', _store.unifiedSpacing, 4, 28, (v) => setState(() => _store.setUnifiedLayout(spacing: v))),
-            SwitchListTile(title: const Text('عرض الحقول المتجاورة حيثما يناسب'), value: _store.unifiedTwoColumns, onChanged: (v) => setState(() => _store.setUnifiedLayout(twoColumns: v))),
-          ])),
-          SectionCard(title: 'إعدادات العرض بعد الإرسال', child: Column(children: [
-            DropdownButtonFormField<String>(value: _store.postSendPlacement, decoration: const InputDecoration(labelText: 'موضع الجداول المرسلة'), items: const [DropdownMenuItem(value: 'top', child: Text('أعلى شاشة الجدول')), DropdownMenuItem(value: 'bottom', child: Text('أسفل شاشة الجدول')), DropdownMenuItem(value: 'dedicated', child: Text('في القسم المخصص فقط'))], onChanged: (v) => setState(() => _store.setPostSend(placement: v))),
-            DropdownButtonFormField<String>(value: _store.postSendVisibility, decoration: const InputDecoration(labelText: 'نطاق الرؤية'), items: const [DropdownMenuItem(value: 'manager', child: Text('المدير فقط')), DropdownMenuItem(value: 'employee', child: Text('الموظف المستلم فقط')), DropdownMenuItem(value: 'shared', child: Text('عرض مشترك حسب الصلاحيات'))], onChanged: (v) => setState(() => _store.setPostSend(visibility: v))),
-            DropdownButtonFormField<String>(value: _store.postSendStyle, decoration: const InputDecoration(labelText: 'نمط القائمة'), items: const [DropdownMenuItem(value: 'standard', child: Text('بطاقة قياسية')), DropdownMenuItem(value: 'compact', child: Text('بطاقة مضغوطة')), DropdownMenuItem(value: 'table', child: Text('عرض جدولي'))], onChanged: (v) => setState(() => _store.setPostSend(style: v))),
-            DropdownButtonFormField<String>(value: _store.postSendSort, decoration: const InputDecoration(labelText: 'ترتيب المرسلات'), items: const [DropdownMenuItem(value: 'newest', child: Text('الأحدث أولًا')), DropdownMenuItem(value: 'employee', child: Text('حسب الموظف')), DropdownMenuItem(value: 'branch', child: Text('حسب الفرع')), DropdownMenuItem(value: 'status', child: Text('حسب الحالة'))], onChanged: (v) => setState(() => _store.setPostSend(sort: v))),
-            SwitchListTile(title: const Text('إظهار الموظف والمسمى'), value: _store.postSendShowEmployee, onChanged: (v) => setState(() => _store.setPostSend(showEmployee: v))),
-            SwitchListTile(title: const Text('إظهار الفرع وتاريخ البدء'), value: _store.postSendShowBranch, onChanged: (v) => setState(() => _store.setPostSend(showBranch: v))),
-            SwitchListTile(title: const Text('إظهار الملخص والهدف'), value: _store.postSendShowSummary, onChanged: (v) => setState(() => _store.setPostSend(showSummary: v))),
-            SwitchListTile(title: const Text('إظهار الحالة ووقت الإرسال'), value: _store.postSendShowStatus, onChanged: (v) => setState(() => _store.setPostSend(showStatus: v))),
-            SwitchListTile(title: const Text('إظهار أزرار التفاصيل والطباعة'), value: _store.postSendShowActions, onChanged: (v) => setState(() => _store.setPostSend(showActions: v))),
-          ])),
-          SectionCard(
-            title: 'المعاينة المباشرة داخل نفس التبويب',
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                const Text(
-                  'غيّر الإعدادات أعلاه وشاهد شكل الجدول مباشرة على الهاتف أو الجهاز اللوحي.',
-                  textAlign: TextAlign.right,
-                ),
-                const SizedBox(height: 10),
-                _previewControls(),
-                const SizedBox(height: 12),
-                _devicePreview(),
-              ],
-            ),
-          ),
-          Row(children: [Expanded(child: FilledButton.icon(onPressed: _saveUnified, icon: const Icon(Icons.save), label: const Text('حفظ وتطبيق الجدول'))), const SizedBox(width: 8), Expanded(child: OutlinedButton.icon(onPressed: () => setState(() => _store.resetUnified()), icon: const Icon(Icons.restore), label: const Text('استعادة الافتراضي')))]),
-          const SizedBox(height: 8),
-          OutlinedButton.icon(onPressed: _export, icon: const Icon(Icons.file_upload_outlined), label: const Text('تصدير الإعدادات JSON')),
-          OutlinedButton.icon(onPressed: _import, icon: const Icon(Icons.file_download_outlined), label: const Text('استيراد الإعدادات JSON')),
+          _intro('تخصيص الجدول الموحد من المعاينة', 'اضغط على العناوين لتعديلها مباشرة، واستخدم أدوات كل قسم لإظهاره أو إخفائه وتحريكه دون مغادرة المعاينة.'),
+          _previewControls(),
+          const SizedBox(height: 10),
+          _devicePreview(),
+          const SizedBox(height: 12),
+          _currentTasksCard(),
+          const SizedBox(height: 12),
+          Row(children: [
+            Expanded(child: FilledButton.icon(onPressed: _saveUnified, icon: const Icon(Icons.save), label: const Text('حفظ وتطبيق الجدول'))),
+            const SizedBox(width: 8),
+            Expanded(child: OutlinedButton.icon(onPressed: () => setState(() => _store.resetUnified()), icon: const Icon(Icons.restore), label: const Text('استعادة الافتراضي'))),
+          ]),
         ],
       );
 
@@ -543,37 +522,30 @@ class _AppCustomizerScreenState extends State<AppCustomizerScreen>
   Widget _unifiedPreviewContent() => Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(_store.unifiedLabel('screenTitle'), textAlign: TextAlign.right, style: const TextStyle(fontWeight: FontWeight.bold)),
-          Text(_store.unifiedLabel('screenSubtitle'), textAlign: TextAlign.right, style: const TextStyle(fontSize: 11)),
+          _editablePreviewLabel('screenTitle', bold: true),
+          _editablePreviewLabel('screenSubtitle', fontSize: 11),
           const SizedBox(height: 8),
-          ..._store.unifiedSectionOrder.where(_store.isUnifiedVisible).map(_unifiedPreviewSection),
+          ..._store.unifiedSectionOrder.asMap().entries
+              .where((entry) => _store.isUnifiedVisible(entry.value))
+              .map((entry) => _unifiedPreviewSection(entry.key, entry.value)),
         ],
       );
 
-  Widget _unifiedPreviewSection(String key) {
+  Widget _unifiedPreviewSection(int index, String key) {
     final title = _store.unifiedLabel(key);
-    if (key == 'employee') return _unifiedPreviewEmployee(title);
-    if (key == 'daily' || key == 'exception') {
-      return _unifiedPreviewBox(title, Column(children: [
-        Row(textDirection: TextDirection.rtl, children: [
-          Expanded(child: Text(_store.unifiedLabel('time'), textAlign: TextAlign.right)),
-          Expanded(flex: 2, child: Text(_store.unifiedLabel('task'), textAlign: TextAlign.right)),
-          Expanded(child: Text(_store.unifiedLabel('output'), textAlign: TextAlign.right)),
-        ]),
-        const Divider(height: 10),
-        const Row(textDirection: TextDirection.rtl, children: [
-          Expanded(child: Text('08:00', textAlign: TextAlign.right)),
-          Expanded(flex: 2, child: Text('مهمة معاينة', textAlign: TextAlign.right)),
-          Expanded(child: Text('مخرج', textAlign: TextAlign.right)),
-        ]),
-      ]));
-    }
-    if (key == 'sent') return _unifiedPreviewBox(title, const Text('لا توجد جداول مرسلة في المعاينة', textAlign: TextAlign.right));
-    if (key == 'approval') return _unifiedPreviewBox(title, const Wrap(textDirection: TextDirection.rtl, spacing: 4, children: [Chip(label: Text('إقرار الموظف')), Chip(label: Text('مراجعة المسؤول'))]));
-    return _unifiedPreviewBox(title, Text('محتوى قسم $title', textAlign: TextAlign.right, style: const TextStyle(fontSize: 12)));
+    final content = key == 'employee'
+        ? _unifiedPreviewEmployee()
+        : key == 'daily' || key == 'exception'
+            ? _unifiedPreviewSchedule()
+            : key == 'sent'
+                ? const Text('لا توجد جداول مرسلة في المعاينة', textAlign: TextAlign.right)
+                : key == 'approval'
+                    ? const Wrap(textDirection: TextDirection.rtl, spacing: 4, children: [Chip(label: Text('إقرار الموظف')), Chip(label: Text('مراجعة المسؤول'))])
+                    : Text('محتوى قسم $title', textAlign: TextAlign.right, style: const TextStyle(fontSize: 12));
+    return _unifiedPreviewBox(key, index, content);
   }
 
-  Widget _unifiedPreviewEmployee(String title) => _unifiedPreviewBox(title, LayoutBuilder(builder: (context, constraints) {
+  Widget _unifiedPreviewEmployee() => LayoutBuilder(builder: (context, constraints) {
         final keys = ['employeeField', 'roleField', 'branchField', 'startDate'].where(_store.isUnifiedFieldVisible).toList()
           ..sort((a, b) {
             final left = _store.unifiedFieldLayout(a);
@@ -586,15 +558,63 @@ class _AppCustomizerScreenState extends State<AppCustomizerScreen>
           final span = '${layout['span'] ?? 'half'}';
           final width = span == 'full' ? constraints.maxWidth : span == 'third' ? (constraints.maxWidth - _store.unifiedSpacing * 2) / 3 : (constraints.maxWidth - _store.unifiedSpacing) / 2;
           final align = '${layout['align'] ?? 'right'}';
-          return SizedBox(width: width, child: TextField(readOnly: true, textAlign: align == 'left' ? TextAlign.left : align == 'center' ? TextAlign.center : TextAlign.right, decoration: InputDecoration(labelText: _store.unifiedLabel(key), isDense: true)));
+          return SizedBox(width: width, child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            Row(children: [Expanded(child: _editablePreviewLabel(key)), Switch(value: _store.isUnifiedFieldVisible(key), onChanged: (v) => setState(() => _store.setUnifiedFieldVisibility(key, v))) ]),
+            TextField(readOnly: true, textAlign: align == 'left' ? TextAlign.left : align == 'center' ? TextAlign.center : TextAlign.right, decoration: const InputDecoration(isDense: true, hintText: 'معاينة القيمة')),
+          ]));
         }).toList());
-      }));
+      });
 
-  Widget _unifiedPreviewBox(String title, Widget child) => Container(
+  Widget _unifiedPreviewSchedule() => Column(children: [
+        Row(textDirection: TextDirection.rtl, children: [
+          Expanded(child: _editablePreviewLabel('time')),
+          Expanded(flex: 2, child: _editablePreviewLabel('task')),
+          Expanded(child: _editablePreviewLabel('output')),
+        ]),
+        const Divider(height: 10),
+        const Row(textDirection: TextDirection.rtl, children: [
+          Expanded(child: Text('08:00', textAlign: TextAlign.right)),
+          Expanded(flex: 2, child: Text('مهمة حالية أو معاينة', textAlign: TextAlign.right)),
+          Expanded(child: Text('مخرج', textAlign: TextAlign.right)),
+        ]),
+      ]);
+
+  Widget _editablePreviewLabel(String key, {bool bold = false, double? fontSize}) => TextField(
+        controller: _unifiedController(key),
+        onChanged: (value) => _store.setUnifiedLabel(key, value),
+        textAlign: TextAlign.right,
+        style: TextStyle(fontWeight: bold ? FontWeight.bold : FontWeight.normal, fontSize: fontSize),
+        decoration: const InputDecoration(isDense: true, border: InputBorder.none, contentPadding: EdgeInsets.symmetric(vertical: 2)),
+      );
+
+  Widget _unifiedPreviewBox(String key, int index, Widget child) => Container(
         margin: EdgeInsets.only(bottom: _store.unifiedSpacing),
         padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(color: const Color(0xFFF8FBFA), borderRadius: BorderRadius.circular(_store.unifiedRadius), border: Border.all(color: const Color(0xFFD8E4E0))),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [Text(title, textAlign: TextAlign.right, style: const TextStyle(fontWeight: FontWeight.bold)), const SizedBox(height: 6), child]),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Row(textDirection: TextDirection.rtl, children: [
+            Expanded(child: _editablePreviewLabel(key, bold: true)),
+            IconButton(tooltip: 'إخفاء القسم', icon: const Icon(Icons.visibility_outlined, size: 18), onPressed: () => setState(() => _store.setUnifiedVisibility(key, false))),
+            IconButton(tooltip: 'تحريك لأعلى', icon: const Icon(Icons.keyboard_arrow_up, size: 18), onPressed: index == 0 ? null : () => setState(() => _store.moveUnifiedSection(index, index - 1))),
+            IconButton(tooltip: 'تحريك لأسفل', icon: const Icon(Icons.keyboard_arrow_down, size: 18), onPressed: index == _store.unifiedSectionOrder.length - 1 ? null : () => setState(() => _store.moveUnifiedSection(index, index + 1))),
+          ]),
+          const SizedBox(height: 4),
+          child,
+        ]),
+      );
+
+  Widget _currentTasksCard() => SectionCard(
+        title: 'المهام الحالية',
+        child: _tasksLoading
+            ? const Center(child: Padding(padding: EdgeInsets.all(12), child: CircularProgressIndicator()))
+            : _currentTasks.isEmpty
+                ? const Text('لا توجد مهام حالية لعرضها.', textAlign: TextAlign.right)
+                : Column(children: _currentTasks.map((task) => ListTile(
+                      dense: true,
+                      contentPadding: EdgeInsets.zero,
+                      title: Text('${task['title'] ?? 'مهمة'}', textAlign: TextAlign.right, maxLines: 2, overflow: TextOverflow.ellipsis),
+                      subtitle: Text('الحالة: ${uiStatusLabel('${task['status'] ?? ''}')} · الأولوية: ${uiPriorityLabel('${task['priority'] ?? ''}')} · الموعد: ${task['due_at'] ?? 'غير محدد'}', textAlign: TextAlign.right),
+                    )).toList()),
       );
 
   Widget _intro(String title, String subtitle) => Padding(
