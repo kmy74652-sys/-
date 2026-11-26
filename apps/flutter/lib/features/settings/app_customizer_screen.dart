@@ -35,7 +35,7 @@ class _AppCustomizerScreenState extends State<AppCustomizerScreen>
   @override
   void initState() {
     super.initState();
-    _tabs = TabController(length: 7, vsync: this);
+    _tabs = TabController(length: 8, vsync: this);
     _loadPermission();
   }
 
@@ -110,6 +110,7 @@ class _AppCustomizerScreenState extends State<AppCustomizerScreen>
                           isScrollable: true,
                           tabs: const [
                             Tab(text: 'المعاينة المباشرة'),
+                            Tab(text: 'معاينة PDF'),
                             Tab(text: 'معاينة الرئيسية'),
                             Tab(text: 'التسميات'),
                             Tab(text: 'الترتيب والإظهار'),
@@ -124,6 +125,7 @@ class _AppCustomizerScreenState extends State<AppCustomizerScreen>
                           controller: _tabs,
                           children: [
                             _livePreviewTab(),
+                            _documentPreviewTab(),
                             _homePreviewTab(),
                             _labelsTab(),
                             _layoutTab(),
@@ -257,6 +259,93 @@ class _AppCustomizerScreenState extends State<AppCustomizerScreen>
         leading: Icon(icon, color: Color(_store.primaryColor)),
         title: Text(title, textAlign: TextAlign.right, style: const TextStyle(fontWeight: FontWeight.w700)),
         trailing: Icon(Icons.chevron_left, color: Color(_store.primaryColor)),
+      );
+
+  Widget _documentPreviewTab() => FutureBuilder<OrganizationBranding>(
+        future: OrganizationBrandingStore.instance.forSession(),
+        builder: (context, snapshot) {
+          final branding = snapshot.data ?? OrganizationBranding.fallback;
+          final company = _store.reportCompanyName.trim().isEmpty ? branding.name : _store.reportCompanyName;
+          final logoUrl = _store.reportLogoUrl.trim().isNotEmpty ? _store.reportLogoUrl.trim() : branding.logoUrl;
+          return ListView(
+            padding: const EdgeInsets.all(12),
+            children: [
+              _intro('معاينة PDF للتقارير والمهام', 'هذه المعاينة تعرض ترتيب الشعار واسم المؤسسة وعنوان المستند كما سيظهر في ملف PDF، وتُحدّث نفسها عند تغيير أي إعداد.'),
+              _documentPreviewCard(
+                title: 'تقرير المهمة',
+                subtitle: 'النتيجة الفعلية والملاحظات الخاصة بالمهمة',
+                company: company,
+                logoUrl: logoUrl,
+              ),
+              const SizedBox(height: 14),
+              _documentPreviewCard(
+                title: 'الجدول الموحد لإنشاء وتنفيذ المهام',
+                subtitle: 'معاينة تقرير المهمة الموحدة وحقولها الأساسية',
+                company: company,
+                logoUrl: logoUrl,
+                unified: true,
+              ),
+              const SizedBox(height: 10),
+              const Text('استخدم تبويب «هوية وتصميم التقارير» لتعديل ترتيب العناصر والمحاذاة والحجم والألوان، ثم راجع النتيجة هنا قبل الحفظ.', textAlign: TextAlign.right, style: TextStyle(fontSize: 12, color: Colors.black54)),
+            ],
+          );
+        },
+      );
+
+  Widget _documentPreviewCard({required String title, required String subtitle, required String company, required String? logoUrl, bool unified = false}) {
+    final primary = Color(_store.reportPrimaryColor);
+    final headerColor = _store.reportHeaderStyle == 'minimal' ? Colors.white : const Color(0xFFEAF4F0);
+    final logo = logoUrl == null || logoUrl.isEmpty
+        ? const Icon(Icons.business_outlined, size: 46, color: Color(0xFF0B3458))
+        : Image.network(logoUrl, width: _store.reportLogoSize.clamp(38, 72), height: _store.reportLogoSize.clamp(38, 72), fit: BoxFit.contain, errorBuilder: (_, __, ___) => const Icon(Icons.business_outlined, size: 46, color: Color(0xFF0B3458)));
+    return Card(
+      clipBehavior: Clip.antiAlias,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14), side: BorderSide(color: primary.withOpacity(.24))),
+      child: Container(
+        color: Colors.white,
+        padding: const EdgeInsets.all(12),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(color: headerColor, border: _store.reportHeaderStyle == 'boxed' ? Border.all(color: primary) : null),
+            child: Row(textDirection: TextDirection.rtl, crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                Text(company, textAlign: TextAlign.right, style: TextStyle(color: primary, fontSize: 15, fontWeight: FontWeight.w900)),
+                const SizedBox(height: 5),
+                Text(title, textAlign: TextAlign.right, style: TextStyle(color: Color(_store.reportHeadingColor), fontSize: 19, fontWeight: FontWeight.w900)),
+                const SizedBox(height: 3),
+                Text(subtitle, textAlign: TextAlign.right, style: const TextStyle(fontSize: 10, color: Colors.black54)),
+                if (_store.reportShowExportDate) const Text('تاريخ التصدير: 27-11-2026 01:10', textAlign: TextAlign.right, style: TextStyle(fontSize: 9, color: Colors.black54)),
+              ])),
+              const SizedBox(width: 10),
+              logo,
+            ]),
+          ),
+          const SizedBox(height: 10),
+          if (!unified) ...[
+            _pdfPreviewMeta('الحالة', 'مكتملة'),
+            _pdfPreviewMeta('الموظف', 'أحمد محمد'),
+            _pdfPreviewMeta('الفرع', 'الفرع الرئيسي'),
+            _pdfPreviewTable(const [['الحقل', 'القيمة'], ['النتيجة الفعلية', 'لا يوجد'], ['حالة التنفيذ', 'لا يوجد'], ['الملاحظات والنتائج', 'لا يوجد']], primary),
+          ] else ...[
+            _pdfPreviewMeta('المسمى الوظيفي', 'الموظف أو المجموعة'),
+            _pdfPreviewMeta('تاريخ بدء التطبيق', '2026-11-27'),
+            _pdfPreviewTable(const [['الوقت', 'المهمة والمسؤولية', 'المخرج المطلوب', 'الحالة'], ['08:00', 'مهمة حالية', 'لا يوجد', 'جديدة'], ['—', 'مهمة استثنائية', 'لا يوجد', 'جديدة']], primary),
+          ],
+        ]),
+      ),
+    );
+  }
+
+  Widget _pdfPreviewMeta(String label, String value) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+        decoration: BoxDecoration(border: Border.all(color: const Color(0xFFD8E4E0))),
+        child: Row(textDirection: TextDirection.rtl, children: [Expanded(child: Text(label, textAlign: TextAlign.right, style: const TextStyle(fontWeight: FontWeight.w700))), Text(value, style: const TextStyle(color: Colors.black54))]),
+      );
+
+  Widget _pdfPreviewTable(List<List<String>> rows, Color primary) => Table(
+        border: TableBorder.all(color: primary.withOpacity(.45)),
+        children: rows.map((row) => TableRow(children: row.map((cell) => Padding(padding: const EdgeInsets.all(7), child: Text(cell, textAlign: TextAlign.right, style: TextStyle(fontSize: 11, fontWeight: row == rows.first ? FontWeight.w900 : FontWeight.normal))).toList())).toList(),
       );
 
   Widget _homePreviewTab() => ListView(
