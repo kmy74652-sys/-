@@ -34,265 +34,6 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
   int _unreadCount = 0;
   Set<String> _permissions = <String>{};
 
-  Future<List<_GlobalSearchResult>> _globalSearch(String rawQuery) async {
-    final query = rawQuery.trim();
-    if (query.length < 2) return const [];
-    final client = Supabase.instance.client;
-    final results = <_GlobalSearchResult>[];
-    String? organizationId;
-    try {
-      final profile = await client.rpc('mobile_my_profile');
-      final employee = profile is Map ? profile['employee'] : null;
-      if (employee is Map) {
-        organizationId = (employee['institutionId'] ??
-                employee['institution_id'] ??
-                employee['organization_id'])
-            ?.toString();
-      }
-    } catch (_) {}
-
-    Future<void> loadEmployees() async {
-      if (organizationId == null || organizationId.isEmpty) return;
-      try {
-        final rows = await client
-            .from('organization_memberships')
-            .select('id,user_id,display_name,employee_no')
-            .eq('organization_id', organizationId)
-            .eq('is_active', true)
-            .or('display_name.ilike.%$query%,employee_no.ilike.%$query%')
-            .limit(20);
-        for (final row in rows.whereType<Map>()) {
-          final data = Map<String, dynamic>.from(row);
-          results.add(_GlobalSearchResult(
-            type: 'الموظفون',
-            title: '${data['display_name'] ?? 'موظف'}',
-            subtitle: 'رقم الموظف: ${data['employee_no'] ?? '—'}',
-            icon: Icons.person_outline,
-            route: '/admin?section=employees',
-          ));
-        }
-      } catch (_) {}
-    }
-
-    Future<void> loadTasks() async {
-      if (organizationId == null || organizationId.isEmpty) return;
-      try {
-        final rows = await client
-            .from('tasks')
-            .select('id,title,description,status')
-            .eq('organization_id', organizationId)
-            .isFilter('deleted_at', null)
-            .or('title.ilike.%$query%,description.ilike.%$query%')
-            .order('updated_at', ascending: false)
-            .limit(20);
-        for (final row in rows.whereType<Map>()) {
-          final data = Map<String, dynamic>.from(row);
-          final id = '${data['id'] ?? ''}';
-          results.add(_GlobalSearchResult(
-            type: 'المهام',
-            title: '${data['title'] ?? 'مهمة'}',
-            subtitle: 'الحالة: ${data['status'] ?? '—'} · السجل: $id',
-            icon: Icons.task_alt_outlined,
-            route: id.isEmpty ? '/tasks' : '/tasks/$id',
-          ));
-        }
-      } catch (_) {}
-    }
-
-    Future<void> loadReports() async {
-      try {
-        final rows = await client
-            .from('task_reports')
-            .select('id,task_id,status,submitted_at,review_note')
-            .or('status.ilike.%$query%,review_note.ilike.%$query%')
-            .order('submitted_at', ascending: false)
-            .limit(20);
-        for (final row in rows.whereType<Map>()) {
-          final data = Map<String, dynamic>.from(row);
-          results.add(_GlobalSearchResult(
-            type: 'التقارير',
-            title: 'تقرير رقم ${data['id'] ?? '—'}',
-            subtitle: 'الحالة: ${data['status'] ?? '—'} · المهمة: ${data['task_id'] ?? '—'}',
-            icon: Icons.description_outlined,
-            route: '/reports?status=${data['status'] ?? 'submitted'}',
-          ));
-        }
-      } catch (_) {}
-    }
-
-    Future<void> loadBranches() async {
-      if (organizationId == null || organizationId.isEmpty) return;
-      try {
-        final rows = await client
-            .from('branches')
-            .select('id,name,code')
-            .eq('organization_id', organizationId)
-            .or('name.ilike.%$query%,code.ilike.%$query%')
-            .limit(20);
-        for (final row in rows.whereType<Map>()) {
-          final data = Map<String, dynamic>.from(row);
-          results.add(_GlobalSearchResult(
-            type: 'الفروع',
-            title: '${data['name'] ?? 'فرع'}',
-            subtitle: 'الرمز: ${data['code'] ?? '—'}',
-            icon: Icons.account_tree_outlined,
-            route: '/admin?section=branches',
-          ));
-        }
-      } catch (_) {}
-    }
-
-    Future<void> loadTemplates() async {
-      if (organizationId == null || organizationId.isEmpty) return;
-      try {
-        final rows = await client
-            .from('report_form_templates')
-            .select('id,title,role_code')
-            .eq('organization_id', organizationId)
-            .or('title.ilike.%$query%,role_code.ilike.%$query%')
-            .limit(20);
-        for (final row in rows.whereType<Map>()) {
-          final data = Map<String, dynamic>.from(row);
-          results.add(_GlobalSearchResult(
-            type: 'القوالب',
-            title: '${data['title'] ?? 'قالب تقرير'}',
-            subtitle: 'الدور: ${uiRoleLabel('${data['role_code'] ?? ''}')} · السجل: ${data['id'] ?? '—'}',
-            icon: Icons.article_outlined,
-            route: '/admin/report-designer',
-          ));
-        }
-      } catch (_) {}
-    }
-
-    await Future.wait([
-      loadEmployees(),
-      loadTasks(),
-      loadReports(),
-      loadBranches(),
-      loadTemplates(),
-    ]);
-    const typeOrder = ['الموظفون', 'المهام', 'التقارير', 'الفروع', 'القوالب'];
-    results.sort(
-      (a, b) => typeOrder.indexOf(a.type).compareTo(typeOrder.indexOf(b.type)),
-    );
-    return results;
-  }
-
-  Future<void> _showGlobalSearch() async {
-    final controller = TextEditingController();
-    List<_GlobalSearchResult> results = const [];
-    var busy = false;
-    var searched = false;
-    await showDialog<void>(
-      context: context,
-      builder: (dialogContext) => StatefulBuilder(
-        builder: (context, setDialogState) => Directionality(
-          textDirection: Directionality.of(context),
-          child: AlertDialog(
-            title: const Text('بحث عام داخل التطبيق'),
-            content: SizedBox(
-              width: 560,
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxHeight: 520),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    TextField(
-                      controller: controller,
-                      autofocus: true,
-                      textAlign: TextAlign.right,
-                      textInputAction: TextInputAction.search,
-                      decoration: InputDecoration(
-                        hintText: 'موظف، مهمة، تقرير، فرع، قالب أو رقم سجل',
-                        prefixIcon: busy
-                            ? const Padding(
-                                padding: EdgeInsets.all(12),
-                                child: SizedBox(
-                                  width: 18,
-                                  height: 18,
-                                  child: CircularProgressIndicator(strokeWidth: 2),
-                                ),
-                              )
-                            : IconButton(
-                                tooltip: 'بحث',
-                                onPressed: () async {
-                                  if (controller.text.trim().length < 2) return;
-                                  setDialogState(() {
-                                    busy = true;
-                                    searched = true;
-                                  });
-                                  final found = await _globalSearch(controller.text);
-                                  if (dialogContext.mounted) {
-                                    setDialogState(() {
-                                      results = found;
-                                      busy = false;
-                                    });
-                                  }
-                                },
-                                icon: const Icon(Icons.search),
-                              ),
-                        border: const OutlineInputBorder(),
-                      ),
-                      onSubmitted: (_) async {
-                        if (controller.text.trim().length < 2) return;
-                        setDialogState(() {
-                          busy = true;
-                          searched = true;
-                        });
-                        final found = await _globalSearch(controller.text);
-                        if (dialogContext.mounted) {
-                          setDialogState(() {
-                            results = found;
-                            busy = false;
-                          });
-                        }
-                      },
-                    ),
-                    const SizedBox(height: 12),
-                    if (!searched)
-                      const Text('اكتب كلمتين على الأقل ثم اضغط بحث.', textAlign: TextAlign.right)
-                    else if (!busy && results.isEmpty)
-                      const Padding(
-                        padding: EdgeInsets.all(20),
-                        child: Text('لا توجد نتائج مطابقة في البيانات المسموح بها.', textAlign: TextAlign.center),
-                      )
-                    else
-                      Flexible(
-                        child: ListView.separated(
-                          shrinkWrap: true,
-                          itemCount: results.length,
-                          separatorBuilder: (_, __) => const Divider(height: 1),
-                          itemBuilder: (context, index) {
-                            final result = results[index];
-                            return ListTile(
-                              leading: Icon(result.icon, color: AppColors.navy),
-                              title: Text(result.title, textAlign: TextAlign.right),
-                              subtitle: Text('${result.type} · ${result.subtitle}', textAlign: TextAlign.right),
-                              onTap: () {
-                                Navigator.of(dialogContext).pop();
-                                context.go(result.route);
-                              },
-                            );
-                          },
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(dialogContext).pop(),
-                child: const Text('إغلاق'),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-    controller.dispose();
-  }
-
   @override
   void initState() {
     super.initState();
@@ -637,7 +378,6 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
                     unreadCount: _unreadCount,
                     onAccount: () => _confirmSignOut(context),
                     onNotifications: () => _showNotifications(context),
-                    onSearch: _showGlobalSearch,
                   ),
                   _PageTitleBar(
                     title: widget.title,
@@ -701,13 +441,11 @@ class _BrandHeader extends StatefulWidget {
     required this.unreadCount,
     required this.onAccount,
     required this.onNotifications,
-    required this.onSearch,
   });
 
   final int unreadCount;
   final VoidCallback onAccount;
   final VoidCallback onNotifications;
-  final VoidCallback onSearch;
 
   @override
   State<_BrandHeader> createState() => _BrandHeaderState();
@@ -775,18 +513,6 @@ class _BrandHeaderState extends State<_BrandHeader> {
                 ),
               ),
               SizedBox(width: compact ? 4 : 8),
-              IconButton(
-                tooltip: 'بحث عام',
-                onPressed: widget.onSearch,
-                style: IconButton.styleFrom(
-                  fixedSize: Size.square(controlSize),
-                  foregroundColor: _navy,
-                  backgroundColor: Colors.transparent,
-                  shadowColor: Colors.transparent,
-                  shape: const CircleBorder(),
-                ),
-                icon: const Icon(Icons.search, size: 23),
-              ),
               SizedBox(width: controlGap),
               IconButton(
                 tooltip: 'تبديل الحساب: تسجيل الخروج',
@@ -834,22 +560,6 @@ class _BrandLogo extends StatelessWidget {
 
 /// Slim page-title strip under the brand header: back button on inner pages,
 /// page title, and the home date/time display.
-class _GlobalSearchResult {
-  const _GlobalSearchResult({
-    required this.type,
-    required this.title,
-    required this.subtitle,
-    required this.icon,
-    required this.route,
-  });
-
-  final String type;
-  final String title;
-  final String subtitle;
-  final IconData icon;
-  final String route;
-}
-
 class _PageTitleBar extends StatefulWidget {
   const _PageTitleBar({
     required this.title,
