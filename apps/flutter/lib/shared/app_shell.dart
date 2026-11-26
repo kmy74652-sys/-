@@ -885,7 +885,7 @@ class _PageTitleBarState extends State<_PageTitleBar> {
   }
 
   String get _dateTimeLabel =>
-      DateFormat('yyyy/MM/dd - HH:mm', 'ar').format(_now);
+      DateFormat('yyyy/MM/dd - HH:mm').format(_now);
 
   @override
   Widget build(BuildContext context) {
