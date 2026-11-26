@@ -76,15 +76,6 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
     return '';
   }
 
-  String _replaceLine(String text, String label, String value) {
-    final lines = text.split('\n');
-    final index = lines.indexWhere((line) => line.trimLeft().startsWith(label));
-    final next = '$label ${value.trim().isEmpty ? 'غير محدد' : value.trim()}';
-    if (index == -1) return '$text\n$next'.trim();
-    lines[index] = next;
-    return lines.join('\n').trim();
-  }
-
   String _localDateTime(dynamic value) {
     final parsed = DateTime.tryParse(_s(value));
     if (parsed == null) return 'غير محدد';
@@ -147,91 +138,6 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
       if (draft.instructions.isNotEmpty) 'التعليمات: ${draft.instructions.join('، ')}',
       if (draft.kpis.isNotEmpty) 'مؤشرات الأداء: ${draft.kpis.join('؛ ')}',
     ].join('\n');
-  }
-
-  List<Map<String, String>> _descriptionRows(String text) {
-    final rows = <Map<String, String>>[];
-    final extras = <String>[];
-    final fields = <String, String>{};
-    for (final rawLine in text.split('\n')) {
-      final line = rawLine.trim();
-      if (line.isEmpty) continue;
-      final separator = line.indexOf(':');
-      if (separator <= 0) {
-        extras.add(line);
-        continue;
-      }
-      final label = line.substring(0, separator).trim();
-      final value = line.substring(separator + 1).trim();
-      if (label == 'وصف المهمة 1' || label == 'وصف المهمة') continue;
-      if (label == 'صف الجدول') {
-        final parts = value.split('|').map((part) => part.trim()).toList();
-        if (parts.isNotEmpty && parts[0].isNotEmpty) fields['الوقت / الفترة'] = parts[0];
-        if (parts.length > 1 && parts[1].isNotEmpty) fields['المهمة / المسؤولية'] = parts[1];
-        if (parts.length > 2 && parts[2].isNotEmpty) fields['المخرج المطلوب'] = parts.sublist(2).join(' | ');
-      } else {
-        final normalizedLabel = label == 'الجدول الموحد' ? 'الجدول الموحد الرسمي' : label;
-        fields[normalizedLabel] = value.isEmpty ? 'غير محدد' : value;
-      }
-    }
-    const preferredOrder = [
-      'الجدول الموحد الرسمي',
-      'المسمى الوظيفي',
-      'الفرع',
-      'الوقت المحدد',
-      'الوقت / الفترة',
-      'المهمة / المسؤولية',
-      'المخرج المطلوب',
-    ];
-    for (final label in preferredOrder) {
-      final value = fields.remove(label);
-      if (value != null && value.isNotEmpty) {
-        rows.add({'label': label, 'value': value});
-      }
-    }
-    fields.forEach((label, value) {
-      rows.add({'label': label, 'value': value.isEmpty ? 'غير محدد' : value});
-    });
-    if (extras.isNotEmpty) rows.add({'label': 'تفاصيل إضافية', 'value': extras.join('\n')});
-    if (rows.isEmpty) rows.add({'label': 'الوصف', 'value': 'لا توجد تفاصيل وصف محفوظة.'});
-    return rows;
-  }
-
-  Widget _descriptionTable(String text) {
-    final rows = _descriptionRows(text);
-    return Directionality(
-      textDirection: Directionality.of(context),
-      child: Container(
-        decoration: BoxDecoration(
-          border: Border.all(color: Theme.of(context).dividerColor),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: Table(
-          columnWidths: const {0: FlexColumnWidth(1.05), 1: FlexColumnWidth(2)},
-          border: TableBorder.symmetric(
-            inside: BorderSide(color: Colors.grey, width: 0.35),
-          ),
-          children: [
-            TableRow(
-              decoration: BoxDecoration(color: Theme.of(context).colorScheme.surfaceVariant),
-              children: const [
-                Padding(padding: EdgeInsets.all(9), child: Text('العنصر', textAlign: TextAlign.right, style: TextStyle(fontWeight: FontWeight.bold))),
-                Padding(padding: EdgeInsets.all(9), child: Text('البيانات', textAlign: TextAlign.right, style: TextStyle(fontWeight: FontWeight.bold))),
-              ],
-            ),
-            ...rows.map(
-              (row) => TableRow(
-                children: [
-                  Padding(padding: const EdgeInsets.all(9), child: Text(row['label']!, textAlign: TextAlign.right, style: const TextStyle(fontWeight: FontWeight.w600))),
-                  Padding(padding: const EdgeInsets.all(9), child: Text(row['value']!, textAlign: TextAlign.right)),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
   }
 
   Future<void> _load() async {
@@ -756,7 +662,7 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
     try {
       final dueIso = dueToIso(dueDate);
       final descriptionText = isUnifiedExisting
-          ? _s(existing?['description'])
+          ? _s(existing!['description'])
           : descriptionCards
               .asMap()
               .entries
