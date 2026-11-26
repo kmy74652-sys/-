@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../shared/app_shell.dart';
 import '../../core/theme.dart';
+import '../../shared/ui_labels.dart';
 
 class AdminScreen extends StatefulWidget {
   const AdminScreen({
@@ -617,7 +618,7 @@ class _AdminScreenState extends State<AdminScreen> {
     ),
   );
   Widget _record(Map<String, dynamic> row) {
-    final headline = _text(
+    final rawHeadline = _text(
       row['title'] ??
           row['name'] ??
           row['display_name'] ??
@@ -625,6 +626,9 @@ class _AdminScreenState extends State<AdminScreen> {
           row['action'] ??
           row['id'],
     );
+    final headline = _section == 'activity'
+        ? uiActivityLabel(rawHeadline)
+        : rawHeadline;
     final details = <String>[];
     for (final key in [
       'status',

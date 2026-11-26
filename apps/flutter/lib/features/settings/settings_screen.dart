@@ -8,6 +8,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/theme.dart';
 import '../../shared/app_shell.dart';
 import '../../shared/organization_branding.dart';
+import '../../shared/ui_labels.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -957,7 +958,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           vertical: 4,
                         ),
                         child: Text(
-                          '${entry['action'] ?? 'إجراء'} · ${DateTime.tryParse('${entry['created_at'] ?? ''}')?.toLocal().toString() ?? entry['created_at'] ?? ''}',
+                          '${uiActivityLabel('${entry['action'] ?? 'إجراء'}')} · ${DateTime.tryParse('${entry['created_at'] ?? ''}')?.toLocal().toString() ?? entry['created_at'] ?? ''}',
                           textAlign: TextAlign.right,
                         ),
                       ),

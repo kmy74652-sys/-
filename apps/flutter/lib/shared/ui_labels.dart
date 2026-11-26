@@ -31,6 +31,7 @@ String uiRoleLabel(String value) => const {
     }[value.trim()] ?? value;
 
 String uiActivityLabel(String value) => const {
+      'started': 'بدأ التنفيذ',
       'task_opened': 'تم فتح المهمة',
       'task_started': 'بدأ تنفيذ المهمة',
       'task_submitted': 'تم إرسال المهمة للمراجعة',
