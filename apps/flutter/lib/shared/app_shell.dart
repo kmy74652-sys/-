@@ -405,12 +405,13 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
   String? _backRoute(String path) {
     switch (path) {
       case '/':
+        return null;
       case '/tasks':
       case '/reports':
       case '/reports/independent':
       case '/hr':
       case '/settings':
-        return null;
+        return '/';
       case '/admin/tasks':
       case '/admin/unified-task-management':
       case '/admin/performance':
@@ -693,7 +694,14 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     return AnimatedBuilder(
       animation: AppCustomizer.instance,
       builder: (context, _) {
-        return Directionality(
+        return PopScope<void>(
+        canPop: path == '/',
+        onPopInvokedWithResult: (didPop, _) {
+          if (didPop) return;
+          final route = _backRoute(path);
+          if (route != null) _navigate(route);
+        },
+        child: Directionality(
         textDirection: TextDirection.rtl,
         child: Scaffold(
         key: _scaffoldKey,
@@ -760,6 +768,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
               ),
             ),
           ),
+        ),
         ),
         ),
         );
