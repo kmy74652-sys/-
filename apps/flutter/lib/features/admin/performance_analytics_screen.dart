@@ -22,6 +22,8 @@ class _PerformanceAnalyticsScreenState
   String _search = '';
   String _sort = 'completion';
   String _taskSource = 'unified';
+  String _evaluationMode = 'best';
+  String _evaluationScope = 'employees';
   String? _employeeFilter;
   DateTime? _fromDate, _toDate;
   Map<String, String> _employeeOptions = {};
@@ -340,6 +342,8 @@ class _PerformanceAnalyticsScreenState
         branch.done += employee.totalDone;
         branch.highRequired += employee.highRequired;
         branch.highDone += employee.highDone;
+        branch.reports += employee.reports;
+        branch.approvedReports += employee.approvedReports;
       }
       if (!mounted || token != _loadToken) return;
       setState(() {
@@ -884,109 +888,104 @@ class _PerformanceAnalyticsScreenState
   }
 
   Widget _evaluationSection() {
-    final taskEmployees = _employees
-        .where((employee) => employee.totalRequired > 0)
-        .toList();
-    final reportEmployees = _employees
-        .where((employee) => employee.reports > 0)
-        .toList();
-    if (taskEmployees.isEmpty && reportEmployees.isEmpty) {
-      return SectionCard(
-        title: 'تقييم الموظفين',
-        child: const Text(
-          'لا توجد بيانات كافية للتقييم ضمن الفلاتر الحالية.',
-          textAlign: TextAlign.right,
-        ),
-      );
-    }
-
-    taskEmployees.sort((a, b) => b.rate.compareTo(a.rate));
-    reportEmployees.sort((a, b) => b.reportRate.compareTo(a.reportRate));
-    final taskHasComparison = taskEmployees.length > 1 &&
-        taskEmployees.any((employee) => employee.rate != taskEmployees.first.rate);
-    final reportHasComparison = reportEmployees.length > 1 &&
-        reportEmployees.any((employee) => employee.reportRate != reportEmployees.first.reportRate);
-    final taskAchievers = taskEmployees.where((employee) => employee.rate > 0).toList();
-    final reportAchievers = reportEmployees.where((employee) => employee.reportRate > 0).toList();
-    final bestTask = taskAchievers.isEmpty ? null : taskAchievers.first;
-    final bestReport = reportAchievers.isEmpty ? null : reportAchievers.first;
-    final leastTask = taskHasComparison ? taskEmployees.last : null;
-    final leastReport = reportHasComparison ? reportEmployees.last : null;
+    final subjects = _evaluationScope == 'branches'
+        ? _branches
+            .map(
+              (branch) => _EvaluationSubject(
+                name: branch.name,
+                totalTasks: branch.required,
+                doneTasks: branch.done,
+                totalReports: branch.reports,
+                approvedReports: branch.approvedReports,
+              ),
+            )
+            .where((subject) => subject.totalTasks > 0 || subject.totalReports > 0)
+            .toList()
+        : _employees
+            .map(
+              (employee) => _EvaluationSubject(
+                name: employee.name,
+                totalTasks: employee.totalRequired,
+                doneTasks: employee.totalDone,
+                totalReports: employee.reports,
+                approvedReports: employee.approvedReports,
+              ),
+            )
+            .where((subject) => subject.totalTasks > 0 || subject.totalReports > 0)
+            .toList();
+    subjects.sort((a, b) => b.rate.compareTo(a.rate));
+    final positive = subjects.where((subject) => subject.rate > 0).toList();
+    final hasComparison = subjects.length > 1 &&
+        subjects.any((subject) => subject.rate != subjects.first.rate);
+    final selected = _evaluationMode == 'best'
+        ? (positive.isEmpty ? null : positive.first)
+        : (hasComparison ? subjects.last : null);
+    final emptyMessage = _evaluationMode == 'best'
+        ? 'لا يوجد إنجاز مسجل بعد'
+        : 'تتطلب بيانات متعددة للمقارنة';
 
     return SectionCard(
-      title: 'تقييم الموظفين: الأكثر والأقل إنجازًا',
+      title: 'التقييم الموحد للمهام والتقارير',
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Text(
-            'يُراعى في التقييم نطاق الفترة والموظف ومصدر المهمة المحدد أعلاه، ولا يُصنّف الموظف بلا بيانات على أنه الأقل.',
+          Text(
+            'نسبة موحدة تجمع إنجاز المهام واعتماد التقارير وفق الفلاتر الحالية.',
             textAlign: TextAlign.right,
-            style: TextStyle(fontSize: 12, color: AppColors.muted),
+            style: const TextStyle(fontSize: 12, color: AppColors.muted),
           ),
           const SizedBox(height: 10),
-          _evaluationTile(
-            title: 'الأكثر إنجازًا في المهام',
-            employee: bestTask,
-            emptyMessage: 'لا يوجد إنجاز مسجل بعد',
-            value: bestTask == null
-                ? 'لا يوجد إنجاز مسجل بعد'
-                : '${bestTask.rate.toStringAsFixed(0)}% · ${bestTask.totalDone}/${bestTask.totalRequired} مهمة',
-            color: AppColors.green,
-            icon: Icons.emoji_events_outlined,
+          Wrap(
+            spacing: 8,
+            runSpacing: 6,
+            children: [
+              ChoiceChip(
+                label: const Text('الأكثر إنجازًا'),
+                selected: _evaluationMode == 'best',
+                onSelected: (_) => setState(() => _evaluationMode = 'best'),
+              ),
+              ChoiceChip(
+                label: const Text('الأقل إنجازًا'),
+                selected: _evaluationMode == 'least',
+                onSelected: (_) => setState(() => _evaluationMode = 'least'),
+              ),
+            ],
           ),
-          const SizedBox(height: 8),
-          _evaluationTile(
-            title: 'الأقل إنجازًا في المهام',
-            employee: leastTask,
-            emptyMessage: taskHasComparison
-                ? 'لا توجد بيانات كافية'
-                : 'تتطلب بيانات لموظفين متعددين للمقارنة',
-            value: leastTask == null
-                ? (taskHasComparison
-                    ? 'لا توجد بيانات كافية'
-                    : 'تتطلب بيانات لموظفين متعددين للمقارنة')
-                : '${leastTask.rate.toStringAsFixed(0)}% · ${leastTask.totalDone}/${leastTask.totalRequired} مهمة',
-            color: Colors.orange.shade800,
-            icon: Icons.warning_amber_rounded,
+          const SizedBox(height: 6),
+          Wrap(
+            spacing: 8,
+            runSpacing: 6,
+            children: [
+              ChoiceChip(
+                label: const Text('الموظفون'),
+                selected: _evaluationScope == 'employees',
+                onSelected: (_) => setState(() => _evaluationScope = 'employees'),
+              ),
+              ChoiceChip(
+                label: const Text('الفروع'),
+                selected: _evaluationScope == 'branches',
+                onSelected: (_) => setState(() => _evaluationScope = 'branches'),
+              ),
+            ],
           ),
-          const SizedBox(height: 8),
-          _evaluationTile(
-            title: 'الأكثر إنجازًا في التقارير',
-            employee: bestReport,
-            emptyMessage: 'لا يوجد إنجاز مسجل بعد',
-            value: bestReport == null
-                ? 'لا يوجد إنجاز مسجل بعد'
-                : '${bestReport.reportRate.toStringAsFixed(0)}% اعتماد · ${bestReport.approvedReports}/${bestReport.reports} تقرير',
-            color: AppColors.green,
-            icon: Icons.assignment_turned_in_outlined,
-          ),
-          const SizedBox(height: 8),
-          _evaluationTile(
-            title: 'الأقل إنجازًا في التقارير',
-            employee: leastReport,
-            emptyMessage: reportHasComparison
-                ? 'لا توجد بيانات كافية'
-                : 'تتطلب بيانات لموظفين متعددين للمقارنة',
-            value: leastReport == null
-                ? (reportHasComparison
-                    ? 'لا توجد بيانات كافية'
-                    : 'تتطلب بيانات لموظفين متعددين للمقارنة')
-                : '${leastReport.reportRate.toStringAsFixed(0)}% اعتماد · ${leastReport.approvedReports}/${leastReport.reports} تقرير',
-            color: Colors.orange.shade800,
-            icon: Icons.assignment_late_outlined,
+          const SizedBox(height: 10),
+          _unifiedEvaluationTile(
+            subject: selected,
+            emptyMessage: emptyMessage,
+            isBest: _evaluationMode == 'best',
           ),
         ],
       ),
     );
   }
 
-  Widget _evaluationTile({
-    required String title,
-    required _Employee? employee,
+  Widget _unifiedEvaluationTile({
+    required _EvaluationSubject? subject,
     required String emptyMessage,
-    required String value,
-    required Color color,
-    required IconData icon,
-  }) => Container(
+    required bool isBest,
+  }) {
+    final color = isBest ? AppColors.green : Colors.orange.shade800;
+    return Container(
     padding: const EdgeInsets.all(11),
     decoration: BoxDecoration(
       color: color.withOpacity(0.07),
@@ -995,26 +994,40 @@ class _PerformanceAnalyticsScreenState
     ),
     child: Row(
       children: [
-        Icon(icon, color: color),
+        Icon(
+          isBest ? Icons.emoji_events_outlined : Icons.warning_amber_rounded,
+          color: color,
+        ),
         const SizedBox(width: 10),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              Text(title, textAlign: TextAlign.right, style: const TextStyle(fontWeight: FontWeight.w800)),
+              Text(
+                isBest ? 'الأكثر إنجازًا' : 'الأقل إنجازًا',
+                textAlign: TextAlign.right,
+                style: const TextStyle(fontWeight: FontWeight.w800),
+              ),
               const SizedBox(height: 3),
               Text(
-                employee == null ? emptyMessage : employee.name,
+                subject == null ? emptyMessage : subject.name,
                 textAlign: TextAlign.right,
                 style: const TextStyle(fontWeight: FontWeight.w700, color: AppColors.navy),
               ),
-              Text(value, textAlign: TextAlign.right, style: TextStyle(fontSize: 12, color: color)),
+              Text(
+                subject == null
+                    ? emptyMessage
+                    : '${subject.rate.toStringAsFixed(0)}% · مهام ${subject.doneTasks}/${subject.totalTasks} · تقارير ${subject.approvedReports}/${subject.totalReports}',
+                textAlign: TextAlign.right,
+                style: TextStyle(fontSize: 12, color: color),
+              ),
             ],
           ),
         ),
       ],
     ),
   );
+  }
 
   Widget _branchCards() => SectionCard(
     title: 'الأداء حسب الفرع',
@@ -1474,6 +1487,28 @@ class _Employee {
 class _Branch {
   _Branch(this.name);
   final String name;
-  int staff = 0, required = 0, done = 0, highRequired = 0, highDone = 0;
+  int staff = 0,
+      required = 0,
+      done = 0,
+      highRequired = 0,
+      highDone = 0,
+      reports = 0,
+      approvedReports = 0;
   double get rate => required == 0 ? 0 : done * 100 / required;
+}
+
+class _EvaluationSubject {
+  const _EvaluationSubject({
+    required this.name,
+    required this.totalTasks,
+    required this.doneTasks,
+    required this.totalReports,
+    required this.approvedReports,
+  });
+
+  final String name;
+  final int totalTasks, doneTasks, totalReports, approvedReports;
+  int get totalUnits => totalTasks + totalReports;
+  int get doneUnits => doneTasks + approvedReports;
+  double get rate => totalUnits == 0 ? 0 : doneUnits * 100 / totalUnits;
 }
