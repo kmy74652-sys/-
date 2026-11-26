@@ -4,7 +4,6 @@ import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mime/mime.dart';
 import 'package:pdf/pdf.dart';
@@ -15,6 +14,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/offline_attachment_store.dart';
 import '../../core/offline_queue.dart';
 import '../../shared/app_shell.dart';
+import '../../shared/report_pdf_theme.dart';
 
 class TaskDetailScreen extends StatefulWidget {
   const TaskDetailScreen({super.key, required this.taskId});
@@ -1089,12 +1089,9 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
     required String status,
   }) async {
     try {
-      final regularFont = pw.Font.ttf(
-        await rootBundle.load('assets/fonts/NotoSansArabic-Regular.ttf'),
-      );
-      final boldFont = pw.Font.ttf(
-        await rootBundle.load('assets/fonts/NotoSansArabic-Bold.ttf'),
-      );
+      final reportTheme = await ReportPdfTheme.load();
+      final regularFont = await ReportPdfTheme.regularFont();
+      final boldFont = await ReportPdfTheme.boldFont();
       final document = pw.Document(
         theme: pw.ThemeData.withFont(base: regularFont, bold: boldFont),
       );
@@ -1108,29 +1105,19 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
               child: pw.Column(
                 crossAxisAlignment: pw.CrossAxisAlignment.stretch,
                 children: [
-                  pw.Text(
-                    'تقرير المهمة',
-                    textAlign: pw.TextAlign.right,
-                    style: pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold),
-                  ),
-                  pw.SizedBox(height: 8),
-                  pw.Text('المهمة: $title', textAlign: pw.TextAlign.right),
-                  pw.Text('النموذج: $reportTitle', textAlign: pw.TextAlign.right),
-                  pw.Text('الحالة: $status', textAlign: pw.TextAlign.right),
-                  pw.Text(
-                    'تاريخ التصدير: ${DateTime.now().toLocal().toString().split('.').first}',
-                    textAlign: pw.TextAlign.right,
-                  ),
+                  reportTheme.header('تقرير المهمة', status: status),
+                  pw.Text('المهمة: $title', textDirection: pw.TextDirection.rtl, textAlign: pw.TextAlign.right, style: pw.TextStyle(fontSize: reportTheme.fontSize)),
+                  pw.Text('النموذج: $reportTitle', textDirection: pw.TextDirection.rtl, textAlign: pw.TextAlign.right, style: pw.TextStyle(fontSize: reportTheme.fontSize)),
                   pw.SizedBox(height: 16),
                   pw.Table(
-                    border: pw.TableBorder.all(color: PdfColors.grey400),
+                    border: reportTheme.tableBorder,
                     columnWidths: const {
                       0: pw.FlexColumnWidth(1),
                       1: pw.FlexColumnWidth(2),
                     },
                     children: [
                       pw.TableRow(
-                        decoration: pw.BoxDecoration(color: PdfColor.fromHex('#EAF4F0')),
+                        decoration: reportTheme.tableHeaderDecoration,
                         children: [
                           _pdfTableCell('القيمة', bold: true),
                           _pdfTableCell('الحقل', bold: true),
@@ -1143,6 +1130,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                         ]),
                     ],
                   ),
+                  reportTheme.footer(),
                 ],
               ),
             ),

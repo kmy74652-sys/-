@@ -2,14 +2,13 @@ import 'dart:convert';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/theme.dart';
 import '../../shared/app_shell.dart';
 import '../../shared/ui_labels.dart';
+import '../../shared/report_pdf_theme.dart';
 
 class ReportsScreen extends StatefulWidget {
   const ReportsScreen({super.key, this.initialFilter});
@@ -447,12 +446,9 @@ class _ReportsScreenState extends State<ReportsScreen> {
       );
       return;
     }
-    final regularFont = pw.Font.ttf(
-      (await rootBundle.load('assets/fonts/NotoSansArabic-Regular.ttf')),
-    );
-    final boldFont = pw.Font.ttf(
-      (await rootBundle.load('assets/fonts/NotoSansArabic-Bold.ttf')),
-    );
+    final reportTheme = await ReportPdfTheme.load();
+    final regularFont = await ReportPdfTheme.regularFont();
+    final boldFont = await ReportPdfTheme.boldFont();
     final document = pw.Document(
       theme: pw.ThemeData.withFont(base: regularFont, bold: boldFont),
     );
@@ -465,23 +461,14 @@ class _ReportsScreenState extends State<ReportsScreen> {
             child: pw.Column(
               crossAxisAlignment: pw.CrossAxisAlignment.stretch,
               children: [
-                pw.Text(
-                  'تقارير الموظفين',
-                  textAlign: pw.TextAlign.right,
-                  style: pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold),
-                ),
-                pw.SizedBox(height: 6),
-                pw.Text(
-                  _pdfSafeText('تاريخ التصدير: ${_formattedDate(DateTime.now().toIso8601String())}'),
-                  textAlign: pw.TextAlign.right,
-                ),
+                reportTheme.header('تقارير الموظفين', status: 'تصدير جماعي'),
                 pw.SizedBox(height: 14),
                 for (var index = 0; index < rows.length; index++)
                   pw.Container(
                     margin: const pw.EdgeInsets.only(bottom: 12),
                     padding: const pw.EdgeInsets.all(10),
                     decoration: pw.BoxDecoration(
-                      border: pw.Border.all(color: PdfColors.grey400),
+                      border: pw.Border.all(color: reportTheme.primary),
                       borderRadius: pw.BorderRadius.circular(6),
                     ),
                     child: pw.Column(
@@ -492,18 +479,9 @@ class _ReportsScreenState extends State<ReportsScreen> {
                           textAlign: pw.TextAlign.right,
                           style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
                         ),
-                        pw.Text(
-                          _pdfSafeText('الموظف: ${_employeeForTask(rows[index])}'),
-                          textAlign: pw.TextAlign.right,
-                        ),
-                        pw.Text(
-                          _pdfSafeText('التاريخ: ${_formattedDate(rows[index]['submitted_at'] ?? rows[index]['report_date'])}'),
-                          textAlign: pw.TextAlign.right,
-                        ),
-                        pw.Text(
-                          _pdfSafeText('الحالة: ${_statusLabel(rows[index]['status']?.toString() ?? '')}'),
-                          textAlign: pw.TextAlign.right,
-                        ),
+                        if (reportTheme.settings.reportShowEmployee) pw.Text(_pdfSafeText('الموظف: ${_employeeForTask(rows[index])}'), textAlign: pw.TextAlign.right),
+                        if (reportTheme.settings.reportShowExportDate) pw.Text(_pdfSafeText('التاريخ: ${_formattedDate(rows[index]['submitted_at'] ?? rows[index]['report_date'])}'), textAlign: pw.TextAlign.right),
+                        if (reportTheme.settings.reportShowStatus) pw.Text(_pdfSafeText('الحالة: ${_statusLabel(rows[index]['status']?.toString() ?? '')}'), textAlign: pw.TextAlign.right),
                         if ((rows[index]['values'] ?? rows[index]['answers']) is Map)
                           for (final entry in ((rows[index]['values'] ?? rows[index]['answers']) as Map).entries)
                             pw.Text(
@@ -513,6 +491,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                       ],
                     ),
                   ),
+                reportTheme.footer(),
               ],
             ),
           ),

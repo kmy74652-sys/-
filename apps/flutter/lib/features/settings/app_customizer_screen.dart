@@ -1,8 +1,12 @@
+import 'dart:typed_data';
+
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../shared/app_customizer.dart';
 import '../../shared/app_shell.dart';
+import '../../shared/organization_branding.dart';
 import '../../shared/ui_labels.dart';
 
 class AppCustomizerScreen extends StatefulWidget {
@@ -20,6 +24,9 @@ class _AppCustomizerScreenState extends State<AppCustomizerScreen>
   bool _previewLandscape = false;
   bool _previewFullScreen = true;
   bool _tasksLoading = true;
+  Uint8List? _pendingLogoBytes;
+  String? _pendingLogoMime;
+  bool _logoBusy = false;
   List<Map<String, dynamic>> _currentTasks = const [];
   late final TabController _tabs;
   final Map<String, TextEditingController> _controllers = {};
@@ -27,7 +34,7 @@ class _AppCustomizerScreenState extends State<AppCustomizerScreen>
   @override
   void initState() {
     super.initState();
-    _tabs = TabController(length: 5, vsync: this);
+    _tabs = TabController(length: 6, vsync: this);
     _loadPermission();
   }
 
@@ -106,6 +113,7 @@ class _AppCustomizerScreenState extends State<AppCustomizerScreen>
                             Tab(text: 'الترتيب والإظهار'),
                             Tab(text: 'المظهر والألوان'),
                             Tab(text: 'تخصيص الجدول الموحد'),
+                            Tab(text: 'هوية وتصميم التقارير'),
                           ],
                         ),
                       ),
@@ -118,6 +126,7 @@ class _AppCustomizerScreenState extends State<AppCustomizerScreen>
                             _layoutTab(),
                             _themeTab(),
                             _unifiedTableTab(),
+                            _reportThemeTab(),
                           ],
                         ),
                       ),
@@ -436,6 +445,96 @@ class _AppCustomizerScreenState extends State<AppCustomizerScreen>
         value: _store.isVisible(key),
         onChanged: (value) => setState(() => _store.setVisibility(key, value)),
       );
+
+  TextEditingController _reportController(String key, String value) => _controllers.putIfAbsent('report:$key', () => TextEditingController(text: value));
+
+  Widget _reportField(String key, String label, String value, void Function(String) onChanged, {int maxLines = 1}) => Padding(
+        padding: const EdgeInsets.only(bottom: 8),
+        child: TextField(controller: _reportController(key, value), textAlign: TextAlign.right, maxLines: maxLines, onChanged: onChanged, decoration: InputDecoration(labelText: label)),
+      );
+
+  Widget _reportThemeTab() => ListView(
+        padding: const EdgeInsets.all(12),
+        children: [
+          _intro('هوية وتصميم التقارير', 'عدّل التقرير من المعاينة نفسها. تحفظ الإعدادات محليًا لهذا الجهاز، ويستخدم التصدير شعار المؤسسة المشترك من Supabase تلقائيًا عند توفره.'),
+          _reportPreview(),
+          const SizedBox(height: 12),
+          SectionCard(title: 'بيانات المؤسسة', child: Column(children: [
+            _reportField('companyName', 'اسم الشركة أو المؤسسة', _store.reportCompanyName, (v) => setState(() => _store.setReportTheme(companyName: v))),
+            _reportField('branchName', 'اسم الفرع أو المؤسسة', _store.reportBranchName, (v) => setState(() => _store.setReportTheme(branchName: v))),
+            _reportField('phone', 'الهاتف', _store.reportPhone, (v) => setState(() => _store.setReportTheme(phone: v))),
+            _reportField('email', 'البريد الإلكتروني', _store.reportEmail, (v) => setState(() => _store.setReportTheme(email: v))),
+            _reportField('address', 'العنوان', _store.reportAddress, (v) => setState(() => _store.setReportTheme(address: v))),
+          ])),
+          SectionCard(title: 'الشعار والترويسة', child: Column(children: [
+            Row(children: [Expanded(child: Text(_store.reportLogoUrl.isEmpty ? 'سيظهر شعار المؤسسة المشترك تلقائيًا' : 'تم تحديد شعار التقرير', textAlign: TextAlign.right)), OutlinedButton.icon(onPressed: _logoBusy ? null : _pickReportLogo, icon: const Icon(Icons.upload_outlined), label: const Text('رفع شعار'))]),
+            DropdownButtonFormField<String>(value: _store.reportLogoPosition, decoration: const InputDecoration(labelText: 'موضع الشعار'), items: const [DropdownMenuItem(value: 'right', child: Text('يمين الترويسة')), DropdownMenuItem(value: 'center', child: Text('وسط الترويسة')), DropdownMenuItem(value: 'left', child: Text('يسار الترويسة'))], onChanged: (v) => setState(() => _store.setReportTheme(logoPosition: v))),
+            DropdownButtonFormField<String>(value: _store.reportHeaderStyle, decoration: const InputDecoration(labelText: 'شكل الترويسة'), items: const [DropdownMenuItem(value: 'band', child: Text('شريط ملون')), DropdownMenuItem(value: 'minimal', child: Text('بسيطة')), DropdownMenuItem(value: 'boxed', child: Text('إطار كامل'))], onChanged: (v) => setState(() => _store.setReportTheme(headerStyle: v))),
+            Row(children: [const Text('حجم الشعار'), Expanded(child: Slider(value: _store.reportLogoSize, min: 28, max: 110, divisions: 16, label: _store.reportLogoSize.round().toString(), onChanged: (v) => setState(() => _store.setReportTheme(logoSize: v))))]),
+            _reportField('headerText', 'نص الترويسة الإضافي', _store.reportHeaderText, (v) => setState(() => _store.setReportTheme(headerText: v))),
+          ])),
+          SectionCard(title: 'ألوان وشكل الجدول', child: Column(children: [
+            DropdownButtonFormField<String>(value: _store.reportTableStyle, decoration: const InputDecoration(labelText: 'شكل الجداول'), items: const [DropdownMenuItem(value: 'simple', child: Text('بسيط')), DropdownMenuItem(value: 'full', child: Text('حدود كاملة')), DropdownMenuItem(value: 'colored', child: Text('تصميم ملون'))], onChanged: (v) => setState(() => _store.setReportTheme(tableStyle: v))),
+            Wrap(spacing: 8, children: [_reportColor('كحلي', 0xFF0B3458), _reportColor('أخضر', 0xFF146B50), _reportColor('أزرق', 0xFF164C80), _reportColor('عنابي', 0xFF7A2430)]),
+            Row(children: [const Text('حجم الخط'), Expanded(child: Slider(value: _store.reportFontSize, min: 8, max: 16, divisions: 8, label: _store.reportFontSize.toStringAsFixed(0), onChanged: (v) => setState(() => _store.setReportTheme(fontSize: v))))]),
+          ])),
+          SectionCard(title: 'العناصر الظاهرة', child: Column(children: [
+            _reportSwitch('تاريخ التصدير', _store.reportShowExportDate, (v) => _store.setReportTheme(showExportDate: v)),
+            _reportSwitch('اسم الموظف', _store.reportShowEmployee, (v) => _store.setReportTheme(showEmployee: v)),
+            _reportSwitch('اسم الفرع', _store.reportShowBranch, (v) => _store.setReportTheme(showBranch: v)),
+            _reportSwitch('حالة التقرير', _store.reportShowStatus, (v) => _store.setReportTheme(showStatus: v)),
+            _reportSwitch('رقم التقرير', _store.reportShowNumber, (v) => _store.setReportTheme(showNumber: v)),
+            _reportSwitch('التوقيع', _store.reportShowSignature, (v) => _store.setReportTheme(showSignature: v)),
+            _reportSwitch('التذييل', _store.reportShowFooter, (v) => _store.setReportTheme(showFooter: v)),
+            _reportField('footerText', 'نص التذييل', _store.reportFooterText, (v) => setState(() => _store.setReportTheme(footerText: v))),
+          ])),
+          FilledButton.icon(onPressed: _saveReportTheme, icon: const Icon(Icons.save_outlined), label: const Text('حفظ وتطبيق تصميم التقارير')),
+        ],
+      );
+
+  Widget _reportSwitch(String title, bool value, void Function(bool) onChanged) => SwitchListTile(title: Text(title, textAlign: TextAlign.right), value: value, onChanged: (v) => setState(() => onChanged(v)));
+  Widget _reportColor(String label, int color) => ActionChip(label: Text(label), avatar: CircleAvatar(backgroundColor: Color(color)), onPressed: () => setState(() => _store.setReportTheme(primaryColor: color, headingColor: color)));
+
+  Widget _reportPreview() => AnimatedBuilder(animation: _store, builder: (_, __) {
+    final primary = Color(_store.reportPrimaryColor);
+    final tableColor = _store.reportTableStyle == 'colored' ? primary.withOpacity(.12) : Colors.white;
+    return Card(child: Container(padding: const EdgeInsets.all(14), color: Colors.white, child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      Row(textDirection: TextDirection.rtl, mainAxisAlignment: _store.reportLogoPosition == 'center' ? MainAxisAlignment.center : _store.reportLogoPosition == 'left' ? MainAxisAlignment.start : MainAxisAlignment.end, children: [
+        if (_store.reportLogoUrl.isNotEmpty) Image.network(_store.reportLogoUrl, width: _store.reportLogoSize.clamp(28, 70), height: _store.reportLogoSize.clamp(28, 70), errorBuilder: (_, __, ___) => const Icon(Icons.image_not_supported_outlined)),
+        const SizedBox(width: 8), Text(_store.reportCompanyName, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17, color: primary)),
+      ]),
+      if (_store.reportHeaderText.isNotEmpty) Text(_store.reportHeaderText, textAlign: TextAlign.right),
+      const Divider(), Text('تقرير المهمة', textAlign: TextAlign.right, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+      const SizedBox(height: 8), Container(color: tableColor, padding: const EdgeInsets.all(8), child: Column(children: const [Text('الحقل                                      القيمة', textAlign: TextAlign.right), Divider(), Text('الحالة                                      مكتملة', textAlign: TextAlign.right), Text('التاريخ                                      26/11/2026', textAlign: TextAlign.right)])),
+      if (_store.reportShowFooter) Padding(padding: const EdgeInsets.only(top: 10), child: Text(_store.reportFooterText, textAlign: TextAlign.center, style: TextStyle(color: primary))),
+    ])));
+  });
+
+  Future<void> _pickReportLogo() async {
+    final result = await FilePicker.platform.pickFiles(type: FileType.image, withData: true);
+    final file = result?.files.single;
+    if (file?.bytes == null) return;
+    setState(() { _logoBusy = true; _pendingLogoBytes = file!.bytes; _pendingLogoMime = file.extension == 'png' ? 'image/png' : file.extension == 'webp' ? 'image/webp' : 'image/jpeg'; });
+    try {
+      final profile = await Supabase.instance.client.rpc('mobile_my_profile');
+      final employee = profile is Map ? profile['employee'] : null;
+      final org = employee is Map ? (employee['institutionId'] ?? employee['institution_id'] ?? employee['organization_id'])?.toString() : null;
+      if (org == null || org.isEmpty) throw Exception('تعذر تحديد المؤسسة');
+      final path = '$org/report_logo_${DateTime.now().microsecondsSinceEpoch}';
+      await Supabase.instance.client.storage.from('organization-branding').uploadBinary(path, _pendingLogoBytes!, fileOptions: FileOptions(contentType: _pendingLogoMime, cacheControl: 'no-cache', upsert: false));
+      final url = '${Supabase.instance.client.storage.from('organization-branding').getPublicUrl(path)}?v=${DateTime.now().millisecondsSinceEpoch}';
+      final organization = await Supabase.instance.client.from('organizations').select('name,settings').eq('id', org).maybeSingle();
+      final settings = organization?['settings'] is Map ? Map<String, dynamic>.from(organization!['settings'] as Map) : <String, dynamic>{};
+      final branding = settings['branding'] is Map ? Map<String, dynamic>.from(settings['branding'] as Map) : <String, dynamic>{};
+      await Supabase.instance.client.rpc('save_organization_branding', params: {'p_organization_id': org, 'p_name': '${organization?['name'] ?? _store.reportCompanyName}', 'p_tagline': '${branding['tagline'] ?? ''}', 'p_logo_url': url});
+      OrganizationBrandingStore.instance.invalidate();
+      _store.setReportTheme(logoUrl: url); await _store.save();
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم رفع شعار التقرير وحفظه لهذا الجهاز.')));
+    } catch (_) { if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تعذر رفع الشعار. تحقق من صلاحية مدير المؤسسة.'))); }
+    finally { if (mounted) setState(() => _logoBusy = false); }
+  }
+
+  Future<void> _saveReportTheme() async { await _store.save(); if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم حفظ تصميم التقارير وتطبيقه.'))); }
 
   Widget _unifiedTableTab() => ListView(
         padding: const EdgeInsets.all(12),

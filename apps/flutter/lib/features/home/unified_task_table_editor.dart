@@ -6,6 +6,7 @@ import 'package:printing/printing.dart';
 
 import '../../core/theme.dart';
 import '../../shared/app_customizer.dart';
+import '../../shared/report_pdf_theme.dart';
 
 class UnifiedTaskTableEditor extends StatefulWidget {
   const UnifiedTaskTableEditor({super.key, required this.onSend, this.onSave, this.initialDraft, this.employees = const [], this.branches = const [], this.reports = const [], this.onChanged});
@@ -738,6 +739,7 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
   Future<void> _exportPdf() async {
     final messenger = ScaffoldMessenger.of(context);
     try {
+      final reportTheme = await ReportPdfTheme.load();
       final regularFontData = await rootBundle.load(
         'assets/fonts/NotoSansArabic-Regular.ttf',
       );
@@ -768,19 +770,7 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
           pageFormat: PdfPageFormat.a4,
           margin: const pw.EdgeInsets.fromLTRB(28, 28, 28, 32),
           build: (context) => [
-            pw.Container(
-              padding: const pw.EdgeInsets.all(14),
-              decoration: pw.BoxDecoration(
-                color: PdfColor.fromHex('#EAF4F0'),
-                border: pw.Border.all(color: PdfColor.fromHex('#B8CEC5')),
-                borderRadius: pw.BorderRadius.circular(8),
-              ),
-              child: pw.Column(children: [
-                pw.Text('مؤسسة الشاعري للتجارة العامة', textDirection: pw.TextDirection.rtl, style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold, color: PdfColor.fromHex('#123B5D'))),
-                pw.SizedBox(height: 4),
-                pw.Text('الجدول الموحد لإنشاء وتنفيذ المهام', textDirection: pw.TextDirection.rtl, style: pw.TextStyle(fontSize: 13, fontWeight: pw.FontWeight.bold)),
-              ]),
-            ),
+            reportTheme.header('الجدول الموحد لإنشاء وتنفيذ المهام', employee: _employee.text, branch: _branch.text),
             pw.SizedBox(height: 12),
             _pdfInfoTable(),
             pw.SizedBox(height: 12),
@@ -806,13 +796,14 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
             pw.Text(_pdfSafeText(_reportNotes.text.trim().isEmpty ? 'لا يوجد' : _reportNotes.text), textDirection: pw.TextDirection.rtl),
             pw.SizedBox(height: 20),
             pw.Table(
-              border: pw.TableBorder.all(color: PdfColor.fromHex('#B8CEC5')),
+              border: reportTheme.tableBorder,
               children: [pw.TableRow(children: [
                 _pdfCell('إقرار الموظف\nالاسم والتوقيع: يترك للتوقيع'),
                 _pdfCell('مراجعة المسؤول المباشر\nالاسم والتوقيع: يترك للتوقيع'),
                 _pdfCell('اعتماد المدير\nالاسم والتوقيع: يترك للتوقيع'),
               ])],
             ),
+            reportTheme.footer(),
           ],
         ),
       );
