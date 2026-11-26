@@ -345,7 +345,29 @@ class _AppCustomizerScreenState extends State<AppCustomizerScreen>
 
   Widget _pdfPreviewTable(List<List<String>> rows, Color primary) => Table(
         border: TableBorder.all(color: primary.withOpacity(.45)),
-        children: rows.map((row) => TableRow(children: row.map((cell) => Padding(padding: const EdgeInsets.all(7), child: Text(cell, textAlign: TextAlign.right, style: TextStyle(fontSize: 11, fontWeight: row == rows.first ? FontWeight.w900 : FontWeight.normal))).toList())).toList(),
+        children: rows
+            .map(
+              (row) => TableRow(
+                children: row
+                    .map(
+                      (cell) => Padding(
+                        padding: const EdgeInsets.all(7),
+                        child: Text(
+                          cell,
+                          textAlign: TextAlign.right,
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: row == rows.first
+                                ? FontWeight.w900
+                                : FontWeight.normal,
+                          ),
+                        ),
+                      ),
+                    )
+                    .toList(),
+              ),
+            )
+            .toList(),
       );
 
   Widget _homePreviewTab() => ListView(
