@@ -453,6 +453,51 @@ class _AppCustomizerScreenState extends State<AppCustomizerScreen>
         child: TextField(controller: _reportController(key, value), textAlign: TextAlign.right, maxLines: maxLines, onChanged: onChanged, decoration: InputDecoration(labelText: label)),
       );
 
+  String _reportOrderLabel(String key) => const {
+        'company': 'اسم الشركة / المؤسسة',
+        'branchName': 'اسم الفرع الثابت',
+        'phone': 'الهاتف',
+        'email': 'البريد الإلكتروني',
+        'address': 'العنوان',
+        'headerText': 'نص الترويسة الإضافي',
+        'title': 'عنوان التقرير',
+        'employee': 'اسم الموظف',
+        'taskBranch': 'فرع المهمة',
+        'status': 'الحالة',
+        'number': 'رقم التقرير',
+        'exportDate': 'تاريخ التصدير',
+      }[key] ?? key;
+
+  Widget _reportHeaderOrderEditor() => SectionCard(
+        title: 'ترتيب عناصر الترويسة وموقعها',
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Text('اسحب العناصر للأعلى أو للأسفل لتحديد ترتيب ظهورها في ملف PDF.', textAlign: TextAlign.right),
+            const SizedBox(height: 8),
+            ReorderableListView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: _store.reportHeaderOrder.length,
+              onReorder: (oldIndex, newIndex) {
+                if (newIndex > oldIndex) newIndex--;
+                setState(() => _store.moveReportHeaderItem(oldIndex, newIndex));
+              },
+              itemBuilder: (_, index) {
+                final key = _store.reportHeaderOrder[index];
+                return ListTile(
+                  key: ValueKey(key),
+                  dense: true,
+                  leading: const Icon(Icons.drag_handle),
+                  title: Text(_reportOrderLabel(key), textAlign: TextAlign.right),
+                  trailing: Text('${index + 1}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                );
+              },
+            ),
+          ],
+        ),
+      );
+
   Widget _reportThemeTab() => ListView(
         padding: const EdgeInsets.all(12),
         children: [
@@ -473,6 +518,7 @@ class _AppCustomizerScreenState extends State<AppCustomizerScreen>
             Row(children: [const Text('حجم الشعار'), Expanded(child: Slider(value: _store.reportLogoSize, min: 28, max: 110, divisions: 16, label: _store.reportLogoSize.round().toString(), onChanged: (v) => setState(() => _store.setReportTheme(logoSize: v))))]),
             _reportField('headerText', 'نص الترويسة الإضافي', _store.reportHeaderText, (v) => setState(() => _store.setReportTheme(headerText: v))),
           ])),
+          _reportHeaderOrderEditor(),
           SectionCard(title: 'ألوان وشكل الجدول', child: Column(children: [
             DropdownButtonFormField<String>(value: _store.reportTableStyle, decoration: const InputDecoration(labelText: 'شكل الجداول'), items: const [DropdownMenuItem(value: 'simple', child: Text('بسيط')), DropdownMenuItem(value: 'full', child: Text('حدود كاملة')), DropdownMenuItem(value: 'colored', child: Text('تصميم ملون'))], onChanged: (v) => setState(() => _store.setReportTheme(tableStyle: v))),
             Wrap(spacing: 8, children: [_reportColor('كحلي', 0xFF0B3458), _reportColor('أخضر', 0xFF146B50), _reportColor('أزرق', 0xFF164C80), _reportColor('عنابي', 0xFF7A2430)]),
@@ -495,16 +541,49 @@ class _AppCustomizerScreenState extends State<AppCustomizerScreen>
   Widget _reportSwitch(String title, bool value, void Function(bool) onChanged) => SwitchListTile(title: Text(title, textAlign: TextAlign.right), value: value, onChanged: (v) => setState(() => onChanged(v)));
   Widget _reportColor(String label, int color) => ActionChip(label: Text(label), avatar: CircleAvatar(backgroundColor: Color(color)), onPressed: () => setState(() => _store.setReportTheme(primaryColor: color, headingColor: color)));
 
+  List<Widget> _reportPreviewOrderedContent(Color primary) {
+    final widgets = <Widget>[];
+    for (final key in _store.reportHeaderOrder) {
+      switch (key) {
+        case 'company':
+          widgets.add(Text(_store.reportCompanyName, textAlign: TextAlign.right, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17, color: primary)));
+        case 'branchName':
+          if (_store.reportBranchName.isNotEmpty) widgets.add(Text(_store.reportBranchName, textAlign: TextAlign.right));
+        case 'phone':
+          if (_store.reportPhone.isNotEmpty) widgets.add(Text('الهاتف: ${_store.reportPhone}', textAlign: TextAlign.right));
+        case 'email':
+          if (_store.reportEmail.isNotEmpty) widgets.add(Text('البريد الإلكتروني: ${_store.reportEmail}', textAlign: TextAlign.right));
+        case 'address':
+          if (_store.reportAddress.isNotEmpty) widgets.add(Text('العنوان: ${_store.reportAddress}', textAlign: TextAlign.right));
+        case 'headerText':
+          if (_store.reportHeaderText.isNotEmpty) widgets.add(Text(_store.reportHeaderText, textAlign: TextAlign.right));
+        case 'title':
+          widgets.add(const Text('تقرير المهمة', textAlign: TextAlign.right, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)));
+        case 'employee':
+          if (_store.reportShowEmployee) widgets.add(const Text('الموظف: أحمد', textAlign: TextAlign.right));
+        case 'taskBranch':
+          if (_store.reportShowBranch) widgets.add(const Text('الفرع: الفرع الرئيسي', textAlign: TextAlign.right));
+        case 'status':
+          if (_store.reportShowStatus) widgets.add(const Text('الحالة: مكتملة', textAlign: TextAlign.right));
+        case 'number':
+          if (_store.reportShowNumber) widgets.add(const Text('رقم التقرير: 0001', textAlign: TextAlign.right));
+        case 'exportDate':
+          if (_store.reportShowExportDate) widgets.add(const Text('تاريخ التصدير: 26/11/2026', textAlign: TextAlign.right));
+      }
+    }
+    return widgets;
+  }
+
   Widget _reportPreview() => AnimatedBuilder(animation: _store, builder: (_, __) {
     final primary = Color(_store.reportPrimaryColor);
     final tableColor = _store.reportTableStyle == 'colored' ? primary.withOpacity(.12) : Colors.white;
     return Card(child: Container(padding: const EdgeInsets.all(14), color: Colors.white, child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       Row(textDirection: TextDirection.rtl, mainAxisAlignment: _store.reportLogoPosition == 'center' ? MainAxisAlignment.center : _store.reportLogoPosition == 'left' ? MainAxisAlignment.start : MainAxisAlignment.end, children: [
         if (_store.reportLogoUrl.isNotEmpty) Image.network(_store.reportLogoUrl, width: _store.reportLogoSize.clamp(28, 70), height: _store.reportLogoSize.clamp(28, 70), errorBuilder: (_, __, ___) => const Icon(Icons.image_not_supported_outlined)),
-        const SizedBox(width: 8), Text(_store.reportCompanyName, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17, color: primary)),
+        const SizedBox(width: 8), const Text('شعار التقرير'),
       ]),
-      if (_store.reportHeaderText.isNotEmpty) Text(_store.reportHeaderText, textAlign: TextAlign.right),
-      const Divider(), Text('تقرير المهمة', textAlign: TextAlign.right, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+      ..._reportPreviewOrderedContent(primary),
+      const Divider(),
       const SizedBox(height: 8), Container(color: tableColor, padding: const EdgeInsets.all(8), child: Column(children: const [Text('الحقل                                      القيمة', textAlign: TextAlign.right), Divider(), Text('الحالة                                      مكتملة', textAlign: TextAlign.right), Text('التاريخ                                      26/11/2026', textAlign: TextAlign.right)])),
       if (_store.reportShowFooter) Padding(padding: const EdgeInsets.only(top: 10), child: Text(_store.reportFooterText, textAlign: TextAlign.center, style: TextStyle(color: primary))),
     ])));

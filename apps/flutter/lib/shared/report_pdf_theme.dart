@@ -44,22 +44,50 @@ class ReportPdfTheme {
   double get fontSize => settings.reportFontSize;
 
   pw.Widget header(String title, {String? employee, String? branch, String? status, String? number}) {
-    final details = <String>[];
-    if (settings.reportShowEmployee && employee != null && employee.trim().isNotEmpty) details.add('الموظف: $employee');
-    if (settings.reportShowBranch && branch != null && branch.trim().isNotEmpty) details.add('الفرع: $branch');
-    if (settings.reportShowStatus && status != null && status.trim().isNotEmpty) details.add('الحالة: $status');
-    if (settings.reportShowNumber && number != null && number.trim().isNotEmpty) details.add('رقم التقرير: $number');
-    if (settings.reportShowExportDate) details.add('تاريخ التصدير: ${DateTime.now().toLocal().toString().split('.').first}');
-    final content = <pw.Widget>[
-      pw.Text(reportPdfSafeText(settings.reportCompanyName), textDirection: pw.TextDirection.rtl, textAlign: pw.TextAlign.right, style: pw.TextStyle(fontSize: 15, fontWeight: pw.FontWeight.bold, color: primary)),
-      if (settings.reportBranchName.trim().isNotEmpty) pw.Text(reportPdfSafeText(settings.reportBranchName), textDirection: pw.TextDirection.rtl, textAlign: pw.TextAlign.right),
-      if ([settings.reportPhone, settings.reportEmail, settings.reportAddress].any((v) => v.trim().isNotEmpty))
-        pw.Text(reportPdfSafeText([settings.reportPhone, settings.reportEmail, settings.reportAddress].where((v) => v.trim().isNotEmpty).join(' - ')), textDirection: pw.TextDirection.rtl, textAlign: pw.TextAlign.right, style: const pw.TextStyle(fontSize: 8)),
-      if (settings.reportHeaderText.trim().isNotEmpty) pw.Text(reportPdfSafeText(settings.reportHeaderText), textDirection: pw.TextDirection.rtl, textAlign: pw.TextAlign.right),
-      pw.SizedBox(height: 5),
-      pw.Text(reportPdfSafeText(title), textDirection: pw.TextDirection.rtl, textAlign: pw.TextAlign.right, style: pw.TextStyle(fontSize: 19, fontWeight: pw.FontWeight.bold, color: heading)),
-      if (details.isNotEmpty) pw.Text(reportPdfSafeText(details.join('   -   ')), textDirection: pw.TextDirection.rtl, textAlign: pw.TextAlign.right, style: const pw.TextStyle(fontSize: 8)),
+    final defaultOrder = const [
+      'company', 'branchName', 'phone', 'email', 'address', 'headerText',
+      'title', 'employee', 'taskBranch', 'status', 'number', 'exportDate',
     ];
+    final order = <String>[
+      ...settings.reportHeaderOrder,
+      ...defaultOrder.where((key) => !settings.reportHeaderOrder.contains(key)),
+    ];
+    final content = <pw.Widget>[];
+    pw.Widget line(String value, {double size = 10, bool bold = false, PdfColor? color}) => pw.Text(
+          reportPdfSafeText(value),
+          textDirection: pw.TextDirection.rtl,
+          textAlign: pw.TextAlign.right,
+          style: pw.TextStyle(fontSize: size, fontWeight: bold ? pw.FontWeight.bold : pw.FontWeight.normal, color: color),
+        );
+    for (final key in order) {
+      switch (key) {
+        case 'company':
+          if (settings.reportCompanyName.trim().isNotEmpty) content.add(line(settings.reportCompanyName, size: 15, bold: true, color: primary));
+        case 'branchName':
+          if (settings.reportBranchName.trim().isNotEmpty) content.add(line(settings.reportBranchName));
+        case 'phone':
+          if (settings.reportPhone.trim().isNotEmpty) content.add(line('الهاتف: ${settings.reportPhone}', size: 8));
+        case 'email':
+          if (settings.reportEmail.trim().isNotEmpty) content.add(line('البريد الإلكتروني: ${settings.reportEmail}', size: 8));
+        case 'address':
+          if (settings.reportAddress.trim().isNotEmpty) content.add(line('العنوان: ${settings.reportAddress}', size: 8));
+        case 'headerText':
+          if (settings.reportHeaderText.trim().isNotEmpty) content.add(line(settings.reportHeaderText));
+        case 'title':
+          content.add(pw.SizedBox(height: 5));
+          content.add(line(title, size: 19, bold: true, color: heading));
+        case 'employee':
+          if (settings.reportShowEmployee && employee != null && employee.trim().isNotEmpty) content.add(line('الموظف: $employee', size: 8));
+        case 'taskBranch':
+          if (settings.reportShowBranch && branch != null && branch.trim().isNotEmpty) content.add(line('الفرع: $branch', size: 8));
+        case 'status':
+          if (settings.reportShowStatus && status != null && status.trim().isNotEmpty) content.add(line('الحالة: $status', size: 8));
+        case 'number':
+          if (settings.reportShowNumber && number != null && number.trim().isNotEmpty) content.add(line('رقم التقرير: $number', size: 8));
+        case 'exportDate':
+          if (settings.reportShowExportDate) content.add(line('تاريخ التصدير: ${DateTime.now().toLocal().toString().split('.').first}', size: 8));
+      }
+    }
     final row = pw.Row(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
       if (settings.reportLogoPosition == 'right' && logo != null) pw.Container(width: settings.reportLogoSize, height: settings.reportLogoSize, child: pw.Image(logo!, fit: pw.BoxFit.contain)),
       pw.Expanded(child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.stretch, children: content)),
