@@ -34,13 +34,6 @@ class NotificationsRuntime {
       final androidPlugin = _plugin.resolvePlatformSpecificImplementation<
           AndroidFlutterLocalNotificationsPlugin>();
       await androidPlugin?.requestNotificationsPermission();
-      final iosPlugin = _plugin.resolvePlatformSpecificImplementation<
-          DarwinFlutterLocalNotificationsPlugin>();
-      await iosPlugin?.requestPermissions(
-        alert: true,
-        badge: true,
-        sound: true,
-      );
       await androidPlugin?.createNotificationChannel(
         const AndroidNotificationChannel(
           'alshaeri_notifications',
