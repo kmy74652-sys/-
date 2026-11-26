@@ -511,10 +511,10 @@ class _AppCustomizerScreenState extends State<AppCustomizerScreen>
   });
 
   Future<void> _pickReportLogo() async {
-    final result = await FilePicker.pickFiles(type: FileType.image);
-    final file = result.isEmpty ? null : result.first;
-    if (file == null || file.bytes == null) return;
-    setState(() { _logoBusy = true; _pendingLogoBytes = file!.bytes; _pendingLogoMime = file.extension == 'png' ? 'image/png' : file.extension == 'webp' ? 'image/webp' : 'image/jpeg'; });
+    final file = await FilePicker.pickFile(type: FileType.image);
+    if (file == null) return;
+    final bytes = await file.readAsBytes();
+    setState(() { _logoBusy = true; _pendingLogoBytes = bytes; _pendingLogoMime = file.extension == 'png' ? 'image/png' : file.extension == 'webp' ? 'image/webp' : 'image/jpeg'; });
     try {
       final profile = await Supabase.instance.client.rpc('mobile_my_profile');
       final employee = profile is Map ? profile['employee'] : null;
