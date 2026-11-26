@@ -902,10 +902,16 @@ class _PerformanceAnalyticsScreenState
 
     taskEmployees.sort((a, b) => b.rate.compareTo(a.rate));
     reportEmployees.sort((a, b) => b.reportRate.compareTo(a.reportRate));
-    final bestTask = taskEmployees.isEmpty ? null : taskEmployees.first;
-    final leastTask = taskEmployees.isEmpty ? null : taskEmployees.last;
-    final bestReport = reportEmployees.isEmpty ? null : reportEmployees.first;
-    final leastReport = reportEmployees.isEmpty ? null : reportEmployees.last;
+    final taskHasComparison = taskEmployees.length > 1 &&
+        taskEmployees.any((employee) => employee.rate != taskEmployees.first.rate);
+    final reportHasComparison = reportEmployees.length > 1 &&
+        reportEmployees.any((employee) => employee.reportRate != reportEmployees.first.reportRate);
+    final taskAchievers = taskEmployees.where((employee) => employee.rate > 0).toList();
+    final reportAchievers = reportEmployees.where((employee) => employee.reportRate > 0).toList();
+    final bestTask = taskAchievers.isEmpty ? null : taskAchievers.first;
+    final bestReport = reportAchievers.isEmpty ? null : reportAchievers.first;
+    final leastTask = taskHasComparison ? taskEmployees.last : null;
+    final leastReport = reportHasComparison ? reportEmployees.last : null;
 
     return SectionCard(
       title: 'تقييم الموظفين: الأكثر والأقل إنجازًا',
@@ -920,8 +926,9 @@ class _PerformanceAnalyticsScreenState
           _evaluationTile(
             title: 'الأكثر إنجازًا في المهام',
             employee: bestTask,
+            emptyMessage: 'لا يوجد إنجاز مسجل بعد',
             value: bestTask == null
-                ? 'لا توجد بيانات'
+                ? 'لا يوجد إنجاز مسجل بعد'
                 : '${bestTask.rate.toStringAsFixed(0)}% · ${bestTask.totalDone}/${bestTask.totalRequired} مهمة',
             color: AppColors.green,
             icon: Icons.emoji_events_outlined,
@@ -930,18 +937,24 @@ class _PerformanceAnalyticsScreenState
           _evaluationTile(
             title: 'الأقل إنجازًا في المهام',
             employee: leastTask,
+            emptyMessage: taskHasComparison
+                ? 'لا توجد بيانات كافية'
+                : 'تتطلب بيانات لموظفين متعددين للمقارنة',
             value: leastTask == null
-                ? 'لا توجد بيانات'
+                ? (taskHasComparison
+                    ? 'لا توجد بيانات كافية'
+                    : 'تتطلب بيانات لموظفين متعددين للمقارنة')
                 : '${leastTask.rate.toStringAsFixed(0)}% · ${leastTask.totalDone}/${leastTask.totalRequired} مهمة',
             color: Colors.orange.shade800,
-            icon: Icons.trending_down,
+            icon: Icons.warning_amber_rounded,
           ),
           const SizedBox(height: 8),
           _evaluationTile(
             title: 'الأكثر إنجازًا في التقارير',
             employee: bestReport,
+            emptyMessage: 'لا يوجد إنجاز مسجل بعد',
             value: bestReport == null
-                ? 'لا توجد بيانات'
+                ? 'لا يوجد إنجاز مسجل بعد'
                 : '${bestReport.reportRate.toStringAsFixed(0)}% اعتماد · ${bestReport.approvedReports}/${bestReport.reports} تقرير',
             color: AppColors.green,
             icon: Icons.assignment_turned_in_outlined,
@@ -950,8 +963,13 @@ class _PerformanceAnalyticsScreenState
           _evaluationTile(
             title: 'الأقل إنجازًا في التقارير',
             employee: leastReport,
+            emptyMessage: reportHasComparison
+                ? 'لا توجد بيانات كافية'
+                : 'تتطلب بيانات لموظفين متعددين للمقارنة',
             value: leastReport == null
-                ? 'لا توجد بيانات'
+                ? (reportHasComparison
+                    ? 'لا توجد بيانات كافية'
+                    : 'تتطلب بيانات لموظفين متعددين للمقارنة')
                 : '${leastReport.reportRate.toStringAsFixed(0)}% اعتماد · ${leastReport.approvedReports}/${leastReport.reports} تقرير',
             color: Colors.orange.shade800,
             icon: Icons.assignment_late_outlined,
@@ -964,6 +982,7 @@ class _PerformanceAnalyticsScreenState
   Widget _evaluationTile({
     required String title,
     required _Employee? employee,
+    required String emptyMessage,
     required String value,
     required Color color,
     required IconData icon,
@@ -985,7 +1004,7 @@ class _PerformanceAnalyticsScreenState
               Text(title, textAlign: TextAlign.right, style: const TextStyle(fontWeight: FontWeight.w800)),
               const SizedBox(height: 3),
               Text(
-                employee == null ? 'لا توجد بيانات كافية' : employee.name,
+                employee == null ? emptyMessage : employee.name,
                 textAlign: TextAlign.right,
                 style: const TextStyle(fontWeight: FontWeight.w700, color: AppColors.navy),
               ),

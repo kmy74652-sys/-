@@ -903,8 +903,18 @@ class _BrandHeaderState extends State<_BrandHeader> {
                     Text(AppCustomizer.instance.label('appName'), maxLines: 1, overflow: TextOverflow.ellipsis,
                       style: TextStyle(color: _navy, fontSize: compact ? 18 : 21, height: 1.15, fontWeight: FontWeight.w900)),
                     const SizedBox(height: 2),
-                    Text(AppCustomizer.instance.label('organizationName'), maxLines: 1, overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(color: _navy, fontSize: 12, height: 1.2, fontWeight: FontWeight.w700)),
+                    Text(
+                      AppCustomizer.instance.label('organizationName'),
+                      maxLines: 2,
+                      softWrap: true,
+                      textWidthBasis: TextWidthBasis.parent,
+                      style: TextStyle(
+                        color: _navy,
+                        fontSize: compact ? 10.5 : 11.5,
+                        height: 1.15,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
                     const SizedBox(height: 3),
                     Row(children: [
                       Container(width: 14, height: 1.2, color: _gold),
