@@ -492,10 +492,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 _unifiedTaskTableSection(),
               ],
             ],
-            if (_manageTasks) ...[
-              const SizedBox(height: 8),
-              _settingsPanel(),
-            ],
+            const SizedBox(height: 8),
+            _settingsPanel(),
           ],
         ],
       ),
