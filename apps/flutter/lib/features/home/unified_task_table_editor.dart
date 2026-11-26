@@ -56,6 +56,7 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
   String _exception = 'الجمعة';
   String? _reportVersionId;
   String? _reportTemplateId;
+  String _reportMode = 'auto';
   final Map<String, List<Map<String, dynamic>>> _customReportSchemas = {};
 
   @override
@@ -82,6 +83,11 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
     _secondPeriod.text = draft.secondPeriod;
     _reportTemplateId = draft.reportTemplateId;
     _reportVersionId = draft.reportVersionId;
+    _reportMode = !draft.reportRequired
+        ? 'none'
+        : draft.reportVersionId != null
+            ? 'ready'
+            : 'auto';
     _replaceRows(_rows, draft.rows);
     _replaceRows(_exceptionRows, const []);
     _replaceList(_responsibilities, draft.responsibilities);
@@ -350,6 +356,7 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
   }
 
   void _suggestReportForRole(String role) {
+    if (_reportMode != 'auto') return;
     if (widget.reports.isEmpty || role.trim().isEmpty) return;
     final roleMap = <String, String>{
       'المحاسب': 'accountant',
@@ -364,6 +371,7 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
     final match = matches.isEmpty ? null : matches.first;
     if (match == null || _reportVersionId == match.versionId) return;
     setState(() {
+      _reportMode = 'ready';
       _reportVersionId = match.versionId;
       _reportTemplateId = match.templateId;
     });
@@ -417,20 +425,45 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
       Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          if (widget.reports.isEmpty)
-            const Text('سيُنشئ النظام تقريرًا تلقائيًا مناسبًا لكل مهمة، ويمكنك معاينته وتعديله قبل الإرسال.', textAlign: TextAlign.right)
-          else
-            DropdownButtonFormField<String>(
-              value: selected?.versionId,
-              isExpanded: true,
-              decoration: const InputDecoration(labelText: 'قالب التقرير اليدوي (اختياري)', isDense: true),
-              items: widget.reports.map((item) => DropdownMenuItem(value: item.versionId, child: Text(item.title, overflow: TextOverflow.ellipsis))).toList(),
-              onChanged: (value) {
-                if (value == null) return;
-                final item = widget.reports.firstWhere((item) => item.versionId == value);
-                setState(() { _reportVersionId = value; _reportTemplateId = item.templateId; });
-              },
-            ),
+          DropdownButtonFormField<String>(
+            value: _reportMode == 'ready'
+                ? (selected == null ? 'auto' : 'ready:${selected.versionId}')
+                : _reportMode,
+            isExpanded: true,
+            decoration: const InputDecoration(labelText: 'قالب التقرير اليومي', isDense: true),
+            items: [
+              const DropdownMenuItem(value: 'none', child: Text('بدون تقرير')),
+              const DropdownMenuItem(value: 'auto', child: Text('التلقائي')),
+              if (widget.reports.isEmpty)
+                const DropdownMenuItem(value: 'ready-unavailable', enabled: false, child: Text('قالب جاهز (لا توجد قوالب منشورة)')),
+              ...widget.reports.map((item) => DropdownMenuItem(
+                    value: 'ready:${item.versionId}',
+                    child: Text('قالب جاهز: ${item.title}', overflow: TextOverflow.ellipsis),
+                  )),
+            ],
+            onChanged: (value) {
+              if (value == null) return;
+              if (value == 'none') {
+                setState(() { _reportMode = 'none'; _reportVersionId = null; _reportTemplateId = null; });
+              } else if (value == 'auto') {
+                setState(() { _reportMode = 'auto'; _reportVersionId = null; _reportTemplateId = null; });
+              } else if (value.startsWith('ready:')) {
+                final versionId = value.substring('ready:'.length);
+                final item = widget.reports.firstWhere((item) => item.versionId == versionId);
+                setState(() { _reportMode = 'ready'; _reportVersionId = item.versionId; _reportTemplateId = item.templateId; });
+              }
+            },
+          ),
+          const SizedBox(height: 6),
+          Text(
+            _reportMode == 'none'
+                ? 'لن يُطلب من الموظف تعبئة تقرير يومي لهذه المهمة.'
+                : _reportMode == 'ready'
+                    ? 'سيستخدم الموظف القالب الجاهز المحدد أعلاه.'
+                    : 'سيُنشئ النظام تقريرًا مناسبًا لطبيعة كل مهمة ويمكنك معاينته وتعديله قبل الإرسال.',
+            textAlign: TextAlign.right,
+            style: const TextStyle(color: Colors.black54),
+          ),
           if (selected != null) ...[
             const SizedBox(height: 10),
             Container(
@@ -507,6 +540,7 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
                       final field = entry.value;
                       final type = '${field['type'] ?? 'text'}';
                       return Card(
+                        key: ValueKey('report-field-$schemaKey-${field['key']}'),
                         margin: const EdgeInsets.only(bottom: 8),
                         child: Padding(
                           padding: const EdgeInsets.all(8),
@@ -514,9 +548,17 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
                             children: [
                               Row(children: [
                                 Expanded(child: TextFormField(initialValue: '${field['label'] ?? ''}', textAlign: TextAlign.right, decoration: const InputDecoration(labelText: 'اسم الحقل', isDense: true), onChanged: (value) { field['label'] = value; _customReportSchemas[schemaKey] = schema; })),
-                                IconButton(onPressed: () { schema.removeAt(index); _customReportSchemas[unifiedTaskReportKey(row)] = schema; refresh(); }, icon: const Icon(Icons.delete_outline, color: Colors.red), tooltip: 'حذف الحقل'),
+                                IconButton(
+                                  onPressed: () {
+                                    if (index < 0 || index >= schema.length) return;
+                                    schema.removeAt(index);
+                                    _customReportSchemas[schemaKey] = schema;
+                                    setDialogState(() {});
+                                  },
+                                  icon: const Icon(Icons.delete_outline, color: Colors.red),
+                                  tooltip: 'حذف هذا الحقل',
+                                ),
                               ]),
-                              Align(alignment: Alignment.centerRight, child: Text('المفتاح: ${field['key']}', textAlign: TextAlign.right, style: const TextStyle(fontSize: 11, color: Colors.black54))),
                               const SizedBox(height: 6),
                               Row(children: [
                                 Expanded(child: DropdownButtonFormField<String>(value: const ['text', 'textarea', 'number', 'money', 'percentage', 'date', 'select', 'checkbox', 'rating', 'attachment', 'calculated'].contains(type) ? type : 'text', decoration: const InputDecoration(labelText: 'نوع الحقل', isDense: true), items: const [
@@ -528,19 +570,34 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
                               if (field['type'] == 'select')
                                 TextFormField(initialValue: (field['options'] as List? ?? const []).join('، '), textAlign: TextAlign.right, decoration: const InputDecoration(labelText: 'خيارات القائمة (افصل بينها بفاصلة)', isDense: true), onChanged: (value) { field['options'] = value.split(RegExp(r'[,،]')).map((item) => item.trim()).where((item) => item.isNotEmpty).toList(); _customReportSchemas[schemaKey] = schema; }),
                               if (field['type'] == 'calculated')
-                                TextFormField(
-                                  initialValue: '${(field['config'] as Map?)?['formula'] ?? ''}',
-                                  textAlign: TextAlign.right,
-                                  decoration: const InputDecoration(
-                                    labelText: 'قاعدة الحساب / المعادلة',
-                                    hintText: '{collected_amount} - {outstanding_amount}',
-                                    helperText: 'استخدم مفاتيح الحقول بين { } والعمليات + - * / والأقواس.',
-                                    isDense: true,
-                                  ),
-                                  onChanged: (value) {
-                                    field['config'] = {'formula': value.trim()};
-                                    _customReportSchemas[schemaKey] = schema;
-                                  },
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                                  children: [
+                                    TextFormField(
+                                      initialValue: '${(field['config'] as Map?)?['formula'] ?? ''}',
+                                      textAlign: TextAlign.right,
+                                      decoration: const InputDecoration(
+                                        labelText: 'المعادلة الداخلية للنظام',
+                                        hintText: 'اكتب المعادلة الحسابية هنا',
+                                        helperText: 'تُستخدم المعادلة داخليًا لحساب النتيجة تلقائيًا.',
+                                        isDense: true,
+                                      ),
+                                      onChanged: (value) {
+                                        field['config'] = {'formula': value.trim()};
+                                        _customReportSchemas[schemaKey] = schema;
+                                        refresh();
+                                      },
+                                    ),
+                                    if ('${(field['config'] as Map?)?['formula'] ?? ''}'.trim().isNotEmpty)
+                                      Padding(
+                                        padding: const EdgeInsets.only(top: 6),
+                                        child: Text(
+                                          'شرح الحساب للموظف: ${_arabicFormula('${(field['config'] as Map?)?['formula'] ?? ''}', schema)}',
+                                          textAlign: TextAlign.right,
+                                          style: const TextStyle(fontSize: 12, color: Colors.black54),
+                                        ),
+                                      ),
+                                  ],
                                 ),
                             ],
                           ),
@@ -561,6 +618,27 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
       ),
     );
     if (result != null && mounted) setState(() {});
+  }
+
+  String _arabicFormula(String formula, List<Map<String, dynamic>> schema) {
+    final labels = <String, String>{};
+    for (final field in schema) {
+      final key = '${field['key'] ?? ''}'.trim();
+      final label = '${field['label'] ?? ''}'.trim();
+      if (key.isNotEmpty && label.isNotEmpty) labels[key] = label;
+    }
+    final sum = RegExp(r'^sum_rows\(([a-z][a-z0-9_]*)\.([a-z][a-z0-9_]*)\)$').firstMatch(formula.trim());
+    if (sum != null) {
+      final table = labels[sum.group(1)!] ?? 'الجدول';
+      final column = labels[sum.group(2)!] ?? 'العمود';
+      return 'مجموع قيم «$column» من «$table»';
+    }
+    var translated = formula.replaceAllMapped(
+      RegExp(r'\{([a-z][a-z0-9_]*)\}'),
+      (match) => '«${labels[match.group(1)!] ?? 'حقل غير مسمى'}»',
+    );
+    translated = translated.replaceAll('*', ' ضرب ').replaceAll('/', ' ÷ ').replaceAll('+', ' زائد ').replaceAll('-', ' ناقص ');
+    return translated.replaceAll(RegExp(r'\s+'), ' ').trim();
   }
 
   void _previewSelectedReport() {
@@ -883,6 +961,7 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
             .toList(),
         reportTemplateId: _reportTemplateId,
         reportVersionId: _reportVersionId,
+        reportRequired: _reportMode != 'none',
         reportSchemasByTask: reportSchemasByTask,
       );
       if (widget.onSave != null) {
@@ -1152,6 +1231,7 @@ class UnifiedTaskTableDraft {
     required this.reportSchemasByTask,
     this.reportTemplateId,
     this.reportVersionId,
+    this.reportRequired = true,
   });
   final String employee, employeeUserId, role, branch, startDate, purpose, reportNotes;
   final String? branchId;
@@ -1160,6 +1240,7 @@ class UnifiedTaskTableDraft {
   final List<String> responsibilities, authorities, instructions, kpis;
   final Map<String, List<Map<String, dynamic>>> reportSchemasByTask;
   final String? reportTemplateId, reportVersionId;
+  final bool reportRequired;
 }
 
 class UnifiedTaskRowData {

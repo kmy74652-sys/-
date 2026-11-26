@@ -266,7 +266,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
               }
             }
           } catch (_) {
-            // عرض التقرير لا يتوقف إذا تعذر جلب عناوين الحقول؛ نعرض المفتاح كبديل.
+            // عرض التقرير لا يتوقف إذا تعذر جلب عناوين الحقول؛ نستخدم عنوانًا عربيًا عامًا.
           }
           _submissionError = null;
         } catch (_) {
@@ -854,12 +854,12 @@ class _ReportsScreenState extends State<ReportsScreen> {
         }
       }
     }
-    return key.toString();
+    return 'حقل التقرير';
   }
 
   String _submissionFieldLabel(Map<String, dynamic> row, Object? key) {
     final formId = row['form_id']?.toString() ?? '';
-    return _submissionFieldLabels[formId]?[key.toString()] ?? key.toString();
+    return _submissionFieldLabels[formId]?[key.toString()] ?? 'حقل التقرير';
   }
 
   bool _matchesEmployee(Map<String, dynamic> row) {

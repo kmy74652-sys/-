@@ -1473,7 +1473,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
           result = _arithmetic(expr);
         }
       } catch (_) {
-        error = 'تعذر حساب الصيغة؛ استخدم مراجع {field_key} والعمليات + − × ÷ أو sum_rows(جدول.عمود).';
+          error = 'تعذر حساب النتيجة. تأكد من إدخال الحقول المرتبطة بصورة صحيحة ثم حاول مرة أخرى.';
       }
       return ListTile(
         title: Text(title, textAlign: TextAlign.right),

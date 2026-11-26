@@ -154,6 +154,7 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
       breakPeriod: hoursValue('الاستراحة'),
       secondPeriod: hoursValue('الفترة الثانية'),
       kpis: _descriptionValue(description, 'مؤشرات الأداء').split('؛').where((v) => v.trim().isNotEmpty).map((v) => v.trim()).toList(),
+      reportRequired: task['report_required'] != false,
       reportSchemasByTask: const {},
     );
   }

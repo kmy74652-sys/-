@@ -480,17 +480,19 @@ class _UnifiedTaskTableScreenState extends State<UnifiedTaskTableScreen> {
           'p_role_code': roleCode,
           'p_template_id': draft.reportTemplateId,
           'p_assigned_to': userId,
-          'p_report_template_id': null,
-          'p_report_version_id': null,
-          'p_report_required': true,
+          'p_report_template_id': draft.reportRequired ? draft.reportTemplateId : null,
+          'p_report_version_id': draft.reportRequired ? draft.reportVersionId : null,
+          'p_report_required': draft.reportRequired,
           'p_idempotency_key': dispatchKey,
-          'p_report_schema': draft.reportSchemasByTask[unifiedTaskReportKey(row)] ??
-              _automaticReportSchema(
-                row,
-                purpose: draft.purpose,
-                instructions: draft.instructions,
-                kpis: draft.kpis,
-              ),
+          'p_report_schema': draft.reportRequired
+              ? (draft.reportSchemasByTask[unifiedTaskReportKey(row)] ??
+                  _automaticReportSchema(
+                    row,
+                    purpose: draft.purpose,
+                    instructions: draft.instructions,
+                    kpis: draft.kpis,
+                  ))
+              : null,
         });
         _successfulDispatches.add(dispatchKey);
       }
