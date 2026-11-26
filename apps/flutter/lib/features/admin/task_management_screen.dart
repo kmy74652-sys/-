@@ -117,6 +117,21 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
     );
   }
 
+  Widget _taskInfoRow(IconData icon, String label, String value, {Color? color}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        textDirection: TextDirection.rtl,
+        children: [
+          Icon(icon, size: 19, color: color ?? Colors.blueGrey.shade600),
+          const SizedBox(width: 8),
+          Text('$label: ', style: const TextStyle(fontWeight: FontWeight.w700)),
+          Expanded(child: Text(value, textAlign: TextAlign.right, overflow: TextOverflow.ellipsis)),
+        ],
+      ),
+    );
+  }
+
   String _descriptionValue(String text, String label) => _lineValue(text, '$label:');
 
   UnifiedTaskTableDraft _unifiedDraftFromTask(Map<String, dynamic> task) {
@@ -993,136 +1008,97 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
                                 final taskId = _s(t['id']);
                                 final expanded = _expandedUnifiedTasks.contains(taskId);
                                 return Card(
-                                  margin: const EdgeInsets.only(bottom: 8),
-                                  child: ListTile(
-                                  contentPadding: const EdgeInsets.all(8),
-                                  title: Text(
-                                    _taskTitle(t),
-                                    textAlign: TextAlign.right,
-                                    maxLines: 2,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                  subtitle: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.end,
-                                    children: [
-                                      Text(
-                                        '📌 ${_status(_s(t['status']))}',
-                                        textAlign: TextAlign.right,
-                                      ),
-                                      Text(
-                                        '🚩 ${_priority(t['priority'])}',
-                                        textAlign: TextAlign.right,
-                                      ),
-                                      Text(
-                                        '⏰ ${_localDateTime(t['due_at'])}',
-                                        textAlign: TextAlign.right,
-                                      ),
-                                      if (_canReviewActions &&
-                                          _reportStatus(t) == 'مرسل للمراجعة')
-                                        Padding(
-                                          padding: const EdgeInsets.only(top: 8),
-                                          child: Wrap(
-                                            alignment: WrapAlignment.end,
-                                            spacing: 8,
-                                            runSpacing: 8,
+                                  margin: const EdgeInsets.only(bottom: 10),
+                                  clipBehavior: Clip.antiAlias,
+                                  child: InkWell(
+                                    onTap: () => _message('حالة التقرير: ${_reportStatus(t)}'),
+                                    child: Padding(
+                                      padding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                                        children: [
+                                          Row(
+                                            textDirection: TextDirection.rtl,
+                                            crossAxisAlignment: CrossAxisAlignment.start,
                                             children: [
-                                              FilledButton.icon(
-                                                onPressed: _busy
-                                                    ? null
-                                                    : () => _reviewTaskReport(t, 'approved'),
-                                                icon: const Icon(Icons.verified_outlined, size: 18),
-                                                label: const Text('اعتماد التقرير'),
+                                              CircleAvatar(
+                                                radius: 21,
+                                                backgroundColor: _reportStatusColor(_reportStatus(t)).withAlpha(31),
+                                                child: Icon(Icons.description_outlined, color: _reportStatusColor(_reportStatus(t))),
                                               ),
-                                              OutlinedButton.icon(
-                                                onPressed: _busy
-                                                    ? null
-                                                    : () => _reviewTaskReport(t, 'returned'),
-                                                icon: const Icon(Icons.undo_outlined, size: 18),
-                                                label: const Text('إعادة للموظف'),
+                                              const SizedBox(width: 10),
+                                              Expanded(
+                                                child: Text(
+                                                  _taskTitle(t),
+                                                  textAlign: TextAlign.right,
+                                                  maxLines: 2,
+                                                  overflow: TextOverflow.ellipsis,
+                                                  style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
+                                                ),
                                               ),
+                                              if (_canManageActions)
+                                                PopupMenuButton<String>(
+                                                  tooltip: 'إجراءات المهمة',
+                                                  onSelected: (value) {
+                                                    if (_busy) return;
+                                                    if (value == 'table') _openUnifiedEditor(t);
+                                                    if (value == 'edit') _saveTask(existing: t);
+                                                    if (value == 'delete') _deleteTask(t);
+                                                  },
+                                                  itemBuilder: (context) => [
+                                                    if (widget.unifiedOnly) const PopupMenuItem(value: 'table', child: Text('تعديل من الجدول الموحد')),
+                                                    const PopupMenuItem(value: 'edit', child: Text('تعديل الموعد والأولوية')),
+                                                    const PopupMenuItem(value: 'delete', child: Text('حذف المهمة')),
+                                                  ],
+                                                ),
                                             ],
                                           ),
-                                        ),
-                                      if (expanded) ...[
-                                        Text(
-                                          'اسم الموظف: ${_employeeName(_s(t['assigned_to']))}',
-                                          textAlign: TextAlign.right,
-                                        ),
-                                        Text(
-                                          'الفرع: ${_branchName(_s(t['branch_id']).isEmpty ? null : _s(t['branch_id']))}',
-                                          textAlign: TextAlign.right,
-                                        ),
-                                        Text(
-                                          '📤 ${_sentAt(t)}',
-                                          textAlign: TextAlign.right,
-                                        ),
-                                        Text(
-                                          '✅ ${_completedAt(t)}',
-                                          textAlign: TextAlign.right,
-                                        ),
-                                        Text(
-                                          '☑️ ${_approvedAt(t)}',
-                                          textAlign: TextAlign.right,
-                                        ),
-                                        Text(
-                                          'ملاحظة الإدارة: ${_s(_reportByTask[taskId]?['review_note']).trim().isEmpty ? 'لا توجد' : _s(_reportByTask[taskId]?['review_note'])}',
-                                          textAlign: TextAlign.right,
-                                          style: const TextStyle(color: Colors.deepOrange),
-                                        ),
-                                      ],
-                                        Align(
-                                          alignment: Alignment.centerRight,
-                                          child: TextButton.icon(
-                                            onPressed: () => setState(() {
-                                              if (expanded) {
-                                                _expandedUnifiedTasks.remove(taskId);
-                                              } else {
-                                                _expandedUnifiedTasks.add(taskId);
-                                              }
-                                            }),
-                                            icon: Icon(expanded ? Icons.expand_less : Icons.expand_more, size: 18),
-                                            label: Text(expanded ? 'إخفاء التفاصيل' : 'إظهار التفاصيل'),
-                                          ),
-                                        ),
-                                    ],
-                                  ),
-                                  leading: CircleAvatar(
-                                    backgroundColor: _reportStatusColor(_reportStatus(t)).withAlpha(31),
-                                    child: Icon(
-                                      Icons.description_outlined,
-                                      color: _reportStatusColor(_reportStatus(t)),
-                                    ),
-                                  ),
-                                  isThreeLine: true,
-                                  trailing: _canManageActions
-                                      ? PopupMenuButton<String>(
-                                          tooltip: 'إجراءات المهمة',
-                                          onSelected: (value) {
-                                            if (_busy) return;
-                                            if (value == 'table') _openUnifiedEditor(t);
-                                            if (value == 'edit') _saveTask(existing: t);
-                                            if (value == 'delete') _deleteTask(t);
-                                          },
-                                          itemBuilder: (context) => [
-                                            if (widget.unifiedOnly)
-                                              const PopupMenuItem(
-                                                value: 'table',
-                                                child: Text('تعديل من الجدول الموحد'),
-                                              ),
-                                            const PopupMenuItem(
-                                              value: 'edit',
-                                              child: Text('تعديل الموعد والأولوية'),
-                                            ),
-                                            const PopupMenuItem(
-                                              value: 'delete',
-                                              child: Text('حذف المهمة'),
+                                          const Divider(height: 22),
+                                          _taskInfoRow(Icons.flag_outlined, 'الحالة', _status(_s(t['status'])), color: _reportStatusColor(_reportStatus(t))),
+                                          _taskInfoRow(Icons.priority_high_outlined, 'الأولوية', _priority(t['priority'])),
+                                          _taskInfoRow(Icons.event_outlined, 'الموعد', _localDateTime(t['due_at'])),
+                                          if (expanded) ...[
+                                            const SizedBox(height: 8),
+                                            Container(
+                                              padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+                                              decoration: BoxDecoration(color: Theme.of(context).colorScheme.surfaceContainerHighest.withAlpha(90), borderRadius: BorderRadius.circular(12)),
+                                              child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                                                const Text('تفاصيل المهمة', textAlign: TextAlign.right, style: TextStyle(fontWeight: FontWeight.w700)),
+                                                const SizedBox(height: 4),
+                                                _taskInfoRow(Icons.person_outline, 'اسم الموظف', _employeeName(_s(t['assigned_to']))),
+                                                _taskInfoRow(Icons.business_outlined, 'الفرع', _branchName(_s(t['branch_id']).isEmpty ? null : _s(t['branch_id']))),
+                                                _taskInfoRow(Icons.send_outlined, 'تاريخ إرسال المهمة', _sentAt(t)),
+                                                _taskInfoRow(Icons.task_alt_outlined, 'تاريخ إنجاز المهمة', _completedAt(t)),
+                                                _taskInfoRow(Icons.verified_outlined, 'تاريخ اعتماد المهمة', _approvedAt(t)),
+                                                _taskInfoRow(Icons.sticky_note_2_outlined, 'ملاحظة الإدارة', _s(_reportByTask[taskId]?['review_note']).trim().isEmpty ? 'لا توجد' : _s(_reportByTask[taskId]?['review_note']), color: Colors.deepOrange),
+                                              ]),
                                             ),
                                           ],
-                                        )
-                                      : null,
-                                  onTap: () => _message(
-                                    'حالة التقرير: ${_reportStatus(t)}',
-                                  ),
+                                          if (_canReviewActions && _reportStatus(t) == 'مرسل للمراجعة')
+                                            Padding(
+                                              padding: const EdgeInsets.only(top: 10),
+                                              child: Wrap(alignment: WrapAlignment.end, spacing: 8, runSpacing: 8, children: [
+                                                FilledButton.icon(onPressed: _busy ? null : () => _reviewTaskReport(t, 'approved'), icon: const Icon(Icons.verified_outlined, size: 18), label: const Text('اعتماد التقرير')),
+                                                OutlinedButton.icon(onPressed: _busy ? null : () => _reviewTaskReport(t, 'returned'), icon: const Icon(Icons.undo_outlined, size: 18), label: const Text('إعادة للموظف')),
+                                              ]),
+                                            ),
+                                          Align(
+                                            alignment: Alignment.centerRight,
+                                            child: TextButton.icon(
+                                              onPressed: () => setState(() {
+                                                if (expanded) {
+                                                  _expandedUnifiedTasks.remove(taskId);
+                                                } else {
+                                                  _expandedUnifiedTasks.add(taskId);
+                                                }
+                                              }),
+                                              icon: Icon(expanded ? Icons.expand_less : Icons.expand_more, size: 18),
+                                              label: Text(expanded ? 'إخفاء التفاصيل' : 'إظهار التفاصيل'),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
                                   ),
                                 );
                               })
