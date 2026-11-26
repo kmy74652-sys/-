@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-
 import '../../shared/app_shell.dart';
-import '../../shared/ui_labels.dart';
 import '../../core/theme.dart';
 
 class AdminScreen extends StatefulWidget {
@@ -11,7 +9,6 @@ class AdminScreen extends StatefulWidget {
     super.key,
     this.embedded = false,
     this.inline = false,
-    this.showSummary = true,
     this.initialSection,
   });
 
@@ -21,8 +18,6 @@ class AdminScreen extends StatefulWidget {
   /// Renders the administration panel as content inside another scroll view.
   final bool inline;
 
-  /// HomeScreen already renders the task metrics.
-  final bool showSummary;
   final String? initialSection;
 
   @override
@@ -257,110 +252,14 @@ class _AdminScreenState extends State<AdminScreen> {
   }
 
   Widget _overview() {
-    final active = _tasks
-        .where(
-          (t) => [
-            'new',
-            'received',
-            'in_progress',
-            'on_hold',
-          ].contains(t['status']),
-        )
-        .length;
-    final review = _tasks
-        .where((t) => t['status'] == 'report_submitted')
-        .length;
-    final late = _tasks
-        .where(
-          (t) =>
-              t['status'] == 'late' ||
-              ((DateTime.tryParse(_text(t['due_at'], ''))
-                          ?.isBefore(DateTime.now()) ??
-                      false) &&
-                  !['completed_approved', 'cancelled'].contains(t['status'])),
-        )
-        .length;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        if (widget.showSummary)
-          SectionCard(
-            title: 'ملخص المهام',
-            child: Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                _metric('إجمالي المهام', _tasks.length, Icons.task_alt),
-                _metric('قيد التنفيذ', active, Icons.play_circle_outline),
-                _metric('بانتظار المراجعة', review, Icons.fact_check_outlined),
-                _metric('متأخرة', late, Icons.schedule),
-              ],
-            ),
-          ),
-        const SizedBox(height: 10),
-        SectionCard(
-          title: 'الفروع والنشاط الحديث',
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(
-                'الفروع النشطة: ${_branches.where((b) => b['is_active'] == true).length}',
-                textAlign: TextAlign.right,
-              ),
-              const Divider(),
-              if (!_can('audit.read'))
-                const Text(
-                  'عرض سجل النشاط يتطلب audit.read.',
-                  textAlign: TextAlign.right,
-                )
-              else if (_activity.isEmpty)
-                const Text('لا توجد أنشطة حديثة.', textAlign: TextAlign.right)
-              else
-                ..._activity
-                    .take(3)
-                    .map(
-                      (a) => ListTile(
-                        dense: true,
-                        contentPadding: EdgeInsets.zero,
-                        title: Text(
-                          uiActivityLabel(_text(a['action'], 'نشاط إداري')),
-                          textAlign: TextAlign.right,
-                        ),
-                        subtitle: Text(
-                          _date(a['created_at']),
-                          textAlign: TextAlign.right,
-                        ),
-                      ),
-                    ),
-            ],
-          ),
-        ),
-      ],
+    return const SectionCard(
+      title: 'لوحة الإدارة',
+      child: Text(
+        'اختر القسم المطلوب من القائمة الجانبية أو من شاشة الموظفين والإعدادات.',
+        textAlign: TextAlign.right,
+      ),
     );
   }
-
-  Widget _metric(String title, int value, IconData icon) => SizedBox(
-    width: 145,
-    child: Card(
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          children: [
-            Icon(icon, color: AppColors.green),
-            Text(
-              '$value',
-              style: const TextStyle(
-                fontSize: 23,
-                fontWeight: FontWeight.bold,
-                color: AppColors.navy,
-              ),
-            ),
-            Text(title, textAlign: TextAlign.center),
-          ],
-        ),
-      ),
-    ),
-  );
   Widget _sectionContent() {
     final title =
         {

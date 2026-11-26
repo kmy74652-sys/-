@@ -19,6 +19,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   final _db = Supabase.instance.client;
   bool _busy = true, _allowed = false, _owner = false;
   bool _branchManagementAllowed = false;
+  bool _activityAllowed = false;
   bool _brandBusy = false;
   String? _error;
   String _organizationId = '';
@@ -79,6 +80,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       _branchManagementAllowed =
           permissions.contains('branches.manage') ||
           permissions.contains('branches.read_all');
+      _activityAllowed = permissions.contains('audit.read');
       // العقد الإداري يمنح هذه الوظائف للمالك والمدير التنفيذي المخوّل؛
       // لا نحصر الواجهة بالمالك ما دام الـBackend أعاد الصلاحية صراحة.
       _allowed = permissions.contains('employees.manage');
@@ -717,20 +719,41 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       onTap: () => context.push('/admin/customizer'),
                     ),
                   ),
-                if (_allowed && _branchManagementAllowed)
+                if (_allowed && (_branchManagementAllowed || _activityAllowed))
                   Card(
-                    child: ListTile(
-                      leading: const Icon(Icons.account_tree_outlined),
-                      title: const Text(
-                        'الفروع وإدارة الفروع',
-                        textAlign: TextAlign.right,
-                      ),
-                      subtitle: const Text(
-                        'إضافة الفروع وتعديلها وأرشفتها من مكان الموظفين والإعدادات',
-                        textAlign: TextAlign.right,
-                      ),
-                      trailing: const Icon(Icons.chevron_left),
-                      onTap: () => context.push('/admin?section=branches'),
+                    child: Column(
+                      children: [
+                        if (_branchManagementAllowed)
+                          ListTile(
+                            leading: const Icon(Icons.account_tree_outlined),
+                            title: const Text(
+                              'الفروع وإدارة الفروع',
+                              textAlign: TextAlign.right,
+                            ),
+                            subtitle: const Text(
+                              'إضافة الفروع وتعديلها وأرشفتها من مكان الموظفين والإعدادات',
+                              textAlign: TextAlign.right,
+                            ),
+                            trailing: const Icon(Icons.chevron_left),
+                            onTap: () => context.push('/admin?section=branches'),
+                          ),
+                        if (_branchManagementAllowed && _activityAllowed)
+                          const Divider(height: 1),
+                        if (_activityAllowed)
+                          ListTile(
+                            leading: const Icon(Icons.history),
+                            title: const Text(
+                              'سجل النشاط',
+                              textAlign: TextAlign.right,
+                            ),
+                            subtitle: const Text(
+                              'متابعة آخر العمليات الإدارية من نفس البطاقة',
+                              textAlign: TextAlign.right,
+                            ),
+                            trailing: const Icon(Icons.chevron_left),
+                            onTap: () => context.push('/admin?section=activity'),
+                          ),
+                      ],
                     ),
                   ),
                 if (_allowed)

@@ -344,8 +344,6 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
           (_can('reports.read_all') || _can('tasks.review')) ||
       (!_managesTasks && _can('tasks.execute'));
 
-  bool get _canActivity => _managesTasks && _can('audit.read');
-
   bool get _canPerformance =>
       _managesTasks && (_can('tasks.review') || _can('reports.read_all'));
 
@@ -384,11 +382,6 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     if (_canEmployees) {
       items.add(
         const _NavigationItem('الموظفون', '/admin?section=employees', Icons.people_outline),
-      );
-    }
-    if (_canActivity) {
-      items.add(
-        const _NavigationItem('سجل النشاط', '/admin?section=activity', Icons.history),
       );
     }
     if (_managesTasks) {
