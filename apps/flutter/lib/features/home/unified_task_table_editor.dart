@@ -84,7 +84,7 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
     for (final row in target) row.dispose();
     target
       ..clear()
-      ..addAll(source.isEmpty ? [_UnifiedRow('', '', '')] : source.map((row) => _UnifiedRow(row.time, row.task, row.output)));
+      ..addAll(source.isEmpty ? [_UnifiedRow('', '', '')] : source.map((row) => _UnifiedRow(row.time, row.task, row.output, row.extras)));
   }
 
   void _replaceList(List<TextEditingController> target, List<String> source) {
@@ -432,16 +432,9 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
   ]));
 
   Widget _scheduleTable(String title, List<_UnifiedRow> source) {
-    final visible = [
-      if (AppCustomizer.instance.isUnifiedFieldVisible('time')) 'time',
-      if (AppCustomizer.instance.isUnifiedFieldVisible('task')) 'task',
-      if (AppCustomizer.instance.isUnifiedFieldVisible('output')) 'output',
-    ]..sort((a, b) {
-      final la = AppCustomizer.instance.unifiedFieldLayout(a);
-      final lb = AppCustomizer.instance.unifiedFieldLayout(b);
-      final row = ((la['row'] as num?)?.toInt() ?? 0).compareTo((lb['row'] as num?)?.toInt() ?? 0);
-      return row != 0 ? row : ((la['column'] as num?)?.toInt() ?? 0).compareTo((lb['column'] as num?)?.toInt() ?? 0);
-    });
+    final visible = AppCustomizer.instance.unifiedScheduleColumns
+        .where((key) => !{'time', 'task', 'output'}.contains(key) || AppCustomizer.instance.isUnifiedFieldVisible(key))
+        .toList();
     return _section(
       title,
       SingleChildScrollView(
@@ -465,12 +458,14 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
     );
   }
 
-  TextEditingController _scheduleController(String key, _UnifiedRow row) => key == 'time' ? row.time : key == 'task' ? row.task : row.output;
-
   Widget _scheduleField(String key, _UnifiedRow row) {
     if (key == 'time') return _timeField(row.time, 'الوقت');
     return TextField(
-      controller: _scheduleController(key, row),
+      controller: key == 'task'
+          ? row.task
+          : key == 'output'
+              ? row.output
+              : row.custom(key),
       onChanged: (_) => widget.onChanged?.call(),
       textAlign: _textAlign(key),
       decoration: const InputDecoration(isDense: true),
@@ -669,6 +664,7 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
               time: row.time.text.trim(),
               task: row.task.text.trim(),
               output: row.output.text.trim(),
+              extras: row.extras,
             ))
         .toList();
     final exceptionTasks = _exceptionRows
@@ -677,6 +673,7 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
               time: '${_exception}: ${row.time.text.trim()}',
               task: row.task.text.trim(),
               output: row.output.text.trim(),
+              extras: row.extras,
             ))
         .toList();
     tasks.addAll(exceptionTasks);
@@ -929,9 +926,16 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
 }
 
 class _UnifiedRow {
-  _UnifiedRow(String time, String task, String output) : time = TextEditingController(text: time), task = TextEditingController(text: task), output = TextEditingController(text: output);
+  _UnifiedRow(String time, String task, String output, [Map<String, String>? extras])
+      : time = TextEditingController(text: time),
+        task = TextEditingController(text: task),
+        output = TextEditingController(text: output),
+        _extras = (extras ?? {}).map((key, value) => MapEntry(key, TextEditingController(text: value)));
   final TextEditingController time, task, output;
-  void dispose() { time.dispose(); task.dispose(); output.dispose(); }
+  final Map<String, TextEditingController> _extras;
+  TextEditingController custom(String key) => _extras.putIfAbsent(key, () => TextEditingController());
+  Map<String, String> get extras => _extras.map((key, value) => MapEntry(key, value.text));
+  void dispose() { time.dispose(); task.dispose(); output.dispose(); for (final controller in _extras.values) controller.dispose(); }
 }
 
 class UnifiedTaskTableDraft {
@@ -967,8 +971,9 @@ class UnifiedTaskTableDraft {
 }
 
 class UnifiedTaskRowData {
-  const UnifiedTaskRowData({required this.time, required this.task, required this.output});
+  const UnifiedTaskRowData({required this.time, required this.task, required this.output, this.extras = const {}});
   final String time, task, output;
+  final Map<String, String> extras;
 }
 
 class UnifiedEmployeeOption {

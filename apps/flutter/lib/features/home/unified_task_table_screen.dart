@@ -210,6 +210,7 @@ class _UnifiedTaskTableScreenState extends State<UnifiedTaskTableScreen> {
       row.time,
       row.task,
       row.output,
+      ...row.extras.entries.map((entry) => '${entry.key}=${entry.value}'),
     ].join('|');
     // Stable FNV-1a hash: no package or platform-specific hashCode is used.
     var hash = 2166136261;
@@ -294,6 +295,7 @@ class _UnifiedTaskTableScreenState extends State<UnifiedTaskTableScreen> {
         final description = [
           'الجدول الموحد الرسمي: ${draft.role}',
           'صف الجدول: ${row.time.isEmpty ? 'غير محدد' : row.time} | ${row.task} | ${row.output.isEmpty ? '—' : row.output}',
+          if (row.extras.isNotEmpty) 'الأعمدة الإضافية: ${row.extras.entries.map((entry) => '${entry.key}: ${entry.value.isEmpty ? '—' : entry.value}').join(' · ')}',
           'المسمى الوظيفي: ${draft.role}',
           if (draft.branch.isNotEmpty) 'الفرع: ${draft.branch}',
           if (draft.startDate.isNotEmpty) 'تاريخ بدء التطبيق: ${draft.startDate}',

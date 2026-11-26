@@ -18,6 +18,7 @@ class _AppCustomizerScreenState extends State<AppCustomizerScreen>
   bool _allowed = false;
   String _previewDevice = 'phone';
   bool _previewLandscape = false;
+  bool _previewFullScreen = true;
   bool _tasksLoading = true;
   List<Map<String, dynamic>> _currentTasks = const [];
   late final TabController _tabs;
@@ -456,6 +457,7 @@ class _AppCustomizerScreenState extends State<AppCustomizerScreen>
         spacing: 8,
         runSpacing: 8,
         children: [
+          ChoiceChip(label: const Text('ملء الشاشة'), selected: _previewFullScreen, onSelected: (value) => setState(() => _previewFullScreen = value)),
           ChoiceChip(label: const Text('هاتف'), selected: _previewDevice == 'phone', onSelected: (_) => setState(() => _previewDevice = 'phone')),
           ChoiceChip(label: const Text('جهاز لوحي'), selected: _previewDevice == 'tablet', onSelected: (_) => setState(() => _previewDevice = 'tablet')),
           ChoiceChip(label: const Text('عمودي'), selected: !_previewLandscape, onSelected: (_) => setState(() => _previewLandscape = false)),
@@ -630,50 +632,59 @@ class _AppCustomizerScreenState extends State<AppCustomizerScreen>
 
   Widget _devicePreview() => AnimatedBuilder(
         animation: _store,
-        builder: (_, __) {
-          final portraitWidth = _previewDevice == 'phone' ? 230.0 : 390.0;
-          final portraitHeight = _previewDevice == 'phone' ? 430.0 : 500.0;
-          final width = _previewLandscape ? portraitHeight : portraitWidth;
-          final height = _previewLandscape ? portraitWidth : portraitHeight;
-          return Center(
-            child: Container(
-              width: width,
-              height: height,
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.black,
-                borderRadius: BorderRadius.circular(_previewDevice == 'phone' ? 28 : 18),
-                boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 12)],
-              ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(_previewDevice == 'phone' ? 20 : 12),
-                child: Material(
-                  color: Color(_store.backgroundColor),
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.all(12),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Text(
-                          _store.label('appName'),
-                          textAlign: TextAlign.right,
-                          style: TextStyle(
-                            fontSize: _store.fontSize == 'large' ? 20 : 16,
-                            fontWeight: FontWeight.bold,
-                            color: Color(_store.primaryColor),
-                          ),
-                        ),
-                        Text(_store.label('organizationName'), textAlign: TextAlign.right),
-                        const Divider(),
-                        _unifiedPreviewContent(),
-                      ],
+        builder: (_, __) => LayoutBuilder(
+          builder: (context, constraints) {
+            final portraitWidth = _previewDevice == 'phone' ? 230.0 : 390.0;
+            final portraitHeight = _previewDevice == 'phone' ? 430.0 : 500.0;
+            final width = _previewFullScreen
+                ? constraints.maxWidth
+                : (_previewLandscape ? portraitHeight : portraitWidth);
+            final height = _previewFullScreen
+                ? (MediaQuery.sizeOf(context).height * .68).clamp(500.0, 760.0).toDouble()
+                : (_previewLandscape ? portraitWidth : portraitHeight);
+            final framed = !_previewFullScreen;
+            final content = Material(
+              color: Color(_store.backgroundColor),
+              child: SingleChildScrollView(
+                padding: EdgeInsets.all(_previewFullScreen ? 18 : 12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(
+                      _store.label('appName'),
+                      textAlign: TextAlign.right,
+                      style: TextStyle(
+                        fontSize: _store.fontSize == 'large' ? 20 : 16,
+                        fontWeight: FontWeight.bold,
+                        color: Color(_store.primaryColor),
+                      ),
                     ),
-                  ),
+                    Text(_store.label('organizationName'), textAlign: TextAlign.right),
+                    const Divider(),
+                    _unifiedPreviewContent(),
+                  ],
                 ),
               ),
-            ),
-          );
-        },
+            );
+            return Center(
+              child: Container(
+                width: width,
+                height: height,
+                padding: framed ? const EdgeInsets.all(12) : EdgeInsets.zero,
+                decoration: BoxDecoration(
+                  color: framed ? Colors.black : Color(_store.backgroundColor),
+                  borderRadius: BorderRadius.circular(framed ? (_previewDevice == 'phone' ? 28 : 18) : _store.unifiedRadius),
+                  boxShadow: framed ? const [BoxShadow(color: Colors.black26, blurRadius: 12)] : null,
+                  border: framed ? null : Border.all(color: Color(_store.primaryColor).withOpacity(.2)),
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(framed ? (_previewDevice == 'phone' ? 20 : 12) : _store.unifiedRadius),
+                  child: content,
+                ),
+              ),
+            );
+          },
+        ),
       );
 
   Widget _unifiedPreviewContent() => Column(
@@ -693,7 +704,7 @@ class _AppCustomizerScreenState extends State<AppCustomizerScreen>
     final content = key == 'employee'
         ? _unifiedPreviewEmployee()
         : key == 'daily' || key == 'exception'
-            ? _unifiedPreviewSchedule()
+            ? _unifiedPreviewSchedule(key)
             : key == 'sent'
                 ? const Text('لا توجد جداول مرسلة في المعاينة', textAlign: TextAlign.right)
                 : key == 'approval'
@@ -722,19 +733,55 @@ class _AppCustomizerScreenState extends State<AppCustomizerScreen>
         }).toList());
       });
 
-  Widget _unifiedPreviewSchedule() => Column(children: [
-        Row(textDirection: TextDirection.rtl, children: [
-          Expanded(child: _editablePreviewLabel('time')),
-          Expanded(flex: 2, child: _editablePreviewLabel('task')),
-          Expanded(child: _editablePreviewLabel('output')),
-        ]),
-        const Divider(height: 10),
-        const Row(textDirection: TextDirection.rtl, children: [
-          Expanded(child: Text('08:00', textAlign: TextAlign.right)),
-          Expanded(flex: 2, child: Text('مهمة حالية أو معاينة', textAlign: TextAlign.right)),
-          Expanded(child: Text('مخرج', textAlign: TextAlign.right)),
-        ]),
-      ]);
+  Widget _unifiedPreviewSchedule(String sectionKey) => Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            textDirection: TextDirection.rtl,
+            children: [
+              Expanded(child: Text('صفوف وأعمدة $sectionKey', textAlign: TextAlign.right, style: const TextStyle(fontWeight: FontWeight.bold))),
+              IconButton(tooltip: 'إضافة صف', icon: const Icon(Icons.add_box_outlined), onPressed: () => setState(() => _store.addUnifiedSchedulePreviewRow())),
+              IconButton(tooltip: 'حذف صف', icon: const Icon(Icons.remove_circle_outline), onPressed: _store.unifiedSchedulePreviewRows <= 1 ? null : () => setState(() => _store.removeUnifiedSchedulePreviewRow())),
+              IconButton(tooltip: 'إضافة عمود', icon: const Icon(Icons.view_column_outlined), onPressed: () => setState(() => _store.addUnifiedScheduleColumn())),
+            ],
+          ),
+          const Divider(height: 8),
+          for (var rowIndex = 0; rowIndex < _store.unifiedSchedulePreviewRows; rowIndex++)
+            Padding(
+              padding: EdgeInsets.only(bottom: _store.unifiedSpacing),
+              child: Row(
+                textDirection: TextDirection.rtl,
+                children: [
+                  for (final column in _store.unifiedScheduleColumns)
+                    Expanded(
+                      flex: column == 'task' ? 2 : 1,
+                      child: Padding(
+                        padding: EdgeInsets.only(left: _store.unifiedSpacing / 2),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            _editablePreviewLabel(column, bold: rowIndex == 0),
+                            if (rowIndex > 0)
+                              Text(
+                                column == 'time' ? '08:00' : column == 'task' ? 'مهمة حالية أو معاينة' : column == 'output' ? 'مخرج' : 'قيمة جديدة',
+                                textAlign: TextAlign.right,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  if (rowIndex == 0 && _store.unifiedScheduleColumns.length > 1)
+                    IconButton(
+                      tooltip: 'حذف آخر عمود',
+                      icon: const Icon(Icons.delete_outline),
+                      onPressed: () => setState(() => _store.removeUnifiedScheduleColumn(_store.unifiedScheduleColumns.last)),
+                    ),
+                ],
+              ),
+            ),
+        ],
+      );
 
   Widget _editablePreviewLabel(String key, {bool bold = false, double? fontSize}) => TextField(
         controller: _unifiedController(key),
