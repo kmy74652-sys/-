@@ -20,7 +20,11 @@ class NotificationsRuntime {
     await stop();
     if (!_initialized) {
       const android = AndroidInitializationSettings('@mipmap/ic_launcher');
-      const ios = DarwinInitializationSettings();
+      const ios = DarwinInitializationSettings(
+        requestAlertPermission: true,
+        requestBadgePermission: true,
+        requestSoundPermission: true,
+      );
       await _plugin.initialize(
         const InitializationSettings(android: android, iOS: ios),
         onDidReceiveNotificationResponse: (response) {
@@ -30,6 +34,13 @@ class NotificationsRuntime {
       final androidPlugin = _plugin.resolvePlatformSpecificImplementation<
           AndroidFlutterLocalNotificationsPlugin>();
       await androidPlugin?.requestNotificationsPermission();
+      final iosPlugin = _plugin.resolvePlatformSpecificImplementation<
+          DarwinFlutterLocalNotificationsPlugin>();
+      await iosPlugin?.requestPermissions(
+        alert: true,
+        badge: true,
+        sound: true,
+      );
       await androidPlugin?.createNotificationChannel(
         const AndroidNotificationChannel(
           'alshaeri_notifications',
