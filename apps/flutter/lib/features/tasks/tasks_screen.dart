@@ -112,13 +112,22 @@ class _TasksScreenState extends State<TasksScreen>
   }
 
   Future<void> _load() async {
+    final uid = Supabase.instance.client.auth.currentUser?.id;
+    if (_tasks.isEmpty && uid != null) {
+      final cached = await TaskCache.load(uid);
+      if (cached != null && mounted && _tasks.isEmpty) {
+        setState(() {
+          _tasks = cached.tasks;
+          _showingCachedTasks = true;
+        });
+      }
+    }
     setState(() {
       _loading = true;
       _error = null;
     });
     try {
       final client = Supabase.instance.client;
-      final uid = client.auth.currentUser?.id;
       final rows = <Map<String, dynamic>>[];
       for (var offset = 0; ; offset += 500) {
         final page = await client
@@ -328,7 +337,7 @@ class _TasksScreenState extends State<TasksScreen>
                 Center(child: CircularProgressIndicator()),
               ],
             )
-          : _error != null
+          : _error != null && _tasks.isEmpty
           ? ListView(
               padding: const EdgeInsets.all(20),
               children: [
