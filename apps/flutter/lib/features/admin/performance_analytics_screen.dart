@@ -200,6 +200,7 @@ class _PerformanceAnalyticsScreenState
         for (final task in tasks) _str(task['id']): task,
       };
       final reportCounts = <String, int>{};
+      final approvedReportCounts = <String, int>{};
       final reportStatusCounts = <String, int>{};
       final latestReportByTask = <String, String>{};
       for (final row in taskReports) {
@@ -211,6 +212,10 @@ class _PerformanceAnalyticsScreenState
         final employeeId = _str(task['assigned_to'], _str(row['submitted_by']));
         if (employeeId.isNotEmpty) {
           reportCounts[employeeId] = (reportCounts[employeeId] ?? 0) + 1;
+          if (_str(row['status']) == 'approved') {
+            approvedReportCounts[employeeId] =
+                (approvedReportCounts[employeeId] ?? 0) + 1;
+          }
         }
         final status = _str(row['status']);
         if (status.isNotEmpty) {
@@ -236,10 +241,14 @@ class _PerformanceAnalyticsScreenState
           if (day != null &&
               ((from != null && day.isBefore(from)) ||
                   (to != null && day.isAfter(to)))) continue;
+          final status = _str(row['status']);
           if (employeeId.isNotEmpty) {
             reportCounts[employeeId] = (reportCounts[employeeId] ?? 0) + 1;
+            if (status == 'approved') {
+              approvedReportCounts[employeeId] =
+                  (approvedReportCounts[employeeId] ?? 0) + 1;
+            }
           }
-          final status = _str(row['status']);
           if (status.isNotEmpty) {
             reportStatusCounts[status] = (reportStatusCounts[status] ?? 0) + 1;
           }
@@ -264,6 +273,7 @@ class _PerformanceAnalyticsScreenState
               ? 'كل الفروع'
               : (branchNames[branchId] ?? 'فرع غير محدد'),
           reports: reportCounts[userId] ?? 0,
+          approvedReports: approvedReportCounts[userId] ?? 0,
         );
       }
       final overallDelivery = _Delivery();
@@ -383,6 +393,12 @@ class _PerformanceAnalyticsScreenState
       case 'reports':
         list.sort((a, b) => b.reports.compareTo(a.reports));
         break;
+      case 'report_rate':
+        list.sort((a, b) => b.reportRate.compareTo(a.reportRate));
+        break;
+      case 'least':
+        list.sort((a, b) => a.rate.compareTo(b.rate));
+        break;
       default:
         list.sort((a, b) => b.rate.compareTo(a.rate));
     }
@@ -454,6 +470,8 @@ class _PerformanceAnalyticsScreenState
                   _overviewCard(),
                   const SizedBox(height: 10),
                   _reportStatusCard(),
+                  const SizedBox(height: 10),
+                  _evaluationSection(),
                   const SizedBox(height: 10),
                   _deliveryCard(),
                   const SizedBox(height: 10),
@@ -803,6 +821,120 @@ class _PerformanceAnalyticsScreenState
     return '${hours ~/ 24} يوم ${hours % 24} س';
   }
 
+  Widget _evaluationSection() {
+    final taskEmployees = _employees
+        .where((employee) => employee.totalRequired > 0)
+        .toList();
+    final reportEmployees = _employees
+        .where((employee) => employee.reports > 0)
+        .toList();
+    if (taskEmployees.isEmpty && reportEmployees.isEmpty) {
+      return SectionCard(
+        title: 'تقييم الموظفين',
+        child: const Text(
+          'لا توجد بيانات كافية للتقييم ضمن الفلاتر الحالية.',
+          textAlign: TextAlign.right,
+        ),
+      );
+    }
+
+    taskEmployees.sort((a, b) => b.rate.compareTo(a.rate));
+    reportEmployees.sort((a, b) => b.reportRate.compareTo(a.reportRate));
+    final bestTask = taskEmployees.isEmpty ? null : taskEmployees.first;
+    final leastTask = taskEmployees.isEmpty ? null : taskEmployees.last;
+    final bestReport = reportEmployees.isEmpty ? null : reportEmployees.first;
+    final leastReport = reportEmployees.isEmpty ? null : reportEmployees.last;
+
+    return SectionCard(
+      title: 'تقييم الموظفين: الأكثر والأقل إنجازًا',
+      child: Column(
+        children: [
+          const Text(
+            'يُراعى في التقييم نطاق الفترة والموظف ومصدر المهمة المحدد أعلاه، ولا يُصنّف الموظف بلا بيانات على أنه الأقل.',
+            textAlign: TextAlign.right,
+            style: TextStyle(fontSize: 12, color: AppColors.muted),
+          ),
+          const SizedBox(height: 10),
+          _evaluationTile(
+            title: 'الأكثر إنجازًا في المهام',
+            employee: bestTask,
+            value: bestTask == null
+                ? 'لا توجد بيانات'
+                : '${bestTask.rate.toStringAsFixed(0)}% · ${bestTask.totalDone}/${bestTask.totalRequired} مهمة',
+            color: AppColors.green,
+            icon: Icons.emoji_events_outlined,
+          ),
+          const SizedBox(height: 8),
+          _evaluationTile(
+            title: 'الأقل إنجازًا في المهام',
+            employee: leastTask,
+            value: leastTask == null
+                ? 'لا توجد بيانات'
+                : '${leastTask.rate.toStringAsFixed(0)}% · ${leastTask.totalDone}/${leastTask.totalRequired} مهمة',
+            color: Colors.orange.shade800,
+            icon: Icons.trending_down,
+          ),
+          const SizedBox(height: 8),
+          _evaluationTile(
+            title: 'الأكثر إنجازًا في التقارير',
+            employee: bestReport,
+            value: bestReport == null
+                ? 'لا توجد بيانات'
+                : '${bestReport.reportRate.toStringAsFixed(0)}% اعتماد · ${bestReport.approvedReports}/${bestReport.reports} تقرير',
+            color: AppColors.green,
+            icon: Icons.assignment_turned_in_outlined,
+          ),
+          const SizedBox(height: 8),
+          _evaluationTile(
+            title: 'الأقل إنجازًا في التقارير',
+            employee: leastReport,
+            value: leastReport == null
+                ? 'لا توجد بيانات'
+                : '${leastReport.reportRate.toStringAsFixed(0)}% اعتماد · ${leastReport.approvedReports}/${leastReport.reports} تقرير',
+            color: Colors.orange.shade800,
+            icon: Icons.assignment_late_outlined,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _evaluationTile({
+    required String title,
+    required _Employee? employee,
+    required String value,
+    required Color color,
+    required IconData icon,
+  }) => Container(
+    padding: const EdgeInsets.all(11),
+    decoration: BoxDecoration(
+      color: color.withOpacity(0.07),
+      borderRadius: BorderRadius.circular(12),
+      border: Border.all(color: color.withOpacity(0.24)),
+    ),
+    child: Row(
+      children: [
+        Icon(icon, color: color),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(title, textAlign: TextAlign.right, style: const TextStyle(fontWeight: FontWeight.w800)),
+              const SizedBox(height: 3),
+              Text(
+                employee == null ? 'لا توجد بيانات كافية' : employee.name,
+                textAlign: TextAlign.right,
+                style: const TextStyle(fontWeight: FontWeight.w700, color: AppColors.navy),
+              ),
+              Text(value, textAlign: TextAlign.right, style: TextStyle(fontSize: 12, color: color)),
+            ],
+          ),
+        ),
+      ],
+    ),
+  );
+
   Widget _branchCards() => SectionCard(
     title: 'الأداء حسب الفرع',
     child: _branches.isEmpty
@@ -907,6 +1039,14 @@ class _PerformanceAnalyticsScreenState
             DropdownMenuItem(
               value: 'reports',
               child: Text('عدد التقارير المقدمة'),
+            ),
+            DropdownMenuItem(
+              value: 'report_rate',
+              child: Text('نسبة اعتماد التقارير'),
+            ),
+            DropdownMenuItem(
+              value: 'least',
+              child: Text('الأقل إنجازًا في المهام'),
             ),
           ],
           onChanged: (value) {
@@ -1217,9 +1357,10 @@ class _Employee {
     required this.roleName,
     required this.branchName,
     required this.reports,
+    required this.approvedReports,
   });
   final String id, userId, name, roleCode, roleName, branchName;
-  final int reports;
+  final int reports, approvedReports;
   int delayed = 0;
   final Map<String, int> required = {
     'urgent': 0,
@@ -1243,6 +1384,8 @@ class _Employee {
   double get rate => totalRequired == 0 ? 0 : totalDone * 100 / totalRequired;
   double get highRate =>
       highRequired == 0 ? 0 : highDone * 100 / highRequired;
+  double get reportRate =>
+      reports == 0 ? 0 : approvedReports * 100 / reports;
   double priorityRate(String key) =>
       (required[key] ?? 0) == 0 ? 0 : (done[key] ?? 0) * 100 / required[key]!;
 }
