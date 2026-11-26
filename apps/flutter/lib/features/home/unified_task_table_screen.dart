@@ -331,14 +331,32 @@ class _UnifiedTaskTableScreenState extends State<UnifiedTaskTableScreen> {
       add('before_work', 'صورة قبل التنفيذ', 'attachment');
       add('completion_evidence', 'صورة الإنجاز', 'attachment');
     }
-    if (_hasKeyword(text, ['عميل', 'اتصال', 'اتصالات', 'متابعة'])) {
+    final isCustomerCollectionTask = _hasKeyword(text, [
+      'تحصيل',
+      'المستحق',
+      'مستحقات',
+      'عملاء',
+      'عميل',
+      'اتصال',
+      'اتصالات',
+      'متابعة',
+    ]);
+    if (isCustomerCollectionTask) {
       add('customer_name', 'اسم العميل', 'text', required: true);
       add('customer_phone', 'رقم العميل', 'text');
+      add('outstanding_amount', 'قيمة المستحقات', 'money');
+      add('collected_amount', 'المبلغ المحصل', 'money');
+      add('collection_status', 'حالة التحصيل', 'select', required: true,
+          options: ['تم التحصيل', 'تحصيل جزئي', 'لم يتم التحصيل', 'وعد بالسداد', 'تعذر التواصل']);
       add('contact_result', 'نتيجة المتابعة', 'textarea', required: true);
       add('next_action', 'الإجراء التالي', 'textarea');
       add('next_follow_up', 'موعد المتابعة القادمة', 'date');
+      add('collection_evidence', 'مرفق التحصيل أو إثبات التواصل', 'attachment');
     }
-    if (_hasKeyword(text, ['محاسبة', 'حساب', 'مصروف', 'قبض', 'صرف', 'تحويل', 'تسوية'])) {
+    // A general accounting purpose must not turn a customer-follow-up task
+    // into a generic accounting transaction form.
+    if (!isCustomerCollectionTask &&
+        _hasKeyword(text, ['محاسبة', 'حساب', 'مصروف', 'قبض', 'صرف', 'تحويل', 'تسوية'])) {
       add('financial_amount', 'المبلغ', 'money', required: true);
       add('transaction_type', 'نوع العملية', 'select', required: true,
           options: ['قبض', 'صرف', 'تسوية', 'تحويل']);

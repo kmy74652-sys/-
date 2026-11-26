@@ -204,7 +204,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
       if (_task!['report_flow'] == 'multi_form') {
         final snapshots = await db
             .from('task_report_form_snapshots')
-            .select('id,title,sort_order,is_required,schema')
+            .select('id,task_id,title,sort_order,is_required,schema')
             .eq('task_id', widget.taskId)
             .order('sort_order')
             .order('id');
@@ -220,7 +220,13 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
             .order('updated_at', ascending: false);
         final reportRows = List<Map<String, dynamic>>.from(reports);
         final draftRows = List<Map<String, dynamic>>.from(drafts);
-        _forms = List<Map<String, dynamic>>.from(snapshots).map((snapshot) {
+        // Keep a second client-side guard as defense in depth. A report form
+        // must never be rendered unless its immutable snapshot belongs to the
+        // task currently open, even if a future query or view changes.
+        final taskSnapshots = List<Map<String, dynamic>>.from(snapshots)
+            .where((snapshot) => '${snapshot['task_id']}' == widget.taskId)
+            .toList();
+        _forms = taskSnapshots.map((snapshot) {
           final sid = '${snapshot['id']}';
           final matchingReports = reportRows.where(
             (r) => r['report_form_snapshot_id'] == sid,
