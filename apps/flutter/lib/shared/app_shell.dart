@@ -28,10 +28,8 @@ class AppShell extends StatefulWidget {
 }
 
 class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
-  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   int _unreadCount = 0;
   Set<String> _permissions = <String>{};
-  bool _navigationLoading = true;
 
   Future<List<_GlobalSearchResult>> _globalSearch(String rawQuery) async {
     final query = rawQuery.trim();
@@ -313,7 +311,6 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
             _permissions = permissions is List
                 ? permissions.map((value) => '$value').toSet()
                 : <String>{};
-            _navigationLoading = false;
           });
         }
         return;
@@ -321,7 +318,6 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     } catch (_) {
       // The destination screens still enforce their own permissions.
     }
-    if (mounted) setState(() => _navigationLoading = false);
   }
 
   bool _can(String permission) => _permissions.contains(permission);
@@ -329,27 +325,6 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
   bool get _managesTasks => _can('tasks.manage');
 
   bool get _canCustomizer => _managesTasks && _can('customizer.manage');
-
-  List<_NavigationItem> _navigationItems() {
-    final items = <_NavigationItem>[
-      const _NavigationItem('الرئيسية', '/', Icons.home_outlined),
-    ];
-    if (_canCustomizer) {
-      items.add(
-        const _NavigationItem(
-          'مصمم الواجهات والتحكم الشامل',
-          '/admin/customizer',
-          Icons.palette_outlined,
-        ),
-      );
-    }
-    return items;
-  }
-
-  Future<void> _openNavigationDrawer(String route) async {
-    _scaffoldKey.currentState?.closeDrawer();
-    await _navigate(route);
-  }
 
   @override
   void dispose() {
@@ -704,7 +679,6 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
         child: Directionality(
         textDirection: TextDirection.rtl,
         child: Scaffold(
-        key: _scaffoldKey,
         backgroundColor: const Color(0xFFF5F7FD),
         body: SafeArea(
           bottom: false,
@@ -717,7 +691,6 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
                     unreadCount: _unreadCount,
                     onAccount: () => _confirmSignOut(context),
                     onNotifications: () => _showNotifications(context),
-                    onMenu: () => _scaffoldKey.currentState?.openDrawer(),
                     onSearch: _showGlobalSearch,
                   ),
                   _PageTitleBar(
@@ -738,12 +711,6 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
               ),
             ),
           ),
-        ),
-        drawer: _NavigationDrawer(
-          loading: _navigationLoading,
-          items: _navigationItems(),
-          currentPath: path,
-          onNavigate: _openNavigationDrawer,
         ),
         bottomNavigationBar: Container(
           decoration: const BoxDecoration(
@@ -789,14 +756,12 @@ class _BrandHeader extends StatefulWidget {
     required this.unreadCount,
     required this.onAccount,
     required this.onNotifications,
-    required this.onMenu,
     required this.onSearch,
   });
 
   final int unreadCount;
   final VoidCallback onAccount;
   final VoidCallback onNotifications;
-  final VoidCallback onMenu;
   final VoidCallback onSearch;
 
   @override
@@ -864,19 +829,6 @@ class _BrandHeaderState extends State<_BrandHeader> {
                 ),
               ),
               SizedBox(width: compact ? 4 : 8),
-              IconButton(
-                tooltip: 'لوحة التنقل',
-                onPressed: widget.onMenu,
-                style: IconButton.styleFrom(
-                  fixedSize: Size.square(controlSize),
-                  backgroundColor: const Color(0xFFF4F8FB),
-                  foregroundColor: _navy,
-                  side: const BorderSide(color: Color(0xFFD5E0EA)),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                ),
-                icon: const Icon(Icons.menu_rounded, size: 23),
-              ),
-              SizedBox(width: controlGap),
               IconButton(
                 tooltip: 'بحث عام',
                 onPressed: widget.onSearch,
@@ -1088,112 +1040,6 @@ class _PageTitleBar extends StatelessWidget {
       ),
     );
   }
-}
-
-class _NavigationItem {
-  const _NavigationItem(this.label, this.route, this.icon);
-
-  final String label;
-  final String route;
-  final IconData icon;
-}
-
-class _NavigationDrawer extends StatelessWidget {
-  const _NavigationDrawer({
-    required this.loading,
-    required this.items,
-    required this.currentPath,
-    required this.onNavigate,
-  });
-
-  final bool loading;
-  final List<_NavigationItem> items;
-  final String currentPath;
-  final Future<void> Function(String route) onNavigate;
-
-  bool _selected(_NavigationItem item) {
-    if (item.route == '/') return currentPath == '/';
-    final routePath = item.route.split('?').first;
-    return currentPath == routePath || currentPath.startsWith('$routePath/');
-  }
-
-  @override
-  Widget build(BuildContext context) => Drawer(
-        child: SafeArea(
-          child: Directionality(
-            textDirection: TextDirection.rtl,
-            child: Column(
-              children: [
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.fromLTRB(20, 24, 20, 18),
-                  decoration: const BoxDecoration(
-                    color: Color(0xFF0B3458),
-                    border: Border(bottom: BorderSide(color: Color(0xFFDBA62A), width: 3)),
-                  ),
-                  child: const Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Text(
-                        'NEXORA',
-                        textAlign: TextAlign.right,
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 23,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: 1.2,
-                        ),
-                      ),
-                      SizedBox(height: 4),
-                      Text(
-                        'لوحة التنقل الموحدة',
-                        textAlign: TextAlign.right,
-                        style: TextStyle(color: Color(0xFFFFD36A), fontSize: 12, fontWeight: FontWeight.w700),
-                      ),
-                    ],
-                  ),
-                ),
-                if (loading)
-                  const Expanded(child: Center(child: CircularProgressIndicator()))
-                else
-                  Expanded(
-                    child: ListView.separated(
-                      padding: const EdgeInsets.fromLTRB(10, 14, 10, 18),
-                      itemCount: items.length,
-                      separatorBuilder: (_, __) => const SizedBox(height: 4),
-                      itemBuilder: (context, index) {
-                        final item = items[index];
-                        final selected = _selected(item);
-                        return ListTile(
-                          selected: selected,
-                          selectedTileColor: const Color(0xFFEAF1F8),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          leading: Icon(
-                            item.icon,
-                            color: selected ? const Color(0xFF0B3458) : AppColors.muted,
-                          ),
-                          title: Text(
-                            item.label,
-                            textAlign: TextAlign.right,
-                            style: TextStyle(
-                              color: selected ? const Color(0xFF0B3458) : null,
-                              fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
-                            ),
-                          ),
-                          trailing: Icon(
-                            Icons.chevron_left,
-                            color: selected ? const Color(0xFFDBA62A) : AppColors.muted,
-                          ),
-                          onTap: () => onNavigate(item.route),
-                        );
-                      },
-                    ),
-                  ),
-              ],
-            ),
-          ),
-        ),
-      );
 }
 
 class _BottomTab extends StatelessWidget {
