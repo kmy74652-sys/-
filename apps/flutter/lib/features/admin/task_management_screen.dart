@@ -974,14 +974,20 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
   }
 
   @override
-  Widget build(BuildContext context) => AppShell(
-    title: widget.unifiedOnly ? 'إدارة الجداول الموحدة' : 'إدارة المهام',
-    subtitle: widget.unifiedOnly
-        ? 'الجداول المرسلة للموظفين وتقاريرها واعتماد إنجازها'
-        : 'الإنشاء المباشر والمتابعة والتقارير',
-    child: _loading
-        ? const Center(child: CircularProgressIndicator())
-        : RefreshIndicator(
+  Widget build(BuildContext context) => PopScope(
+    canPop: widget.unifiedOnly,
+    onPopInvoked: (didPop) {
+      if (didPop || widget.unifiedOnly || !mounted) return;
+      context.go('/tasks');
+    },
+    child: AppShell(
+      title: widget.unifiedOnly ? 'إدارة الجداول الموحدة' : 'إدارة المهام',
+      subtitle: widget.unifiedOnly
+          ? 'الجداول المرسلة للموظفين وتقاريرها واعتماد إنجازها'
+          : 'الإنشاء المباشر والمتابعة والتقارير',
+      child: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : RefreshIndicator(
             onRefresh: _load,
             child: ListView(
               padding: const EdgeInsets.all(14),
@@ -1341,5 +1347,6 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
               ],
             ),
           ),
+    ),
   );
 }
