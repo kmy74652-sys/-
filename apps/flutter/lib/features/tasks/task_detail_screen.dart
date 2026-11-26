@@ -4,8 +4,12 @@ import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mime/mime.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/offline_attachment_store.dart';
@@ -1016,6 +1020,17 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
             'p_idempotency_key': idempotencyKey,
           },
         );
+        final currentForm = _forms.firstWhere(
+          (form) => '${form['id']}' == snapshotId,
+          orElse: () => <String, dynamic>{'title': 'نموذج تقرير'},
+        );
+        await _shareSnapshotPdf(
+          title: '${_task?['title'] ?? 'تقرير المهمة'}',
+          reportTitle: '${currentForm['title'] ?? 'نموذج تقرير'}',
+          schema: schema,
+          values: values,
+          status: 'مرسل للمراجعة',
+        );
         await _load();
         if (mounted)
           ScaffoldMessenger.of(context).showSnackBar(
@@ -1054,6 +1069,114 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
       if (mounted) setState(() => _saving = false);
     }
   }
+
+  String _pdfValue(dynamic value) {
+    if (value == null || '$value'.trim().isEmpty) return 'لا يوجد';
+    if (value is List) return value.map(_pdfValue).join('، ');
+    if (value is Map) {
+      return value.entries
+          .map((entry) => '${entry.key}: ${_pdfValue(entry.value)}')
+          .join('، ');
+    }
+    return '$value';
+  }
+
+  Future<void> _shareSnapshotPdf({
+    required String title,
+    required String reportTitle,
+    required List<Map<String, dynamic>> schema,
+    required Map<String, dynamic> values,
+    required String status,
+  }) async {
+    try {
+      final regularFont = pw.Font.ttf(
+        await rootBundle.load('assets/fonts/NotoSansArabic-Regular.ttf'),
+      );
+      final boldFont = pw.Font.ttf(
+        await rootBundle.load('assets/fonts/NotoSansArabic-Bold.ttf'),
+      );
+      final document = pw.Document(
+        theme: pw.ThemeData.withFont(base: regularFont, bold: boldFont),
+      );
+      document.addPage(
+        pw.MultiPage(
+          pageFormat: PdfPageFormat.a4,
+          margin: const pw.EdgeInsets.all(28),
+          build: (_) => [
+            pw.Directionality(
+              textDirection: pw.TextDirection.rtl,
+              child: pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+                children: [
+                  pw.Text(
+                    'تقرير المهمة',
+                    textAlign: pw.TextAlign.right,
+                    style: pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold),
+                  ),
+                  pw.SizedBox(height: 8),
+                  pw.Text('المهمة: $title', textAlign: pw.TextAlign.right),
+                  pw.Text('النموذج: $reportTitle', textAlign: pw.TextAlign.right),
+                  pw.Text('الحالة: $status', textAlign: pw.TextAlign.right),
+                  pw.Text(
+                    'تاريخ التصدير: ${DateTime.now().toLocal().toString().split('.').first}',
+                    textAlign: pw.TextAlign.right,
+                  ),
+                  pw.SizedBox(height: 16),
+                  pw.Table(
+                    border: pw.TableBorder.all(color: PdfColors.grey400),
+                    columnWidths: const {
+                      0: pw.FlexColumnWidth(1),
+                      1: pw.FlexColumnWidth(2),
+                    },
+                    children: [
+                      pw.TableRow(
+                        decoration: pw.BoxDecoration(color: PdfColor.fromHex('#EAF4F0')),
+                        children: [
+                          _pdfTableCell('القيمة', bold: true),
+                          _pdfTableCell('الحقل', bold: true),
+                        ],
+                      ),
+                      for (final field in schema)
+                        pw.TableRow(children: [
+                          _pdfTableCell(_pdfValue(values[field['key']])),
+                          _pdfTableCell('${field['label'] ?? field['key']}'),
+                        ]),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+      await Printing.sharePdf(
+        bytes: await document.save(),
+        filename: 'nexora-task-report-${DateTime.now().millisecondsSinceEpoch}.pdf',
+      );
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'تم إرسال التقرير، وتعذر فتح تصدير PDF تلقائيًا. يمكنك المحاولة من زر تصدير PDF.',
+            ),
+          ),
+        );
+      }
+    }
+  }
+
+  pw.Widget _pdfTableCell(String value, {bool bold = false}) => pw.Padding(
+        padding: const pw.EdgeInsets.all(8),
+        child: pw.Text(
+          value.trim().isEmpty ? 'لا يوجد' : value,
+          textDirection: pw.TextDirection.rtl,
+          textAlign: pw.TextAlign.right,
+          style: pw.TextStyle(
+            fontWeight: bold ? pw.FontWeight.bold : pw.FontWeight.normal,
+          ),
+        ),
+      );
 
   List<Map<String, dynamic>> _attachmentList(TextEditingController? ctl) {
     try {
@@ -1776,6 +1899,33 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                                       ),
                                       child: _snapshotField(field, snapshotId),
                                     ),
+                            Align(
+                              alignment: Alignment.centerRight,
+                              child: OutlinedButton.icon(
+                                onPressed: _saving
+                                    ? null
+                                    : () {
+                                        final values = locked
+                                            ? savedValues
+                                            : <String, dynamic>{
+                                                for (final field in schema)
+                                                  '${field['key']}': _snapshotValue(
+                                                    field,
+                                                    snapshotId,
+                                                  ),
+                                              };
+                                        _shareSnapshotPdf(
+                                          title: '${_task?['title'] ?? 'تقرير المهمة'}',
+                                          reportTitle: '${form['title'] ?? 'نموذج تقرير'}',
+                                          schema: schema,
+                                          values: values,
+                                          status: locked ? '${status == 'approved' ? 'معتمد' : 'مرسل للمراجعة'}' : 'مسودة',
+                                        );
+                                      },
+                                icon: const Icon(Icons.picture_as_pdf_outlined),
+                                label: const Text('تصدير PDF'),
+                              ),
+                            ),
                             if (!locked)
                               Wrap(
                                 alignment: WrapAlignment.center,
