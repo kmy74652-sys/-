@@ -229,7 +229,103 @@ class _UnifiedTaskTableScreenState extends State<UnifiedTaskTableScreen> {
         .eq('idempotency_key', key)
         .isFilter('deleted_at', null)
         .limit(1);
-    return (rows as List).isNotEmpty;
+    return rows.isNotEmpty;
+  }
+
+  bool _hasKeyword(String text, List<String> words) =>
+      words.any(text.contains);
+
+  String _fieldKey(String value) {
+    final normalized = value
+        .toLowerCase()
+        .replaceAll(RegExp(r'[^a-z0-9]+'), '_')
+        .replaceAll(RegExp(r'^_+|_+$'), '');
+    return normalized.isEmpty ? 'custom_field' : 'custom_$normalized';
+  }
+
+  List<Map<String, dynamic>> _automaticReportSchema(
+    UnifiedTaskRowData row,
+    UnifiedTaskTableDraft draft,
+  ) {
+    final text = [
+      row.task,
+      row.output,
+      ...row.extras.entries.map((entry) => '${entry.key} ${entry.value}'),
+      draft.purpose,
+      ...draft.instructions,
+      ...draft.kpis,
+    ].join(' ').toLowerCase();
+    final fields = <Map<String, dynamic>>[];
+    final keys = <String>{};
+
+    void add(String key, String label, String type, {
+      bool required = false,
+      List<String> options = const [],
+    }) {
+      if (keys.add(key)) {
+        fields.add({
+          'key': key,
+          'label': label,
+          'type': type,
+          'required': required,
+          if (options.isNotEmpty) 'options': options,
+        });
+      }
+    }
+
+    add('actual_result', 'النتيجة الفعلية', 'textarea', required: true);
+    add('execution_status', 'حالة التنفيذ', 'select', required: true,
+        options: ['مكتملة', 'مكتملة جزئيًا', 'تعذر التنفيذ']);
+
+    if (_hasKeyword(text, ['مخزون', 'كمية', 'مستودع', 'صنف', 'أصناف'])) {
+      add('system_quantity', 'الكمية في النظام', 'number', required: true);
+      add('actual_quantity', 'الكمية الفعلية', 'number', required: true);
+      add('stock_condition', 'حالة المخزون', 'select', required: true,
+          options: ['مطابق', 'يوجد فرق', 'تالف', 'غير متوفر']);
+    }
+    if (_hasKeyword(text, ['مبيعات', 'بيع', 'فاتورة', 'فواتير', 'إيراد'])) {
+      add('sales_total', 'إجمالي المبيعات', 'number', required: true);
+      add('invoice_count', 'عدد الفواتير', 'number', required: true);
+      add('returns_total', 'قيمة المرتجعات', 'number');
+    }
+    if (_hasKeyword(text, ['حضور', 'انصراف', 'دوام', 'تأخير'])) {
+      add('attendance_time', 'وقت الحضور', 'text', required: true);
+      add('departure_time', 'وقت الانصراف', 'text');
+      add('delay_reason', 'سبب التأخير', 'textarea');
+    }
+    if (_hasKeyword(text, ['صيانة', 'إصلاح', 'عطل'])) {
+      add('issue_description', 'وصف العطل', 'textarea', required: true);
+      add('action_taken', 'الإجراء المتخذ', 'textarea', required: true);
+      add('parts_used', 'قطع الغيار المستخدمة', 'textarea');
+      add('repair_status', 'حالة الإصلاح', 'select', required: true,
+          options: ['تم الإصلاح', 'يحتاج متابعة', 'لم يتم الإصلاح']);
+    }
+    if (_hasKeyword(text, ['فحص', 'تفتيش', 'مراجعة', 'تدقيق', 'مطابقة'])) {
+      add('inspection_result', 'نتيجة الفحص', 'select', required: true,
+          options: ['سليم', 'يحتاج معالجة', 'غير مطابق']);
+      add('findings', 'الملاحظات والنتائج', 'textarea');
+      add('evidence', 'مرفق الإثبات', 'attachment');
+    }
+    if (_hasKeyword(text, ['تنظيف', 'ترتيب', 'تجهيز', 'إنجاز'])) {
+      add('completion_percent', 'نسبة الإنجاز', 'percentage', required: true);
+      add('completion_evidence', 'صورة الإنجاز', 'attachment');
+    }
+    if (_hasKeyword(text, ['عميل', 'اتصال', 'اتصالات', 'متابعة'])) {
+      add('customer_name', 'اسم العميل', 'text', required: true);
+      add('contact_result', 'نتيجة المتابعة', 'textarea', required: true);
+      add('next_action', 'الإجراء التالي', 'textarea');
+    }
+    var extraIndex = 0;
+    for (final entry in row.extras.entries) {
+      final label = entry.key.trim();
+      if (label.isNotEmpty) {
+        add('${_fieldKey(label)}_$extraIndex', label, 'text');
+        extraIndex++;
+      }
+    }
+    add('execution_date', 'تاريخ التنفيذ', 'date', required: true);
+    add('notes', 'ملاحظات الموظف', 'textarea');
+    return fields;
   }
 
   Future<void> _send(UnifiedTaskTableDraft draft) async {
@@ -317,10 +413,11 @@ class _UnifiedTaskTableScreenState extends State<UnifiedTaskTableScreen> {
           'p_role_code': roleCode,
           'p_template_id': draft.reportTemplateId,
           'p_assigned_to': userId,
-          'p_report_template_id': draft.reportTemplateId,
-          'p_report_version_id': draft.reportVersionId,
-          'p_report_required': draft.reportTemplateId != null && draft.reportVersionId != null,
+          'p_report_template_id': null,
+          'p_report_version_id': null,
+          'p_report_required': true,
           'p_idempotency_key': dispatchKey,
+          'p_report_schema': _automaticReportSchema(row, draft),
         });
         _successfulDispatches.add(dispatchKey);
       }

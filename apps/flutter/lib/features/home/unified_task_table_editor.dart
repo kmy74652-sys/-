@@ -367,12 +367,12 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           if (widget.reports.isEmpty)
-            const Text('لا توجد قوالب تقارير منشورة ومعتمدة متاحة لهذا الحساب.', textAlign: TextAlign.right)
+            const Text('سيُنشئ النظام تقريرًا تلقائيًا مناسبًا لكل مهمة عند الإرسال.', textAlign: TextAlign.right)
           else
             DropdownButtonFormField<String>(
               value: selected?.versionId,
               isExpanded: true,
-              decoration: const InputDecoration(labelText: 'اختر قالب التقرير المعتمد', isDense: true),
+              decoration: const InputDecoration(labelText: 'قالب التقرير اليدوي (اختياري)', isDense: true),
               items: widget.reports.map((item) => DropdownMenuItem(value: item.versionId, child: Text(item.title, overflow: TextOverflow.ellipsis))).toList(),
               onChanged: (value) {
                 if (value == null) return;
@@ -392,7 +392,7 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
                   const SizedBox(height: 5),
                   Text('الإصدار ${selected.versionNumber} · ${selected.fieldCount} حقول · ${selected.requiredFieldCount} إلزامية', textAlign: TextAlign.right),
                   const SizedBox(height: 5),
-                  const Text('سيظهر هذا النموذج جاهزًا للموظف عند فتح المهمة، ولا يمكنه تعديل بنيته.', textAlign: TextAlign.right, style: TextStyle(fontSize: 12)),
+                  const Text('سيُنشئ النظام أيضًا نموذجًا تلقائيًا خاصًا بكل مهمة عند الإرسال، ولا يمكن للموظف تعديل بنيته.', textAlign: TextAlign.right, style: TextStyle(fontSize: 12)),
                   Align(alignment: Alignment.centerRight, child: TextButton.icon(onPressed: _previewSelectedReport, icon: const Icon(Icons.preview_outlined), label: const Text('معاينة التقرير'))),
                 ],
               ),
@@ -683,10 +683,6 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
     }
     if (tasks.isEmpty) {
       messenger.showSnackBar(const SnackBar(content: Text('أضف مهمة زمنية واحدة على الأقل قبل الإرسال.', textAlign: TextAlign.right)));
-      return;
-    }
-    if (_reportVersionId == null) {
-      messenger.showSnackBar(const SnackBar(content: Text('اختر قالب التقرير اليومي المنشور والمعتمد قبل الإرسال.', textAlign: TextAlign.right)));
       return;
     }
     setState(() => _sending = true);
