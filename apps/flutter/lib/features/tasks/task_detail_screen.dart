@@ -1122,7 +1122,9 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                       ),
                       for (final field in schema)
                         pw.TableRow(children: [
-                          _pdfTableCell(_pdfValue(values[field['key']])),
+                          '${field['type'] ?? ''}' == 'signature'
+                              ? reportPdfSignatureWidget(values[field['key']])
+                              : _pdfTableCell(_pdfValue(values[field['key']])),
                           _pdfTableCell('${field['label'] ?? field['key']}'),
                         ]),
                     ],

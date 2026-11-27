@@ -483,10 +483,20 @@ class _ReportsScreenState extends State<ReportsScreen> {
                         if (reportTheme.settings.reportShowStatus) pw.Text(_pdfSafeText('الحالة: ${_statusLabel(rows[index]['status']?.toString() ?? '')}'), textAlign: pw.TextAlign.right),
                         if ((rows[index]['values'] ?? rows[index]['answers']) is Map)
                           for (final entry in ((rows[index]['values'] ?? rows[index]['answers']) as Map).entries)
-                            pw.Text(
-                              _pdfSafeText('${entry.key}: ${_displayValue(entry.value)}'),
-                              textAlign: pw.TextAlign.right,
-                            ),
+                            reportPdfIsSignature(entry.value)
+                                ? pw.Row(
+                                    textDirection: pw.TextDirection.rtl,
+                                    children: [
+                                      pw.Expanded(child: reportPdfSignatureWidget(entry.value)),
+                                      pw.SizedBox(width: 8),
+                                      pw.Text(_pdfSafeText('${entry.key}:'), textDirection: pw.TextDirection.rtl, textAlign: pw.TextAlign.right),
+                                    ],
+                                  )
+                                : pw.Text(
+                                    _pdfSafeText('${entry.key}: ${_displayValue(entry.value)}'),
+                                    textDirection: pw.TextDirection.rtl,
+                                    textAlign: pw.TextAlign.right,
+                                  ),
                       ],
                     ),
                   ),

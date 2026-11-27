@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:flutter/services.dart';
@@ -16,6 +17,60 @@ String reportPdfSafeText(String value) => value
     .replaceAll(RegExp(r'[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F]'), ' ')
     .replaceAll(RegExp(r'[ \t]{2,}'), ' ')
     .trim();
+
+Map<String, dynamic> _reportPdfSignatureMap(Object? raw) {
+  if (raw is Map) return Map<String, dynamic>.from(raw);
+  if (raw is String) {
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is Map) return Map<String, dynamic>.from(decoded);
+    } catch (_) {}
+  }
+  return <String, dynamic>{};
+}
+
+bool reportPdfIsSignature(Object? raw) {
+  final value = _reportPdfSignatureMap(raw);
+  return value['strokes'] is List ||
+      value['signature_attachment_id'] != null ||
+      value['signed_at'] != null ||
+      value['acknowledged'] != null;
+}
+
+String? _reportPdfSignatureSvg(Object? raw) {
+  final value = _reportPdfSignatureMap(raw);
+  final paths = <String>[];
+  final strokes = value['strokes'];
+  if (strokes is List) {
+    for (final stroke in strokes.whereType<String>()) {
+      final commands = RegExp(r'([ML])\s*(-?\d+(?:\.\d+)?)\s+(-?\d+(?:\.\d+)?)')
+          .allMatches(stroke)
+          .map((match) => '${match.group(1)} ${match.group(2)} ${match.group(3)}')
+          .join(' ');
+      if (commands.isNotEmpty) paths.add(commands);
+    }
+  }
+  if (paths.isEmpty) return null;
+  return '<svg xmlns="http://www.w3.org/2000/svg" width="600" height="170" viewBox="0 0 600 170">'
+      '<g fill="none" stroke="#111111" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">'
+      '${paths.map((path) => '<path d="$path"/>').join()}'
+      '</g></svg>';
+}
+
+pw.Widget reportPdfSignatureWidget(Object? raw) {
+  final value = _reportPdfSignatureMap(raw);
+  final svg = _reportPdfSignatureSvg(raw);
+  final signed = value['acknowledged'] == true ? 'تم التوقيع والموافقة' : 'تم التوقيع';
+  final signedAt = '${value['signed_at'] ?? ''}'.trim();
+  return pw.Column(
+    crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+    children: [
+      if (svg != null) pw.SvgImage(svg: svg, width: 170, height: 55, fit: pw.BoxFit.contain),
+      pw.Text(svg == null && !reportPdfIsSignature(raw) ? 'لم يتم التوقيع' : signed, textDirection: pw.TextDirection.rtl, textAlign: pw.TextAlign.right, style: const pw.TextStyle(fontSize: 8)),
+      if (signedAt.isNotEmpty) pw.Text(reportPdfSafeText(signedAt), textDirection: pw.TextDirection.ltr, textAlign: pw.TextAlign.right, style: const pw.TextStyle(fontSize: 7)),
+    ],
+  );
+}
 
 class ReportPdfTheme {
   ReportPdfTheme(this.settings, {this.logo, required this.latinRegular, required this.latinBold});
