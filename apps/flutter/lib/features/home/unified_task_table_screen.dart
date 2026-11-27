@@ -399,6 +399,104 @@ class _UnifiedTaskTableScreenState extends State<UnifiedTaskTableScreen> {
     if (selected.isNotEmpty) setState(() => _editingTask = selected.first);
   }
 
+  Widget _previousUnifiedTasksTable() {
+    if (_existingUnifiedTasks.isEmpty) return const SizedBox.shrink();
+    final rows = <DataRow>[];
+    for (final task in _existingUnifiedTasks) {
+      final description = _text(task['description']);
+      final matches = RegExp(
+        r'^صف الجدول:\s*(.*?)\s*\|\s*(.*?)\s*\|\s*(.*?)\s*$',
+        multiLine: true,
+      ).allMatches(description);
+      final taskRows = matches.isEmpty
+          ? [
+              [
+                _lineValue(description, 'الوقت المحدد'),
+                _text(task['title'], 'مهمة'),
+              ],
+            ]
+          : matches
+              .map((match) => [
+                    match.group(1)?.trim() ?? '',
+                    match.group(2)?.trim() ?? '',
+                  ])
+              .toList();
+      for (final row in taskRows) {
+        rows.add(
+          DataRow(
+            cells: [
+              DataCell(Text(
+                _text(task['status'], 'جديدة'),
+                textAlign: TextAlign.right,
+              )),
+              DataCell(Text(
+                _branchName(_text(task['branch_id'])).isEmpty
+                    ? '—'
+                    : _branchName(_text(task['branch_id'])),
+                textAlign: TextAlign.right,
+              )),
+              DataCell(Text(
+                _employeeName(_text(task['assigned_to'])).isEmpty
+                    ? 'مهام مشتركة'
+                    : _employeeName(_text(task['assigned_to'])),
+                textAlign: TextAlign.right,
+              )),
+              DataCell(Text(row[1].isEmpty ? '—' : row[1], textAlign: TextAlign.right)),
+              DataCell(Text(row[0].isEmpty ? '—' : row[0], textAlign: TextAlign.right)),
+            ],
+          ),
+        );
+      }
+    }
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      color: const Color(0xFFF8FBFA),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+        side: const BorderSide(color: Color(0xFFD8E4E0)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Text(
+              'المهام السابقة في الجدول الموحد',
+              textAlign: TextAlign.right,
+              style: TextStyle(
+                fontWeight: FontWeight.w900,
+                color: Color(0xFF0B3458),
+                fontSize: 16,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'تم العثور على ${rows.length} صف سابق. يمكن إنشاء مهمة جديدة دون حذف هذه البيانات.',
+              textAlign: TextAlign.right,
+              style: const TextStyle(color: Colors.black54, fontSize: 12),
+            ),
+            const SizedBox(height: 8),
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: DataTable(
+                textDirection: TextDirection.rtl,
+                headingRowColor: WidgetStatePropertyAll(Color(0xFFEAF1EF)),
+                columns: const [
+                  DataColumn(label: Text('الحالة')),
+                  DataColumn(label: Text('الفرع')),
+                  DataColumn(label: Text('الموظف')),
+                  DataColumn(label: Text('المهمة والمسؤولية')),
+                  DataColumn(label: Text('الوقت')),
+                ],
+                rows: rows,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Future<void> _updateExistingTask(UnifiedTaskTableDraft draft) async {
     final task = _editingTask;
     final organizationId = _organizationId;
@@ -904,6 +1002,7 @@ class _UnifiedTaskTableScreenState extends State<UnifiedTaskTableScreen> {
                             ],
                           ),
                         ),
+                        _previousUnifiedTasksTable(),
                         UnifiedTaskTableEditor(
                           key: ValueKey(
                               _editingTask?['id'] ?? 'new-unified-task'),

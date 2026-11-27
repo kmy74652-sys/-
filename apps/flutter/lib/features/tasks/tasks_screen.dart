@@ -1138,6 +1138,12 @@ class _TasksScreenState extends State<TasksScreen>
                   onPressed: () => setState(() => _officialHeaderCollapsed = !_officialHeaderCollapsed),
                   icon: Icon(_officialHeaderCollapsed ? Icons.visibility_outlined : Icons.visibility_off_outlined, size: 20),
                 ),
+                if (_canEditOfficialTasks)
+                  IconButton(
+                    tooltip: 'إضافة مهمة من الجدول الموحد',
+                    onPressed: () => context.push('/admin/unified-tasks'),
+                    icon: const Icon(Icons.add, size: 25, color: AppColors.green),
+                  ),
               ],
             ),
             if (!_officialHeaderCollapsed) ...[
