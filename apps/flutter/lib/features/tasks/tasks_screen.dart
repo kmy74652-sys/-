@@ -268,6 +268,7 @@ class _TasksScreenState extends State<TasksScreen>
     setState(() {
       _view = view;
       if (view == 'ledger') _statusFilter = 'pending';
+      if (view == 'approved_cycles') _statusFilter = 'all';
     });
     if (loadCycles && view == 'approved_cycles') _loadApprovedCycles();
   }
@@ -752,11 +753,27 @@ class _TasksScreenState extends State<TasksScreen>
         child: Center(child: CircularProgressIndicator()),
       );
     }
-    final cycles = _employeeFilter == 'all'
-        ? _approvedCycles
-        : _approvedCycles
-            .where((cycle) => '${cycle['employee_user_id'] ?? ''}' == _employeeFilter)
-            .toList();
+    final query = _search.trim().toLowerCase();
+    final cycles = _approvedCycles.where((cycle) {
+      final employeeId = '${cycle['employee_user_id'] ?? ''}';
+      final title = '${cycle['title'] ?? ''}';
+      final description = '${cycle['description'] ?? ''}';
+      final employee = '${cycle['employee_name'] ?? ''}';
+      final branch = '${cycle['branch_name'] ?? ''}';
+      final priority = '${cycle['priority'] ?? 'normal'}';
+      final active = cycle['active'] == true;
+      final searchable = '$title $description $employee $branch'.toLowerCase();
+      final statusMatches = switch (_statusFilter) {
+        'all' || 'approved' => true,
+        'in_progress' => active,
+        'rejected' => !active,
+        _ => false,
+      };
+      return (_employeeFilter == 'all' || employeeId == _employeeFilter) &&
+          (_priorityFilter == 'all' || priority == _priorityFilter) &&
+          (query.isEmpty || searchable.contains(query)) &&
+          statusMatches;
+    }).toList();
     if (cycles.isEmpty) {
       return const Card(
         child: Padding(
