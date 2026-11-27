@@ -87,6 +87,15 @@ class ReportPdfTheme {
     if (settings.reportCompanyName.trim().isEmpty || settings.reportCompanyName == 'مؤسسة الشاعري للتجارة العامة') {
       settings.reportCompanyName = organizationBranding.name;
     }
+    if (organizationBranding.englishName.trim().isNotEmpty) {
+      settings.reportEnglishCompanyName = organizationBranding.englishName;
+    }
+    if (organizationBranding.phone.trim().isNotEmpty) {
+      settings.reportPhone = organizationBranding.phone;
+    }
+    if (organizationBranding.address.trim().isNotEmpty) {
+      settings.reportAddress = organizationBranding.address;
+    }
     pw.ImageProvider? logo;
     // الشعار اختياري صراحةً. لا نستخدم شعار المؤسسة المشترك كـ fallback؛
     // حتى يبقى حذف الشعار من إعدادات الهوية محترمًا في ملفات PDF الجديدة.

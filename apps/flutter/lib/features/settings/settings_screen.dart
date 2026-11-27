@@ -144,11 +144,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
       _tagline.text = tagline;
       final customizer = AppCustomizer.instance;
       await customizer.load();
-      _pdfArabicName.text = customizer.reportCompanyName;
-      _pdfEnglishName.text = customizer.reportEnglishCompanyName;
+      _pdfArabicName.text = organizationName;
+      _pdfEnglishName.text = branding['english_name']?.toString().trim().isNotEmpty == true
+          ? '${branding['english_name']}'
+          : customizer.reportEnglishCompanyName;
       _pdfTitle.text = customizer.reportUnifiedTitle;
-      _pdfPhone.text = customizer.reportPhone;
-      _pdfAddress.text = customizer.reportAddress;
+      _pdfPhone.text = branding['phone']?.toString().trim().isNotEmpty == true
+          ? '${branding['phone']}'
+          : customizer.reportPhone;
+      _pdfAddress.text = branding['address']?.toString().trim().isNotEmpty == true
+          ? '${branding['address']}'
+          : customizer.reportAddress;
       _pdfFooter.text = customizer.reportFooterText;
       _logoUrl = logoUrl;
       return true;
@@ -585,6 +591,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
           'p_name': _brandName.text.trim(),
           'p_tagline': _tagline.text.trim(),
           'p_logo_url': logoUrl,
+          'p_english_name': _pdfEnglishName.text.trim(),
+          'p_phone': _pdfPhone.text.trim(),
+          'p_address': _pdfAddress.text.trim(),
         },
       );
       OrganizationBrandingStore.instance.invalidate();
@@ -671,6 +680,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
       footerText: _pdfFooter.text,
     );
     await customizer.save();
+    if (_owner && _organizationId.isNotEmpty) {
+      await _db.rpc(
+        'save_organization_branding',
+        params: {
+          'p_organization_id': _organizationId,
+          'p_name': _pdfArabicName.text.trim(),
+          'p_tagline': _tagline.text.trim(),
+          'p_logo_url': _logoUrl,
+          'p_english_name': _pdfEnglishName.text.trim(),
+          'p_phone': _pdfPhone.text.trim(),
+          'p_address': _pdfAddress.text.trim(),
+        },
+      );
+      _brandName.text = _pdfArabicName.text.trim();
+      OrganizationBrandingStore.instance.invalidate();
+    }
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('تم حفظ نصوص وهوية ملفات PDF.')),

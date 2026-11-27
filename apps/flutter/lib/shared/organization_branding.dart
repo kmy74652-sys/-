@@ -5,16 +5,23 @@ class OrganizationBranding {
     required this.name,
     required this.tagline,
     required this.logoUrl,
+    this.englishName = '',
+    this.phone = '',
+    this.address = '',
   });
 
   final String name;
   final String tagline;
   final String? logoUrl;
+  final String englishName;
+  final String phone;
+  final String address;
 
   static const fallback = OrganizationBranding(
     name: 'مؤسسة الشاعري للتجارة العامة',
     tagline: 'Smart Business Management',
     logoUrl: null,
+    englishName: 'Al-Shaeri General Trading Establishment',
   );
 }
 
@@ -58,6 +65,9 @@ class OrganizationBrandingStore {
         name: '${row?['name'] ?? OrganizationBranding.fallback.name}',
         tagline: '${branding['tagline'] ?? OrganizationBranding.fallback.tagline}',
         logoUrl: _clean(branding['logo_url']),
+        englishName: _clean(branding['english_name']) ?? OrganizationBranding.fallback.englishName,
+        phone: _clean(branding['phone']) ?? '',
+        address: _clean(branding['address']) ?? '',
       );
     } catch (_) {
       return OrganizationBranding.fallback;
