@@ -631,29 +631,33 @@ class _TasksScreenState extends State<TasksScreen>
                       ),
                     ),
                     const SizedBox(height: 8),
-                    Row(
-                      textDirection: TextDirection.rtl,
-                      children: [
-                        ChoiceChip(
-                          label: const Text('المهام الحالية'),
-                          selected: _view == 'tasks',
-                          onSelected: (_) => _selectSection('tasks', loadCycles: false),
-                        ),
-                        const SizedBox(width: 8),
-                        ChoiceChip(
-                          label: const Text('كشف المهام'),
-                          selected: _view == 'ledger',
-                          onSelected: (_) => _selectSection('ledger', loadCycles: false),
-                        ),
-                        if (_canFilterEmployees) ...[
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      reverse: true,
+                      child: Row(
+                        textDirection: TextDirection.rtl,
+                        children: [
+                          ChoiceChip(
+                            label: const Text('المهام الحالية'),
+                            selected: _view == 'tasks',
+                            onSelected: (_) => _selectSection('tasks', loadCycles: false),
+                          ),
                           const SizedBox(width: 8),
                           ChoiceChip(
-                            label: const Text('المهام والتقارير المعتمدة والمرحلة'),
-                            selected: _view == 'approved_cycles',
-                            onSelected: (_) => _selectSection('approved_cycles'),
+                            label: const Text('كشف المهام'),
+                            selected: _view == 'ledger',
+                            onSelected: (_) => _selectSection('ledger', loadCycles: false),
                           ),
+                          if (_canFilterEmployees) ...[
+                            const SizedBox(width: 8),
+                            ChoiceChip(
+                              label: const Text('المهام والتقارير المعتمدة والمرحلة'),
+                              selected: _view == 'approved_cycles',
+                              onSelected: (_) => _selectSection('approved_cycles'),
+                            ),
+                          ],
                         ],
-                      ],
+                      ),
                     ),
                     const SizedBox(height: 8),
                     AnimatedSize(
