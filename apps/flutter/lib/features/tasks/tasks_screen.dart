@@ -1033,13 +1033,13 @@ class _TasksScreenState extends State<TasksScreen>
                   controller: titleController,
                   maxLines: 2,
                   textDirection: TextDirection.rtl,
-                  decoration: const InputDecoration(labelText: 'المهمة والمسؤولية'),
+                  decoration: const InputDecoration(labelText: 'المهمة'),
                 ),
                 TextField(
                   controller: outputController,
                   maxLines: 2,
                   textDirection: TextDirection.rtl,
-                  decoration: const InputDecoration(labelText: 'المخرج المطلوب'),
+                  decoration: const InputDecoration(labelText: 'المخرج'),
                 ),
               ],
             ),
@@ -1398,7 +1398,7 @@ class _TasksScreenState extends State<TasksScreen>
               children: [
                 const Expanded(
                   child: Text(
-                    'مؤسسة الشاعري للتجارة العامة · الجدول الرسمي',
+                    'المهام الحالية',
                     textAlign: TextAlign.right,
                     style: TextStyle(fontWeight: FontWeight.w900, color: AppColors.navy),
                   ),
@@ -1430,7 +1430,7 @@ class _TasksScreenState extends State<TasksScreen>
             if (!_officialHeaderCollapsed) ...[
               const SizedBox(height: 4),
               const Text(
-                'بيانات الموظف والاعتماد والهدف',
+                'بيانات الموظف والهدف',
                 textAlign: TextAlign.right,
                 style: TextStyle(fontWeight: FontWeight.w800, color: AppColors.navy),
               ),
@@ -1451,7 +1451,7 @@ class _TasksScreenState extends State<TasksScreen>
               children: [
                 const Expanded(
                   child: Text(
-                    'المهام والبيانات',
+                    'قائمة المهام',
                     textAlign: TextAlign.right,
                     style: TextStyle(fontWeight: FontWeight.w800, color: AppColors.navy),
                   ),
@@ -1480,8 +1480,8 @@ class _TasksScreenState extends State<TasksScreen>
                   decoration: const BoxDecoration(color: Color(0xFFEAF1EF)),
                   children: [
                     _officialCell('الوقت', bold: true, background: const Color(0xFFEAF1EF), singleLine: true),
-                    _officialCell('المهمة والمسؤولية', bold: true, background: const Color(0xFFEAF1EF)),
-                    _officialCell('المخرج المطلوب', bold: true, background: const Color(0xFFEAF1EF)),
+                    _officialCell('المهمة', bold: true, background: const Color(0xFFEAF1EF)),
+                    _officialCell('المخرج', bold: true, background: const Color(0xFFEAF1EF)),
                     _officialCell('الحالة', bold: true, background: const Color(0xFFEAF1EF)),
                   ],
                 ),
@@ -1490,13 +1490,13 @@ class _TasksScreenState extends State<TasksScreen>
                     children: [
                       _officialCell(row['time'] ?? '—', singleLine: true),
                       _officialTextCell(
-                        section: 'المهمة والمسؤولية',
+                        section: 'المهمة',
                         time: row['time'] ?? '—',
                         text: row['title'] ?? '—',
                         row: row,
                       ),
                       _officialTextCell(
-                        section: 'المخرج المطلوب',
+                        section: 'المخرج',
                         time: row['time'] ?? '—',
                         text: row['output'] ?? '—',
                         row: row,
@@ -1518,7 +1518,7 @@ class _TasksScreenState extends State<TasksScreen>
               children: [
                 Expanded(
                   child: const Text(
-                    'التفاصيل الإدارية للمهمة',
+                    'التفاصيل الإدارية',
                     textAlign: TextAlign.right,
                     style: TextStyle(fontWeight: FontWeight.w800, color: AppColors.navy),
                   ),
