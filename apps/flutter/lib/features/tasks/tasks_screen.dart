@@ -729,19 +729,24 @@ class _TasksScreenState extends State<TasksScreen>
         child: Center(child: CircularProgressIndicator()),
       );
     }
-    if (_approvedCycles.isEmpty) {
+    final cycles = _employeeFilter == 'all'
+        ? _approvedCycles
+        : _approvedCycles
+            .where((cycle) => '${cycle['employee_user_id'] ?? ''}' == _employeeFilter)
+            .toList();
+    if (cycles.isEmpty) {
       return const Card(
         child: Padding(
           padding: EdgeInsets.all(22),
           child: Text(
-            'لا توجد مهام وتقارير معتمدة قيد المرحلة حاليًا. عند اعتماد تقرير مهمة ستظهر دورته هنا تلقائيًا.',
+            'لا توجد مهام وتقارير معتمدة لهذا الموظف حاليًا. عند اعتماد تقرير مهمة ستظهر دورته هنا تلقائيًا.',
             textAlign: TextAlign.right,
           ),
         ),
       );
     }
     return Column(
-      children: _approvedCycles.map((cycle) {
+      children: cycles.map((cycle) {
         final active = cycle['active'] == true;
         final title = '${cycle['title'] ?? 'مهمة'}'.trim();
         final employee = '${cycle['employee_name'] ?? 'موظف'}'.trim();
