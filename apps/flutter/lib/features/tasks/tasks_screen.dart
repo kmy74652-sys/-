@@ -360,6 +360,11 @@ class _TasksScreenState extends State<TasksScreen>
     final query = _search.trim().toLowerCase();
     final now = DateTime.now();
     return _tasks.where((task) {
+      // المهمة المعتمدة أصبحت سجلًا تاريخيًا بعد إنشاء دورة الإعادة؛
+      // تُعرض في تبويب الدورات/السجل ولا تُكرر داخل المهام الحالية.
+      if (_view == 'tasks' && _normalizedStatus(task) == 'approved') {
+        return false;
+      }
       final text = '${task['title'] ?? ''} ${task['description'] ?? ''}'
           .toLowerCase();
       final priority = '${task['priority'] ?? 'normal'}';
