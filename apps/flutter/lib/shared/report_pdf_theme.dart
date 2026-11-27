@@ -173,9 +173,9 @@ class ReportPdfTheme {
           pw.Row(
             crossAxisAlignment: pw.CrossAxisAlignment.center,
             children: [
-              pw.Expanded(child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [pw.Text(englishName, textDirection: pw.TextDirection.ltr, textAlign: pw.TextAlign.left, style: pw.TextStyle(font: latinBold, fontSize: 9, color: officialNavy)), if (settings.reportPhone.trim().isNotEmpty) pw.Text(reportPdfSafeText(settings.reportPhone), textDirection: pw.TextDirection.ltr, textAlign: pw.TextAlign.left, style: const pw.TextStyle(fontSize: 7)), if (settings.reportAddress.trim().isNotEmpty) pw.Text(reportPdfSafeText(settings.reportAddress), textDirection: pw.TextDirection.ltr, textAlign: pw.TextAlign.left, style: const pw.TextStyle(fontSize: 7))])),
               if (logo != null) pw.Padding(padding: const pw.EdgeInsets.symmetric(horizontal: 10), child: pw.Image(logo!, width: 58, height: 58, fit: pw.BoxFit.contain)) else pw.SizedBox(width: 78),
               pw.Expanded(child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.stretch, children: [pw.Text(organization, textDirection: pw.TextDirection.rtl, textAlign: pw.TextAlign.right, style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold, color: officialNavy)), if (settings.reportHeaderText.trim().isNotEmpty) pw.Text(reportPdfSafeText(settings.reportHeaderText), textDirection: pw.TextDirection.rtl, textAlign: pw.TextAlign.right, style: pw.TextStyle(fontSize: 8, color: officialNavy))])),
+              pw.Expanded(child: pw.Text(englishName, textDirection: pw.TextDirection.ltr, textAlign: pw.TextAlign.right, style: pw.TextStyle(font: latinBold, fontSize: 9, color: officialNavy))),
             ],
           ),
           pw.SizedBox(height: 8),
@@ -207,19 +207,37 @@ class ReportPdfTheme {
     decoration: pw.BoxDecoration(border: pw.Border(top: pw.BorderSide(color: officialGold, width: .8))),
     child: pw.Row(
       children: [
-        pw.Expanded(child: pw.Text(_contactLine(), textDirection: pw.TextDirection.rtl, style: const pw.TextStyle(fontSize: 7))),
+        pw.Expanded(child: _contactBlock()),
         pw.Expanded(child: pw.Column(children: [pw.Text('${context == null ? '' : 'صفحة ${context.pageNumber} من ${context.pagesCount}'}', textDirection: pw.TextDirection.rtl, textAlign: pw.TextAlign.center, style: pw.TextStyle(fontSize: 7, color: officialNavy)), pw.Text(reportPdfSafeText(footerText ?? settings.reportFooterText), textDirection: pw.TextDirection.ltr, textAlign: pw.TextAlign.center, style: pw.TextStyle(fontSize: 7, color: officialNavy))])),
         pw.Expanded(child: pw.Text(reportPdfSafeText(settings.reportCompanyName), textDirection: pw.TextDirection.rtl, textAlign: pw.TextAlign.right, style: pw.TextStyle(fontSize: 7, color: officialNavy))),
       ],
     ),
   );
 
-  String _contactLine() {
-    final values = <String>[];
-    if (settings.reportPhone.trim().isNotEmpty) values.add('الهاتف: ${settings.reportPhone.trim()}');
-    if (settings.reportEmail.trim().isNotEmpty) values.add('البريد: ${settings.reportEmail.trim()}');
-    if (settings.reportAddress.trim().isNotEmpty) values.add('العنوان: ${settings.reportAddress.trim()}');
-    return reportPdfSafeText(values.join(' | '));
+  pw.Widget _contactBlock() {
+    final phone = settings.reportPhone.trim();
+    final address = settings.reportAddress.trim();
+    if (phone.isEmpty && address.isEmpty) return pw.SizedBox();
+    return pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.start,
+      children: [
+        if (phone.isNotEmpty)
+          pw.Text(
+            reportPdfSafeText('الهاتف: $phone'),
+            textDirection: pw.TextDirection.rtl,
+            textAlign: pw.TextAlign.left,
+            style: const pw.TextStyle(fontSize: 7),
+          ),
+        if (address.isNotEmpty)
+          pw.Text(
+            reportPdfSafeText('العنوان: $address'),
+            textDirection: pw.TextDirection.rtl,
+            textAlign: pw.TextAlign.left,
+            maxLines: 2,
+            style: const pw.TextStyle(fontSize: 7),
+          ),
+      ],
+    );
   }
 
   Future<Uint8List> buildDesignerPreviewPdf() async {
