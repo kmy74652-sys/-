@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:pdf/pdf.dart';
@@ -1002,20 +1004,41 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
   }
 
   Future<void> _exportPdf() async {
-    final messenger = ScaffoldMessenger.of(context);
     try {
       final reportTheme = await ReportPdfTheme.load();
-      final regularFontData = await rootBundle.load(
-        'assets/fonts/NotoSansArabic-Regular.ttf',
-      );
-      final boldFontData = await rootBundle.load(
-        'assets/fonts/NotoSansArabic-Bold.ttf',
-      );
+      final regularFontData = await rootBundle.load('assets/fonts/NotoSansArabic-Regular.ttf');
+      final boldFontData = await rootBundle.load('assets/fonts/NotoSansArabic-Bold.ttf');
       final font = pw.Font.ttf(regularFontData);
       final boldFont = pw.Font.ttf(boldFontData);
-      final document = pw.Document(
-        theme: pw.ThemeData.withFont(base: font, bold: boldFont),
+      if (!mounted) return;
+      await showDialog<void>(
+        context: context,
+        builder: (_) => _UnifiedPdfPreviewDialog(
+          initialTexts: _UnifiedPdfTexts(
+            arabicOrganization: reportTheme.settings.reportCompanyName,
+            englishOrganization: 'NEXORA',
+            title: 'الجدول الموحد لإنشاء وتنفيذ المهام',
+            footer: reportTheme.settings.reportFooterText.trim().isEmpty ? 'NEXORA' : reportTheme.settings.reportFooterText,
+          ),
+          buildPdf: (texts) => _buildUnifiedPdf(reportTheme, font, boldFont, texts),
+        ),
       );
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('تعذر فتح معاينة PDF: $error', textAlign: TextAlign.right)),
+        );
+      }
+    }
+  }
+
+  Future<Uint8List> _buildUnifiedPdf(
+    ReportPdfTheme reportTheme,
+    pw.Font font,
+    pw.Font boldFont,
+    _UnifiedPdfTexts texts,
+  ) async {
+      final document = pw.Document(theme: pw.ThemeData.withFont(base: font, bold: boldFont));
       final rows = [..._rows, ..._exceptionRows]
           .map((row) => [_pdfSafeText(row.timeValue), _pdfSafeText(row.task.text), _pdfSafeText(row.output.text), 'جديدة'])
           .toList();
@@ -1085,22 +1108,98 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
           pageFormat: PdfPageFormat.a4,
           margin: const pw.EdgeInsets.fromLTRB(28, 28, 28, 32),
           build: (context) => [
-            reportTheme.header('الجدول الموحد لإنشاء وتنفيذ المهام', employee: _employee.text, branch: _branch.text),
+            _classicPdfHeader(reportTheme, texts),
             pw.SizedBox(height: 12),
             for (final section in orderedSections) ...[
               section,
               pw.SizedBox(height: 12),
             ],
-            reportTheme.footer(),
           ],
+          footer: (_) => _classicPdfFooter(texts),
         ),
       );
-      final bytes = await document.save();
-      await Printing.sharePdf(bytes: bytes, filename: 'unified-task-table.pdf');
-    } catch (error) {
-      messenger.showSnackBar(SnackBar(content: Text('تعذر تصدير PDF: $error', textAlign: TextAlign.right)));
-    }
+      return document.save();
   }
+
+  pw.Widget _classicPdfHeader(ReportPdfTheme theme, _UnifiedPdfTexts texts) => pw.Container(
+    padding: const pw.EdgeInsets.all(9),
+    decoration: pw.BoxDecoration(
+      color: PdfColor.fromHex('#F7FAF9'),
+      border: pw.Border.all(color: theme.primary, width: .8),
+    ),
+    child: pw.Column(
+      children: [
+        pw.Row(
+          textDirection: pw.TextDirection.ltr,
+          crossAxisAlignment: pw.CrossAxisAlignment.center,
+          children: [
+            pw.Expanded(
+              child: pw.Text(
+                texts.englishOrganization,
+                textAlign: pw.TextAlign.left,
+                style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold, color: theme.primary),
+              ),
+            ),
+            if (theme.logo != null)
+              pw.Padding(
+                padding: const pw.EdgeInsets.symmetric(horizontal: 12),
+                child: pw.Image(theme.logo!, width: 54, height: 54, fit: pw.BoxFit.contain),
+              )
+            else
+              pw.SizedBox(width: 78),
+            pw.Expanded(
+              child: pw.Text(
+                texts.arabicOrganization,
+                textDirection: pw.TextDirection.rtl,
+                textAlign: pw.TextAlign.right,
+                style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold, color: theme.primary),
+              ),
+            ),
+          ],
+        ),
+        pw.SizedBox(height: 8),
+        pw.Container(
+          width: double.infinity,
+          padding: const pw.EdgeInsets.symmetric(vertical: 7, horizontal: 8),
+          color: theme.primary,
+          child: pw.Text(
+            texts.title,
+            textDirection: pw.TextDirection.rtl,
+            textAlign: pw.TextAlign.center,
+            style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold, color: PdfColors.white),
+          ),
+        ),
+        pw.SizedBox(height: 6),
+        pw.Row(
+          textDirection: pw.TextDirection.rtl,
+          children: [
+            pw.Expanded(child: _pdfHeaderData('الموظف', _employee.text)),
+            pw.Expanded(child: _pdfHeaderData('الفرع', _branch.text)),
+            pw.Expanded(child: _pdfHeaderData('التاريخ', _startDate.text)),
+          ],
+        ),
+      ],
+    ),
+  );
+
+  pw.Widget _pdfHeaderData(String label, String value) => pw.Text(
+    '$label: ${_pdfSafeText(value.trim().isEmpty ? '—' : value.trim())}',
+    textDirection: pw.TextDirection.rtl,
+    textAlign: pw.TextAlign.right,
+    style: const pw.TextStyle(fontSize: 8),
+  );
+
+  pw.Widget _classicPdfFooter(_UnifiedPdfTexts texts) => pw.Container(
+    width: double.infinity,
+    padding: const pw.EdgeInsets.only(top: 12),
+    decoration: const pw.BoxDecoration(border: pw.Border(top: pw.BorderSide(color: PdfColors.grey300, width: .7))),
+    child: pw.Text(
+      texts.footer,
+      textDirection: pw.TextDirection.rtl,
+      textAlign: pw.TextAlign.center,
+      style: const pw.TextStyle(fontSize: 8),
+    ),
+  );
 
   pw.Widget _pdfHeading(String title) => pw.Container(
     width: double.infinity,
@@ -1215,6 +1314,107 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
     );
     return cleaned.replaceAll(RegExp(r'[ \t]{2,}'), ' ').trim();
   }
+}
+
+class _UnifiedPdfTexts {
+  const _UnifiedPdfTexts({
+    required this.arabicOrganization,
+    required this.englishOrganization,
+    required this.title,
+    required this.footer,
+  });
+
+  final String arabicOrganization;
+  final String englishOrganization;
+  final String title;
+  final String footer;
+}
+
+class _UnifiedPdfPreviewDialog extends StatefulWidget {
+  const _UnifiedPdfPreviewDialog({required this.initialTexts, required this.buildPdf});
+
+  final _UnifiedPdfTexts initialTexts;
+  final Future<Uint8List> Function(_UnifiedPdfTexts texts) buildPdf;
+
+  @override
+  State<_UnifiedPdfPreviewDialog> createState() => _UnifiedPdfPreviewDialogState();
+}
+
+class _UnifiedPdfPreviewDialogState extends State<_UnifiedPdfPreviewDialog> {
+  late final TextEditingController _arabicOrganization;
+  late final TextEditingController _englishOrganization;
+  late final TextEditingController _title;
+  late final TextEditingController _footer;
+
+  @override
+  void initState() {
+    super.initState();
+    _arabicOrganization = TextEditingController(text: widget.initialTexts.arabicOrganization);
+    _englishOrganization = TextEditingController(text: widget.initialTexts.englishOrganization);
+    _title = TextEditingController(text: widget.initialTexts.title);
+    _footer = TextEditingController(text: widget.initialTexts.footer);
+  }
+
+  @override
+  void dispose() {
+    _arabicOrganization.dispose();
+    _englishOrganization.dispose();
+    _title.dispose();
+    _footer.dispose();
+    super.dispose();
+  }
+
+  _UnifiedPdfTexts get _texts => _UnifiedPdfTexts(
+        arabicOrganization: _arabicOrganization.text,
+        englishOrganization: _englishOrganization.text,
+        title: _title.text,
+        footer: _footer.text,
+      );
+
+  void _refresh() => setState(() {});
+
+  @override
+  Widget build(BuildContext context) => Dialog.fullscreen(
+        child: Directionality(
+          textDirection: TextDirection.rtl,
+          child: Scaffold(
+            appBar: AppBar(
+              title: const Text('معاينة PDF وتحرير النصوص'),
+              actions: [IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.close))],
+            ),
+            body: Column(
+              children: [
+                Material(
+                  color: const Color(0xFFF5F7FD),
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(10, 8, 10, 4),
+                    child: Wrap(
+                      spacing: 8,
+                      runSpacing: 6,
+                      children: [
+                        SizedBox(width: 210, child: TextField(controller: _arabicOrganization, onChanged: (_) => _refresh(), textAlign: TextAlign.right, decoration: const InputDecoration(labelText: 'النص العربي يمينًا', isDense: true))),
+                        SizedBox(width: 180, child: TextField(controller: _englishOrganization, onChanged: (_) => _refresh(), textDirection: TextDirection.ltr, textAlign: TextAlign.left, decoration: const InputDecoration(labelText: 'English left text', isDense: true))),
+                        SizedBox(width: 230, child: TextField(controller: _title, onChanged: (_) => _refresh(), textAlign: TextAlign.right, decoration: const InputDecoration(labelText: 'شريط العنوان', isDense: true))),
+                        SizedBox(width: 210, child: TextField(controller: _footer, onChanged: (_) => _refresh(), textAlign: TextAlign.right, decoration: const InputDecoration(labelText: 'تذييل الصفحة', isDense: true))),
+                      ],
+                    ),
+                  ),
+                ),
+                Expanded(
+                  child: PdfPreview(
+                    canChangeOrientation: false,
+                    canChangePageFormat: false,
+                    allowPrinting: true,
+                    allowSharing: true,
+                    pdfFileName: 'unified-task-table.pdf',
+                    build: (_) => widget.buildPdf(_texts),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
 }
 
 String _displayUnifiedTime(String value) {
