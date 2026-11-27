@@ -464,6 +464,63 @@ class _TasksScreenState extends State<TasksScreen>
     ),
   );
 
+  Widget _sectionTab({
+    required String value,
+    required String label,
+    bool loadCycles = false,
+  }) {
+    final selected = _view == value;
+    return Expanded(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 3),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(12),
+            onTap: () => _selectSection(value, loadCycles: loadCycles),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 180),
+              constraints: const BoxConstraints(minHeight: 48),
+              alignment: Alignment.center,
+              padding: const EdgeInsets.symmetric(horizontal: 6),
+              decoration: BoxDecoration(
+                color: selected ? const Color(0xFFDCEAF8) : Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: selected ? const Color(0xFFB9D2EB) : const Color(0xFFC9D3DE),
+                  width: selected ? 1.2 : 1,
+                ),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                textDirection: TextDirection.rtl,
+                children: [
+                  Flexible(
+                    child: Text(
+                      label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: selected ? AppColors.navy : AppColors.muted,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ),
+                  if (selected) ...[
+                    const SizedBox(width: 5),
+                    const Icon(Icons.check, size: 17, color: AppColors.navy),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) => AppShell(
     title: 'المهام والمتابعة',
@@ -588,6 +645,7 @@ class _TasksScreenState extends State<TasksScreen>
                                       child: Text(
                                         '${employee['display_name'] ?? 'موظف'}'
                                         '${employee['employee_no'] == null ? '' : ' · ${employee['employee_no']}' }',
+                                        maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
                                         textDirection: TextDirection.rtl,
                                       ),
@@ -611,7 +669,7 @@ class _TasksScreenState extends State<TasksScreen>
                               child: Row(
                                 textDirection: TextDirection.rtl,
                                 children: [
-                                  const Expanded(child: Text('الفلاتر', textAlign: TextAlign.right, style: TextStyle(fontWeight: FontWeight.w800, color: AppColors.navy))),
+                                  const Icon(Icons.tune_outlined, size: 20, color: AppColors.navy),
                                   IconButton(
                                     tooltip: 'إعادة تعيين الفلاتر',
                                     onPressed: _resetFilters,
@@ -642,45 +700,24 @@ class _TasksScreenState extends State<TasksScreen>
                     ),
                     const SizedBox(height: 8),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 5),
                       decoration: BoxDecoration(
                         color: const Color(0xFFF7FAFD),
                         borderRadius: BorderRadius.circular(16),
                         border: Border.all(color: const Color(0xFFD7E1EC)),
                       ),
-                      child: SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        reverse: true,
-                        child: Row(
-                          textDirection: TextDirection.rtl,
-                          children: [
-                          ChoiceChip(
-                            label: const Text('الحالية'),
-                            selected: _view == 'tasks',
-                            onSelected: (_) => _selectSection('tasks', loadCycles: false),
-                            selectedColor: const Color(0xFFDCEAF8),
-                            labelStyle: TextStyle(color: _view == 'tasks' ? AppColors.navy : AppColors.muted, fontWeight: FontWeight.w700),
-                          ),
-                          const SizedBox(width: 8),
-                          ChoiceChip(
-                            label: const Text('السجل'),
-                            selected: _view == 'ledger',
-                            onSelected: (_) => _selectSection('ledger', loadCycles: false),
-                            selectedColor: const Color(0xFFDCEAF8),
-                            labelStyle: TextStyle(color: _view == 'ledger' ? AppColors.navy : AppColors.muted, fontWeight: FontWeight.w700),
-                          ),
-                          if (_canFilterEmployees) ...[
-                            const SizedBox(width: 8),
-                            ChoiceChip(
-                              label: const Text('المعتمدة'),
-                              selected: _view == 'approved_cycles',
-                              onSelected: (_) => _selectSection('approved_cycles'),
-                              selectedColor: const Color(0xFFDCEAF8),
-                              labelStyle: TextStyle(color: _view == 'approved_cycles' ? AppColors.navy : AppColors.muted, fontWeight: FontWeight.w700),
+                      child: Row(
+                        textDirection: TextDirection.rtl,
+                        children: [
+                          _sectionTab(value: 'tasks', label: 'المهام الحالية'),
+                          _sectionTab(value: 'ledger', label: 'سجل المهام'),
+                          if (_canFilterEmployees)
+                            _sectionTab(
+                              value: 'approved_cycles',
+                              label: 'المهام المعتمدة',
+                              loadCycles: true,
                             ),
-                          ],
-                          ],
-                        ),
+                        ],
                       ),
                     ),
                     const SizedBox(height: 8),
