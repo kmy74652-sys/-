@@ -132,9 +132,11 @@ void initializeRouter() {
       ),
       GoRoute(
         path: '/admin/unified-tasks',
-        builder: (context, state) => const _PermissionGate(
+        builder: (context, state) => _PermissionGate(
           permissions: {'tasks.manage'},
-          child: UnifiedTaskTableScreen(),
+          child: UnifiedTaskTableScreen(
+            employeeUserId: state.uri.queryParameters['employee'],
+          ),
         ),
       ),
       GoRoute(

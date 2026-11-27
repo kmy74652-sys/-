@@ -8,7 +8,9 @@ import '../../shared/app_shell.dart';
 import 'unified_task_table_editor.dart';
 
 class UnifiedTaskTableScreen extends StatefulWidget {
-  const UnifiedTaskTableScreen({super.key});
+  const UnifiedTaskTableScreen({super.key, this.employeeUserId});
+
+  final String? employeeUserId;
 
   @override
   State<UnifiedTaskTableScreen> createState() => _UnifiedTaskTableScreenState();
@@ -24,6 +26,7 @@ class _UnifiedTaskTableScreenState extends State<UnifiedTaskTableScreen> {
   List<UnifiedBranchOption> _branches = const [];
   List<UnifiedReportOption> _reports = const [];
   List<Map<String, dynamic>> _existingUnifiedTasks = const [];
+  List<Map<String, dynamic>> _selectedEmployeeTasks = const [];
   Map<String, dynamic>? _editingTask;
   final Set<String> _successfulDispatches = <String>{};
   bool _hasUnsavedChanges = false;
@@ -189,6 +192,16 @@ class _UnifiedTaskTableScreenState extends State<UnifiedTaskTableScreen> {
             .map((row) => Map<String, dynamic>.from(row))
             .where(_isUnifiedTask)
             .toList();
+        _selectedEmployeeTasks = widget.employeeUserId == null ||
+                widget.employeeUserId!.trim().isEmpty
+            ? const []
+            : _existingUnifiedTasks
+                .where((task) =>
+                    _text(task['assigned_to']) == widget.employeeUserId)
+                .toList();
+        if (_selectedEmployeeTasks.isNotEmpty) {
+          _editingTask = _selectedEmployeeTasks.first;
+        }
         _reports = reports;
         _loading = false;
       });
@@ -321,6 +334,76 @@ class _UnifiedTaskTableScreenState extends State<UnifiedTaskTableScreen> {
     );
   }
 
+  UnifiedTaskTableDraft _draftFromEmployeeTasks(
+      List<Map<String, dynamic>> tasks) {
+    final first = _draftFromExistingTask(tasks.first);
+    final rows = tasks
+        .map(_draftFromExistingTask)
+        .expand((draft) => draft.rows)
+        .toList();
+    return UnifiedTaskTableDraft(
+      employee: first.employee,
+      employeeUserId: first.employeeUserId,
+      role: first.role,
+      branch: first.branch,
+      branchId: first.branchId,
+      startDate: first.startDate,
+      purpose: first.purpose,
+      reportNotes: first.reportNotes,
+      rows: rows,
+      responsibilities: first.responsibilities,
+      authorities: first.authorities,
+      instructions: first.instructions,
+      workType: first.workType,
+      workDays: first.workDays,
+      weeklyException: first.weeklyException,
+      firstPeriod: first.firstPeriod,
+      breakPeriod: first.breakPeriod,
+      secondPeriod: first.secondPeriod,
+      kpis: first.kpis,
+      reportSchemasByTask: const {},
+      reportTemplateId: first.reportTemplateId,
+      reportVersionId: first.reportVersionId,
+      reportRequired: first.reportRequired,
+    );
+  }
+
+  Future<void> _updateSelectedEmployeeTasks(UnifiedTaskTableDraft draft) async {
+    final organizationId = _organizationId;
+    if (organizationId == null || _selectedEmployeeTasks.isEmpty) return;
+    for (var index = 0;
+        index < _selectedEmployeeTasks.length && index < draft.rows.length;
+        index++) {
+      final task = _selectedEmployeeTasks[index];
+      final row = draft.rows[index];
+      await _db.rpc('admin_update_unified_task', params: {
+        'p_organization_id': organizationId,
+        'p_task_id': task['id'],
+        'p_title': 'الجدول الموحد - ${draft.role} · ${row.task}',
+        'p_description': _descriptionForRow(draft, row),
+        'p_due_at': _dueForRow(draft.startDate, row.time).toIso8601String(),
+        'p_assigned_to':
+            draft.employeeUserId.isEmpty ? null : draft.employeeUserId,
+        'p_branch_id': draft.branchId,
+        'p_role_code': _roleCode(draft.role),
+      });
+    }
+    if (!mounted) return;
+    setState(() {
+      _editingTask = null;
+      _selectedEmployeeTasks = const [];
+      _hasUnsavedChanges = false;
+    });
+    await _loadOptions();
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('تم تحديث جميع مهام الموظف داخل الجدول الموحد.'),
+        ),
+      );
+    }
+  }
+
   String _descriptionForRow(
           UnifiedTaskTableDraft draft, UnifiedTaskRowData row) =>
       [
@@ -345,9 +428,12 @@ class _UnifiedTaskTableScreenState extends State<UnifiedTaskTableScreen> {
       ].join('\n');
 
   Widget _previousUnifiedTasksTable() {
-    if (_existingUnifiedTasks.isEmpty) return const SizedBox.shrink();
+    final previousTasks = widget.employeeUserId == null
+        ? _existingUnifiedTasks
+        : _selectedEmployeeTasks;
+    if (previousTasks.isEmpty) return const SizedBox.shrink();
     final rows = <DataRow>[];
-    for (final task in _existingUnifiedTasks) {
+    for (final task in previousTasks) {
       final description = _text(task['description']);
       final matches = RegExp(
         r'^صف الجدول:\s*(.*?)\s*\|\s*(.*?)\s*\|\s*(.*?)\s*$',
@@ -942,11 +1028,16 @@ class _UnifiedTaskTableScreenState extends State<UnifiedTaskTableScreen> {
                           key: ValueKey(
                               _editingTask?['id'] ?? 'new-unified-task'),
                           onSend: _send,
-                          initialDraft: _editingTask == null
-                              ? null
-                              : _draftFromExistingTask(_editingTask!),
-                          onSave:
-                              _editingTask == null ? null : _updateExistingTask,
+                          initialDraft: _selectedEmployeeTasks.isNotEmpty
+                              ? _draftFromEmployeeTasks(_selectedEmployeeTasks)
+                              : (_editingTask == null
+                                  ? null
+                                  : _draftFromExistingTask(_editingTask!)),
+                          onSave: _selectedEmployeeTasks.isNotEmpty
+                              ? _updateSelectedEmployeeTasks
+                              : (_editingTask == null
+                                  ? null
+                                  : _updateExistingTask),
                           reportSchemaBuilder:
                               (row, purpose, instructions, kpis) =>
                                   _automaticReportSchema(

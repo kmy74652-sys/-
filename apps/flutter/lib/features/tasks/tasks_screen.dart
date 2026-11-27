@@ -1141,7 +1141,18 @@ class _TasksScreenState extends State<TasksScreen>
                 if (_canEditOfficialTasks)
                   IconButton(
                     tooltip: 'إضافة مهمة من الجدول الموحد',
-                    onPressed: () => context.push('/admin/unified-tasks'),
+                    onPressed: _employeeFilter == 'all'
+                        ? () => ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('حدد موظفًا أولًا لعرض جميع مهامه في الجدول الموحد.'),
+                              ),
+                            )
+                        : () => context.push(
+                              Uri(
+                                path: '/admin/unified-tasks',
+                                queryParameters: {'employee': _employeeFilter},
+                              ).toString(),
+                            ),
                     icon: const Icon(Icons.add, size: 25, color: AppColors.green),
                   ),
               ],
