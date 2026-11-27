@@ -141,4 +141,25 @@ class NotificationsRepository {
     }
     return marked;
   }
+
+  static Future<bool> deleteNotification(String notificationId) async {
+    final result = await Supabase.instance.client.rpc(
+      'delete_notification',
+      params: {'p_notification_id': notificationId},
+    );
+    final deleted = result == true;
+    if (!deleted) return false;
+
+    final uid = Supabase.instance.client.auth.currentUser?.id;
+    if (uid != null && uid.isNotEmpty) {
+      final cached = await loadCached(uid);
+      if (cached != null) {
+        await _save(
+          uid,
+          cached.where((item) => item.id != notificationId).toList(),
+        );
+      }
+    }
+    return true;
+  }
 }

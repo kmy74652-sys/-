@@ -228,11 +228,12 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (sheetContext) => Directionality(
-        textDirection: Directionality.of(sheetContext),
-        child: SizedBox(
-          height: MediaQuery.sizeOf(sheetContext).height * 0.68,
-          child: Column(
+      builder: (sheetContext) => StatefulBuilder(
+        builder: (sheetContext, setSheetState) => Directionality(
+          textDirection: Directionality.of(sheetContext),
+          child: SizedBox(
+            height: MediaQuery.sizeOf(sheetContext).height * 0.68,
+            child: Column(
             children: [
               Padding(
                 padding: const EdgeInsets.fromLTRB(20, 18, 12, 12),
@@ -287,64 +288,39 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
                     : ListView.separated(
                         padding: const EdgeInsets.all(16),
                         itemCount: notifications.length,
-                        separatorBuilder: (_, __) => const Divider(height: 1),
+                        separatorBuilder: (_, __) => const SizedBox(height: 8),
                         itemBuilder: (context, index) {
                           final item = notifications[index];
                           final isUnread = item.isUnread;
-                          return ListTile(
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 4,
-                              vertical: 5,
+                          return Dismissible(
+                            key: ValueKey('notification-${item.id}'),
+                            direction: DismissDirection.horizontal,
+                            background: _notificationDismissBackground(
+                              alignment: Alignment.centerLeft,
+                              icon: Icons.delete_outline,
                             ),
-                            leading: Icon(
-                              isUnread
-                                  ? Icons.notifications_active_outlined
-                                  : Icons.notifications_none,
-                              color: isUnread
-                                  ? const Color(0xFF0B3458)
-                                  : AppColors.muted,
+                            secondaryBackground: _notificationDismissBackground(
+                              alignment: Alignment.centerRight,
+                              icon: Icons.delete_outline,
                             ),
-                            title: Text(
-                              item.title,
-                              style: TextStyle(
-                                fontWeight: isUnread
-                                    ? FontWeight.w800
-                                    : FontWeight.w600,
-                              ),
-                            ),
-                            subtitle: Column(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                if (item.body != null && item.body!.trim().isNotEmpty)
-                                  Text(
-                                    item.body!,
-                                    maxLines: 3,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  'أُرسل: ${_notificationTimestamp(item.createdAt)}',
-                                  textAlign: TextAlign.right,
-                                  style: const TextStyle(
-                                    fontSize: 11,
-                                    color: AppColors.muted,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            trailing: _notificationSeverityLabel(item.severity).isEmpty
-                                ? null
-                                : Text(
-                                    _notificationSeverityLabel(item.severity),
-                                    style: const TextStyle(
-                                      fontSize: 11,
-                                      color: AppColors.muted,
-                                    ),
-                                  ),
-                            onTap: () async {
+                            onDismissed: (_) async {
+                              final removedIndex = index;
+                              setSheetState(() {
+                                notifications.removeWhere((entry) => entry.id == item.id);
+                              });
                               try {
-                                await NotificationsRepository.markRead(item.id);
-                                if (mounted && item.isUnread) {
+                                final deleted = await NotificationsRepository.deleteNotification(item.id);
+                                if (!deleted && sheetContext.mounted) {
+                                  setSheetState(() {
+                                    notifications.insert(
+                                      removedIndex.clamp(0, notifications.length),
+                                      item,
+                                    );
+                                  });
+                                  ScaffoldMessenger.of(sheetContext).showSnackBar(
+                                    const SnackBar(content: Text('تعذر إزالة التنبيه، حاول مرة أخرى.')),
+                                  );
+                                } else if (mounted && isUnread) {
                                   setState(
                                     () => _unreadCount = (_unreadCount - 1)
                                         .clamp(0, 999999)
@@ -352,24 +328,124 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
                                   );
                                 }
                               } catch (_) {
-                                // لا يمنع فشل الشبكة قراءة الإشعار أو فتح المهمة.
-                              }
-                              final taskId = item.taskId;
-                              if (!sheetContext.mounted) return;
-                              Navigator.pop(sheetContext);
-                              if (taskId != null && taskId.isNotEmpty) {
-                                NotificationsRepository.markTaskOpened(taskId);
-                                context.go('/tasks/$taskId');
+                                if (sheetContext.mounted) {
+                                  setSheetState(() {
+                                    notifications.insert(
+                                      removedIndex.clamp(0, notifications.length),
+                                      item,
+                                    );
+                                  });
+                                  ScaffoldMessenger.of(sheetContext).showSnackBar(
+                                    const SnackBar(content: Text('تعذر الاتصال لإزالة التنبيه.')),
+                                  );
+                                }
                               }
                             },
+                            child: Card(
+                              margin: EdgeInsets.zero,
+                              elevation: 0,
+                              color: isUnread ? const Color(0xFFF3F7FC) : Colors.white,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                                side: BorderSide(
+                                  color: isUnread
+                                      ? const Color(0xFFD7E5F5)
+                                      : const Color(0xFFE7ECF2),
+                                ),
+                              ),
+                              child: ListTile(
+                                contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 14,
+                                  vertical: 8,
+                                ),
+                                leading: Icon(
+                                  isUnread
+                                      ? Icons.notifications_active_outlined
+                                      : Icons.notifications_none,
+                                  color: isUnread
+                                      ? const Color(0xFF0B3458)
+                                      : AppColors.muted,
+                                ),
+                                title: Text(
+                                  item.title,
+                                  style: TextStyle(
+                                    fontWeight: isUnread
+                                        ? FontWeight.w800
+                                        : FontWeight.w600,
+                                  ),
+                                ),
+                                subtitle: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                                  children: [
+                                    if (item.body != null && item.body!.trim().isNotEmpty)
+                                      Text(item.body!),
+                                    const SizedBox(height: 6),
+                                    Text(
+                                      'أُرسل: ${_notificationTimestamp(item.createdAt)}',
+                                      textAlign: TextAlign.right,
+                                      style: const TextStyle(
+                                        fontSize: 11,
+                                        color: AppColors.muted,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                trailing: _notificationSeverityLabel(item.severity).isEmpty
+                                    ? null
+                                    : Text(
+                                        _notificationSeverityLabel(item.severity),
+                                        style: const TextStyle(
+                                          fontSize: 11,
+                                          color: AppColors.muted,
+                                        ),
+                                      ),
+                                onTap: () async {
+                                  try {
+                                    await NotificationsRepository.markRead(item.id);
+                                    if (mounted && item.isUnread) {
+                                      setState(
+                                        () => _unreadCount = (_unreadCount - 1)
+                                            .clamp(0, 999999)
+                                            .toInt(),
+                                      );
+                                    }
+                                  } catch (_) {
+                                    // لا يمنع فشل الشبكة قراءة الإشعار أو فتح المهمة.
+                                  }
+                                  final taskId = item.taskId;
+                                  if (!sheetContext.mounted) return;
+                                  Navigator.pop(sheetContext);
+                                  if (taskId != null && taskId.isNotEmpty) {
+                                    NotificationsRepository.markTaskOpened(taskId);
+                                    context.go('/tasks/$taskId');
+                                  }
+                                },
+                              ),
+                            ),
                           );
                         },
                       ),
               ),
             ],
+            ),
           ),
         ),
       ),
+    );
+  }
+
+  Widget _notificationDismissBackground({
+    required Alignment alignment,
+    required IconData icon,
+  }) {
+    return Container(
+      alignment: alignment,
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      decoration: BoxDecoration(
+        color: const Color(0xFFB42318),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Icon(icon, color: Colors.white),
     );
   }
 
