@@ -1573,11 +1573,11 @@ class _TasksScreenState extends State<TasksScreen>
                   width: 42,
                   height: 42,
                   decoration: BoxDecoration(
-                    color: AppColors.gold.withValues(alpha: .16),
+                    color: const Color(0xFFC9A227).withValues(alpha: .16),
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: AppColors.gold.withValues(alpha: .55)),
+                    border: Border.all(color: const Color(0xFFC9A227).withValues(alpha: .55)),
                   ),
-                  child: const Icon(Icons.fact_check_outlined, color: AppColors.gold),
+                  child: const Icon(Icons.fact_check_outlined, color: Color(0xFFC9A227)),
                 ),
                 const SizedBox(width: 10),
                 const Expanded(
