@@ -181,6 +181,7 @@ class _AppCustomizerScreenState extends State<AppCustomizerScreen>
                     : _pdfStudioTab(),
       );
 
+  // ignore: unused_element
   Widget _livePreviewTab() => AnimatedBuilder(
         animation: _store,
         builder: (context, _) => ListView(
@@ -289,6 +290,7 @@ class _AppCustomizerScreenState extends State<AppCustomizerScreen>
         trailing: Icon(Icons.chevron_left, color: Color(_store.primaryColor)),
       );
 
+  // ignore: unused_element
   Widget _documentPreviewTab() => FutureBuilder<OrganizationBranding>(
         future: OrganizationBrandingStore.instance.forSession(),
         builder: (context, snapshot) {
@@ -398,6 +400,7 @@ class _AppCustomizerScreenState extends State<AppCustomizerScreen>
             .toList(),
       );
 
+  // ignore: unused_element
   Widget _homePreviewTab() => ListView(
         padding: const EdgeInsets.all(12),
         children: [
@@ -571,6 +574,7 @@ class _AppCustomizerScreenState extends State<AppCustomizerScreen>
         ActionChip(label: const Text('خلفية هادئة'), onPressed: () => setState(() => _store.setTheme(background: 0xFFEAF4F0))),
       ]));
 
+  // ignore: unused_element
   Widget _labelsTab() => ListView(
         padding: const EdgeInsets.all(12),
         children: [
@@ -621,6 +625,7 @@ class _AppCustomizerScreenState extends State<AppCustomizerScreen>
         ),
       );
 
+  // ignore: unused_element
   Widget _layoutTab() => ListView(
         padding: const EdgeInsets.all(12),
         children: [
@@ -757,6 +762,7 @@ class _AppCustomizerScreenState extends State<AppCustomizerScreen>
     return key == 'title' ? _store.reportHeadingColor : _store.reportPrimaryColor;
   }
 
+  // ignore: unused_element
   void _setReportElementColor(String key, Map<String, dynamic>? custom, int color) {
     if (custom != null) {
       _store.updateReportCustomElement(key, color: color);
@@ -776,6 +782,7 @@ class _AppCustomizerScreenState extends State<AppCustomizerScreen>
     return key == 'company' || key == 'title';
   }
 
+  // ignore: unused_element
   void _setReportElementAlign(String key, Map<String, dynamic>? custom, String align) {
     if (custom != null) {
       _store.updateReportCustomElement(key, align: align);
@@ -784,6 +791,7 @@ class _AppCustomizerScreenState extends State<AppCustomizerScreen>
     }
   }
 
+  // ignore: unused_element
   void _setReportElementBold(String key, Map<String, dynamic>? custom, bool bold) {
     if (custom != null) {
       _store.updateReportCustomElement(key, bold: bold);
@@ -1227,6 +1235,7 @@ class _AppCustomizerScreenState extends State<AppCustomizerScreen>
         ),
       );
 
+  // ignore: unused_element
   Widget _reportThemeTab() => ListView(
         padding: const EdgeInsets.all(12),
         children: [
@@ -1358,6 +1367,7 @@ class _AppCustomizerScreenState extends State<AppCustomizerScreen>
 
   Future<void> _saveReportTheme() async { await _store.save(); if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم حفظ تصميم التقارير وتطبيقه.'))); }
 
+  // ignore: unused_element
   Widget _unifiedTableTab() => ListView(
         padding: const EdgeInsets.all(12),
         children: [
@@ -1397,6 +1407,7 @@ class _AppCustomizerScreenState extends State<AppCustomizerScreen>
     if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم حفظ تخصيص الجدول الموحد وتطبيقه.')));
   }
 
+  // ignore: unused_element
   Widget _themeTab() => ListView(
         padding: const EdgeInsets.all(12),
         children: [
