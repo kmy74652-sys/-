@@ -1524,51 +1524,93 @@ class _TasksScreenState extends State<TasksScreen>
           (!done && due != null && due.isBefore(DateTime.now()));
     }).length;
     return Card(
-      color: const Color(0xFFF8FBFA),
+      color: const Color(0xFFF7FAFD),
+      margin: EdgeInsets.zero,
+      elevation: 0,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(14),
-        side: const BorderSide(color: Color(0xFFD8E4E0)),
+        borderRadius: BorderRadius.circular(18),
+        side: const BorderSide(color: Color(0xFFD7E1EC)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Padding(
-            padding: EdgeInsets.fromLTRB(12, 12, 12, 4),
-            child: Text(
-              'كشف المهام · سجل محفوظ ومرتب',
-              textAlign: TextAlign.right,
-              style: TextStyle(fontWeight: FontWeight.w900, color: AppColors.navy),
+          Container(
+            padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
+            decoration: const BoxDecoration(
+              color: AppColors.navy,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
             ),
-          ),
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-            child: Text(
-              'يشمل المهام التي أُنجزت والتقارير المرتبطة بها للرجوع والمراجعة.',
-              textAlign: TextAlign.right,
-              style: TextStyle(color: AppColors.muted, fontSize: 12),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(12, 4, 12, 8),
-            child: Wrap(
+            child: Row(
               textDirection: TextDirection.rtl,
-              spacing: 6,
-              runSpacing: 6,
               children: [
-                _ledgerSummaryChip('الإجمالي', ordered.length, Icons.receipt_long_outlined),
-                _ledgerSummaryChip('مكتملة', completed, Icons.verified_outlined),
-                _ledgerSummaryChip('بانتظار المراجعة', submitted, Icons.fact_check),
-                _ledgerSummaryChip('غير مكتملة', pending, Icons.pending_actions),
-                _ledgerSummaryChip('متأخرة', late, Icons.schedule_outlined),
+                Container(
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(
+                    color: AppColors.gold.withValues(alpha: .16),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppColors.gold.withValues(alpha: .55)),
+                  ),
+                  child: const Icon(Icons.fact_check_outlined, color: AppColors.gold),
+                ),
+                const SizedBox(width: 10),
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Text(
+                        'سجل المهام',
+                        textAlign: TextAlign.right,
+                        style: TextStyle(fontWeight: FontWeight.w900, color: Colors.white, fontSize: 16),
+                      ),
+                      SizedBox(height: 3),
+                      Text(
+                        'المهام والتقارير المحفوظة للرجوع والمراجعة',
+                        textAlign: TextAlign.right,
+                        style: TextStyle(color: Color(0xFFD8E6F5), fontSize: 11),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Text(
+                  '${ordered.length}',
+                  style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w900),
+                ),
               ],
             ),
           ),
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+            padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
+            child: GridView.count(
+              crossAxisCount: 2,
+              childAspectRatio: 3.15,
+              crossAxisSpacing: 8,
+              mainAxisSpacing: 8,
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              children: [
+                _ledgerSummaryChip('الإجمالي', ordered.length, Icons.receipt_long_outlined, AppColors.navy),
+                _ledgerSummaryChip('مكتملة', completed, Icons.verified_outlined, AppColors.green),
+                _ledgerSummaryChip('بانتظار المراجعة', submitted, Icons.fact_check_outlined, const Color(0xFFB7791F)),
+                _ledgerSummaryChip('غير مكتملة', pending, Icons.pending_actions_outlined, const Color(0xFF64748B)),
+                _ledgerSummaryChip('متأخرة', late, Icons.schedule_outlined, const Color(0xFFC2413A)),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
             child: DropdownButtonFormField<String>(
               value: _ledgerOrder,
               isExpanded: true,
-              decoration: const InputDecoration(labelText: 'ترتيب الكشف', isDense: true),
+              decoration: InputDecoration(
+                labelText: 'ترتيب السجل',
+                prefixIcon: const Icon(Icons.sort_rounded, size: 20),
+                isDense: true,
+                filled: true,
+                fillColor: Colors.white,
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              ),
               items: const [
                 DropdownMenuItem(value: 'latest', child: Text('الأحدث تحديثًا أولًا')),
                 DropdownMenuItem(value: 'oldest', child: Text('الأقدم أولًا')),
@@ -1578,17 +1620,35 @@ class _TasksScreenState extends State<TasksScreen>
               },
             ),
           ),
-          for (final task in ordered)
-            _ledgerEntry(task),
+          for (final task in ordered) _ledgerEntry(task),
+          const SizedBox(height: 6),
         ],
       ),
     );
   }
 
-  Widget _ledgerSummaryChip(String label, int count, IconData icon) => Chip(
-    avatar: Icon(icon, size: 16, color: AppColors.green),
-    label: Text('$label: $count'),
-    visualDensity: VisualDensity.compact,
+  Widget _ledgerSummaryChip(String label, int count, IconData icon, Color color) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 8),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(11),
+      border: Border.all(color: color.withValues(alpha: .26)),
+    ),
+    child: Row(
+      textDirection: TextDirection.rtl,
+      children: [
+        Icon(icon, size: 17, color: color),
+        const SizedBox(width: 5),
+        Expanded(
+          child: Text(
+            '$label: $count',
+            textAlign: TextAlign.right,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: color),
+          ),
+        ),
+      ],
+    ),
   );
 
   Widget _ledgerEntry(Map<String, dynamic> task) {
