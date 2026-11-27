@@ -143,9 +143,10 @@ class ReportPdfTheme {
     String? period,
     String? createdAt,
     String? arabicOrganization,
-    String englishOrganization = 'NEXORA',
+    String? englishOrganization,
   }) {
     final organization = reportPdfSafeText(arabicOrganization ?? settings.reportCompanyName);
+    final englishName = reportPdfSafeText(englishOrganization ?? settings.reportEnglishCompanyName);
     final metadata = <List<String>>[
       ['القسم', department ?? settings.reportBranchName],
       ['الموظف', employee ?? ''],
@@ -172,7 +173,7 @@ class ReportPdfTheme {
           pw.Row(
             crossAxisAlignment: pw.CrossAxisAlignment.center,
             children: [
-              pw.Expanded(child: pw.Text(reportPdfSafeText(englishOrganization), textDirection: pw.TextDirection.ltr, textAlign: pw.TextAlign.left, style: pw.TextStyle(font: latinBold, fontSize: 10, color: officialNavy))),
+              pw.Expanded(child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [pw.Text(englishName, textDirection: pw.TextDirection.ltr, textAlign: pw.TextAlign.left, style: pw.TextStyle(font: latinBold, fontSize: 9, color: officialNavy)), if (settings.reportPhone.trim().isNotEmpty) pw.Text(reportPdfSafeText(settings.reportPhone), textDirection: pw.TextDirection.ltr, textAlign: pw.TextAlign.left, style: const pw.TextStyle(fontSize: 7)), if (settings.reportAddress.trim().isNotEmpty) pw.Text(reportPdfSafeText(settings.reportAddress), textDirection: pw.TextDirection.ltr, textAlign: pw.TextAlign.left, style: const pw.TextStyle(fontSize: 7))])),
               if (logo != null) pw.Padding(padding: const pw.EdgeInsets.symmetric(horizontal: 10), child: pw.Image(logo!, width: 58, height: 58, fit: pw.BoxFit.contain)) else pw.SizedBox(width: 78),
               pw.Expanded(child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.stretch, children: [pw.Text(organization, textDirection: pw.TextDirection.rtl, textAlign: pw.TextAlign.right, style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold, color: officialNavy)), if (settings.reportHeaderText.trim().isNotEmpty) pw.Text(reportPdfSafeText(settings.reportHeaderText), textDirection: pw.TextDirection.rtl, textAlign: pw.TextAlign.right, style: pw.TextStyle(fontSize: 8, color: officialNavy))])),
             ],
@@ -207,7 +208,7 @@ class ReportPdfTheme {
     child: pw.Row(
       children: [
         pw.Expanded(child: pw.Text(_contactLine(), textDirection: pw.TextDirection.rtl, style: const pw.TextStyle(fontSize: 7))),
-        pw.Expanded(child: pw.Text('${context == null ? '' : 'صفحة ${context.pageNumber} من ${context.pagesCount}'}\n${reportPdfSafeText(footerText ?? settings.reportFooterText)}', textDirection: pw.TextDirection.rtl, textAlign: pw.TextAlign.center, style: pw.TextStyle(fontSize: 7, color: officialNavy))),
+        pw.Expanded(child: pw.Column(children: [pw.Text('${context == null ? '' : 'صفحة ${context.pageNumber} من ${context.pagesCount}'}', textDirection: pw.TextDirection.rtl, textAlign: pw.TextAlign.center, style: pw.TextStyle(fontSize: 7, color: officialNavy)), pw.Text(reportPdfSafeText(footerText ?? settings.reportFooterText), textDirection: pw.TextDirection.ltr, textAlign: pw.TextAlign.center, style: pw.TextStyle(fontSize: 7, color: officialNavy))])),
         pw.Expanded(child: pw.Text(reportPdfSafeText(settings.reportCompanyName), textDirection: pw.TextDirection.rtl, textAlign: pw.TextAlign.right, style: pw.TextStyle(fontSize: 7, color: officialNavy))),
       ],
     ),

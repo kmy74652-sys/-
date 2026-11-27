@@ -7,6 +7,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/theme.dart';
 import '../../shared/app_shell.dart';
+import '../../shared/app_customizer.dart';
 import '../../shared/organization_branding.dart';
 import '../../shared/ui_labels.dart';
 
@@ -39,6 +40,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
       _code = TextEditingController();
   final _brandName = TextEditingController(),
       _tagline = TextEditingController();
+  final _pdfArabicName = TextEditingController(),
+      _pdfEnglishName = TextEditingController(),
+      _pdfTitle = TextEditingController(),
+      _pdfPhone = TextEditingController(),
+      _pdfAddress = TextEditingController(),
+      _pdfFooter = TextEditingController();
   String _role = 'warehouse_worker', _branchId = '';
 
   @override
@@ -54,6 +61,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _code.dispose();
     _brandName.dispose();
     _tagline.dispose();
+    _pdfArabicName.dispose();
+    _pdfEnglishName.dispose();
+    _pdfTitle.dispose();
+    _pdfPhone.dispose();
+    _pdfAddress.dispose();
+    _pdfFooter.dispose();
     for (final controller in _loginCodes.values) {
       controller.clear();
       controller.dispose();
@@ -129,6 +142,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
       }
       _brandName.text = organizationName;
       _tagline.text = tagline;
+      final customizer = AppCustomizer.instance;
+      await customizer.load();
+      _pdfArabicName.text = customizer.reportCompanyName;
+      _pdfEnglishName.text = customizer.reportEnglishCompanyName;
+      _pdfTitle.text = customizer.reportUnifiedTitle;
+      _pdfPhone.text = customizer.reportPhone;
+      _pdfAddress.text = customizer.reportAddress;
+      _pdfFooter.text = customizer.reportFooterText;
       _logoUrl = logoUrl;
       return true;
     } catch (_) {
@@ -639,6 +660,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
     await _saveBrand();
   }
 
+  Future<void> _savePdfTextSettings() async {
+    final customizer = AppCustomizer.instance;
+    customizer.setReportTheme(
+      companyName: _pdfArabicName.text,
+      englishCompanyName: _pdfEnglishName.text,
+      unifiedTitle: _pdfTitle.text,
+      phone: _pdfPhone.text,
+      address: _pdfAddress.text,
+      footerText: _pdfFooter.text,
+    );
+    await customizer.save();
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('تم حفظ نصوص وهوية ملفات PDF.')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) => AppShell(
     title: 'الموظفون والإعدادات',
@@ -723,6 +762,29 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             if (_brandBusy) const LinearProgressIndicator(),
                             FilledButton(onPressed: _brandBusy ? null : _saveBrand, child: Text(_brandBusy ? 'جارٍ حفظ الهوية…' : 'حفظ الهوية')),
                           ],
+                        ],
+                      ),
+                    ),
+                  ),
+                if (_allowed && _owner)
+                  Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(14),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          const Text('نصوص وهوية ملفات PDF', textAlign: TextAlign.right, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17)),
+                          const SizedBox(height: 6),
+                          const Text('تُستخدم هذه القيم في الترويسة والتذييل والمعاينة والتصدير دون تحرير داخل شاشة المعاينة.', textAlign: TextAlign.right, style: TextStyle(color: Colors.black54)),
+                          const Divider(height: 20),
+                          TextField(controller: _pdfArabicName, textAlign: TextAlign.right, decoration: const InputDecoration(labelText: 'اسم المؤسسة بالعربية')),
+                          TextField(controller: _pdfEnglishName, textDirection: TextDirection.ltr, textAlign: TextAlign.left, decoration: const InputDecoration(labelText: 'اسم المؤسسة باللغة الإنجليزية')),
+                          TextField(controller: _pdfTitle, textAlign: TextAlign.right, decoration: const InputDecoration(labelText: 'عنوان مستند الجدول الموحد')),
+                          TextField(controller: _pdfPhone, textDirection: TextDirection.ltr, textAlign: TextAlign.left, decoration: const InputDecoration(labelText: 'رقم هاتف المؤسسة')),
+                          TextField(controller: _pdfAddress, textAlign: TextAlign.right, decoration: const InputDecoration(labelText: 'عنوان المؤسسة')),
+                          TextField(controller: _pdfFooter, textDirection: TextDirection.ltr, textAlign: TextAlign.left, decoration: const InputDecoration(labelText: 'اسم التطبيق في التذييل')),
+                          const SizedBox(height: 10),
+                          FilledButton.icon(onPressed: _savePdfTextSettings, icon: const Icon(Icons.save_outlined), label: const Text('حفظ نصوص PDF')),
                         ],
                       ),
                     ),

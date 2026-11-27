@@ -1016,8 +1016,8 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
         builder: (_) => _UnifiedPdfPreviewDialog(
           initialTexts: _UnifiedPdfTexts(
             arabicOrganization: reportTheme.settings.reportCompanyName,
-            englishOrganization: 'NEXORA',
-            title: 'الجدول الموحد لإنشاء وتنفيذ المهام',
+            englishOrganization: reportTheme.settings.reportEnglishCompanyName,
+            title: reportTheme.settings.reportUnifiedTitle,
             footer: reportTheme.settings.reportFooterText.trim().isEmpty ? 'NEXORA' : reportTheme.settings.reportFooterText,
           ),
           buildPdf: (texts) => _buildUnifiedPdf(reportTheme, font, boldFont, texts),
@@ -1113,7 +1113,7 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
                   pw.Text(_pdfSafeText(theme.settings.reportHeaderText.trim().isEmpty ? 'معًا .. نحو أداء أفضل' : theme.settings.reportHeaderText), textDirection: pw.TextDirection.rtl, textAlign: pw.TextAlign.center, style: pw.TextStyle(fontSize: 8, color: ReportPdfTheme.officialNavy)),
                 ])),
                 pw.SizedBox(width: 10),
-                pw.SizedBox(width: 62, child: pw.Text(_pdfSafeText(texts.englishOrganization), textDirection: pw.TextDirection.ltr, textAlign: pw.TextAlign.left, style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold, color: ReportPdfTheme.officialNavy))),
+                pw.SizedBox(width: 105, child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [pw.Text(_pdfSafeText(texts.englishOrganization), textDirection: pw.TextDirection.ltr, textAlign: pw.TextAlign.left, style: pw.TextStyle(fontSize: 8.5, fontWeight: pw.FontWeight.bold, color: ReportPdfTheme.officialNavy)), if (theme.settings.reportPhone.trim().isNotEmpty) pw.Text(_pdfSafeText(theme.settings.reportPhone), textDirection: pw.TextDirection.ltr, textAlign: pw.TextAlign.left, style: const pw.TextStyle(fontSize: 7)), if (theme.settings.reportAddress.trim().isNotEmpty) pw.Text(_pdfSafeText(theme.settings.reportAddress), textDirection: pw.TextDirection.ltr, textAlign: pw.TextAlign.left, style: const pw.TextStyle(fontSize: 7))])),
               ]),
               pw.SizedBox(height: 8),
               pw.Container(color: ReportPdfTheme.officialNavy, padding: const pw.EdgeInsets.symmetric(vertical: 7, horizontal: 8), child: pw.Text(_pdfSafeText(texts.title), textDirection: pw.TextDirection.rtl, textAlign: pw.TextAlign.center, style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold, color: PdfColors.white))),
@@ -1274,48 +1274,11 @@ class _UnifiedPdfTexts {
   final String footer;
 }
 
-class _UnifiedPdfPreviewDialog extends StatefulWidget {
+class _UnifiedPdfPreviewDialog extends StatelessWidget {
   const _UnifiedPdfPreviewDialog({required this.initialTexts, required this.buildPdf});
 
   final _UnifiedPdfTexts initialTexts;
   final Future<Uint8List> Function(_UnifiedPdfTexts texts) buildPdf;
-
-  @override
-  State<_UnifiedPdfPreviewDialog> createState() => _UnifiedPdfPreviewDialogState();
-}
-
-class _UnifiedPdfPreviewDialogState extends State<_UnifiedPdfPreviewDialog> {
-  late final TextEditingController _arabicOrganization;
-  late final TextEditingController _englishOrganization;
-  late final TextEditingController _title;
-  late final TextEditingController _footer;
-
-  @override
-  void initState() {
-    super.initState();
-    _arabicOrganization = TextEditingController(text: widget.initialTexts.arabicOrganization);
-    _englishOrganization = TextEditingController(text: widget.initialTexts.englishOrganization);
-    _title = TextEditingController(text: widget.initialTexts.title);
-    _footer = TextEditingController(text: widget.initialTexts.footer);
-  }
-
-  @override
-  void dispose() {
-    _arabicOrganization.dispose();
-    _englishOrganization.dispose();
-    _title.dispose();
-    _footer.dispose();
-    super.dispose();
-  }
-
-  _UnifiedPdfTexts get _texts => _UnifiedPdfTexts(
-        arabicOrganization: _arabicOrganization.text,
-        englishOrganization: _englishOrganization.text,
-        title: _title.text,
-        footer: _footer.text,
-      );
-
-  void _refresh() => setState(() {});
 
   @override
   Widget build(BuildContext context) => Dialog.fullscreen(
@@ -1323,35 +1286,18 @@ class _UnifiedPdfPreviewDialogState extends State<_UnifiedPdfPreviewDialog> {
           textDirection: TextDirection.rtl,
           child: Scaffold(
             appBar: AppBar(
-              title: const Text('معاينة PDF وتحرير النصوص'),
+              title: const Text('معاينة PDF'),
               actions: [IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.close))],
             ),
             body: Column(
-              children: [
-                Material(
-                  color: const Color(0xFFF5F7FD),
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(10, 8, 10, 4),
-                    child: Wrap(
-                      spacing: 8,
-                      runSpacing: 6,
-                      children: [
-                        SizedBox(width: 210, child: TextField(controller: _arabicOrganization, onChanged: (_) => _refresh(), textAlign: TextAlign.right, decoration: const InputDecoration(labelText: 'النص العربي يمينًا', isDense: true))),
-                        SizedBox(width: 180, child: TextField(controller: _englishOrganization, onChanged: (_) => _refresh(), textDirection: TextDirection.ltr, textAlign: TextAlign.left, decoration: const InputDecoration(labelText: 'English left text', isDense: true))),
-                        SizedBox(width: 230, child: TextField(controller: _title, onChanged: (_) => _refresh(), textAlign: TextAlign.right, decoration: const InputDecoration(labelText: 'شريط العنوان', isDense: true))),
-                        SizedBox(width: 210, child: TextField(controller: _footer, onChanged: (_) => _refresh(), textAlign: TextAlign.right, decoration: const InputDecoration(labelText: 'تذييل الصفحة', isDense: true))),
-                      ],
-                    ),
-                  ),
-                ),
-                Expanded(
+              children: [Expanded(
                   child: PdfPreview(
                     canChangeOrientation: false,
                     canChangePageFormat: false,
                     allowPrinting: true,
                     allowSharing: true,
                     pdfFileName: 'unified-task-table.pdf',
-                    build: (_) => widget.buildPdf(_texts),
+                    build: (_) => buildPdf(initialTexts),
                   ),
                 ),
               ],
