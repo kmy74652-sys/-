@@ -148,7 +148,11 @@ void initializeRouter() {
         path: '/admin',
         redirect: (context, state) {
           final section = state.uri.queryParameters['section'];
-          return section == null || section.isEmpty ? '/' : null;
+          // لا توجد شاشة عامة مستقلة للوحة الإدارة؛ افتح الأقسام الفعلية
+          // فقط، وأعد أي رابط قديم للوحة العامة إلى الرئيسية.
+          return section == null || section.isEmpty || section == 'overview'
+              ? '/'
+              : null;
         },
         builder: (context, state) => AdminScreen(
           initialSection: state.uri.queryParameters['section'],
