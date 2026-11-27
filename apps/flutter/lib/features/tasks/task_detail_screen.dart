@@ -1129,8 +1129,8 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                         ]),
                     ],
             ),
-            reportTheme.footer(),
           ],
+          footer: (context) => reportTheme.footer(context),
         ),
       );
       await Printing.sharePdf(

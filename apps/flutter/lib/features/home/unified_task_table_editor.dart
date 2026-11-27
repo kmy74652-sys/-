@@ -1115,96 +1115,27 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
               pw.SizedBox(height: 12),
             ],
           ],
-          footer: (_) => _classicPdfFooter(texts),
+          footer: (context) => reportTheme.footer(context, texts.footer),
         ),
       );
       return document.save();
   }
 
-  pw.Widget _classicPdfHeader(ReportPdfTheme theme, _UnifiedPdfTexts texts) => pw.Container(
-    padding: const pw.EdgeInsets.all(9),
-    decoration: pw.BoxDecoration(
-      color: PdfColor.fromHex('#F7FAF9'),
-      border: pw.Border.all(color: theme.primary, width: .8),
-    ),
-    child: pw.Column(
-      children: [
-        pw.Row(
-          crossAxisAlignment: pw.CrossAxisAlignment.center,
-          children: [
-            pw.Expanded(
-              child: pw.Text(
-                texts.englishOrganization,
-                textAlign: pw.TextAlign.left,
-                style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold, color: theme.primary),
-              ),
-            ),
-            if (theme.logo != null)
-              pw.Padding(
-                padding: const pw.EdgeInsets.symmetric(horizontal: 12),
-                child: pw.Image(theme.logo!, width: 54, height: 54, fit: pw.BoxFit.contain),
-              )
-            else
-              pw.SizedBox(width: 78),
-            pw.Expanded(
-              child: pw.Text(
-                texts.arabicOrganization,
-                textDirection: pw.TextDirection.rtl,
-                textAlign: pw.TextAlign.right,
-                style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold, color: theme.primary),
-              ),
-            ),
-          ],
-        ),
-        pw.SizedBox(height: 8),
-        pw.Container(
-          width: double.infinity,
-          padding: const pw.EdgeInsets.symmetric(vertical: 7, horizontal: 8),
-          color: theme.primary,
-          child: pw.Text(
-            texts.title,
-            textDirection: pw.TextDirection.rtl,
-            textAlign: pw.TextAlign.center,
-            style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold, color: PdfColors.white),
-          ),
-        ),
-        pw.SizedBox(height: 6),
-        pw.Row(
-          children: [
-            pw.Expanded(child: _pdfHeaderData('الموظف', _employee.text)),
-            pw.Expanded(child: _pdfHeaderData('الفرع', _branch.text)),
-            pw.Expanded(child: _pdfHeaderData('التاريخ', _startDate.text)),
-          ],
-        ),
-      ],
-    ),
-  );
-
-  pw.Widget _pdfHeaderData(String label, String value) => pw.Text(
-    '$label: ${_pdfSafeText(value.trim().isEmpty ? '—' : value.trim())}',
-    textDirection: pw.TextDirection.rtl,
-    textAlign: pw.TextAlign.right,
-    style: const pw.TextStyle(fontSize: 8),
-  );
-
-  pw.Widget _classicPdfFooter(_UnifiedPdfTexts texts) => pw.Container(
-    width: double.infinity,
-    padding: const pw.EdgeInsets.only(top: 12),
-    decoration: const pw.BoxDecoration(border: pw.Border(top: pw.BorderSide(color: PdfColors.grey300, width: .7))),
-    child: pw.Text(
-      texts.footer,
-      textDirection: pw.TextDirection.rtl,
-      textAlign: pw.TextAlign.center,
-      style: const pw.TextStyle(fontSize: 8),
-    ),
+  pw.Widget _classicPdfHeader(ReportPdfTheme theme, _UnifiedPdfTexts texts) => theme.officialHeader(
+    texts.title,
+    employee: _employee.text,
+    branch: _branch.text,
+    createdAt: _startDate.text,
+    arabicOrganization: texts.arabicOrganization,
+    englishOrganization: texts.englishOrganization,
   );
 
   pw.Widget _pdfHeading(String title) => pw.Container(
     width: double.infinity,
     margin: const pw.EdgeInsets.only(bottom: 6),
     padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-    color: PdfColor.fromHex('#EAF4F0'),
-    child: pw.Text(_pdfSafeText(title), textDirection: pw.TextDirection.rtl, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, color: PdfColor.fromHex('#123B5D'))),
+    color: PdfColor.fromHex('#004A87'),
+    child: pw.Text(_pdfSafeText(title), textDirection: pw.TextDirection.rtl, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, color: PdfColors.white)),
   );
 
   pw.Widget _pdfInfoTable() {
@@ -1229,7 +1160,7 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
       final left = index + 1 < visible.length ? _pdfCell(fields[visible[index + 1]]!) : _pdfCell('');
       rows.add(pw.TableRow(children: [right, left]));
     }
-    return pw.Table(border: pw.TableBorder.all(color: PdfColor.fromHex('#B8CEC5')), children: rows);
+    return pw.Table(border: pw.TableBorder.all(color: PdfColor.fromHex('#6EA6D8')), children: rows);
   }
 
   pw.Widget _pdfScheduleTable(List<List<String>> rows) {
@@ -1241,14 +1172,14 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
       ),
     ];
     return pw.Table(
-      border: pw.TableBorder.all(color: PdfColor.fromHex('#B8CEC5')),
+      border: pw.TableBorder.all(color: PdfColor.fromHex('#6EA6D8')),
       children: tableRows
           .asMap()
           .entries
           .map(
             (entry) => pw.TableRow(
               decoration: entry.key == 0
-                  ? pw.BoxDecoration(color: PdfColor.fromHex('#EAF4F0'))
+                  ? pw.BoxDecoration(color: PdfColor.fromHex('#E5F2FF'))
                   : null,
               children: entry.value,
             ),
@@ -1271,14 +1202,14 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
       ),
     ];
     return pw.Table(
-      border: pw.TableBorder.all(color: PdfColor.fromHex('#B8CEC5')),
+      border: pw.TableBorder.all(color: PdfColor.fromHex('#6EA6D8')),
       children: rows
           .asMap()
           .entries
           .map(
             (entry) => pw.TableRow(
               decoration: entry.key == 0
-                  ? pw.BoxDecoration(color: PdfColor.fromHex('#EAF4F0'))
+                  ? pw.BoxDecoration(color: PdfColor.fromHex('#E5F2FF'))
                   : null,
               children: entry.value,
             ),

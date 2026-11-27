@@ -492,11 +492,11 @@ class _ReportsScreenState extends State<ReportsScreen> {
                       ],
                     ),
                   ),
-                reportTheme.footer(),
               ],
             ),
           ),
-        ],
+          ],
+          footer: (context) => reportTheme.footer(context),
       ),
     );
     final bytes = await document.save();
