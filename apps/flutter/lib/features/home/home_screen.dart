@@ -35,16 +35,9 @@ class _HomeScreenState extends State<HomeScreen> {
       [
         _Module(
           'tasks',
-          'إدارة مهام الجداول الموحدة',
-          'متابعة المهام والتقارير الناتجة من الجداول الموحدة',
+          'المهام والمتابعة',
+          'متابعة المهام والتقارير والمهام الحالية',
           Icons.task_alt,
-          '/tasks',
-        ),
-        _Module(
-          'independentTasks',
-          'المهام المستقلة',
-          'عرض المهام اليومية المستقلة وتنفيذها ومتابعة حالتها',
-          Icons.assignment_outlined,
           '/tasks',
         ),
         _Module(

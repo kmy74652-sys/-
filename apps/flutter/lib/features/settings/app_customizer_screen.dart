@@ -1,12 +1,15 @@
+import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:printing/printing.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../shared/app_customizer.dart';
 import '../../shared/app_shell.dart';
 import '../../shared/organization_branding.dart';
+import '../../shared/report_pdf_theme.dart';
 import '../../shared/ui_labels.dart';
 
 class AppCustomizerScreen extends StatefulWidget {
@@ -27,16 +30,67 @@ class _AppCustomizerScreenState extends State<AppCustomizerScreen>
   Uint8List? _pendingLogoBytes;
   String? _pendingLogoMime;
   bool _logoBusy = false;
+  bool _exportingDesignPdf = false;
   List<Map<String, dynamic>> _currentTasks = const [];
   late final TabController _tabs;
   final Map<String, TextEditingController> _controllers = {};
   String _selectedHeaderElement = 'company';
+  String? _draggingHeaderElement;
+  Offset? _dragStartGlobalPosition;
+  Map<String, double>? _dragStartElementPosition;
+  String? _resizingHeaderElement;
+  Offset? _resizeStartGlobalPosition;
+  Map<String, double>? _resizeStartElementPosition;
+  final List<Map<String, dynamic>> _reportUndo = [];
+  final List<Map<String, dynamic>> _reportRedo = [];
+  Map<String, dynamic>? _lastReportSnapshot;
+  bool _restoringReportHistory = false;
 
   @override
   void initState() {
     super.initState();
     _tabs = TabController(length: 8, vsync: this);
+    _store.addListener(_handleReportHistoryChange);
     _loadPermission();
+  }
+
+  void _handleReportHistoryChange() {
+    final current = _store.reportThemeSnapshot();
+    if (_restoringReportHistory) {
+      _lastReportSnapshot = current;
+      return;
+    }
+    if (_lastReportSnapshot != null && jsonEncode(_lastReportSnapshot) != jsonEncode(current)) {
+      _reportUndo.add(_lastReportSnapshot!);
+      if (_reportUndo.length > 60) _reportUndo.removeAt(0);
+      _reportRedo.clear();
+    }
+    _lastReportSnapshot = current;
+    if (mounted) setState(() {});
+  }
+
+  void _undoReportChange() {
+    if (_reportUndo.isEmpty) return;
+    final current = _store.reportThemeSnapshot();
+    final target = _reportUndo.removeLast();
+    _reportRedo.add(current);
+    _restoringReportHistory = true;
+    _store.restoreReportThemeSnapshot(target);
+    _restoringReportHistory = false;
+    _lastReportSnapshot = _store.reportThemeSnapshot();
+    if (mounted) setState(() {});
+  }
+
+  void _redoReportChange() {
+    if (_reportRedo.isEmpty) return;
+    final current = _store.reportThemeSnapshot();
+    final target = _reportRedo.removeLast();
+    _reportUndo.add(current);
+    _restoringReportHistory = true;
+    _store.restoreReportThemeSnapshot(target);
+    _restoringReportHistory = false;
+    _lastReportSnapshot = _store.reportThemeSnapshot();
+    if (mounted) setState(() {});
   }
 
   Future<void> _loadPermission() async {
@@ -48,6 +102,7 @@ class _AppCustomizerScreenState extends State<AppCustomizerScreen>
     } catch (_) {
       _allowed = false;
     }
+    _lastReportSnapshot = _store.reportThemeSnapshot();
     if (mounted) setState(() => _loading = false);
   }
 
@@ -76,8 +131,27 @@ class _AppCustomizerScreenState extends State<AppCustomizerScreen>
     }
   }
 
+  Future<void> _exportDesignPdf() async {
+    if (_exportingDesignPdf) return;
+    setState(() => _exportingDesignPdf = true);
+    try {
+      await _store.save();
+      final theme = await ReportPdfTheme.load();
+      final bytes = await theme.buildDesignerPreviewPdf();
+      await Printing.sharePdf(
+        bytes: bytes,
+        filename: 'nexora-report-design-${DateTime.now().millisecondsSinceEpoch}.pdf',
+      );
+    } catch (error) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('تعذر تصدير تصميم PDF: $error')));
+    } finally {
+      if (mounted) setState(() => _exportingDesignPdf = false);
+    }
+  }
+
   @override
   void dispose() {
+    _store.removeListener(_handleReportHistoryChange);
     _tabs.dispose();
     for (final controller in _controllers.values) controller.dispose();
     super.dispose();
@@ -266,7 +340,7 @@ class _AppCustomizerScreenState extends State<AppCustomizerScreen>
         builder: (context, snapshot) {
           final branding = snapshot.data ?? OrganizationBranding.fallback;
           final company = _store.reportCompanyName.trim().isEmpty ? branding.name : _store.reportCompanyName;
-          final logoUrl = _store.reportLogoUrl.trim().isNotEmpty ? _store.reportLogoUrl.trim() : branding.logoUrl;
+          final logoUrl = _store.reportLogoUrl.trim();
           return ListView(
             padding: const EdgeInsets.all(12),
             children: [
@@ -417,8 +491,7 @@ class _AppCustomizerScreenState extends State<AppCustomizerScreen>
             _homePreviewCard('submitted', Icons.pending_actions_outlined, '3', 0xFF68419A),
             _homePreviewCard('lateTasks', Icons.schedule, '2', 0xFFAB2B37),
             _homePreviewSection('workSection', [
-              _homePreviewModule('taskManagement', Icons.task_alt, 'متابعة المهام والتقارير الناتجة من الجداول الموحدة'),
-              _homePreviewModule('independentTasks', Icons.assignment_outlined, 'عرض المهام اليومية المستقلة وتنفيذها ومتابعة حالتها'),
+              _homePreviewModule('taskManagement', Icons.task_alt, 'متابعة المهام والتقارير والمهام الحالية'),
               _homePreviewModule('reports', Icons.description_outlined, 'التقارير المرفوعة للمراجعة والاعتماد'),
               _homePreviewModule('performance', Icons.query_stats, 'ترتيب الموظفين ومقارنة الفروع'),
             ]),
@@ -714,9 +787,151 @@ class _AppCustomizerScreenState extends State<AppCustomizerScreen>
   }
 
   void _moveReportElement(String key, double left, double top, double width, double height) {
-    double snap(double value) => (value / .02).round() * .02;
-    _store.setReportElementPosition(key, left: snap(left).clamp(0.0, 1.0 - width).toDouble(), top: snap(top).clamp(0.0, 1.0 - height).toDouble(), width: width, height: height);
+    _store.setReportElementPosition(
+      key,
+      left: left.clamp(0.0, 1.0 - width).toDouble(),
+      top: top.clamp(0.0, 1.0 - height).toDouble(),
+      width: width,
+      height: height,
+    );
   }
+
+  int _reportElementColorValue(String key, Map<String, dynamic>? custom) {
+    if (custom != null && custom['color'] is num) return (custom['color'] as num).toInt();
+    final configured = _store.reportHeaderLayouts[key]?['color'];
+    if (configured is num) return configured.toInt();
+    return key == 'title' ? _store.reportHeadingColor : _store.reportPrimaryColor;
+  }
+
+  void _setReportElementColor(String key, Map<String, dynamic>? custom, int color) {
+    if (custom != null) {
+      _store.updateReportCustomElement(key, color: color);
+    } else {
+      _store.setReportHeaderLayout(key, color: color);
+    }
+  }
+
+  String _reportElementAlign(String key, Map<String, dynamic>? custom) {
+    final value = custom?['align'] ?? _store.reportHeaderLayouts[key]?['align'];
+    return {'right', 'center', 'left'}.contains(value) ? '$value' : 'right';
+  }
+
+  bool _reportElementBold(String key, Map<String, dynamic>? custom) {
+    if (custom?['bold'] is bool) return custom!['bold'] as bool;
+    if (_store.reportHeaderLayouts[key]?['bold'] is bool) return _store.reportHeaderLayouts[key]!['bold'] as bool;
+    return key == 'company' || key == 'title';
+  }
+
+  void _setReportElementAlign(String key, Map<String, dynamic>? custom, String align) {
+    if (custom != null) {
+      _store.updateReportCustomElement(key, align: align);
+    } else {
+      _store.setReportHeaderLayout(key, align: align);
+    }
+  }
+
+  void _setReportElementBold(String key, Map<String, dynamic>? custom, bool bold) {
+    if (custom != null) {
+      _store.updateReportCustomElement(key, bold: bold);
+    } else {
+      _store.setReportHeaderLayout(key, bold: bold);
+    }
+  }
+
+  List<String> _visibleReportElements() => _reportCanvasElements.where((key) {
+        final custom = _store.reportCustomElements[key];
+        return custom == null || custom['visible'] != false;
+      }).toList();
+
+  void _alignSelectedReportElement(String alignment) {
+    final key = _selectedHeaderElement;
+    if (!_reportCanvasElements.contains(key)) return;
+    final position = _store.reportElementPosition(key);
+    var left = position['left']!;
+    var top = position['top']!;
+    switch (alignment) {
+      case 'left':
+        left = .04;
+      case 'center':
+        left = (1 - position['width']!) / 2;
+      case 'right':
+        left = .96 - position['width']!;
+      case 'top':
+        top = .04;
+      case 'middle':
+        top = (1 - position['height']!) / 2;
+      case 'bottom':
+        top = .96 - position['height']!;
+    }
+    _moveReportElement(key, left, top, position['width']!, position['height']!);
+  }
+
+  void _distributeReportElements({required bool vertical}) {
+    final keys = _visibleReportElements();
+    if (keys.length < 3) return;
+    final positions = {for (final key in keys) key: _store.reportElementPosition(key)};
+    keys.sort((a, b) => vertical
+        ? positions[a]!['top']!.compareTo(positions[b]!['top']!)
+        : positions[a]!['left']!.compareTo(positions[b]!['left']!));
+    final totalSize = keys.fold<double>(0, (sum, key) => sum + (vertical ? positions[key]!['height']! : positions[key]!['width']!));
+    if (totalSize > .84) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('لا توجد مساحة كافية لتوزيع هذه العناصر مع الحفاظ على أحجامها.')));
+      return;
+    }
+    final gap = ((.92 - .08 - totalSize) / (keys.length - 1)).clamp(.01, .35).toDouble();
+    var cursor = .04;
+    for (final key in keys) {
+      final position = positions[key]!;
+      _store.setReportElementPosition(
+        key,
+        left: vertical ? position['left'] : cursor,
+        top: vertical ? cursor : position['top'],
+        width: position['width'],
+        height: position['height'],
+      );
+      cursor += (vertical ? position['height']! : position['width']!) + gap;
+    }
+  }
+
+  Widget _reportAlignmentTools() => SectionCard(
+        title: 'محاذاة وتوزيع العناصر',
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text('العنصر المحدد: ${_reportElementLabel(_selectedHeaderElement)}', textAlign: TextAlign.right, style: const TextStyle(fontWeight: FontWeight.w700)),
+            const SizedBox(height: 6),
+            Wrap(
+              alignment: WrapAlignment.end,
+              spacing: 6,
+              runSpacing: 6,
+              children: [
+                _alignmentButton('يسار الصفحة', Icons.align_horizontal_left, () => _alignSelectedReportElement('left')),
+                _alignmentButton('وسط الصفحة', Icons.align_horizontal_center, () => _alignSelectedReportElement('center')),
+                _alignmentButton('يمين الصفحة', Icons.align_horizontal_right, () => _alignSelectedReportElement('right')),
+                _alignmentButton('أعلى الصفحة', Icons.vertical_align_top, () => _alignSelectedReportElement('top')),
+                _alignmentButton('منتصف الصفحة', Icons.vertical_align_center, () => _alignSelectedReportElement('middle')),
+                _alignmentButton('أسفل الصفحة', Icons.vertical_align_bottom, () => _alignSelectedReportElement('bottom')),
+              ],
+            ),
+            const Divider(height: 18),
+            Wrap(
+              alignment: WrapAlignment.end,
+              spacing: 6,
+              children: [
+                _alignmentButton('توزيع رأسي متساوٍ', Icons.view_stream_outlined, () => _distributeReportElements(vertical: true)),
+                _alignmentButton('توزيع أفقي متساوٍ', Icons.view_column_outlined, () => _distributeReportElements(vertical: false)),
+              ],
+            ),
+          ],
+        ),
+      );
+
+  Widget _alignmentButton(String label, IconData icon, VoidCallback onPressed) => OutlinedButton.icon(
+        onPressed: onPressed,
+        icon: Icon(icon, size: 17),
+        label: Text(label, textAlign: TextAlign.right),
+        style: OutlinedButton.styleFrom(visualDensity: VisualDensity.compact),
+      );
 
   Widget _reportCanvasElement(String key, int index, double canvasWidth, double canvasHeight) {
     final custom = _store.reportCustomElements[key];
@@ -725,29 +940,175 @@ class _AppCustomizerScreenState extends State<AppCustomizerScreen>
     final selected = _selectedHeaderElement == key;
     final configuredSize = _store.reportHeaderLayouts[key]?['size'];
     final size = custom != null ? ((custom['size'] as num?)?.toDouble() ?? 12.0) : (configuredSize is num ? configuredSize.toDouble() : (key == 'title' ? 19.0 : key == 'company' ? 15.0 : 10.0));
-    final color = custom != null ? Color((custom['color'] as num?)?.toInt() ?? _store.reportHeadingColor) : Color(key == 'title' ? _store.reportHeadingColor : _store.reportPrimaryColor);
+    final color = Color(_reportElementColorValue(key, custom));
+    final align = _reportElementAlign(key, custom);
+    final bold = _reportElementBold(key, custom);
     final child = (key == 'logo' || custom?['type'] == 'logo') && _store.reportLogoUrl.isNotEmpty
         ? Image.network(_store.reportLogoUrl, fit: BoxFit.contain, errorBuilder: (_, __, ___) => const Icon(Icons.image_not_supported_outlined))
         : Text(_reportElementText(key), textAlign: TextAlign.right, softWrap: true, style: TextStyle(fontSize: size, fontWeight: key == 'company' || key == 'title' ? FontWeight.w800 : FontWeight.normal, color: color));
+    final content = Stack(
+      clipBehavior: Clip.none,
+      children: [
+        Positioned.fill(
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () => setState(() => _selectedHeaderElement = key),
+            onPanStart: (details) {
+              _draggingHeaderElement = key;
+              _dragStartGlobalPosition = details.globalPosition;
+              _dragStartElementPosition = Map<String, double>.from(position);
+              setState(() => _selectedHeaderElement = key);
+            },
+            onPanUpdate: (details) {
+              if (_draggingHeaderElement != key || _dragStartGlobalPosition == null || _dragStartElementPosition == null) return;
+              final delta = details.globalPosition - _dragStartGlobalPosition!;
+              final start = _dragStartElementPosition!;
+              _moveReportElement(
+                key,
+                start['left']! + delta.dx / canvasWidth,
+                start['top']! + delta.dy / canvasHeight,
+                start['width']!,
+                start['height']!,
+              );
+            },
+            onPanEnd: (_) {
+              _draggingHeaderElement = null;
+              _dragStartGlobalPosition = null;
+              _dragStartElementPosition = null;
+            },
+            child: Container(
+              alignment: key == 'logo' ? Alignment.center : align == 'left' ? Alignment.centerLeft : align == 'center' ? Alignment.center : Alignment.centerRight,
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+              decoration: BoxDecoration(
+                color: selected ? Color(_store.reportPrimaryColor).withOpacity(.10) : Colors.transparent,
+                border: Border.all(color: selected ? Color(_store.reportPrimaryColor) : Colors.transparent, width: 1.2),
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: key == 'logo' ? child : DefaultTextStyle.merge(style: TextStyle(fontWeight: bold ? FontWeight.w800 : FontWeight.normal), child: child),
+            ),
+          ),
+        ),
+        if (selected)
+          Positioned(
+            left: 0,
+            top: -48,
+            child: Material(
+              elevation: 4,
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(10),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 3),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.format_size, size: 15, color: AppColors.navy),
+                    SizedBox(
+                      width: 108,
+                      height: 28,
+                      child: Slider(
+                        min: 7,
+                        max: 32,
+                        divisions: 25,
+                        value: size.clamp(7, 32).toDouble(),
+                        onChanged: key == 'logo' ? null : (value) {
+                          if (custom != null) {
+                            _store.updateReportCustomElement(key, size: value);
+                          } else {
+                            _store.setReportHeaderLayout(key, size: value);
+                          }
+                        },
+                      ),
+                    ),
+                    for (final swatch in [
+                      _store.reportPrimaryColor,
+                      _store.reportHeadingColor,
+                      0xFF146B50,
+                      0xFF7A2430,
+                      0xFF222222,
+                    ])
+                      GestureDetector(
+                        onTap: key == 'logo' ? null : () => _setReportElementColor(key, custom, swatch),
+                        child: Container(
+                          width: 17,
+                          height: 17,
+                          margin: const EdgeInsets.symmetric(horizontal: 2),
+                          decoration: BoxDecoration(
+                            color: Color(swatch),
+                            shape: BoxShape.circle,
+                            border: Border.all(color: color.value == swatch ? Colors.white : Colors.black12, width: 2),
+                          ),
+                        ),
+                      ),
+                    if (key != 'logo') ...[
+                      IconButton(
+                        tooltip: bold ? 'إلغاء الخط العريض' : 'خط عريض',
+                        visualDensity: VisualDensity.compact,
+                        padding: EdgeInsets.zero,
+                        icon: Icon(Icons.format_bold, size: 18, color: bold ? Color(_store.reportPrimaryColor) : AppColors.muted),
+                        onPressed: () => _setReportElementBold(key, custom, !bold),
+                      ),
+                      for (final option in [
+                        ('right', Icons.format_align_right),
+                        ('center', Icons.format_align_center),
+                        ('left', Icons.format_align_left),
+                      ])
+                        IconButton(
+                          tooltip: 'محاذاة ${option.$1 == 'right' ? 'يمين' : option.$1 == 'center' ? 'وسط' : 'يسار'}',
+                          visualDensity: VisualDensity.compact,
+                          padding: EdgeInsets.zero,
+                          icon: Icon(option.$2, size: 17, color: align == option.$1 ? Color(_store.reportPrimaryColor) : AppColors.muted),
+                          onPressed: () => _setReportElementAlign(key, custom, option.$1),
+                        ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+          ),
+        if (selected)
+          Positioned(
+            right: -7,
+            bottom: -7,
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onPanStart: (details) {
+                _resizingHeaderElement = key;
+                _resizeStartGlobalPosition = details.globalPosition;
+                _resizeStartElementPosition = Map<String, double>.from(position);
+              },
+              onPanUpdate: (details) {
+                if (_resizingHeaderElement != key || _resizeStartGlobalPosition == null || _resizeStartElementPosition == null) return;
+                final delta = details.globalPosition - _resizeStartGlobalPosition!;
+                final start = _resizeStartElementPosition!;
+                final nextWidth = (start['width']! + delta.dx / canvasWidth).clamp(.12, 1.0 - start['left']!).toDouble();
+                final nextHeight = (start['height']! + delta.dy / canvasHeight).clamp(.035, 1.0 - start['top']!).toDouble();
+                _store.setReportElementPosition(key, width: nextWidth, height: nextHeight);
+              },
+              onPanEnd: (_) {
+                _resizingHeaderElement = null;
+                _resizeStartGlobalPosition = null;
+                _resizeStartElementPosition = null;
+              },
+              child: Container(
+                width: 16,
+                height: 16,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  border: Border.all(color: Color(_store.reportPrimaryColor), width: 2),
+                  borderRadius: BorderRadius.circular(3),
+                ),
+                child: Icon(Icons.open_in_full, size: 10, color: Color(_store.reportPrimaryColor)),
+              ),
+            ),
+          ),
+      ],
+    );
     return Positioned(
       left: position['left']! * canvasWidth,
       top: position['top']! * canvasHeight,
       width: position['width']! * canvasWidth,
       height: position['height']! * canvasHeight,
-      child: GestureDetector(
-        onTap: () => setState(() => _selectedHeaderElement = key),
-        onPanUpdate: (details) {
-          final nextLeft = (position['left']! + details.delta.dx / canvasWidth).clamp(0.0, 1.0 - position['width']!).toDouble();
-          final nextTop = (position['top']! + details.delta.dy / canvasHeight).clamp(0.0, 1.0 - position['height']!).toDouble();
-          _moveReportElement(key, nextLeft, nextTop, position['width']!, position['height']!);
-        },
-        child: Container(
-          alignment: key == 'logo' ? Alignment.center : Alignment.centerRight,
-          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-          decoration: BoxDecoration(color: selected ? Color(_store.reportPrimaryColor).withOpacity(.10) : Colors.transparent, border: Border.all(color: selected ? Color(_store.reportPrimaryColor) : Colors.transparent, width: 1.2), borderRadius: BorderRadius.circular(4)),
-          child: child,
-        ),
-      ),
+      child: content,
     );
   }
 
@@ -770,25 +1131,48 @@ class _AppCustomizerScreenState extends State<AppCustomizerScreen>
     final height = width * 1.4142;
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       SectionCard(title: 'معاينة A4 مباشرة', child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        const Text('اضغط على أي عنصر ثم اسحبه داخل الورقة. ستظهر خطوط وحدود المحاذاة تلقائيًا ولن يخرج العنصر عن الهوامش.', textAlign: TextAlign.right),
+        const Text('صمّم الصفحة مباشرة: اضغط واسحب العنصر لتحريكه، واسحب المقبض أسفل يمينه لتغيير حجمه. كل عنصر يبقى داخل ورقة A4.', textAlign: TextAlign.right),
         const SizedBox(height: 8),
-        Center(child: Container(width: width, height: height, decoration: BoxDecoration(color: Colors.white, border: Border.all(color: const Color(0xFFD4DEDF)), boxShadow: const [BoxShadow(color: Color(0x22000000), blurRadius: 8)]), child: Stack(children: [
+        Center(child: Container(width: width, height: height, decoration: BoxDecoration(color: Colors.white, border: Border.all(color: const Color(0xFFD4DEDF)), boxShadow: const [BoxShadow(color: Color(0x22000000), blurRadius: 8)]), child: Stack(clipBehavior: Clip.none, children: [
           IgnorePointer(child: CustomPaint(size: Size(width, height), painter: _ReportAlignmentPainter())),
           for (var i = 0; i < _reportCanvasElements.length; i++) _reportCanvasElement(_reportCanvasElements[i], i, width, height),
           Positioned(left: width * .06, top: height * .48, width: width * .88, height: height * .30, child: _pdfPreviewTable(const [['الوقت', 'المهمة والبيان', 'المخرج المطلوب', 'الحالة'], ['08:00', 'مهمة حالية', 'لا يوجد', 'جديدة'], ['—', 'مهمة استثنائية', 'لا يوجد', 'جديدة']], Color(_store.reportPrimaryColor))),
         ]))),
         const SizedBox(height: 8),
-        Wrap(alignment: WrapAlignment.center, spacing: 8, children: [OutlinedButton.icon(onPressed: () => setState(() { _selectedHeaderElement = _store.addReportCustomElement(type: 'text', text: 'نص مخصص'); }), icon: const Icon(Icons.text_fields), label: const Text('إضافة نص')), OutlinedButton.icon(onPressed: () => setState(() { _selectedHeaderElement = _store.addReportCustomElement(type: 'logo', text: 'الشعار'); }), icon: const Icon(Icons.image_outlined), label: const Text('إضافة شعار'))]),
+        Wrap(alignment: WrapAlignment.center, spacing: 8, runSpacing: 8, children: [
+          OutlinedButton.icon(onPressed: () => setState(() { _selectedHeaderElement = _store.addReportCustomElement(type: 'text', text: 'نص مخصص'); }), icon: const Icon(Icons.text_fields), label: const Text('إضافة نص')),
+          OutlinedButton.icon(onPressed: () => setState(() { _selectedHeaderElement = _store.addReportCustomElement(type: 'logo', text: 'الشعار'); }), icon: const Icon(Icons.image_outlined), label: const Text('إضافة شعار')),
+          FilledButton.icon(onPressed: _exportingDesignPdf ? null : _exportDesignPdf, icon: _exportingDesignPdf ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.picture_as_pdf_outlined), label: const Text('تصدير التصميم PDF')),
+        ]),
       ])),
       const SizedBox(height: 10),
       _reportElementToolbar(),
+      const SizedBox(height: 10),
+      _reportAlignmentTools(),
     ]);
   }));
 
   Widget _reportThemeTab() => ListView(
         padding: const EdgeInsets.all(12),
         children: [
-          _intro('هوية وتصميم التقارير', 'عدّل التقرير من المعاينة نفسها. تحفظ الإعدادات محليًا لهذا الجهاز، ويستخدم التصدير شعار المؤسسة المشترك من Supabase تلقائيًا عند توفره.'),
+          _intro('هوية وتصميم التقارير', 'عدّل التقرير من المعاينة نفسها. تحفظ الإعدادات محليًا لهذا الجهاز، ولا يظهر الشعار في التصدير إلا إذا رفعت شعارًا للتقرير صراحةً.'),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.start,
+            children: [
+              OutlinedButton.icon(
+                onPressed: _reportUndo.isEmpty ? null : _undoReportChange,
+                icon: const Icon(Icons.undo),
+                label: const Text('تراجع'),
+              ),
+              const SizedBox(width: 8),
+              OutlinedButton.icon(
+                onPressed: _reportRedo.isEmpty ? null : _redoReportChange,
+                icon: const Icon(Icons.redo),
+                label: const Text('إعادة'),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
           _reportPreview(),
           const SizedBox(height: 12),
           SectionCard(title: 'بيانات المؤسسة', child: Column(children: [
@@ -799,7 +1183,7 @@ class _AppCustomizerScreenState extends State<AppCustomizerScreen>
             _reportField('address', 'العنوان', _store.reportAddress, (v) => setState(() => _store.setReportTheme(address: v))),
           ])),
           SectionCard(title: 'الشعار والترويسة', child: Column(children: [
-            Row(children: [Expanded(child: Text(_store.reportLogoUrl.isEmpty ? 'سيظهر شعار المؤسسة المشترك تلقائيًا' : 'تم تحديد شعار التقرير', textAlign: TextAlign.right)), OutlinedButton.icon(onPressed: _logoBusy ? null : _pickReportLogo, icon: const Icon(Icons.upload_outlined), label: const Text('رفع شعار'))]),
+            Row(children: [Expanded(child: Text(_store.reportLogoUrl.isEmpty ? 'لا يوجد شعار محدد للتقرير' : 'تم تحديد شعار التقرير', textAlign: TextAlign.right)), OutlinedButton.icon(onPressed: _logoBusy ? null : _pickReportLogo, icon: const Icon(Icons.upload_outlined), label: const Text('رفع شعار'))]),
             DropdownButtonFormField<String>(value: _store.reportLogoPosition, decoration: const InputDecoration(labelText: 'موضع الشعار'), items: const [DropdownMenuItem(value: 'right', child: Text('يمين الترويسة')), DropdownMenuItem(value: 'center', child: Text('وسط الترويسة')), DropdownMenuItem(value: 'left', child: Text('يسار الترويسة'))], onChanged: (v) => setState(() => _store.setReportTheme(logoPosition: v))),
             DropdownButtonFormField<String>(value: _store.reportHeaderStyle, decoration: const InputDecoration(labelText: 'شكل الترويسة'), items: const [DropdownMenuItem(value: 'band', child: Text('شريط ملون')), DropdownMenuItem(value: 'minimal', child: Text('بسيطة')), DropdownMenuItem(value: 'boxed', child: Text('إطار كامل'))], onChanged: (v) => setState(() => _store.setReportTheme(headerStyle: v))),
             Row(children: [const Text('حجم الشعار'), Expanded(child: Slider(value: _store.reportLogoSize, min: 28, max: 110, divisions: 16, label: _store.reportLogoSize.round().toString(), onChanged: (v) => setState(() => _store.setReportTheme(logoSize: v))))]),

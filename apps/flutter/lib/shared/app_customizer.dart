@@ -119,14 +119,18 @@ class AppCustomizer extends ChangeNotifier {
     final size = raw?['size'] is num ? (raw!['size'] as num).toDouble() : 10.0;
     final x = raw?['x'] is num ? (raw!['x'] as num).toDouble() : 0.0;
     final y = raw?['y'] is num ? (raw!['y'] as num).toDouble() : 0.0;
-    return {'align': align, 'size': size.clamp(7, 32).toDouble(), 'x': x.clamp(-40, 40).toDouble(), 'y': y.clamp(-20, 20).toDouble()};
+    final color = raw?['color'] is num ? (raw!['color'] as num).toInt() : null;
+    final bold = raw?['bold'] is bool ? raw!['bold'] as bool : null;
+    return {'align': align, 'size': size.clamp(7, 32).toDouble(), 'x': x.clamp(-40, 40).toDouble(), 'y': y.clamp(-20, 20).toDouble(), if (color != null) 'color': color, if (bold != null) 'bold': bold};
   }
-  void setReportHeaderLayout(String key, {String? align, double? size, double? x, double? y}) {
+  void setReportHeaderLayout(String key, {String? align, double? size, double? x, double? y, int? color, bool? bold}) {
     final current = Map<String, dynamic>.from(reportHeaderLayout(key));
     if (align != null && {'right', 'center', 'left'}.contains(align)) current['align'] = align;
     if (size != null) current['size'] = size.clamp(7, 32).toDouble();
     if (x != null) current['x'] = x.clamp(-40, 40).toDouble();
     if (y != null) current['y'] = y.clamp(-20, 20).toDouble();
+    if (color != null) current['color'] = color;
+    if (bold != null) current['bold'] = bold;
     reportHeaderLayouts[key] = current;
     notifyListeners();
   }
@@ -149,7 +153,7 @@ class AppCustomizer extends ChangeNotifier {
     setReportElementPosition(key, left: .08, top: .30, width: .84, height: type == 'logo' ? .12 : .06);
     return key;
   }
-  void updateReportCustomElement(String key, {String? name, String? text, double? size, int? color, String? shape, bool? visible}) {
+  void updateReportCustomElement(String key, {String? name, String? text, double? size, int? color, String? shape, String? align, bool? bold, bool? visible}) {
     final current = reportCustomElements[key];
     if (current == null) return;
     if (name != null) current['name'] = name;
@@ -157,10 +161,44 @@ class AppCustomizer extends ChangeNotifier {
     if (size != null) current['size'] = size.clamp(7, 32).toDouble();
     if (color != null) current['color'] = color;
     if (shape != null) current['shape'] = shape;
+    if (align != null && {'right', 'center', 'left'}.contains(align)) current['align'] = align;
+    if (bold != null) current['bold'] = bold;
     if (visible != null) current['visible'] = visible;
     notifyListeners();
   }
   void removeReportCustomElement(String key) { reportCustomElements.remove(key); reportElementPositions.remove(key); notifyListeners(); }
+
+  Map<String, dynamic> reportThemeSnapshot() => jsonDecode(jsonEncode(toJsonMap()['reportTheme'])) as Map<String, dynamic>;
+
+  void restoreReportThemeSnapshot(Map<String, dynamic> snapshot) {
+    reportCompanyName = '${snapshot['companyName'] ?? reportCompanyName}';
+    reportBranchName = '${snapshot['branchName'] ?? reportBranchName}';
+    reportPhone = '${snapshot['phone'] ?? reportPhone}';
+    reportEmail = '${snapshot['email'] ?? reportEmail}';
+    reportAddress = '${snapshot['address'] ?? reportAddress}';
+    reportHeaderText = '${snapshot['headerText'] ?? reportHeaderText}';
+    reportFooterText = '${snapshot['footerText'] ?? reportFooterText}';
+    reportLogoPosition = '${snapshot['logoPosition'] ?? reportLogoPosition}';
+    reportHeaderStyle = '${snapshot['headerStyle'] ?? reportHeaderStyle}';
+    reportTableStyle = '${snapshot['tableStyle'] ?? reportTableStyle}';
+    reportPrimaryColor = _int(snapshot['primaryColor'], reportPrimaryColor);
+    reportHeadingColor = _int(snapshot['headingColor'], reportHeadingColor);
+    reportLogoSize = _num(snapshot['logoSize'], reportLogoSize).clamp(28, 110).toDouble();
+    reportFontSize = _num(snapshot['fontSize'], reportFontSize).clamp(8, 16).toDouble();
+    reportShowExportDate = snapshot['showExportDate'] is bool ? snapshot['showExportDate'] as bool : reportShowExportDate;
+    reportShowEmployee = snapshot['showEmployee'] is bool ? snapshot['showEmployee'] as bool : reportShowEmployee;
+    reportShowBranch = snapshot['showBranch'] is bool ? snapshot['showBranch'] as bool : reportShowBranch;
+    reportShowStatus = snapshot['showStatus'] is bool ? snapshot['showStatus'] as bool : reportShowStatus;
+    reportShowNumber = snapshot['showNumber'] is bool ? snapshot['showNumber'] as bool : reportShowNumber;
+    reportShowSignature = snapshot['showSignature'] is bool ? snapshot['showSignature'] as bool : reportShowSignature;
+    reportShowFooter = snapshot['showFooter'] is bool ? snapshot['showFooter'] as bool : reportShowFooter;
+    reportLogoUrl = '${snapshot['logoUrl'] ?? reportLogoUrl}';
+    reportHeaderOrder = (snapshot['headerOrder'] as List? ?? reportHeaderOrder).map((item) => '$item').toList();
+    reportHeaderLayouts = _layoutMap(snapshot['elementLayouts']);
+    reportCustomElements = _layoutMap(snapshot['customElements']);
+    reportElementPositions = _positionMap(snapshot['elementPositions']);
+    notifyListeners();
+  }
 
   bool isUnifiedVisible(String key) => unifiedVisibility[key] ?? true;
   bool isUnifiedFieldVisible(String key) => unifiedFieldVisibility[key] ?? true;

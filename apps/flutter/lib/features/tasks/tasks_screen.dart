@@ -39,7 +39,7 @@ class _TasksScreenState extends State<TasksScreen>
   String _view = 'tasks';
   String _ledgerOrder = 'latest';
   bool _officialHeaderCollapsed = true;
-  bool _officialTasksCollapsed = true;
+  bool _officialTasksCollapsed = false;
   bool _administrativeDetailsCollapsed = true;
   String? _organizationId;
   bool _canEditOfficialTasks = false;
@@ -459,14 +459,20 @@ class _TasksScreenState extends State<TasksScreen>
                         children: [
                           if (_canFilterEmployees && _employees.isNotEmpty)
                             Expanded(
-                              flex: 3,
+                              flex: 1,
                               child: DropdownButtonFormField<String>(
                                 value: _employeeFilter,
                                 isExpanded: true,
                                 decoration: const InputDecoration(
                                   labelText: 'عرض الموظفين',
                                   prefixIcon: Icon(Icons.person_outline),
-                                  border: OutlineInputBorder(),
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.all(Radius.circular(16)),
+                                  ),
+                                  enabledBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.all(Radius.circular(16)),
+                                    borderSide: BorderSide(color: Color(0xFFD8DEE8)),
+                                  ),
                                   isDense: true,
                                 ),
                                 items: [
@@ -487,10 +493,11 @@ class _TasksScreenState extends State<TasksScreen>
                               ),
                             ),
                           if (_canFilterEmployees && _employees.isNotEmpty) const SizedBox(width: 8),
-                          SizedBox(
-                            width: 220,
+                          Expanded(
+                            flex: 1,
                             child: Card(
                               margin: EdgeInsets.zero,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                               child: Row(
                                 textDirection: TextDirection.rtl,
                                 children: [

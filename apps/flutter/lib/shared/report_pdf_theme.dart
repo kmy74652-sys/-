@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:pdf/pdf.dart';
@@ -25,10 +27,10 @@ class ReportPdfTheme {
       settings.reportCompanyName = organizationBranding.name;
     }
     pw.ImageProvider? logo;
-    final url = settings.reportLogoUrl.trim().isNotEmpty
-        ? settings.reportLogoUrl.trim()
-        : organizationBranding.logoUrl;
-    if (url != null && url.isNotEmpty) {
+    // الشعار اختياري صراحةً. لا نستخدم شعار المؤسسة المشترك كـ fallback؛
+    // حتى يبقى حذف الشعار من إعدادات الهوية محترمًا في ملفات PDF الجديدة.
+    final url = settings.reportLogoUrl.trim();
+    if (url.isNotEmpty) {
       try {
         final response = await http.get(Uri.parse(url));
         if (response.statusCode == 200 && response.bodyBytes.isNotEmpty) {
@@ -47,16 +49,23 @@ class ReportPdfTheme {
     final defaultOrder = const ['company', 'branchName', 'phone', 'email', 'address', 'headerText', 'title', 'employee', 'taskBranch', 'status', 'number', 'exportDate'];
     final order = <String>[...settings.reportHeaderOrder, ...defaultOrder.where((key) => !settings.reportHeaderOrder.contains(key))];
     final content = <pw.Widget>[];
-    pw.Widget line(String key, String value, {double size = 10, bool bold = false, PdfColor? color}) {
+    pw.Widget line(String key, String value, {double size = 10, bool bold = false, PdfColor? color, String? alignOverride, bool? boldOverride}) {
       final layout = settings.reportHeaderLayout(key);
-      final align = layout['align'] == 'left' ? pw.TextAlign.left : layout['align'] == 'center' ? pw.TextAlign.center : pw.TextAlign.right;
+      final selectedAlign = alignOverride ?? layout['align'];
+      final align = selectedAlign == 'left' ? pw.TextAlign.left : selectedAlign == 'center' ? pw.TextAlign.center : pw.TextAlign.right;
       final configuredSize = settings.reportHeaderLayouts.containsKey(key) ? (layout['size'] as num).toDouble() : size;
+      final configuredColor = settings.reportHeaderLayouts.containsKey(key) && layout['color'] is num
+          ? PdfColor.fromInt((layout['color'] as num).toInt())
+          : color;
+      final configuredBold = boldOverride ?? (settings.reportHeaderLayouts.containsKey(key) && layout['bold'] is bool
+          ? layout['bold'] as bool
+          : bold);
       final position = settings.reportElementPositions[key];
       final x = position == null ? (layout['x'] as num).toDouble() : (position['left'] ?? 0) * 100;
       final y = position == null ? (layout['y'] as num).toDouble() : (position['top'] ?? 0) * 100;
       return pw.Container(
         margin: pw.EdgeInsets.only(left: x > 0 ? x : 0, right: x < 0 ? -x : 0, top: y > 0 ? y : 0, bottom: y < 0 ? -y : 0),
-        child: pw.Text(reportPdfSafeText(value), textDirection: pw.TextDirection.rtl, textAlign: align, style: pw.TextStyle(fontSize: configuredSize, fontWeight: bold ? pw.FontWeight.bold : pw.FontWeight.normal, color: color)),
+        child: pw.Text(reportPdfSafeText(value), textDirection: pw.TextDirection.rtl, textAlign: align, style: pw.TextStyle(fontSize: configuredSize, fontWeight: configuredBold ? pw.FontWeight.bold : pw.FontWeight.normal, color: configuredColor)),
       );
     }
     for (final key in order) {
@@ -82,7 +91,7 @@ class ReportPdfTheme {
       if (text.isEmpty) continue;
       final size = (custom['size'] is num ? (custom['size'] as num).toDouble() : 12).clamp(7, 32).toDouble();
       final color = PdfColor.fromInt(custom['color'] is num ? (custom['color'] as num).toInt() : settings.reportHeadingColor);
-      content.add(line(entry.key, text, size: size, color: color));
+      content.add(line(entry.key, text, size: size, color: color, alignOverride: '${custom['align'] ?? ''}', boldOverride: custom['bold'] is bool ? custom['bold'] as bool : null));
     }
     final row = pw.Row(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
       if (settings.reportLogoPosition == 'right' && logo != null) pw.Container(width: settings.reportLogoSize, height: settings.reportLogoSize, child: pw.Image(logo!, fit: pw.BoxFit.contain)),
@@ -100,6 +109,137 @@ class ReportPdfTheme {
         if (settings.reportShowSignature) pw.Padding(padding: const pw.EdgeInsets.only(top: 12), child: pw.Text('التوقيع: __________________', textAlign: pw.TextAlign.right, textDirection: pw.TextDirection.rtl, style: pw.TextStyle(fontSize: 9, color: heading))),
         if (settings.reportShowFooter && settings.reportFooterText.trim().isNotEmpty) pw.Padding(padding: const pw.EdgeInsets.only(top: 12), child: pw.Text(reportPdfSafeText(settings.reportFooterText), textAlign: pw.TextAlign.center, textDirection: pw.TextDirection.rtl, style: pw.TextStyle(fontSize: 8, color: heading))),
       ]);
+
+  Future<Uint8List> buildDesignerPreviewPdf() async {
+    final document = pw.Document();
+    final regular = await regularFont();
+    final boldFontValue = await boldFont();
+    final pageWidth = PdfPageFormat.a4.width;
+    final pageHeight = PdfPageFormat.a4.height;
+    final keys = <String>[
+      'logo',
+      ...settings.reportHeaderOrder,
+      'signature',
+      'footer',
+      ...settings.reportCustomElements.keys,
+    ];
+
+    Map<String, double> positionFor(String key, int index) {
+      if (settings.reportCustomElements.containsKey(key) || settings.reportElementPositions.containsKey(key)) {
+        return settings.reportElementPosition(key);
+      }
+      if (key == 'logo') return {'left': .06, 'top': .04, 'width': .18, 'height': .11};
+      return {'left': .08, 'top': (.04 + ((index + 1) * .055)).clamp(.02, .72).toDouble(), 'width': .84, 'height': .045};
+    }
+
+    String valueFor(String key) {
+      final custom = settings.reportCustomElements[key];
+      if (custom != null) return '${custom['text'] ?? ''}';
+      switch (key) {
+        case 'company': return settings.reportCompanyName;
+        case 'branchName': return settings.reportBranchName;
+        case 'phone': return settings.reportPhone.isEmpty ? '' : 'الهاتف: ${settings.reportPhone}';
+        case 'email': return settings.reportEmail.isEmpty ? '' : 'البريد الإلكتروني: ${settings.reportEmail}';
+        case 'address': return settings.reportAddress.isEmpty ? '' : 'العنوان: ${settings.reportAddress}';
+        case 'headerText': return settings.reportHeaderText;
+        case 'title': return 'تقرير المهمة';
+        case 'employee': return settings.reportShowEmployee ? 'الموظف: أحمد محمد' : '';
+        case 'taskBranch': return settings.reportShowBranch ? 'الفرع: الفرع الرئيسي' : '';
+        case 'status': return settings.reportShowStatus ? 'الحالة: مكتملة' : '';
+        case 'number': return settings.reportShowNumber ? 'رقم التقرير: 0001' : '';
+        case 'exportDate': return settings.reportShowExportDate ? 'تاريخ التصدير: ${DateTime.now().toLocal().toString().split('.').first}' : '';
+        case 'signature': return settings.reportShowSignature ? 'التوقيع: __________________' : '';
+        case 'footer': return settings.reportShowFooter ? settings.reportFooterText : '';
+        default: return '';
+      }
+    }
+
+    pw.Widget textElement(String key, int index) {
+      final custom = settings.reportCustomElements[key];
+      if (custom?['visible'] == false) return pw.SizedBox();
+      final position = positionFor(key, index);
+      final layout = settings.reportHeaderLayout(key);
+      final size = custom != null
+          ? (custom['size'] is num ? (custom['size'] as num).toDouble() : 12)
+          : (layout['size'] as num).toDouble();
+      final colorValue = custom?['color'] is num
+          ? (custom!['color'] as num).toInt()
+          : layout['color'] is num
+              ? (layout['color'] as num).toInt()
+              : key == 'title'
+                  ? settings.reportHeadingColor
+                  : settings.reportPrimaryColor;
+      final alignValue = custom?['align'] ?? layout['align'];
+      final textAlign = alignValue == 'left' ? pw.TextAlign.left : alignValue == 'center' ? pw.TextAlign.center : pw.TextAlign.right;
+      final isBold = custom?['bold'] is bool ? custom!['bold'] as bool : layout['bold'] is bool ? layout['bold'] as bool : key == 'company' || key == 'title';
+      final value = reportPdfSafeText(valueFor(key)).trim();
+      if (value.isEmpty) return pw.SizedBox();
+      return pw.Positioned(
+        left: position['left']! * pageWidth,
+        top: position['top']! * pageHeight,
+        width: position['width']! * pageWidth,
+        height: position['height']! * pageHeight,
+        child: pw.Container(
+          alignment: alignValue == 'left' ? pw.Alignment.centerLeft : alignValue == 'center' ? pw.Alignment.center : pw.Alignment.centerRight,
+          child: pw.Text(value, textDirection: pw.TextDirection.rtl, textAlign: textAlign, style: pw.TextStyle(font: isBold ? boldFontValue : regular, fontSize: size, color: PdfColor.fromInt(colorValue))),
+        ),
+      );
+    }
+
+    document.addPage(
+      pw.Page(
+        pageFormat: PdfPageFormat.a4,
+        margin: pw.EdgeInsets.zero,
+        build: (_) => pw.Stack(
+          children: [
+            pw.Positioned.fill(
+              child: pw.Container(
+                color: PdfColors.white,
+                child: pw.Container(
+                  margin: const pw.EdgeInsets.all(18),
+                  decoration: pw.BoxDecoration(
+                    color: settings.reportHeaderStyle == 'minimal' ? PdfColors.white : PdfColor.fromHex('#EAF4F0'),
+                    border: settings.reportHeaderStyle == 'boxed' ? pw.Border.all(color: primary, width: .8) : null,
+                  ),
+                ),
+              ),
+            ),
+            for (var index = 0; index < keys.length; index++)
+              if (keys[index] == 'logo' && logo != null)
+                pw.Positioned(
+                  left: positionFor(keys[index], index)['left']! * pageWidth,
+                  top: positionFor(keys[index], index)['top']! * pageHeight,
+                  width: positionFor(keys[index], index)['width']! * pageWidth,
+                  height: positionFor(keys[index], index)['height']! * pageHeight,
+                  child: pw.Image(logo!, fit: pw.BoxFit.contain),
+                )
+              else if (keys[index] != 'logo')
+                textElement(keys[index], index),
+            pw.Positioned(
+              left: .06 * pageWidth,
+              top: .48 * pageHeight,
+              width: .88 * pageWidth,
+              height: .30 * pageHeight,
+              child: pw.Table.fromTextArray(
+                headers: const ['الوقت', 'المهمة والبيان', 'المخرج المطلوب', 'الحالة'],
+                data: const [
+                  ['08:00', 'مهمة حالية', 'لا يوجد', 'جديدة'],
+                  ['—', 'مهمة استثنائية', 'لا يوجد', 'جديدة'],
+                ],
+                headerStyle: pw.TextStyle(font: boldFontValue, fontSize: 9, color: primary),
+                cellStyle: pw.TextStyle(font: regular, fontSize: 8),
+                headerDecoration: pw.BoxDecoration(color: PdfColor.fromHex('#EAF1EF')),
+                border: tableBorder,
+                cellAlignment: pw.Alignment.centerRight,
+                cellPadding: const pw.EdgeInsets.all(5),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+    return document.save();
+  }
 
   static Future<pw.Font> regularFont() async => pw.Font.ttf(await rootBundle.load('assets/fonts/NotoSansArabic-Regular.ttf'));
   static Future<pw.Font> boldFont() async => pw.Font.ttf(await rootBundle.load('assets/fonts/NotoSansArabic-Bold.ttf'));

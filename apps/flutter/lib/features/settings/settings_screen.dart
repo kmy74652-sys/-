@@ -122,11 +122,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
       // قد تمنع RLS قراءة صف organizations مباشرة رغم أن ترويسة التطبيق
       // قادرة على قراءة الهوية من المصدر المخصص للجلسة. لا نترك حقل الاسم
       // فارغًا لأن RPC الحفظ يرفضه عمدًا.
-      if (organizationName.isEmpty || tagline.isEmpty || logoUrl == null) {
+      if (organizationName.isEmpty || tagline.isEmpty) {
         final sessionBranding = await OrganizationBrandingStore.instance.forSession();
         if (organizationName.isEmpty) organizationName = sessionBranding.name.trim();
         if (tagline.isEmpty) tagline = sessionBranding.tagline.trim();
-        logoUrl ??= sessionBranding.logoUrl;
       }
       _brandName.text = organizationName;
       _tagline.text = tagline;
