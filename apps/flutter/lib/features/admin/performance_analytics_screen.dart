@@ -127,7 +127,7 @@ class _PerformanceAnalyticsScreenState
         db
             .from('tasks')
             .select(
-              'id,title,description,assigned_to,position_code,branch_id,priority,status,due_at,assigned_at,received_at,opened_at,report_required',
+              'id,title,description,assigned_to,position_code,branch_id,priority,status,due_at,completed_at,updated_at,assigned_at,received_at,opened_at,report_required',
             )
             .isFilter('deleted_at', null)
             .order('due_at')
@@ -280,10 +280,14 @@ class _PerformanceAnalyticsScreenState
         employee.required[bucket] = (employee.required[bucket] ?? 0) + 1;
         if (isDone) employee.done[bucket] = (employee.done[bucket] ?? 0) + 1;
         final due = dueDate;
-        if (!isDone &&
-            status != 'cancelled' &&
-            due != null &&
-            due.isBefore(DateTime.now()))
+        final completedAt = DateTime.tryParse(
+          _str(task['completed_at'], isDone ? _str(task['updated_at']) : ''),
+        )?.toLocal();
+        final completedLate =
+            isDone && due != null && completedAt != null && completedAt.isAfter(due);
+        if (status == 'late' ||
+            completedLate ||
+            (!isDone && status != 'cancelled' && due != null && due.isBefore(DateTime.now())))
           employee.delayed++;
         final item = _Task(
           id: _str(task['id']),

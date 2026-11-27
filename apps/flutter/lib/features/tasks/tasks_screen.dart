@@ -142,7 +142,7 @@ class _TasksScreenState extends State<TasksScreen>
         final page = await client
             .from('tasks')
             .select(
-              'id,organization_id,title,description,due_at,priority,status,report_required,report_form_snapshot_id,assigned_to,assigned_at,received_at,opened_at,created_at,updated_at',
+              'id,organization_id,title,description,due_at,completed_at,priority,status,report_required,report_form_snapshot_id,assigned_to,assigned_at,received_at,opened_at,created_at,updated_at',
             )
             .isFilter('deleted_at', null)
             .order('due_at')
@@ -1509,7 +1509,15 @@ class _TasksScreenState extends State<TasksScreen>
     final late = ordered.where((task) {
       final status = _normalizedStatus(task);
       final due = DateTime.tryParse('${task['due_at'] ?? ''}');
-      return status != 'approved' && due != null && due.isBefore(DateTime.now());
+      final done = {'approved', 'completed'}.contains(status);
+      final completedAt = DateTime.tryParse(
+        '${task['completed_at'] ?? (done ? task['updated_at'] ?? '' : '')}',
+      );
+      final completedLate =
+          done && due != null && completedAt != null && completedAt.isAfter(due);
+      return status == 'late' ||
+          completedLate ||
+          (!done && due != null && due.isBefore(DateTime.now()));
     }).length;
     return Card(
       color: const Color(0xFFF8FBFA),
