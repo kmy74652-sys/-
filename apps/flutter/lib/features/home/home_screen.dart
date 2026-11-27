@@ -499,40 +499,6 @@ class _HomeScreenState extends State<HomeScreen> {
     ),
   );
 
-  Widget _unifiedTaskTableSection() {
-    if (!AppCustomizer.instance.isVisible('unifiedTable')) {
-      return const SizedBox.shrink();
-    }
-    return SectionCard(
-      title: 'إنشاء المهام',
-      child: InkWell(
-        borderRadius: BorderRadius.circular(12),
-        onTap: _manageTasks ? () => context.push('/admin/unified-tasks') : null,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          child: Row(
-            textDirection: TextDirection.rtl,
-            children: [
-              Icon(Icons.table_chart_outlined,
-                  color: Color(AppCustomizer.instance.primaryColor), size: 30),
-              const SizedBox(width: 9),
-              Expanded(
-                child: Text(
-                  'إعداد المهام وجدولتها وإرسالها للموظفين',
-                  textAlign: TextAlign.right,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(fontWeight: FontWeight.w700),
-                ),
-              ),
-              const Icon(Icons.chevron_left),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
   Widget _settingsPanel() {
     if (!AppCustomizer.instance.isVisible('adminSections')) {
       return const SizedBox.shrink();
