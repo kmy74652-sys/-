@@ -232,9 +232,9 @@ class _UnifiedTaskTableScreenState extends State<UnifiedTaskTableScreen> {
       value == null ? fallback : value.toString();
 
   bool _isUnifiedTask(Map<String, dynamic> task) {
-    // الإصدارات اليومية الناتجة عن دورة اعتماد التقرير مهام تشغيلية،
-    // وليست سجلات قابلة للتحرير من محرر إنشاء الجدول الموحد.
-    if (_text(task['idempotency_key']).startsWith('approved-cycle:')) {
+    // المهمة الأصلية المعتمدة سجل تاريخي، أما الإصدار اليومي الناتج
+    // عن دورة الاعتماد فيبقى ظاهرًا وقابلًا للتحرير ضمن الجدول الموحد.
+    if (_text(task['status']) == 'completed_approved') {
       return false;
     }
     return _text(task['title']).startsWith('الجدول الموحد -') ||
