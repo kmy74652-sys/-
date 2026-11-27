@@ -55,7 +55,7 @@ class AppCustomizer extends ChangeNotifier {
 
   static const defaults = <String, String>{
     'appName': 'NEXORA', 'organizationName': 'مؤسسة الشاعري للتجارة العامة', 'tagline': 'Smart Business Management', 'time': 'الوقت من وإلى',
-    'home': 'الرئيسية', 'tasks': 'المهام', 'independentTasks': 'المهام المستقلة', 'employees': 'الموظفون', 'activity': 'سجل النشاط', 'report-designer': 'مصمم التقارير', 'hr': 'الموارد البشرية', 'workSection': 'العمل والمتابعة', 'unifiedTable': 'الجدول الموحد لإنشاء المهام', 'taskManagement': 'إدارة مهام الجداول الموحدة', 'reports': 'تقارير الموظفين', 'performance': 'إحصائيات ومقارنة الأداء', 'dailyReports': 'التقارير اليومية المصممة', 'employeeReports': 'تقارير الموظف', 'adminSections': 'أقسام الإدارة', 'settings': 'الإعدادات', 'totalTasks': 'إجمالي المهام', 'inProgress': 'قيد التنفيذ', 'submitted': 'بانتظار المراجعة', 'lateTasks': 'مهام متأخرة',
+    'home': 'الرئيسية', 'tasks': 'المهام الحالية', 'independentTasks': 'المهام المستقلة', 'employees': 'الموظفون', 'activity': 'سجل النشاط', 'report-designer': 'مصمم التقارير', 'hr': 'الموارد البشرية', 'workSection': 'العمل والمتابعة', 'unifiedTable': 'إنشاء المهام بالجدول الموحد', 'taskManagement': 'إدارة مهام الجدول الموحد', 'reports': 'مراجعة التقارير', 'performance': 'تحليلات أداء الموظفين والفروع', 'dailyReports': 'التقارير اليومية المصممة', 'employeeReports': 'تقاريري اليومية', 'adminSections': 'أقسام الإدارة', 'settings': 'إعدادات التطبيق والحساب', 'totalTasks': 'إجمالي المهام', 'inProgress': 'قيد التنفيذ', 'submitted': 'بانتظار المراجعة', 'lateTasks': 'مهام متأخرة',
   };
 
   Future<void> load() => _loaded ? Future<void>.value() : (_loadFuture ??= _loadOnce());
@@ -88,6 +88,18 @@ class AppCustomizer extends ChangeNotifier {
     }
     if (labels['tagline'] == 'معًا .. نحو إدارة أفضل') {
       labels['tagline'] = defaults['tagline']!;
+    }
+    const migrations = <String, String>{
+      'tasks': 'المهام',
+      'unifiedTable': 'الجدول الموحد لإنشاء المهام',
+      'taskManagement': 'إدارة مهام الجداول الموحدة',
+      'reports': 'تقارير الموظفين',
+      'performance': 'إحصائيات ومقارنة الأداء',
+      'employeeReports': 'تقارير الموظف',
+      'settings': 'الإعدادات',
+    };
+    for (final entry in migrations.entries) {
+      if (labels[entry.key] == entry.value) labels[entry.key] = defaults[entry.key]!;
     }
   }
 

@@ -375,8 +375,8 @@ class _IndependentReportsScreenState extends State<IndependentReportsScreen> {
 
   @override
   Widget build(BuildContext context) => AppShell(
-    title: 'تقارير الموظف',
-    subtitle: 'نماذج التقارير المستقلة اليومية',
+    title: 'تقاريري اليومية',
+    subtitle: 'التقارير اليومية المبنية على النماذج المعتمدة',
     child: RefreshIndicator(
       onRefresh: _load,
       child: _loading
@@ -385,7 +385,7 @@ class _IndependentReportsScreenState extends State<IndependentReportsScreen> {
               padding: const EdgeInsets.all(12),
               children: [
                 const Text(
-                  'تقارير الموظف المستقلة',
+                  'التقارير اليومية',
                   textAlign: TextAlign.right,
                   style: TextStyle(
                     color: AppColors.navy,

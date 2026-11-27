@@ -236,12 +236,12 @@ class _AdminScreenState extends State<AdminScreen> {
     if (widget.embedded) return content;
     return AppShell(
       title: _section == 'overview'
-          ? 'لوحة إدارة المؤسسة'
+          ? 'لوحة الإدارة'
           : const {
-              'tasks': 'مهام الجداول الموحدة',
-              'reports': 'تقارير الموظفين',
-              'branches': 'إدارة الفروع',
-              'employees': 'إدارة الموظفين',
+              'tasks': 'مهام الجدول الموحد',
+              'reports': 'مراجعة التقارير',
+              'branches': 'الفروع',
+              'employees': 'الموظفون',
               'activity': 'سجل النشاط',
               'performance': 'تحليلات الأداء',
             }[_section] ?? 'الإدارة',
@@ -264,8 +264,8 @@ class _AdminScreenState extends State<AdminScreen> {
   Widget _sectionContent() {
     final title =
         {
-          'tasks': 'المهام والتكليفات',
-          'reports': 'تقارير الموظفين',
+          'tasks': 'مهام الجدول الموحد',
+          'reports': 'مراجعة التقارير',
           'branches': 'الفروع',
           'employees': 'الموظفون',
           'activity': 'سجل النشاط',

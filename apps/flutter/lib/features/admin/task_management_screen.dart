@@ -869,10 +869,10 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
       context.go('/tasks');
     },
     child: AppShell(
-      title: widget.unifiedOnly ? 'إدارة الجداول الموحدة' : 'إدارة المهام',
+      title: widget.unifiedOnly ? 'إدارة مهام الجدول الموحد' : 'إدارة المهام والتقارير',
       subtitle: widget.unifiedOnly
-          ? 'الجداول المرسلة للموظفين وتقاريرها واعتماد إنجازها'
-          : 'الإنشاء المباشر والمتابعة والتقارير',
+          ? 'متابعة المهام المرسلة وتقاريرها واعتماد الإنجاز'
+          : 'إنشاء المهام ومتابعة تنفيذها وتقاريرها',
       child: _loading
           ? const Center(child: CircularProgressIndicator())
           : RefreshIndicator(
@@ -884,7 +884,7 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
                 if (_busy) const LinearProgressIndicator(),
                 if (!widget.unifiedOnly)
                   SectionCard(
-                    title: 'إجراءات الإدارة',
+                    title: 'إجراءات المهام',
                     child: Wrap(
                       spacing: 8,
                       runSpacing: 8,
@@ -1108,7 +1108,7 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
                 ),
                 if (_tasks.isNotEmpty)
                   SectionCard(
-                    title: 'متابعة التقارير مباشرة',
+                    title: 'مراجعة واعتماد التقارير',
                     child: Wrap(
                       spacing: 8,
                       runSpacing: 8,

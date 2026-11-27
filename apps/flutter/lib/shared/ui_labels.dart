@@ -6,8 +6,8 @@ String uiStatusLabel(String value) => const {
       'on_hold': 'معلّقة',
       'report_submitted': 'بانتظار المراجعة',
       'submitted': 'بانتظار المراجعة',
-      'needs_revision': 'مرفوضة',
-      'returned': 'مرفوضة',
+      'needs_revision': 'يحتاج تعديلًا',
+      'returned': 'يحتاج تعديلًا',
       'rejected': 'مرفوضة',
       'completed': 'مكتملة',
       'approved': 'معتمدة',
@@ -77,7 +77,7 @@ class UiLabels {
         'submitted': 'بانتظار المراجعة',
         'reviewed': 'بانتظار الاعتماد',
         'approved': 'معتمدة',
-        'returned': 'مرفوضة',
+        'returned': 'يحتاج تعديلًا',
         'rejected': 'مرفوضة',
       }[value.trim()] ?? 'غير محددة';
 }

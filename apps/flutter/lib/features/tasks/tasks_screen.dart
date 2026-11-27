@@ -421,7 +421,7 @@ class _TasksScreenState extends State<TasksScreen>
           textDirection: TextDirection.rtl,
           textAlign: TextAlign.right,
           decoration: const InputDecoration(
-            hintText: 'عنوان المهمة أو وصفها',
+            hintText: 'عنوان المهمة أو وصفها أو اسم الموظف',
             prefixIcon: Icon(Icons.search),
             border: OutlineInputBorder(),
           ),
@@ -564,7 +564,7 @@ class _TasksScreenState extends State<TasksScreen>
                                 value: _employeeFilter,
                                 isExpanded: true,
                                 decoration: const InputDecoration(
-                                  labelText: 'عرض الموظفين',
+                                  labelText: 'تصفية حسب الموظف',
                                   prefixIcon: Icon(Icons.person_outline),
                                   border: OutlineInputBorder(
                                     borderRadius: BorderRadius.all(Radius.circular(16)),
@@ -601,7 +601,7 @@ class _TasksScreenState extends State<TasksScreen>
                               child: Row(
                                 textDirection: TextDirection.rtl,
                                 children: [
-                                  const Expanded(child: Text('الفلاتر', textAlign: TextAlign.right, style: TextStyle(fontWeight: FontWeight.w800))),
+                                  const Expanded(child: Text('عوامل التصفية', textAlign: TextAlign.right, style: TextStyle(fontWeight: FontWeight.w800))),
                                   IconButton(
                                     tooltip: 'إعادة تعيين الفلاتر',
                                     onPressed: _resetFilters,
@@ -638,20 +638,20 @@ class _TasksScreenState extends State<TasksScreen>
                         textDirection: TextDirection.rtl,
                         children: [
                           ChoiceChip(
-                            label: const Text('الحالية'),
+                            label: const Text('المهام الحالية'),
                             selected: _view == 'tasks',
                             onSelected: (_) => _selectSection('tasks', loadCycles: false),
                           ),
                           const SizedBox(width: 8),
                           ChoiceChip(
-                            label: const Text('السجل'),
+                            label: const Text('سجل المهام'),
                             selected: _view == 'ledger',
                             onSelected: (_) => _selectSection('ledger', loadCycles: false),
                           ),
                           if (_canFilterEmployees) ...[
                             const SizedBox(width: 8),
                             ChoiceChip(
-                              label: const Text('الدورات المعتمدة'),
+                              label: const Text('دورات المهام المعتمدة'),
                               selected: _view == 'approved_cycles',
                               onSelected: (_) => _selectSection('approved_cycles'),
                             ),
@@ -816,7 +816,7 @@ class _TasksScreenState extends State<TasksScreen>
                           textAlign: TextAlign.right,
                           style: const TextStyle(fontWeight: FontWeight.w800)),
                     ),
-                    Text(active ? 'مرحلة فعالة' : 'متوقفة',
+                    Text(active ? 'دورة نشطة' : 'دورة متوقفة',
                         style: TextStyle(
                             color: active ? Colors.green : AppColors.muted,
                             fontWeight: FontWeight.w700)),
@@ -835,13 +835,13 @@ class _TasksScreenState extends State<TasksScreen>
                     OutlinedButton.icon(
                       onPressed: active ? () => _issueApprovedCycleNow(cycle) : null,
                       icon: const Icon(Icons.add_task_outlined, size: 18),
-                      label: const Text('إصدار الآن'),
+                      label: const Text('إصدار مهمة الآن'),
                     ),
                     const SizedBox(width: 8),
                     TextButton.icon(
                       onPressed: () => _toggleApprovedCycle(cycle),
                       icon: Icon(active ? Icons.pause : Icons.play_arrow, size: 18),
-                      label: Text(active ? 'إيقاف المرحلة' : 'استئناف المرحلة'),
+                      label: Text(active ? 'إيقاف الدورة' : 'استئناف الدورة'),
                     ),
                   ],
                 ),

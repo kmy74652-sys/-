@@ -882,8 +882,8 @@ class _ReportsScreenState extends State<ReportsScreen> {
 
   @override
   Widget build(BuildContext context) => AppShell(
-    title: 'تقارير الموظفين',
-    subtitle: 'تقارير المهام والتقارير المستقلة الظاهرة وفق صلاحيات حسابك',
+    title: 'مراجعة التقارير',
+    subtitle: 'مراجعة تقارير المهام والنماذج والتقارير اليومية وفق الصلاحيات',
     child: RefreshIndicator(
       onRefresh: _load,
       child: _busy
@@ -929,7 +929,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
       padding: const EdgeInsets.all(12),
       children: [
         const Text(
-          'تقارير الموظفين',
+          'قائمة التقارير',
           textAlign: TextAlign.right,
           style: TextStyle(
             color: AppColors.navy,
@@ -954,7 +954,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                   onSelected: (_) => setState(() => _stream = 'tasks'),
                 ),
                 ChoiceChip(
-                  label: const Text('التقارير المستقلة'),
+                  label: const Text('تقارير النماذج'),
                   selected: _stream == 'submissions',
                   visualDensity: VisualDensity.compact,
                   materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
@@ -986,7 +986,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
           ),
         ] else if (_stream == 'submissions') ...[
           const Text(
-            'التقارير المستقلة',
+            'تقارير النماذج',
             textAlign: TextAlign.right,
             style: TextStyle(
               color: AppColors.navy,

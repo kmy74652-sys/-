@@ -237,7 +237,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
                   children: [
                     const Expanded(
                       child: Text(
-                        'التنبيهات',
+                        'مركز التنبيهات',
                         style: TextStyle(
                           fontSize: 19,
                           fontWeight: FontWeight.w800,
@@ -246,7 +246,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
                       ),
                     ),
                     IconButton(
-                      tooltip: 'إغلاق التنبيهات',
+                      tooltip: 'إغلاق مركز التنبيهات',
                       onPressed: () => Navigator.pop(sheetContext),
                       icon: const Icon(Icons.close),
                     ),
@@ -280,7 +280,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
                         ),
                       )
                     : notifications.isEmpty
-                    ? const Center(child: Text('لا توجد تنبيهات.'))
+                    ? const Center(child: Text('لا توجد تنبيهات جديدة.'))
                     : ListView.separated(
                         padding: const EdgeInsets.all(16),
                         itemCount: notifications.length,

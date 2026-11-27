@@ -387,8 +387,8 @@ class _PerformanceAnalyticsScreenState
   Widget build(BuildContext context) => Directionality(
     textDirection: TextDirection.rtl,
     child: AppShell(
-      title: 'تحليلات الأداء',
-      subtitle: 'مؤشرات الموظفين والفروع وفق البيانات المتاحة',
+      title: 'تحليلات أداء الموظفين والفروع',
+      subtitle: 'قياس الإنجاز والتأخر والتقارير حسب البيانات المتاحة',
       child: RefreshIndicator(
         onRefresh: _load,
         child: _loading && _employees.isEmpty
@@ -450,7 +450,7 @@ class _PerformanceAnalyticsScreenState
   );
 
   Widget _ledgerFilters() => SectionCard(
-    title: 'كشف المهام حسب الموظف والفترة',
+    title: 'سجل المهام حسب الموظف والفترة',
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [

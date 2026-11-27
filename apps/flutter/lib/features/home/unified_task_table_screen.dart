@@ -969,8 +969,8 @@ class _UnifiedTaskTableScreenState extends State<UnifiedTaskTableScreen> {
 
   @override
   Widget build(BuildContext context) => AppShell(
-        title: 'الجدول الموحد لإنشاء المهام',
-        subtitle: 'إنشاء منظم وإرسال مباشر للموظف',
+        title: 'إنشاء مهام بالجدول الموحد',
+        subtitle: 'إنشاء المهام اليومية وإرسالها للموظفين',
         onBeforeNavigate: _confirmDiscardChanges,
         child: WillPopScope(
           onWillPop: _confirmDiscardChanges,
@@ -1026,7 +1026,7 @@ class _UnifiedTaskTableScreenState extends State<UnifiedTaskTableScreen> {
                                         .push('/admin/unified-task-management');
                                 },
                                 icon: const Icon(Icons.manage_search_outlined),
-                                label: const Text('إدارة الجداول الموحدة'),
+                                label: const Text('إدارة مهام الجدول الموحد'),
                               ),
                             ],
                           ),
