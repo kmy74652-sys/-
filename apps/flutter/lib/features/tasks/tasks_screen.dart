@@ -39,6 +39,7 @@ class _TasksScreenState extends State<TasksScreen>
   String _view = 'tasks';
   String _ledgerOrder = 'latest';
   bool _officialHeaderCollapsed = false;
+  bool _administrativeDetailsCollapsed = true;
   String? _organizationId;
   bool _canEditOfficialTasks = false;
   bool _canFilterEmployees = false;
@@ -310,6 +311,44 @@ class _TasksScreenState extends State<TasksScreen>
     });
   }
 
+  Future<void> _openTaskSearch() async {
+    final controller = TextEditingController(text: _search);
+    final value = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('البحث في المهام', textAlign: TextAlign.right),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          textDirection: TextDirection.rtl,
+          textAlign: TextAlign.right,
+          decoration: const InputDecoration(
+            hintText: 'عنوان المهمة أو وصفها',
+            prefixIcon: Icon(Icons.search),
+            border: OutlineInputBorder(),
+          ),
+          onSubmitted: (query) => Navigator.of(dialogContext).pop(query),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('إلغاء'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(controller.text),
+            child: const Text('بحث'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (!mounted || value == null) return;
+    setState(() {
+      _search = value;
+      _searchController.value = TextEditingValue(text: value);
+    });
+  }
+
   Widget _chip(
     String value,
     String label,
@@ -411,26 +450,18 @@ class _TasksScreenState extends State<TasksScreen>
                           ),
                         ),
                       ),
-                    TextField(
-                      controller: _searchController,
-                      textDirection: TextDirection.rtl,
-                      textAlign: TextAlign.right,
-                      decoration: InputDecoration(
-                        hintText: 'ابحث في عنوان المهمة أو وصفها…',
-                        prefixIcon: const Icon(Icons.search),
-                        suffixIcon: _search.isEmpty
-                            ? null
-                            : IconButton(
-                                icon: const Icon(Icons.close),
-                                onPressed: () => setState(() {
+                    Align(
+                      alignment: AlignmentDirectional.centerEnd,
+                      child: IconButton(
+                        tooltip: _search.isEmpty ? 'بحث' : 'مسح البحث',
+                        icon: Icon(_search.isEmpty ? Icons.search : Icons.search_off),
+                        onPressed: _search.isEmpty
+                            ? _openTaskSearch
+                            : () => setState(() {
                                   _search = '';
                                   _searchController.clear();
                                 }),
-                              ),
-                        isDense: true,
-                        border: const OutlineInputBorder(),
                       ),
-                      onChanged: (value) => setState(() => _search = value),
                     ),
                     if (_canFilterEmployees && _employees.isNotEmpty) ...[
                       const SizedBox(height: 8),
@@ -438,7 +469,7 @@ class _TasksScreenState extends State<TasksScreen>
                         value: _employeeFilter,
                         isExpanded: true,
                         decoration: const InputDecoration(
-                          labelText: 'عرض حسب الموظف',
+                          labelText: 'عرض الموظفين',
                           prefixIcon: Icon(Icons.person_outline),
                           border: OutlineInputBorder(),
                           isDense: true,
@@ -498,9 +529,10 @@ class _TasksScreenState extends State<TasksScreen>
                                   style: const TextStyle(fontWeight: FontWeight.w800),
                                 ),
                               ),
-                              TextButton(
+                              IconButton(
+                                tooltip: 'إعادة تعيين الفلاتر',
                                 onPressed: _resetFilters,
-                                child: const Text('إعادة التعيين'),
+                                icon: const Icon(Icons.restart_alt),
                               ),
                               IconButton(
                                 tooltip: _filtersExpanded ? 'إخفاء الفلاتر' : 'إظهار الفلاتر',
@@ -558,11 +590,6 @@ class _TasksScreenState extends State<TasksScreen>
                               fontSize: 12,
                             ),
                           ),
-                        ),
-                        TextButton.icon(
-                          onPressed: _resetFilters,
-                          icon: const Icon(Icons.clear_all, size: 18),
-                          label: const Text('مسح المرشحات'),
                         ),
                       ],
                     ),
@@ -973,8 +1000,7 @@ class _TasksScreenState extends State<TasksScreen>
               Text(
                 fieldValue.trim().isEmpty ? '—' : fieldValue,
                 textAlign: TextAlign.right,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
+                softWrap: true,
                 style: const TextStyle(fontSize: 12),
               ),
             ],
@@ -1013,6 +1039,16 @@ class _TasksScreenState extends State<TasksScreen>
       if (firstPeriod != '—' && firstPeriod.isNotEmpty) ('الفترة الأولى', firstPeriod),
       if (breakPeriod != '—' && breakPeriod.isNotEmpty) ('الاستراحة', breakPeriod),
       if (secondPeriod != '—' && secondPeriod.isNotEmpty) ('الفترة الثانية', secondPeriod),
+    ];
+    final recommendations = value('التوصيات الإدارية') != '—'
+        ? value('التوصيات الإدارية')
+        : value('التعليمات');
+    final detailFields = <(String, String)>[
+      ('المسؤوليات الأساسية', value('المسؤوليات')),
+      ('الصلاحيات', value('الصلاحيات')),
+      ('التوصيات الإدارية', recommendations),
+      ('مؤشرات تقييم الأداء', value('مؤشرات الأداء')),
+      ('ملاحظات وتعليمات للإدارة أو الموظف', value('ملاحظات وتعليمات إضافية')),
     ];
     final officialRows = <Map<String, dynamic>>[];
     final rowPattern = RegExp(
@@ -1158,12 +1194,37 @@ class _TasksScreenState extends State<TasksScreen>
               ],
             ),
             const SizedBox(height: 6),
-            if (value('المسؤوليات') != '—')
-              Text('المسؤوليات: ${value('المسؤوليات')}', textAlign: TextAlign.right),
-            if (value('الصلاحيات') != '—')
-              Text('الصلاحيات: ${value('الصلاحيات')}', textAlign: TextAlign.right),
-            if (value('مؤشرات الأداء') != '—')
-              Text('مؤشرات الأداء: ${value('مؤشرات الأداء')}', textAlign: TextAlign.right),
+            Row(
+              textDirection: Directionality.of(context),
+              children: [
+                Expanded(
+                  child: const Text(
+                    'التفاصيل الإدارية للمهمة',
+                    textAlign: TextAlign.right,
+                    style: TextStyle(fontWeight: FontWeight.w800, color: AppColors.navy),
+                  ),
+                ),
+                IconButton(
+                  tooltip: _administrativeDetailsCollapsed ? 'إظهار التفاصيل' : 'إخفاء التفاصيل',
+                  visualDensity: VisualDensity.compact,
+                  icon: Icon(
+                    _administrativeDetailsCollapsed
+                        ? Icons.visibility_outlined
+                        : Icons.visibility_off_outlined,
+                    size: 19,
+                    color: AppColors.navy,
+                  ),
+                  onPressed: () => setState(() {
+                    _administrativeDetailsCollapsed = !_administrativeDetailsCollapsed;
+                  }),
+                ),
+              ],
+            ),
+            if (!_administrativeDetailsCollapsed) ...[
+              const SizedBox(height: 5),
+              compactGrid(detailFields),
+            ],
+            const SizedBox(height: 6),
             Text(
               'التقرير اليومي: ${tasks.any((task) => task['report_required'] == true) ? 'نموذج جاهز مطلوب' : 'غير محدد'}',
               textAlign: TextAlign.right,
