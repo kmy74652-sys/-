@@ -114,13 +114,16 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
   List<_ShellTab> _tabs() => [
         _ShellTab('/', AppCustomizer.instance.label('home'), Icons.home_outlined),
         _ShellTab('/tasks', AppCustomizer.instance.label('tasks'), Icons.task_alt_outlined),
-        if (_permissions.contains('employees.manage'))
-          _ShellTab('/settings', 'الإعدادات', Icons.settings_outlined),
+        if (_permissions.contains('tasks.manage'))
+          const _ShellTab('/admin/unified-tasks', 'إنشاء المهام', Icons.table_chart_outlined)
+        else if (_permissions.contains('employees.manage'))
+          const _ShellTab('/settings', 'الإعدادات', Icons.settings_outlined),
       ];
 
   int _selectedIndex(String path) {
     if (path == '/tasks' || path.startsWith('/tasks/')) return 1;
-    if (path == '/settings' || path.startsWith('/settings/')) return _tabs().length - 1;
+    if (path == '/settings' || path.startsWith('/settings/') ||
+        path == '/admin/unified-tasks') return _tabs().length - 1;
     if (path == '/' || path.isEmpty) return 0;
     // الإدارة والتقارير والتحليلات مسارات داخلية وتُحسب بصريًا على الرئيسية.
     return 0;

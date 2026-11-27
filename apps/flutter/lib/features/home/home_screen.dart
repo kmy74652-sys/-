@@ -484,10 +484,6 @@ class _HomeScreenState extends State<HomeScreen> {
             for (final group in _groups) ...[
               const SizedBox(height: 14),
               _moduleGroup(group.$1, group.$2),
-              if (group.$1 == 'العمل والمتابعة' && _manageTasks) ...[
-                const SizedBox(height: 10),
-                _unifiedTaskTableSection(),
-              ],
             ],
             const SizedBox(height: 8),
             _settingsPanel(),
