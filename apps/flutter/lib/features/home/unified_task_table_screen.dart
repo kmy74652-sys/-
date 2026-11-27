@@ -1017,7 +1017,7 @@ class _UnifiedTaskTableScreenState extends State<UnifiedTaskTableScreen> {
                                     context.pop();
                                 },
                                 icon: const Icon(Icons.arrow_forward),
-                                label: const Text('العودة إلى الرئيسية'),
+                                label: const Text('العودة إلى الشاشة السابقة'),
                               ),
                               OutlinedButton.icon(
                                 onPressed: () async {

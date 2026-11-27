@@ -153,7 +153,8 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
   Future<void> _goBack(String path) async {
     final allowed = await widget.onBeforeNavigate?.call() ?? true;
     if (!allowed || !mounted) return;
-    if (path.startsWith('/tasks/') && context.canPop()) {
+    if ((path.startsWith('/tasks/') || path == '/admin/unified-tasks') &&
+        context.canPop()) {
       context.pop();
       return;
     }
