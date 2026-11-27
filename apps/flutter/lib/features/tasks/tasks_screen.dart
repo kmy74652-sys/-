@@ -265,7 +265,10 @@ class _TasksScreenState extends State<TasksScreen>
 
   void _selectSection(String view, {bool loadCycles = true}) {
     if (_view == view) return;
-    setState(() => _view = view);
+    setState(() {
+      _view = view;
+      if (view == 'ledger') _statusFilter = 'pending';
+    });
     if (loadCycles && view == 'approved_cycles') _loadApprovedCycles();
   }
 
