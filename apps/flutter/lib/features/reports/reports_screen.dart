@@ -335,8 +335,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
     if (parsed == null) return raw;
     final local = parsed.toLocal();
     String two(int number) => number.toString().padLeft(2, '0');
-    return '${local.year}-${two(local.month)}-${two(local.day)} '
-        formatArabicTime(local);
+    return '${local.year}-${two(local.month)}-${two(local.day)} ${formatArabicTime(local)}';
   }
 
   String _snapshotTitle(Map<String, dynamic> row) {
