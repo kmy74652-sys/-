@@ -1103,6 +1103,34 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
     return '$value';
   }
 
+  bool _pdfLooksLikeSignature(dynamic value) {
+    if (value is! Map) return false;
+    return value['strokes'] is List ||
+        value['signature_attachment_id'] != null ||
+        value['signed_at'] != null ||
+        value['acknowledged'] != null;
+  }
+
+  String _pdfFieldLabel(Map<String, dynamic> field, int index) {
+    final label = '${field['label'] ?? ''}'.trim();
+    final key = '${field['key'] ?? ''}'.trim();
+    final candidate = label.isNotEmpty ? label : key;
+    final looksLikeCode = candidate.isEmpty ||
+        candidate.contains(RegExp(r'dlef', caseSensitive: false)) ||
+        RegExp(r'^[_:\-\d]+$').hasMatch(candidate);
+    if (!looksLikeCode) return reportPdfSafeText(candidate);
+    return switch ('${field['type'] ?? ''}') {
+      'date' => 'التاريخ',
+      'datetime' => 'التاريخ والوقت',
+      'signature' => 'التوقيع',
+      'calculated' => 'القيمة المحسوبة',
+      'attachment' => 'المرفق',
+      'select' => 'الحالة',
+      'number' => 'القيمة',
+      _ => 'الحقل ${index + 1}',
+    };
+  }
+
   Future<void> _shareSnapshotPdf({
     required String title,
     required String reportTitle,
@@ -1138,12 +1166,13 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                           _pdfTableCell('الحقل', bold: true),
                         ],
                       ),
-                      for (final field in schema)
+                      for (var index = 0; index < schema.length; index++)
                         pw.TableRow(children: [
-                          '${field['type'] ?? ''}' == 'signature'
-                              ? reportPdfSignatureWidget(values[field['key']])
-                              : _pdfTableCell(_pdfValue(values[field['key']])),
-                          _pdfTableCell('${field['label'] ?? field['key']}'),
+                          '${schema[index]['type'] ?? ''}' == 'signature' ||
+                                  _pdfLooksLikeSignature(values[schema[index]['key']])
+                              ? reportPdfSignatureWidget(values[schema[index]['key']])
+                              : _pdfTableCell(_pdfValue(values[schema[index]['key']])),
+                          _pdfTableCell(_pdfFieldLabel(schema[index], index)),
                         ]),
                     ],
             ),
