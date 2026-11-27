@@ -9,6 +9,7 @@ import 'package:printing/printing.dart';
 import '../../core/theme.dart';
 import '../../shared/app_customizer.dart';
 import '../../shared/report_pdf_theme.dart';
+import '../../shared/ui_labels.dart';
 
 typedef AutomaticReportSchemaBuilder = List<Map<String, dynamic>> Function(
   UnifiedTaskRowData row,
@@ -18,13 +19,14 @@ typedef AutomaticReportSchemaBuilder = List<Map<String, dynamic>> Function(
 );
 
 class UnifiedTaskTableEditor extends StatefulWidget {
-  const UnifiedTaskTableEditor({super.key, required this.onSend, this.onSave, this.initialDraft, this.employees = const [], this.branches = const [], this.reports = const [], this.onChanged, this.reportSchemaBuilder});
+  const UnifiedTaskTableEditor({super.key, required this.onSend, this.onSave, this.initialDraft, this.employees = const [], this.branches = const [], this.reports = const [], this.previousTasks = const [], this.onChanged, this.reportSchemaBuilder});
   final Future<void> Function(UnifiedTaskTableDraft draft) onSend;
   final Future<void> Function(UnifiedTaskTableDraft draft)? onSave;
   final UnifiedTaskTableDraft? initialDraft;
   final List<UnifiedEmployeeOption> employees;
   final List<UnifiedBranchOption> branches;
   final List<UnifiedReportOption> reports;
+  final List<Map<String, dynamic>> previousTasks;
   final VoidCallback? onChanged;
   final AutomaticReportSchemaBuilder? reportSchemaBuilder;
 
@@ -1065,11 +1067,7 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
       'lists': _pdfSection('التعليمات والإرشادات', pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.stretch, children: [listContent('المسؤوليات الأساسية', _responsibilities), pw.SizedBox(height: 7), listContent('الصلاحيات وحدود المسؤولية', _authorities), pw.SizedBox(height: 7), listContent('التوصيات والتعليمات الإدارية', _instructions)])),
       'kpi': _pdfSection('المهام حسب الأولوية ومؤشرات القياس', _pdfKpiTable()),
       'report': _pdfSection(store.unifiedLabel('report'), pw.Text(_pdfSafeText(_selectedReport == null ? 'لا يوجد' : '${_selectedReport!.title} - الإصدار ${_selectedReport!.versionNumber} - ${_selectedReport!.fieldCount} حقول (${_selectedReport!.requiredFieldCount} إلزامية)'), textDirection: pw.TextDirection.rtl, textAlign: pw.TextAlign.right)),
-      'notes': _pdfSection('معلومات إضافية', pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.stretch, children: [
-        _pdfAdditionalTable(),
-        pw.SizedBox(height: 7),
-        pw.Text(_pdfSafeText(_reportNotes.text.trim().isEmpty ? 'لا يوجد' : _reportNotes.text), textDirection: pw.TextDirection.rtl, textAlign: pw.TextAlign.right),
-      ])),
+      'notes': _pdfSection('المهام السابقة', _pdfPreviousTasksTable()),
       'approval': _pdfApprovalCards(),
     };
     final orderedKeys = store.unifiedSectionOrder.where(store.isUnifiedVisible).where((key) => key != 'employee').where(sections.containsKey).toList();
@@ -1189,13 +1187,32 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
     return pw.Table(border: pw.TableBorder.all(color: ReportPdfTheme.officialBorder, width: .6), children: rows.asMap().entries.map((entry) => pw.TableRow(decoration: entry.key == 0 ? pw.BoxDecoration(color: ReportPdfTheme.officialLightBlue) : null, children: entry.value)).toList());
   }
 
-  pw.Widget _pdfAdditionalTable() => pw.Table(
-        border: pw.TableBorder.all(color: ReportPdfTheme.officialBorder, width: .6),
-        children: [
-          pw.TableRow(decoration: pw.BoxDecoration(color: ReportPdfTheme.officialLightBlue), children: ['نوع المهمة', 'أولوية التنفيذ', 'ملاحظات'].map((value) => _pdfTableCell(value, bold: true)).toList()),
-          ...[..._rows, ..._exceptionRows].map((row) => pw.TableRow(children: [_pdfTableCell(row.task.text.trim().isEmpty ? 'لا يوجد' : row.task.text), _pdfTableCell('عادية'), _pdfTableCell(row.output.text.trim().isEmpty ? 'لا يوجد' : row.output.text)])),
-        ],
-      );
+  pw.Widget _pdfPreviousTasksTable() {
+    final rows = <List<String>>[];
+    for (final task in widget.previousTasks) {
+      final title = '${task['title'] ?? ''}'.trim();
+      if (title.isEmpty) continue;
+      rows.add([
+        title,
+        uiStatusLabel('${task['status'] ?? 'new'}'),
+        '${task['due_at'] ?? task['updated_at'] ?? '—'}'.split('T').first,
+        '${task['assigned_to'] ?? ''}'.trim().isEmpty ? 'مهام مشتركة' : 'موظف محدد',
+      ]);
+    }
+    if (rows.isEmpty) {
+      return pw.Text('لا توجد مهام سابقة', textDirection: pw.TextDirection.rtl, textAlign: pw.TextAlign.right, style: const pw.TextStyle(fontSize: 8));
+    }
+    return pw.Table(
+      border: pw.TableBorder.all(color: ReportPdfTheme.officialBorder, width: .6),
+      children: [
+        pw.TableRow(
+          decoration: pw.BoxDecoration(color: ReportPdfTheme.officialLightBlue),
+          children: ['المهمة السابقة', 'الحالة', 'الموعد', 'المسؤول'].map((value) => _pdfTableCell(value, bold: true)).toList(),
+        ),
+        ...rows.map((row) => pw.TableRow(children: row.map(_pdfTableCell).toList())),
+      ],
+    );
+  }
 
   pw.Widget _pdfApprovalCards() => pw.Row(
         children: ['اعتماد المدير', 'مراجعة المحاسب', 'إدارة الموظفين']

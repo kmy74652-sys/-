@@ -11,7 +11,7 @@ String uiStatusLabel(String value) => const {
       'rejected': 'مرفوضة',
       'completed': 'مكتملة',
       'approved': 'معتمدة',
-      'completed_approved': 'معتمدة',
+      'completed_approved': 'مكتملة ومعتمدة',
       'late': 'متأخرة',
       'cancelled': 'ملغاة',
       'active': 'نشطة',

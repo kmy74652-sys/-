@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../shared/app_shell.dart';
+import '../../shared/ui_labels.dart';
 import 'unified_task_table_editor.dart';
 
 class UnifiedTaskTableScreen extends StatefulWidget {
@@ -457,7 +458,7 @@ class _UnifiedTaskTableScreenState extends State<UnifiedTaskTableScreen> {
           DataRow(
             cells: [
               DataCell(Text(
-                _text(task['status'], 'جديدة'),
+                uiStatusLabel(_text(task['status'], 'new')),
                 textAlign: TextAlign.right,
               )),
               DataCell(Text(
@@ -1028,6 +1029,9 @@ class _UnifiedTaskTableScreenState extends State<UnifiedTaskTableScreen> {
                           key: ValueKey(
                               _editingTask?['id'] ?? 'new-unified-task'),
                           onSend: _send,
+                          previousTasks: widget.employeeUserId == null
+                              ? _existingUnifiedTasks
+                              : _selectedEmployeeTasks,
                           initialDraft: _selectedEmployeeTasks.isNotEmpty
                               ? _draftFromEmployeeTasks(_selectedEmployeeTasks)
                               : (_editingTask == null
