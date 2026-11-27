@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/theme.dart';
 import '../../shared/app_shell.dart';
+import '../../shared/form_widgets.dart';
 
 class ReportDesignerScreen extends StatefulWidget {
   const ReportDesignerScreen({super.key});
@@ -150,7 +150,7 @@ class _ReportDesignerScreenState extends State<ReportDesignerScreen> {
   String _formatTimestamp(Object? raw) {
     final parsed = DateTime.tryParse(raw?.toString() ?? '');
     if (parsed == null) return 'تاريخ غير متاح';
-    return DateFormat('dd/MM/yyyy HH:mm').format(parsed.toLocal());
+    return formatArabicDateTime(parsed.toLocal(), separator: ' ');
   }
 
   String _templateKind(Map<String, dynamic> template) {

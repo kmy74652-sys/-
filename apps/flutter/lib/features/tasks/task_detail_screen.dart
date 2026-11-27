@@ -14,6 +14,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/offline_attachment_store.dart';
 import '../../core/offline_queue.dart';
 import '../../shared/app_shell.dart';
+import '../../shared/form_widgets.dart';
 import '../../shared/report_pdf_theme.dart';
 
 class TaskDetailScreen extends StatefulWidget {
@@ -108,9 +109,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
   String _localDateTime(Object? value) {
     final parsed = DateTime.tryParse('${value ?? ''}');
     if (parsed == null) return 'غير محدد';
-    final local = parsed.toLocal();
-    String two(int number) => number.toString().padLeft(2, '0');
-    return '${two(local.day)}/${two(local.month)}/${local.year} · ${two(local.hour)}:${two(local.minute)}';
+    return formatArabicDateTime(parsed.toLocal());
   }
 
   @override
@@ -496,9 +495,8 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
     final parsed = _parseFlexibleDate(value);
     if (parsed == null) return value;
     final local = parsed.toLocal();
-    String two(int number) => number.toString().padLeft(2, '0');
-    final date = '${two(local.day)}/${two(local.month)}/${local.year}';
-    return type == 'date' ? date : '$date · ${two(local.hour)}:${two(local.minute)}';
+    final date = '${local.day.toString().padLeft(2, '0')}/${local.month.toString().padLeft(2, '0')}/${local.year}';
+    return type == 'date' ? date : '$date · ${formatArabicTime(local)}';
   }
 
   String _snapshotDisplayValue(Map<String, dynamic> field, Object? value) {

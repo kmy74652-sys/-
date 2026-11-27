@@ -2,13 +2,13 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/notifications_repository.dart';
 import '../core/notifications_runtime.dart';
 import '../core/theme.dart';
 import 'app_customizer.dart';
+import 'form_widgets.dart';
 import 'organization_branding.dart';
 
 class AppShell extends StatefulWidget {
@@ -18,12 +18,14 @@ class AppShell extends StatefulWidget {
     required this.child,
     this.subtitle,
     this.onBeforeNavigate,
+    this.immersive = false,
   });
 
   final String title;
   final String? subtitle;
   final Widget child;
   final Future<bool> Function()? onBeforeNavigate;
+  final bool immersive;
 
   @override
   State<AppShell> createState() => _AppShellState();
@@ -374,21 +376,25 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
               constraints: const BoxConstraints(maxWidth: 840),
               child: Column(
                 children: [
-                  _BrandHeader(
-                    unreadCount: _unreadCount,
-                    onAccount: () => _confirmSignOut(context),
-                    onNotifications: () => _showNotifications(context),
-                  ),
-                  _PageTitleBar(
-                    title: widget.title,
-                    showDateTime: path == '/',
-                    onBack: _backRoute(path) == null
-                        ? null
-                        : () => _navigate(_backRoute(path)!),
-                  ),
+                  if (!widget.immersive)
+                    _BrandHeader(
+                      unreadCount: _unreadCount,
+                      onAccount: () => _confirmSignOut(context),
+                      onNotifications: () => _showNotifications(context),
+                    ),
+                  if (!widget.immersive)
+                    _PageTitleBar(
+                      title: widget.title,
+                      showDateTime: path == '/',
+                      onBack: _backRoute(path) == null
+                          ? null
+                          : () => _navigate(_backRoute(path)!),
+                    ),
                   Expanded(
                     child: Padding(
-                      padding: const EdgeInsets.fromLTRB(4, 4, 4, 0),
+                      padding: widget.immersive
+                          ? EdgeInsets.zero
+                          : const EdgeInsets.fromLTRB(4, 4, 4, 0),
                       child: widget.child,
                     ),
                   ),
@@ -397,7 +403,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
             ),
           ),
         ),
-        bottomNavigationBar: Container(
+        bottomNavigationBar: widget.immersive ? null : Container(
           decoration: const BoxDecoration(
             color: Color(0xFF0B3458),
             border: Border(top: BorderSide(color: Color(0xFFDBA62A), width: 2)),
@@ -596,7 +602,7 @@ class _PageTitleBarState extends State<_PageTitleBar> {
   }
 
   String get _dateTimeLabel =>
-      DateFormat('yyyy/MM/dd - HH:mm').format(_now);
+      '${_now.year}/${_now.month.toString().padLeft(2, '0')}/${_now.day.toString().padLeft(2, '0')} - ${formatArabicTime(_now)}';
 
   @override
   Widget build(BuildContext context) {

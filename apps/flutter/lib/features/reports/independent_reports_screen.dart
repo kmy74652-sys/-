@@ -7,6 +7,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/theme.dart';
 import '../../shared/app_shell.dart';
+import '../../shared/form_widgets.dart';
 import '../../shared/ui_labels.dart';
 import 'independent_signature_capture.dart';
 
@@ -665,11 +666,7 @@ class _IndependentReportsScreenState extends State<IndependentReportsScreen> {
     final parsed = DateTime.tryParse(controller.text)?.toLocal();
     final value = parsed == null
         ? controller.text
-        : '${parsed.year.toString().padLeft(4, '0')}/'
-              '${parsed.month.toString().padLeft(2, '0')}/'
-              '${parsed.day.toString().padLeft(2, '0')} - '
-              '${parsed.hour.toString().padLeft(2, '0')}:'
-              '${parsed.minute.toString().padLeft(2, '0')}';
+        : formatArabicDateTime(parsed, separator: ' - ');
     return InputDecorator(
       decoration: const InputDecoration(
         border: OutlineInputBorder(),

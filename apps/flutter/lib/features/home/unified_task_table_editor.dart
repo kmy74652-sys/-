@@ -46,7 +46,7 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
   final _kpis = <List<TextEditingController>>[
     [TextEditingController(), TextEditingController()],
   ];
-  final _rows = <_UnifiedRow>[_UnifiedRow('08:00', '', '')];
+  final _rows = <_UnifiedRow>[_UnifiedRow('08:00', '', '', null, '09:00')];
   final _exceptionRows = <_UnifiedRow>[];
   bool _expanded = true;
   bool _sending = false;
@@ -100,7 +100,7 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
     for (final row in target) row.dispose();
     target
       ..clear()
-      ..addAll(source.isEmpty ? [_UnifiedRow('', '', '')] : source.map((row) => _UnifiedRow(row.time, row.task, row.output, row.extras)));
+      ..addAll(source.isEmpty ? [_UnifiedRow('', '', '')] : source.map((row) => _UnifiedRow.fromTimeValue(row.time, row.task, row.output, row.extras)));
   }
 
   void _replaceList(List<TextEditingController> target, List<String> source) {
@@ -381,7 +381,7 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
     final rows = _rows
         .where((row) => row.task.text.trim().isNotEmpty)
         .map((row) => UnifiedTaskRowData(
-              time: row.time.text.trim(),
+              time: row.timeValue,
               task: row.task.text.trim(),
               output: row.output.text.trim(),
               extras: row.extras,
@@ -390,7 +390,7 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
     rows.addAll(_exceptionRows
         .where((row) => row.task.text.trim().isNotEmpty)
         .map((row) => UnifiedTaskRowData(
-              time: '${_exception}: ${row.time.text.trim()}',
+              time: '${_exception}: ${row.timeValue}',
               task: row.task.text.trim(),
               output: row.output.text.trim(),
               extras: row.extras,
@@ -697,7 +697,7 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
   }
 
   Widget _scheduleField(String key, _UnifiedRow row) {
-    if (key == 'time') return _timeField(row.time, 'الوقت');
+    if (key == 'time') return _timeRangeField(row);
     return TextField(
       controller: key == 'task'
           ? row.task
@@ -740,6 +740,15 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
         onTap: () { widget.onChanged?.call(); _pickTime(controller); },
       );
 
+  Widget _timeRangeField(_UnifiedRow row) => Row(
+        textDirection: TextDirection.rtl,
+        children: [
+          Expanded(child: _timeField(row.endTime, 'إلى')),
+          const Padding(padding: EdgeInsets.symmetric(horizontal: 3), child: Text('–')),
+          Expanded(child: _timeField(row.time, 'من')),
+        ],
+      );
+
   Widget _periodField(
     TextEditingController controller,
     String label,
@@ -766,14 +775,19 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
       '${value.year.toString().padLeft(4, '0')}-${value.month.toString().padLeft(2, '0')}-${value.day.toString().padLeft(2, '0')}';
 
   String _formatTime(TimeOfDay value) =>
-      '${value.hour.toString().padLeft(2, '0')}:${value.minute.toString().padLeft(2, '0')}';
+      '${value.hour % 12 == 0 ? 12 : value.hour % 12}:${value.minute.toString().padLeft(2, '0')} ${value.hour < 12 ? 'ص' : 'م'}';
 
   TimeOfDay _parseTime(String value, TimeOfDay fallback) {
-    final match = RegExp(r'^(\d{1,2}):(\d{2})$').firstMatch(value.trim());
+    final normalized = value.trim().replaceAll('صباحًا', 'ص').replaceAll('مساءً', 'م');
+    final match = RegExp(r'^(\d{1,2}):(\d{2})\s*([صم])?$').firstMatch(normalized);
     final hour = int.tryParse(match?.group(1) ?? '');
     final minute = int.tryParse(match?.group(2) ?? '');
-    if (hour == null || minute == null || hour > 23 || minute > 59) return fallback;
-    return TimeOfDay(hour: hour, minute: minute);
+    final marker = match?.group(3);
+    if (hour == null || minute == null || hour > 23 || minute > 59 || (marker != null && hour > 12)) return fallback;
+    final normalizedHour = marker == null
+        ? hour
+        : (hour % 12) + (marker == 'م' ? 12 : 0);
+    return TimeOfDay(hour: normalizedHour, minute: minute);
   }
 
   Future<void> _pickStartDate() async {
@@ -831,7 +845,7 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
   }
   double _scheduleFieldWidth(String key) {
     final span = '${AppCustomizer.instance.unifiedFieldLayout(key)['span'] ?? 'half'}';
-    return span == 'full' ? 300 : span == 'third' ? 110 : key == 'time' ? 150 : 220;
+    return span == 'full' ? 300 : span == 'third' ? 110 : key == 'time' ? 235 : 220;
   }
 
   Widget _editableList(String title, List<TextEditingController> list) => _section(title, Column(children: [for (var i = 0; i < list.length; i++) Row(children: [Expanded(child: TextField(controller: list[i], onChanged: (_) => widget.onChanged?.call(), textAlign: TextAlign.right, decoration: InputDecoration(isDense: true, hintText: 'أضف بندًا'))), IconButton(onPressed: () { widget.onChanged?.call(); _removeTextRow(list, i); }, icon: const Icon(Icons.delete_outline))]), Align(alignment: Alignment.centerRight, child: TextButton.icon(onPressed: () { widget.onChanged?.call(); _addTextRow(list); }, icon: const Icon(Icons.add), label: const Text('إضافة بند')))]));
@@ -899,7 +913,7 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
     final tasks = _rows
         .where((row) => row.task.text.trim().isNotEmpty)
         .map((row) => UnifiedTaskRowData(
-              time: row.time.text.trim(),
+              time: row.timeValue,
               task: row.task.text.trim(),
               output: row.output.text.trim(),
               extras: row.extras,
@@ -908,7 +922,7 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
     final exceptionTasks = _exceptionRows
         .where((row) => row.task.text.trim().isNotEmpty)
         .map((row) => UnifiedTaskRowData(
-              time: '${_exception}: ${row.time.text.trim()}',
+              time: '${_exception}: ${row.timeValue}',
               task: row.task.text.trim(),
               output: row.output.text.trim(),
               extras: row.extras,
@@ -994,7 +1008,7 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
         theme: pw.ThemeData.withFont(base: font, bold: boldFont),
       );
       final rows = [..._rows, ..._exceptionRows]
-          .map((row) => [_pdfSafeText(row.time.text), _pdfSafeText(row.task.text), _pdfSafeText(row.output.text), 'جديدة'])
+          .map((row) => [_pdfSafeText(row.timeValue), _pdfSafeText(row.task.text), _pdfSafeText(row.output.text), 'جديدة'])
           .toList();
       final listSection = (String title, List<TextEditingController> values) => pw.Column(
         crossAxisAlignment: pw.CrossAxisAlignment.stretch,
@@ -1024,7 +1038,7 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
         ]),
         'exception': pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.stretch, children: [
           _pdfHeading(store.unifiedLabel('exception')),
-          _pdfScheduleTable([..._exceptionRows].map((row) => [_pdfSafeText(row.time.text), _pdfSafeText(row.task.text), _pdfSafeText(row.output.text), 'جديدة']).toList()),
+          _pdfScheduleTable([..._exceptionRows].map((row) => [_pdfSafeText(row.timeValue), _pdfSafeText(row.task.text), _pdfSafeText(row.output.text), 'جديدة']).toList()),
         ]),
         'lists': pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.stretch, children: [
           listSection('المسؤوليات الأساسية', _responsibilities),
@@ -1194,17 +1208,51 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
   }
 }
 
+String _displayUnifiedTime(String value) {
+  final match = RegExp(r'^(\d{1,2}):(\d{2})\s*([صم])?$').firstMatch(value.trim());
+  final hour = int.tryParse(match?.group(1) ?? '');
+  final minute = int.tryParse(match?.group(2) ?? '');
+  if (hour == null || minute == null || hour > 23 || minute > 59) return value;
+  final marker = match?.group(3);
+  final isPm = marker == 'م' || (marker == null && hour >= 12);
+  final displayHour = hour % 12 == 0 ? 12 : hour % 12;
+  return '$displayHour:${minute.toString().padLeft(2, '0')} ${isPm ? 'م' : 'ص'}';
+}
+
+String _standardUnifiedTime(String value) {
+  final normalized = value.trim().replaceAll('صباحًا', 'ص').replaceAll('مساءً', 'م');
+  final match = RegExp(r'^(\d{1,2}):(\d{2})\s*([صم])?$').firstMatch(normalized);
+  final hour = int.tryParse(match?.group(1) ?? '');
+  final minute = int.tryParse(match?.group(2) ?? '');
+  if (hour == null || minute == null || hour > 23 || minute > 59) return value.trim();
+  final marker = match?.group(3);
+  final standardHour = marker == null ? hour : (hour % 12) + (marker == 'م' ? 12 : 0);
+  return '${standardHour.toString().padLeft(2, '0')}:${minute.toString().padLeft(2, '0')}';
+}
+
 class _UnifiedRow {
-  _UnifiedRow(String time, String task, String output, [Map<String, String>? extras])
-      : time = TextEditingController(text: time),
+  _UnifiedRow(String time, String task, String output, [Map<String, String>? extras, String endTime = ''])
+      : time = TextEditingController(text: _displayUnifiedTime(time)),
+        endTime = TextEditingController(text: _displayUnifiedTime(endTime)),
         task = TextEditingController(text: task),
         output = TextEditingController(text: output),
         _extras = (extras ?? {}).map((key, value) => MapEntry(key, TextEditingController(text: value)));
-  final TextEditingController time, task, output;
+  factory _UnifiedRow.fromTimeValue(String value, String task, String output, [Map<String, String>? extras]) {
+    final parts = value.split(RegExp(r'\s*[-–]\s*'));
+    return _UnifiedRow(parts.isEmpty ? '' : parts.first, task, output, extras, parts.length > 1 ? parts.last : '');
+  }
+  final TextEditingController time, endTime, task, output;
   final Map<String, TextEditingController> _extras;
+  String get timeValue {
+    final start = _standardUnifiedTime(time.text);
+    final end = _standardUnifiedTime(endTime.text);
+    if (start.isEmpty) return end;
+    if (end.isEmpty) return start;
+    return '$start - $end';
+  }
   TextEditingController custom(String key) => _extras.putIfAbsent(key, () => TextEditingController());
   Map<String, String> get extras => _extras.map((key, value) => MapEntry(key, value.text));
-  void dispose() { time.dispose(); task.dispose(); output.dispose(); for (final controller in _extras.values) controller.dispose(); }
+  void dispose() { time.dispose(); endTime.dispose(); task.dispose(); output.dispose(); for (final controller in _extras.values) controller.dispose(); }
 }
 
 class UnifiedTaskTableDraft {

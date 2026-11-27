@@ -9,6 +9,7 @@ import '../../core/theme.dart';
 import '../../core/offline_queue.dart';
 import '../../core/task_cache.dart';
 import '../../shared/app_shell.dart';
+import '../../shared/form_widgets.dart';
 import '../../shared/ui_labels.dart';
 
 class TasksScreen extends StatefulWidget {
@@ -1391,8 +1392,7 @@ class _TasksScreenState extends State<TasksScreen>
     if (value.isEmpty) return 'غير محدد';
     final parsed = DateTime.tryParse(value)?.toLocal();
     if (parsed == null) return value;
-    String two(int number) => number.toString().padLeft(2, '0');
-    return '${two(parsed.day)}/${two(parsed.month)}/${parsed.year} · ${two(parsed.hour)}:${two(parsed.minute)}';
+    return formatArabicDateTime(parsed);
   }
 
   String _reportStatusLabel(Object? status) => switch ('$status') {

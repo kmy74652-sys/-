@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../home/unified_task_table_editor.dart';
 import '../../shared/app_shell.dart';
@@ -78,7 +77,7 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
   String _localDateTime(dynamic value) {
     final parsed = DateTime.tryParse(_s(value));
     if (parsed == null) return 'غير محدد';
-    return DateFormat('dd/MM/yyyy HH:mm').format(parsed.toLocal());
+    return formatArabicDateTime(parsed.toLocal());
   }
 
   String _taskTitle(Map<String, dynamic> task) {

@@ -221,7 +221,7 @@ class ReportPdfTheme {
                 textElement(keys[index], index),
             pw.Positioned(
               left: (.06 * pageWidth).toDouble(),
-              top: (.48 * pageHeight).toDouble(),
+              top: (.56 * pageHeight).toDouble(),
               child: pw.SizedBox(
                 width: (.88 * pageWidth).toDouble(),
                 height: (.30 * pageHeight).toDouble(),

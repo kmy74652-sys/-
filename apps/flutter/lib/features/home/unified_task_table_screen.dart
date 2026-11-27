@@ -196,7 +196,6 @@ class _UnifiedTaskTableScreenState extends State<UnifiedTaskTableScreen> {
     required String roleCode,
     required String startDate,
     required String reportVersionId,
-    required int rowIndex,
     required UnifiedTaskRowData row,
   }) {
     final canonical = [
@@ -206,11 +205,7 @@ class _UnifiedTaskTableScreenState extends State<UnifiedTaskTableScreen> {
       roleCode,
       startDate,
       reportVersionId,
-      '$rowIndex',
-      row.time,
-      row.task,
-      row.output,
-      ...row.extras.entries.map((entry) => '${entry.key}=${entry.value}'),
+      _timeSlot(row.time),
     ].join('|');
     // Stable FNV-1a hash: no package or platform-specific hashCode is used.
     var hash = 2166136261;
@@ -230,6 +225,41 @@ class _UnifiedTaskTableScreenState extends State<UnifiedTaskTableScreen> {
         .isFilter('deleted_at', null)
         .limit(1);
     return rows.isNotEmpty;
+  }
+
+  Future<bool> _dispatchTimeAlreadyExists({
+    required String userId,
+    required String? branchId,
+    required String time,
+  }) async {
+    final slot = _timeSlot(time);
+    if (!RegExp(r'^\d{1,2}:\d{2}$').hasMatch(slot)) return false;
+    final marker = 'صف الجدول: $slot';
+    var query = _db
+        .from('tasks')
+        .select('id')
+        .eq('organization_id', _organizationId!)
+        .eq('assignee_employee_id', userId)
+        .ilike('description', '%$marker%')
+        .isFilter('deleted_at', null);
+    query = branchId == null || branchId.isEmpty
+        ? query.isFilter('branch_id', null)
+        : query.eq('branch_id', branchId);
+    final rows = await query.limit(1);
+    return rows.isNotEmpty;
+  }
+
+  DateTime _dueForRow(String startDate, String time) {
+    final date = DateTime.tryParse(startDate) ?? DateTime.now();
+    final match = RegExp(r'(\d{1,2}):(\d{2})').firstMatch(_timeSlot(time));
+    final hour = int.tryParse(match?.group(1) ?? '') ?? 0;
+    final minute = int.tryParse(match?.group(2) ?? '') ?? 0;
+    return DateTime(date.year, date.month, date.day, hour, minute).toUtc();
+  }
+
+  String _timeSlot(String value) {
+    final match = RegExp(r'(\d{1,2}:\d{2})').firstMatch(value.trim());
+    return match?.group(1) ?? value.trim().toLowerCase();
   }
 
   bool _hasKeyword(String text, List<String> words) =>
@@ -434,13 +464,12 @@ class _UnifiedTaskTableScreenState extends State<UnifiedTaskTableScreen> {
       throw Exception('المسمى الوظيفي غير معروف.');
     }
     final branchId = draft.branchId ?? _defaultBranchId;
-    final due = DateTime.tryParse(draft.startDate)?.toUtc() ??
-        DateTime.now().toUtc().add(const Duration(days: 1));
+    var skippedDuplicateCount = 0;
     for (final member in selected) {
       final userId = member['user_id']?.toString();
       if (userId == null || userId.isEmpty) continue;
-      for (var rowIndex = 0; rowIndex < draft.rows.length; rowIndex++) {
-        final row = draft.rows[rowIndex];
+      for (final row in draft.rows) {
+        final due = _dueForRow(draft.startDate, row.time);
         final dispatchKey = _stableDispatchKey(
           organizationId: organizationId,
           userId: userId,
@@ -448,11 +477,17 @@ class _UnifiedTaskTableScreenState extends State<UnifiedTaskTableScreen> {
           roleCode: roleCode,
           startDate: draft.startDate,
           reportVersionId: draft.reportVersionId ?? '',
-          rowIndex: rowIndex,
           row: row,
         );
-        if (_successfulDispatches.contains(dispatchKey) || await _dispatchAlreadyExists(dispatchKey)) {
+        if (_successfulDispatches.contains(dispatchKey) ||
+            await _dispatchAlreadyExists(dispatchKey) ||
+            await _dispatchTimeAlreadyExists(
+              userId: userId,
+              branchId: branchId,
+              time: row.time,
+            )) {
           _successfulDispatches.add(dispatchKey);
+          skippedDuplicateCount++;
           continue;
         }
         final description = [
@@ -498,6 +533,11 @@ class _UnifiedTaskTableScreenState extends State<UnifiedTaskTableScreen> {
       }
     }
     if (mounted) setState(() => _hasUnsavedChanges = false);
+    if (skippedDuplicateCount > 0 && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('تم تجاهل $skippedDuplicateCount مهمة مكررة لأن وقتها سبق إرساله.', textAlign: TextAlign.right)),
+      );
+    }
   }
 
   Future<bool> _confirmDiscardChanges() async {

@@ -3,6 +3,7 @@ import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:printing/printing.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -50,7 +51,7 @@ class _AppCustomizerScreenState extends State<AppCustomizerScreen>
   @override
   void initState() {
     super.initState();
-    _tabs = TabController(length: 8, vsync: this);
+    _tabs = TabController(length: 4, vsync: this);
     _store.addListener(_handleReportHistoryChange);
     _loadPermission();
   }
@@ -170,62 +171,14 @@ class _AppCustomizerScreenState extends State<AppCustomizerScreen>
 
   @override
   Widget build(BuildContext context) => AppShell(
-        title: 'مصمم الواجهات والتحكم الشامل',
-        subtitle: 'تخصيص التطبيق متاح لصلاحيات المدير فقط',
+        title: 'استوديو تصميم PDF',
+        subtitle: '',
+        immersive: true,
         child: _loading
             ? const Center(child: CircularProgressIndicator())
             : !_allowed
                 ? const Center(child: Text('هذا القسم متاح للمدير فقط.'))
-                    : Column(
-                        children: [
-                      Material(
-                        color: Colors.white,
-                        child: TabBar(
-                          controller: _tabs,
-                          isScrollable: true,
-                          tabs: const [
-                            Tab(text: 'المعاينة المباشرة'),
-                            Tab(text: 'معاينة PDF'),
-                            Tab(text: 'معاينة الرئيسية'),
-                            Tab(text: 'التسميات'),
-                            Tab(text: 'الترتيب والإظهار'),
-                            Tab(text: 'المظهر والألوان'),
-                            Tab(text: 'تخصيص الجدول الموحد'),
-                            Tab(text: 'هوية وتصميم التقارير'),
-                          ],
-                        ),
-                      ),
-                      Expanded(
-                        child: TabBarView(
-                          controller: _tabs,
-                          children: [
-                            _livePreviewTab(),
-                            _documentPreviewTab(),
-                            _homePreviewTab(),
-                            _labelsTab(),
-                            _layoutTab(),
-                            _themeTab(),
-                            _unifiedTableTab(),
-                            _reportThemeTab(),
-                          ],
-                        ),
-                      ),
-                      SafeArea(
-                        top: false,
-                        child: Padding(
-                          padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
-                          child: SizedBox(
-                            width: double.infinity,
-                            child: FilledButton.icon(
-                              onPressed: _save,
-                              icon: const Icon(Icons.save_outlined),
-                              label: const Text('حفظ وتطبيق التغييرات'),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
+                    : _pdfStudioTab(),
       );
 
   Widget _livePreviewTab() => AnimatedBuilder(
@@ -784,7 +737,7 @@ class _AppCustomizerScreenState extends State<AppCustomizerScreen>
     final custom = _store.reportCustomElements[key];
     if (custom != null || _store.reportElementPositions.containsKey(key)) return _store.reportElementPosition(key);
     if (key == 'logo') return {'left': .06, 'top': .04, 'width': .18, 'height': .11};
-    return {'left': .08, 'top': (.04 + ((index + 1) * .055)).clamp(.02, .72).toDouble(), 'width': .84, 'height': .045};
+    return {'left': .08, 'top': (.12 + ((index + 1) * .045)).clamp(.12, .47).toDouble(), 'width': .84, 'height': .04};
   }
 
   void _moveReportElement(String key, double left, double top, double width, double height) {
@@ -991,83 +944,6 @@ class _AppCustomizerScreenState extends State<AppCustomizerScreen>
         ),
         if (selected)
           Positioned(
-            left: 0,
-            top: -48,
-            child: Material(
-              elevation: 4,
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(10),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 3),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(Icons.format_size, size: 15, color: AppColors.navy),
-                    SizedBox(
-                      width: 108,
-                      height: 28,
-                      child: Slider(
-                        min: 7,
-                        max: 32,
-                        divisions: 25,
-                        value: size.clamp(7, 32).toDouble(),
-                        onChanged: key == 'logo' ? null : (value) {
-                          if (custom != null) {
-                            _store.updateReportCustomElement(key, size: value);
-                          } else {
-                            _store.setReportHeaderLayout(key, size: value);
-                          }
-                        },
-                      ),
-                    ),
-                    for (final swatch in [
-                      _store.reportPrimaryColor,
-                      _store.reportHeadingColor,
-                      0xFF146B50,
-                      0xFF7A2430,
-                      0xFF222222,
-                    ])
-                      GestureDetector(
-                        onTap: key == 'logo' ? null : () => _setReportElementColor(key, custom, swatch),
-                        child: Container(
-                          width: 17,
-                          height: 17,
-                          margin: const EdgeInsets.symmetric(horizontal: 2),
-                          decoration: BoxDecoration(
-                            color: Color(swatch),
-                            shape: BoxShape.circle,
-                            border: Border.all(color: color.value == swatch ? Colors.white : Colors.black12, width: 2),
-                          ),
-                        ),
-                      ),
-                    if (key != 'logo') ...[
-                      IconButton(
-                        tooltip: bold ? 'إلغاء الخط العريض' : 'خط عريض',
-                        visualDensity: VisualDensity.compact,
-                        padding: EdgeInsets.zero,
-                        icon: Icon(Icons.format_bold, size: 18, color: bold ? Color(_store.reportPrimaryColor) : AppColors.muted),
-                        onPressed: () => _setReportElementBold(key, custom, !bold),
-                      ),
-                      for (final option in [
-                        ('right', Icons.format_align_right),
-                        ('center', Icons.format_align_center),
-                        ('left', Icons.format_align_left),
-                      ])
-                        IconButton(
-                          tooltip: 'محاذاة ${option.$1 == 'right' ? 'يمين' : option.$1 == 'center' ? 'وسط' : 'يسار'}',
-                          visualDensity: VisualDensity.compact,
-                          padding: EdgeInsets.zero,
-                          icon: Icon(option.$2, size: 17, color: align == option.$1 ? Color(_store.reportPrimaryColor) : AppColors.muted),
-                          onPressed: () => _setReportElementAlign(key, custom, option.$1),
-                        ),
-                    ],
-                  ],
-                ),
-              ),
-            ),
-          ),
-        if (selected)
-          Positioned(
             right: -7,
             bottom: -7,
             child: GestureDetector(
@@ -1152,6 +1028,204 @@ class _AppCustomizerScreenState extends State<AppCustomizerScreen>
       _reportAlignmentTools(),
     ]);
   }));
+
+  Future<void> _choosePdfTemplate() async {
+    final template = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (sheetContext) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const Text('اختر قالبًا جاهزًا', textAlign: TextAlign.right, style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: AppColors.navy)),
+                const SizedBox(height: 6),
+                const Text('سيتم تطبيقه على المعاينة وكل ملفات PDF، ويمكنك تعديله بعد ذلك بالسحب.', textAlign: TextAlign.right, style: TextStyle(color: AppColors.muted)),
+                const SizedBox(height: 12),
+                _templateTile(sheetContext, 'official', 'الترويسة الرسمية', 'شعار واسم المؤسسة وعنوان واضح بألوان رسمية.', Icons.account_balance_outlined, const Color(0xFF0B3458)),
+                _templateTile(sheetContext, 'modern', 'الترويسة الحديثة', 'شريط علوي حديث وتوزيع بصري خفيف للعناصر.', Icons.auto_awesome_outlined, const Color(0xFF146B50)),
+                _templateTile(sheetContext, 'executive', 'قالب الجدول التنفيذي', 'معلومات المهمة في رأس مختصر وجدول واضح للتنفيذ.', Icons.table_chart_outlined, const Color(0xFF7A2430)),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    if (template != null && mounted) _applyPdfTemplate(template);
+  }
+
+  Widget _templateTile(BuildContext context, String value, String title, String description, IconData icon, Color color) => Card(
+        margin: const EdgeInsets.only(bottom: 8),
+        child: ListTile(
+          onTap: () => Navigator.of(context).pop(value),
+          leading: CircleAvatar(backgroundColor: color.withOpacity(.12), foregroundColor: color, child: Icon(icon)),
+          title: Text(title, textAlign: TextAlign.right, style: const TextStyle(fontWeight: FontWeight.w800)),
+          subtitle: Text(description, textAlign: TextAlign.right),
+          trailing: const Icon(Icons.chevron_left),
+        ),
+      );
+
+  void _applyPdfTemplate(String template) {
+    final navy = 0xFF0B3458;
+    final green = 0xFF146B50;
+    final burgundy = 0xFF7A2430;
+    final gold = 0xFFB17D16;
+    final isOfficial = template == 'official';
+    final isModern = template == 'modern';
+    _store.reportCustomElements.clear();
+    _store.reportElementPositions.clear();
+    _store.reportHeaderLayouts.clear();
+    _store.reportHeaderOrder = isOfficial
+        ? ['company', 'branchName', 'title', 'employee', 'taskBranch', 'status', 'number', 'exportDate']
+        : isModern
+            ? ['company', 'title', 'branchName', 'employee', 'taskBranch', 'status', 'exportDate']
+            : ['company', 'title', 'employee', 'taskBranch', 'status', 'number', 'exportDate'];
+    _store.setReportTheme(
+      headerStyle: isModern ? 'band' : isOfficial ? 'boxed' : 'band',
+      tableStyle: isModern ? 'colored' : 'full',
+      primaryColor: isOfficial ? navy : isModern ? green : burgundy,
+      headingColor: isOfficial ? gold : isModern ? navy : burgundy,
+      logoPosition: isModern ? 'left' : 'right',
+      logoSize: isModern ? 48 : 58,
+      fontSize: isModern ? 10 : 10,
+      showEmployee: true,
+      showBranch: true,
+      showStatus: true,
+      showNumber: !isModern,
+      showExportDate: true,
+      showSignature: true,
+      showFooter: true,
+    );
+
+    final color = isOfficial ? navy : isModern ? green : burgundy;
+    final titleColor = isOfficial ? gold : isModern ? navy : burgundy;
+    void layout(String key, {required double top, double left = .08, double width = .84, double size = 10, String align = 'right', bool bold = false, int? elementColor}) {
+      _store.setReportHeaderLayout(key, align: align, size: size, color: elementColor ?? color, bold: bold);
+      _store.setReportElementPosition(key, left: left, top: top, width: width, height: key == 'title' ? .065 : .045);
+    }
+    _store.setReportElementPosition('logo', left: isModern ? .06 : .76, top: .035, width: .18, height: .11);
+    layout('company', top: .045, left: isModern ? .26 : .20, width: .58, size: 16, align: isModern ? 'left' : 'right', bold: true);
+    layout('branchName', top: .105, left: isModern ? .26 : .20, width: .58, size: 10, align: isModern ? 'left' : 'right');
+    layout('title', top: .19, left: .08, width: .84, size: 18, align: 'center', bold: true, elementColor: titleColor);
+    layout('employee', top: .285, size: 9);
+    layout('taskBranch', top: .33, size: 9);
+    layout('status', top: .375, size: 9);
+    layout('number', top: .42, size: 9);
+    layout('exportDate', top: .465, size: 9);
+    if (template == 'executive') {
+      layout('employee', top: .29, left: .52, width: .40, size: 9);
+      layout('taskBranch', top: .29, left: .08, width: .40, size: 9);
+      layout('status', top: .345, left: .52, width: .40, size: 9);
+      layout('number', top: .345, left: .08, width: .40, size: 9);
+    }
+    setState(() {});
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('تم تطبيق قالب ${template == 'official' ? 'الترويسة الرسمية' : template == 'modern' ? 'الترويسة الحديثة' : 'الجدول التنفيذي'} ويمكنك تعديله الآن.', textAlign: TextAlign.right)));
+  }
+
+  Widget _pdfStudioTab() => AnimatedBuilder(
+        animation: _store,
+        builder: (context, _) => LayoutBuilder(
+          builder: (context, constraints) {
+            final width = (constraints.maxWidth - 28).clamp(300.0, 620.0).toDouble();
+            final height = width * 1.4142;
+            return ListView(
+              padding: const EdgeInsets.fromLTRB(12, 10, 12, 18),
+              children: [
+                Row(
+                  children: [
+                    IconButton(
+                      tooltip: 'الرجوع',
+                      onPressed: () => context.go('/settings'),
+                      icon: const Icon(Icons.arrow_back),
+                    ),
+                    const Expanded(
+                      child: Text(
+                        'مصمم PDF الموحد',
+                        textAlign: TextAlign.right,
+                        style: TextStyle(fontSize: 21, fontWeight: FontWeight.w900, color: AppColors.navy),
+                      ),
+                    ),
+                    IconButton(
+                      tooltip: 'القوالب الجاهزة',
+                      onPressed: _choosePdfTemplate,
+                      icon: const Icon(Icons.dashboard_customize_outlined),
+                    ),
+                    IconButton(
+                      tooltip: 'تراجع',
+                      onPressed: _reportUndo.isEmpty ? null : _undoReportChange,
+                      icon: const Icon(Icons.undo),
+                    ),
+                    IconButton(
+                      tooltip: 'إعادة',
+                      onPressed: _reportRedo.isEmpty ? null : _redoReportChange,
+                      icon: const Icon(Icons.redo),
+                    ),
+                    IconButton(
+                      tooltip: 'حفظ وتطبيق',
+                      onPressed: _saveReportTheme,
+                      icon: const Icon(Icons.save_outlined),
+                    ),
+                  ],
+                ),
+                const Text(
+                  'حرّك العناصر داخل الورقة كما تريد. نفس الرأس والتذييل سيظهران تلقائيًا في تقارير الموظفين وتفاصيل المهام والجدول الموحد.',
+                  textAlign: TextAlign.right,
+                  style: TextStyle(color: AppColors.muted),
+                ),
+                const SizedBox(height: 10),
+                Center(
+                  child: Container(
+                    width: width,
+                    height: height,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      border: Border.all(color: const Color(0xFFD4DEDF)),
+                      boxShadow: const [BoxShadow(color: Color(0x22000000), blurRadius: 10)],
+                    ),
+                    child: Stack(
+                      clipBehavior: Clip.hardEdge,
+                      children: [
+                        IgnorePointer(child: CustomPaint(size: Size(width, height), painter: _ReportAlignmentPainter())),
+                        for (var i = 0; i < _reportCanvasElements.length; i++)
+                          _reportCanvasElement(_reportCanvasElements[i], i, width, height),
+                        Positioned(
+                          left: width * .06,
+                          top: height * .56,
+                          width: width * .88,
+                          height: height * .25,
+                          child: _pdfPreviewTable(
+                            const [['الوقت', 'المهمة والبيان', 'المخرج المطلوب', 'الحالة'], ['8:00 ص', 'مهمة حالية', 'لا يوجد', 'جديدة'], ['—', 'مهمة استثنائية', 'لا يوجد', 'جديدة']],
+                            Color(_store.reportPrimaryColor),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                _reportElementToolbar(),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(child: OutlinedButton.icon(onPressed: () => setState(() => _selectedHeaderElement = _store.addReportCustomElement(type: 'text', text: 'نص مخصص')), icon: const Icon(Icons.text_fields), label: const Text('نص'))),
+                    const SizedBox(width: 8),
+                    Expanded(child: OutlinedButton.icon(onPressed: () => setState(() => _selectedHeaderElement = _store.addReportCustomElement(type: 'logo', text: 'الشعار')), icon: const Icon(Icons.image_outlined), label: const Text('شعار'))),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                FilledButton.icon(onPressed: _exportingDesignPdf ? null : _exportDesignPdf, icon: const Icon(Icons.picture_as_pdf_outlined), label: const Text('معاينة وتصدير PDF')),
+                const SizedBox(height: 6),
+                OutlinedButton.icon(onPressed: _saveReportTheme, icon: const Icon(Icons.save_outlined), label: const Text('حفظ التصميم وتطبيقه على كل ملفات PDF')),
+              ],
+            );
+          },
+        ),
+      );
 
   Widget _reportThemeTab() => ListView(
         padding: const EdgeInsets.all(12),

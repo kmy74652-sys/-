@@ -5,6 +5,11 @@ const _months = <String>['يناير','فبراير','مارس','أبريل','م
 const _days = <String>['الاثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت','الأحد'];
 String formatArabicDate(DateTime d) => '${_days[d.weekday - 1]} ${d.day} ${_months[d.month - 1]} ${d.year}';
 String formatArabicTime(DateTime d) => '${d.hour % 12 == 0 ? 12 : d.hour % 12}:${d.minute.toString().padLeft(2, '0')} ${d.hour < 12 ? 'ص' : 'م'}';
+String formatArabicDateTime(DateTime d, {String separator = ' · '}) => '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}$separator${formatArabicTime(d)}';
+String formatArabicDateTimeValue(Object? value, {String fallback = 'غير محدد', String separator = ' · '}) {
+  final parsed = DateTime.tryParse('${value ?? ''}');
+  return parsed == null ? fallback : formatArabicDateTime(parsed.toLocal(), separator: separator);
+}
 DateTime defaultDueDate() { final d = DateTime.now().add(const Duration(days: 1)); return DateTime(d.year, d.month, d.day, 17); }
 String dueToIso(DateTime value) => value.toUtc().toIso8601String();
 InputDecoration formDecoration(String label, {String? hint, Widget? suffixIcon}) => InputDecoration(labelText: label, hintText: hint, suffixIcon: suffixIcon, contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14));

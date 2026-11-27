@@ -52,7 +52,7 @@ class AppCustomizer extends ChangeNotifier {
   int unifiedSchedulePreviewRows = 1;
 
   static const defaults = <String, String>{
-    'appName': 'NEXORA', 'organizationName': 'مؤسسة الشاعري للتجارة العامة', 'tagline': 'Smart Business Management',
+    'appName': 'NEXORA', 'organizationName': 'مؤسسة الشاعري للتجارة العامة', 'tagline': 'Smart Business Management', 'time': 'الوقت من وإلى',
     'home': 'الرئيسية', 'tasks': 'المهام', 'independentTasks': 'المهام المستقلة', 'employees': 'الموظفون', 'activity': 'سجل النشاط', 'report-designer': 'مصمم التقارير', 'customizer': 'مصمم الواجهات والتحكم الشامل', 'hr': 'الموارد البشرية', 'workSection': 'العمل والمتابعة', 'unifiedTable': 'الجدول الموحد لإنشاء المهام', 'taskManagement': 'إدارة مهام الجداول الموحدة', 'reports': 'تقارير الموظفين', 'performance': 'إحصائيات ومقارنة الأداء', 'dailyReports': 'التقارير اليومية المصممة', 'employeeReports': 'تقارير الموظف', 'adminSections': 'أقسام الإدارة', 'settings': 'الإعدادات', 'totalTasks': 'إجمالي المهام', 'inProgress': 'قيد التنفيذ', 'submitted': 'بانتظار المراجعة', 'lateTasks': 'مهام متأخرة',
   };
 
@@ -271,5 +271,5 @@ class AppCustomizer extends ChangeNotifier {
 
 class UnifiedTableCustomization {
   static const defaultSectionOrder = ['sent', 'employee', 'purpose', 'hours', 'daily', 'exception', 'report', 'lists', 'kpi', 'notes', 'approval'];
-  static const defaults = <String, String>{'screenTitle': 'الجدول الموحد لإنشاء المهام', 'screenSubtitle': 'إنشاء منظم وإرسال مباشر للموظف', 'sent': 'الجداول الموحدة المرسلة', 'back': 'العودة إلى الرئيسية', 'employee': 'بيانات الموظف والاعتماد', 'purpose': 'الهدف من الوظيفة', 'purposeHint': 'اكتب الهدف العام من الوظيفة', 'hours': 'ساعات الدوام الرسمية', 'daily': 'الجدول الزمني اليومي', 'exception': 'العمل الاستثنائي', 'report': 'قالب التقرير اليومي', 'lists': 'البنود التنظيمية', 'kpi': 'مؤشرات تقييم الأداء', 'notes': 'ملاحظات وتعليمات للإدارة أو الموظف', 'approval': 'حالة الاعتماد', 'time': 'الوقت', 'task': 'المهمة المحددة والمسؤولية', 'output': 'المخرج المطلوب', 'employeeField': 'الموظف أو المجموعة', 'roleField': 'المسمى الوظيفي', 'branchField': 'الفرع', 'startDate': 'تاريخ بدء التطبيق'};
+  static const defaults = <String, String>{'screenTitle': 'الجدول الموحد لإنشاء المهام', 'screenSubtitle': 'إنشاء منظم وإرسال مباشر للموظف', 'sent': 'الجداول الموحدة المرسلة', 'back': 'العودة إلى الرئيسية', 'employee': 'بيانات الموظف والاعتماد', 'purpose': 'الهدف من الوظيفة', 'purposeHint': 'اكتب الهدف العام من الوظيفة', 'hours': 'ساعات الدوام الرسمية', 'daily': 'الجدول الزمني اليومي', 'exception': 'العمل الاستثنائي', 'report': 'قالب التقرير اليومي', 'lists': 'البنود التنظيمية', 'kpi': 'مؤشرات تقييم الأداء', 'notes': 'ملاحظات وتعليمات للإدارة أو الموظف', 'approval': 'حالة الاعتماد', 'time': 'الوقت من وإلى', 'task': 'المهمة المحددة والمسؤولية', 'output': 'المخرج المطلوب', 'employeeField': 'الموظف أو المجموعة', 'roleField': 'المسمى الوظيفي', 'branchField': 'الفرع', 'startDate': 'تاريخ بدء التطبيق'};
 }

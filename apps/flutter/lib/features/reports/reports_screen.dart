@@ -8,6 +8,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/theme.dart';
 import '../../shared/app_shell.dart';
+import '../../shared/form_widgets.dart';
 import '../../shared/ui_labels.dart';
 import '../../shared/report_pdf_theme.dart';
 
@@ -335,7 +336,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
     final local = parsed.toLocal();
     String two(int number) => number.toString().padLeft(2, '0');
     return '${local.year}-${two(local.month)}-${two(local.day)} '
-        '${two(local.hour)}:${two(local.minute)}';
+        formatArabicTime(local);
   }
 
   String _snapshotTitle(Map<String, dynamic> row) {
@@ -801,9 +802,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
       final parsedDate = DateTime.tryParse(raw);
       if (parsedDate != null) {
         final local = parsedDate.toLocal();
-        String two(int number) => number.toString().padLeft(2, '0');
-        return '${two(local.day)}/${two(local.month)}/${local.year} · '
-            '${two(local.hour)}:${two(local.minute)}';
+        return formatArabicDateTime(local);
       }
       try {
         final decoded = jsonDecode(raw);
