@@ -18,10 +18,12 @@ String reportPdfSafeText(String value) => value
     .trim();
 
 class ReportPdfTheme {
-  ReportPdfTheme(this.settings, {this.logo});
+  ReportPdfTheme(this.settings, {this.logo, required this.latinRegular, required this.latinBold});
 
   final AppCustomizer settings;
   final pw.ImageProvider? logo;
+  final pw.Font latinRegular;
+  final pw.Font latinBold;
 
   static Future<ReportPdfTheme> load() async {
     final settings = AppCustomizer.instance;
@@ -48,7 +50,9 @@ class ReportPdfTheme {
         logo = pw.MemoryImage(data.buffer.asUint8List());
       } catch (_) {}
     }
-    return ReportPdfTheme(settings, logo: logo);
+    final latinRegular = await ReportPdfTheme.latinRegularFont();
+    final latinBold = await ReportPdfTheme.latinBoldFont();
+    return ReportPdfTheme(settings, logo: logo, latinRegular: latinRegular, latinBold: latinBold);
   }
 
   static final officialNavy = PdfColor.fromHex('#004A87');
@@ -119,7 +123,7 @@ class ReportPdfTheme {
           pw.Row(
             crossAxisAlignment: pw.CrossAxisAlignment.center,
             children: [
-              pw.Expanded(child: pw.Text(englishOrganization, textAlign: pw.TextAlign.left, style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold, color: officialNavy))),
+              pw.Expanded(child: pw.Text(reportPdfSafeText(englishOrganization), textDirection: pw.TextDirection.ltr, textAlign: pw.TextAlign.left, style: pw.TextStyle(font: latinBold, fontSize: 10, color: officialNavy))),
               if (logo != null) pw.Padding(padding: const pw.EdgeInsets.symmetric(horizontal: 10), child: pw.Image(logo!, width: 58, height: 58, fit: pw.BoxFit.contain)) else pw.SizedBox(width: 78),
               pw.Expanded(child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.stretch, children: [pw.Text(organization, textDirection: pw.TextDirection.rtl, textAlign: pw.TextAlign.right, style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold, color: officialNavy)), if (settings.reportHeaderText.trim().isNotEmpty) pw.Text(reportPdfSafeText(settings.reportHeaderText), textDirection: pw.TextDirection.rtl, textAlign: pw.TextAlign.right, style: pw.TextStyle(fontSize: 8, color: officialNavy))])),
             ],
@@ -169,9 +173,17 @@ class ReportPdfTheme {
   }
 
   Future<Uint8List> buildDesignerPreviewPdf() async {
-    final document = pw.Document();
     final regular = await regularFont();
     final boldFontValue = await boldFont();
+    final latin = await latinRegularFont();
+    final latinBold = await latinBoldFont();
+    final document = pw.Document(
+      theme: pw.ThemeData.withFont(
+        base: regular,
+        bold: boldFontValue,
+        fontFallback: [latin, latinBold],
+      ),
+    );
     final pageWidth = PdfPageFormat.a4.width;
     final pageHeight = PdfPageFormat.a4.height;
     final keys = <String>[
@@ -307,4 +319,14 @@ class ReportPdfTheme {
 
   static Future<pw.Font> regularFont() async => pw.Font.ttf(await rootBundle.load('assets/fonts/NotoSansArabic-Regular.ttf'));
   static Future<pw.Font> boldFont() async => pw.Font.ttf(await rootBundle.load('assets/fonts/NotoSansArabic-Bold.ttf'));
+  static Future<pw.Font> latinRegularFont() async => pw.Font.ttf(await rootBundle.load('assets/fonts/NotoSans-Regular.ttf'));
+  static Future<pw.Font> latinBoldFont() async => pw.Font.ttf(await rootBundle.load('assets/fonts/NotoSans-Bold.ttf'));
+
+  static Future<pw.ThemeData> pdfTheme({pw.Font? base, pw.Font? bold}) async {
+    final regular = base ?? await regularFont();
+    final boldFont = bold ?? await boldFont();
+    final latin = await latinRegularFont();
+    final latinBold = await latinBoldFont();
+    return pw.ThemeData.withFont(base: regular, bold: boldFont, fontFallback: [latin, latinBold]);
+  }
 }

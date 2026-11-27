@@ -36,6 +36,8 @@ flutter:
     - assets/images/
     - assets/fonts/NotoSansArabic-Regular.ttf
     - assets/fonts/NotoSansArabic-Bold.ttf
+    - assets/fonts/NotoSans-Regular.ttf
+    - assets/fonts/NotoSans-Bold.ttf
   fonts:
     - family: AlshaeriArabic
       fonts:

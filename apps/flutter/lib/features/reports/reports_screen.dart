@@ -448,10 +448,8 @@ class _ReportsScreenState extends State<ReportsScreen> {
       return;
     }
     final reportTheme = await ReportPdfTheme.load();
-    final regularFont = await ReportPdfTheme.regularFont();
-    final boldFont = await ReportPdfTheme.boldFont();
     final document = pw.Document(
-      theme: pw.ThemeData.withFont(base: regularFont, bold: boldFont),
+      theme: await ReportPdfTheme.pdfTheme(),
     );
     document.addPage(
       pw.MultiPage(

@@ -1038,7 +1038,7 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
     pw.Font boldFont,
     _UnifiedPdfTexts texts,
   ) async {
-      final document = pw.Document(theme: pw.ThemeData.withFont(base: font, bold: boldFont));
+      final document = pw.Document(theme: await ReportPdfTheme.pdfTheme(base: font, bold: boldFont));
       final rows = [..._rows, ..._exceptionRows]
           .map((row) => [_pdfSafeText(row.timeValue), _pdfSafeText(row.task.text), _pdfSafeText(row.output.text), 'جديدة'])
           .toList();
