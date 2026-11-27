@@ -42,8 +42,8 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         _Module(
           'performance',
-          'إحصائيات ومقارنة الأداء',
-          'ترتيب الموظفين ومقارنة الفروع',
+          'أداء الموظفين',
+          'تحليل الأداء ومقارنة الفروع',
           Icons.query_stats,
           '/admin/performance',
         ),
@@ -508,7 +508,7 @@ class _HomeScreenState extends State<HomeScreen> {
       return const SizedBox.shrink();
     }
     return SectionCard(
-      title: AppCustomizer.instance.label('unifiedTable'),
+      title: 'إنشاء المهام',
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
         onTap: _manageTasks ? () => context.push('/admin/unified-tasks') : null,
@@ -522,7 +522,7 @@ class _HomeScreenState extends State<HomeScreen> {
               const SizedBox(width: 9),
               Expanded(
                 child: Text(
-                  'افتح ${AppCustomizer.instance.label('unifiedTable')} لإنشاء المهام وإرسالها للموظف',
+                  'إعداد المهام وجدولتها وإرسالها للموظفين',
                   textAlign: TextAlign.right,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
@@ -562,8 +562,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   Expanded(
                     child: Text(
                       _adminExpanded
-                          ? 'إخفاء الإعدادات وأقسام الإدارة'
-                          : 'إظهار الإعدادات وأقسام الإدارة (${visible.length})',
+                          ? 'إخفاء الأقسام'
+                          : 'عرض الأقسام (${visible.length})',
                       textAlign: TextAlign.right,
                       style: const TextStyle(fontWeight: FontWeight.w800),
                     ),
