@@ -638,20 +638,20 @@ class _TasksScreenState extends State<TasksScreen>
                         textDirection: TextDirection.rtl,
                         children: [
                           ChoiceChip(
-                            label: const Text('المهام الحالية'),
+                            label: const Text('الحالية'),
                             selected: _view == 'tasks',
                             onSelected: (_) => _selectSection('tasks', loadCycles: false),
                           ),
                           const SizedBox(width: 8),
                           ChoiceChip(
-                            label: const Text('كشف المهام'),
+                            label: const Text('السجل'),
                             selected: _view == 'ledger',
                             onSelected: (_) => _selectSection('ledger', loadCycles: false),
                           ),
                           if (_canFilterEmployees) ...[
                             const SizedBox(width: 8),
                             ChoiceChip(
-                              label: const Text('المهام والتقارير المعتمدة والمرحلة'),
+                              label: const Text('الدورات المعتمدة'),
                               selected: _view == 'approved_cycles',
                               onSelected: (_) => _selectSection('approved_cycles'),
                             ),
