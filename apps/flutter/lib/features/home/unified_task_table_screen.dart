@@ -981,15 +981,6 @@ class _UnifiedTaskTableScreenState extends State<UnifiedTaskTableScreen> {
                                 icon: const Icon(Icons.arrow_forward),
                                 label: const Text('العودة إلى الرئيسية'),
                               ),
-                              FilledButton.icon(
-                                onPressed: _chooseCreateOrEdit,
-                                icon: Icon(_editingTask == null
-                                    ? Icons.add_task
-                                    : Icons.edit_note),
-                                label: Text(_editingTask == null
-                                    ? 'إنشاء أو تعديل المهام'
-                                    : 'تغيير المهمة المحددة'),
-                              ),
                               OutlinedButton.icon(
                                 onPressed: () async {
                                   if (await _confirmDiscardChanges() && mounted)
