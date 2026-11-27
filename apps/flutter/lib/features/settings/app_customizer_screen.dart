@@ -690,56 +690,6 @@ class _AppCustomizerScreenState extends State<AppCustomizerScreen>
         'exportDate': 'تاريخ التصدير',
       }[key] ?? key;
 
-  Widget _reportHeaderOrderEditor() => SectionCard(
-        title: 'ترتيب عناصر الترويسة وموقعها',
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const Text('اسحب العناصر للأعلى أو للأسفل لتحديد ترتيب ظهورها في ملف PDF.', textAlign: TextAlign.right),
-            const SizedBox(height: 8),
-            ReorderableListView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: _store.reportHeaderOrder.length,
-              onReorder: (oldIndex, newIndex) {
-                if (newIndex > oldIndex) newIndex--;
-                setState(() => _store.moveReportHeaderItem(oldIndex, newIndex));
-              },
-              itemBuilder: (_, index) {
-                final key = _store.reportHeaderOrder[index];
-                return ListTile(
-                  key: ValueKey(key),
-                  dense: true,
-                  leading: const Icon(Icons.drag_handle),
-                  title: Text(_reportOrderLabel(key), textAlign: TextAlign.right),
-                  trailing: Text('${index + 1}', style: const TextStyle(fontWeight: FontWeight.bold)),
-                );
-              },
-            ),
-          ],
-        ),
-      );
-
-  Widget _reportHeaderLayoutEditor() {
-    final key = _selectedHeaderElement;
-    final layout = _store.reportHeaderLayout(key);
-    final align = '${layout['align']}';
-    final size = (layout['size'] as num).toDouble();
-    final x = (layout['x'] as num).toDouble();
-    final y = (layout['y'] as num).toDouble();
-    void update({String? nextAlign, double? nextSize, double? nextX, double? nextY}) {
-      setState(() => _store.setReportHeaderLayout(key, align: nextAlign, size: nextSize, x: nextX, y: nextY));
-    }
-    return SectionCard(title: 'تحكم تفصيلي في الترويسة', child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      const Text('اختر عنصرًا ثم عدّل مكانه وحجمه. ستظهر النتيجة في المعاينة وتُستخدم نفسها عند تصدير PDF.', textAlign: TextAlign.right),
-      DropdownButtonFormField<String>(value: key, decoration: const InputDecoration(labelText: 'العنصر المراد تعديله'), items: _store.reportHeaderOrder.map((item) => DropdownMenuItem(value: item, child: Text(_reportOrderLabel(item), textAlign: TextAlign.right))).toList(), onChanged: (value) => setState(() => _selectedHeaderElement = value ?? key)),
-      DropdownButtonFormField<String>(value: align, decoration: const InputDecoration(labelText: 'المحاذاة'), items: const [DropdownMenuItem(value: 'right', child: Text('يمين')), DropdownMenuItem(value: 'center', child: Text('وسط')), DropdownMenuItem(value: 'left', child: Text('يسار'))], onChanged: (value) => update(nextAlign: value)),
-      Row(children: [const SizedBox(width: 72, child: Text('حجم الخط')), Expanded(child: Slider(value: size, min: 7, max: 32, divisions: 25, label: size.round().toString(), onChanged: (value) => update(nextSize: value)))]),
-      Row(children: [const SizedBox(width: 72, child: Text('يمين / يسار')), Expanded(child: Slider(value: x, min: -40, max: 40, divisions: 80, label: x.round().toString(), onChanged: (value) => update(nextX: value)))]),
-      Row(children: [const SizedBox(width: 72, child: Text('أعلى / أسفل')), Expanded(child: Slider(value: y, min: -20, max: 20, divisions: 40, label: y.round().toString(), onChanged: (value) => update(nextY: value)))]),
-    ]));
-  }
-
   String _reportElementLabel(String key) {
     final custom = _store.reportCustomElements[key];
     if (custom != null) return '${custom['name'] ?? custom['text'] ?? 'عنصر مخصص'}';
@@ -789,7 +739,7 @@ class _AppCustomizerScreenState extends State<AppCustomizerScreen>
     final position = _defaultReportPosition(key, index);
     final selected = _selectedHeaderElement == key;
     final configuredSize = _store.reportHeaderLayouts[key]?['size'];
-    final size = custom != null ? ((custom['size'] as num?)?.toDouble() ?? 12) : (configuredSize is num ? configuredSize.toDouble() : (key == 'title' ? 19 : key == 'company' ? 15 : 10));
+    final size = custom != null ? ((custom['size'] as num?)?.toDouble() ?? 12.0) : (configuredSize is num ? configuredSize.toDouble() : (key == 'title' ? 19.0 : key == 'company' ? 15.0 : 10.0));
     final color = custom != null ? Color((custom['color'] as num?)?.toInt() ?? _store.reportHeadingColor) : Color(key == 'title' ? _store.reportHeadingColor : _store.reportPrimaryColor);
     final child = (key == 'logo' || custom?['type'] == 'logo') && _store.reportLogoUrl.isNotEmpty
         ? Image.network(_store.reportLogoUrl, fit: BoxFit.contain, errorBuilder: (_, __, ___) => const Icon(Icons.image_not_supported_outlined))
