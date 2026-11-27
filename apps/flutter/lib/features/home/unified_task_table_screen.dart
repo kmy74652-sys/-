@@ -77,10 +77,10 @@ class _UnifiedTaskTableScreenState extends State<UnifiedTaskTableScreen> {
             .eq('is_active', true)
             .order('name')
             .limit(200),
-        _db
+      _db
             .from('tasks')
             .select(
-                'id,title,description,branch_id,assigned_to,due_at,status,report_required,updated_at,deleted_at')
+                'id,title,description,branch_id,assigned_to,due_at,status,report_required,updated_at,deleted_at,idempotency_key')
             .eq('organization_id', organization)
             .isFilter('deleted_at', null)
             .order('updated_at', ascending: false)
@@ -231,9 +231,15 @@ class _UnifiedTaskTableScreenState extends State<UnifiedTaskTableScreen> {
   String _text(dynamic value, [String fallback = '']) =>
       value == null ? fallback : value.toString();
 
-  bool _isUnifiedTask(Map<String, dynamic> task) =>
-      _text(task['title']).startsWith('الجدول الموحد -') ||
-      _text(task['description']).contains('الجدول الموحد الرسمي:');
+  bool _isUnifiedTask(Map<String, dynamic> task) {
+    // الإصدارات اليومية الناتجة عن دورة اعتماد التقرير مهام تشغيلية،
+    // وليست سجلات قابلة للتحرير من محرر إنشاء الجدول الموحد.
+    if (_text(task['idempotency_key']).startsWith('approved-cycle:')) {
+      return false;
+    }
+    return _text(task['title']).startsWith('الجدول الموحد -') ||
+        _text(task['description']).contains('الجدول الموحد الرسمي:');
+  }
 
   String _lineValue(String text, String label) {
     for (final line in text.split('\n')) {
