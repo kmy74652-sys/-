@@ -146,7 +146,7 @@ class ReportPdfTheme {
 
   pw.Widget footer([pw.Context? context, String? footerText]) => pw.Container(
     padding: const pw.EdgeInsets.only(top: 8),
-    decoration: const pw.BoxDecoration(border: pw.Border(top: pw.BorderSide(color: officialGold, width: .8))),
+    decoration: pw.BoxDecoration(border: pw.Border(top: pw.BorderSide(color: officialGold, width: .8))),
     child: pw.Row(
       children: [
         pw.Expanded(child: pw.Text(_contactLine(), textDirection: pw.TextDirection.rtl, style: const pw.TextStyle(fontSize: 7))),
