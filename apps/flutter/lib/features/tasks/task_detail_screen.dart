@@ -1754,6 +1754,132 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
     }
   }
 
+  Widget _taskOverviewCard() {
+    final status = '${_task?['status'] ?? ''}';
+    final statusColor = status == 'completed_approved'
+        ? AppColors.green
+        : status == 'late'
+        ? const Color(0xFFC2413A)
+        : AppColors.navy;
+    final priorityColor = '${_task?['priority'] ?? ''}' == 'high'
+        ? const Color(0xFFC2413A)
+        : const Color(0xFFB7791F);
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFD7E1EC)),
+        boxShadow: const [
+          BoxShadow(color: Color(0x0D17324D), blurRadius: 12, offset: Offset(0, 4)),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            textDirection: TextDirection.rtl,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 46,
+                height: 46,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFEAF1F8),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: const Icon(Icons.task_alt_outlined, color: AppColors.navy, size: 25),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  _taskTitle(),
+                  textAlign: TextAlign.right,
+                  style: const TextStyle(
+                    color: AppColors.navy,
+                    fontSize: 18,
+                    height: 1.45,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 12),
+            child: Divider(height: 1),
+          ),
+          Wrap(
+            alignment: WrapAlignment.end,
+            textDirection: TextDirection.rtl,
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              _detailBadge(
+                icon: Icons.flag_outlined,
+                label: 'الأولوية: ${_priorityLabel(_task?['priority'])}',
+                color: priorityColor,
+              ),
+              _detailBadge(
+                icon: Icons.timelapse_outlined,
+                label: 'الحالة: ${_taskStatusLabel(_task?['status'])}',
+                color: statusColor,
+              ),
+            ],
+          ),
+          if (_task?['due_at'] != null) ...[
+            const SizedBox(height: 10),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF7FAFD),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFE0E8EF)),
+              ),
+              child: Row(
+                textDirection: TextDirection.rtl,
+                children: [
+                  const Icon(Icons.event_outlined, size: 20, color: AppColors.navy),
+                  const SizedBox(width: 7),
+                  Expanded(
+                    child: Text(
+                      'موعد الاستحقاق: ${_localDateTime(_task!['due_at'])}',
+                      textAlign: TextAlign.right,
+                      style: const TextStyle(fontWeight: FontWeight.w700, color: AppColors.navy),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _detailBadge({
+    required IconData icon,
+    required String label,
+    required Color color,
+  }) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
+    decoration: BoxDecoration(
+      color: color.withValues(alpha: .07),
+      borderRadius: BorderRadius.circular(11),
+      border: Border.all(color: color.withValues(alpha: .28)),
+    ),
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      textDirection: TextDirection.rtl,
+      children: [
+        Icon(icon, size: 18, color: color),
+        const SizedBox(width: 6),
+        Text(label, style: TextStyle(color: color, fontWeight: FontWeight.w700)),
+      ],
+    ),
+  );
+
   @override
   Widget build(BuildContext context) => AppShell(
     title: 'تفاصيل المهمة',
@@ -1773,36 +1899,9 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
             ),
           )
         : ListView(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.fromLTRB(12, 8, 12, 30),
             children: [
-              SectionCard(
-                title: _taskTitle(),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Wrap(
-                      alignment: WrapAlignment.end,
-                      spacing: 8,
-                      runSpacing: 6,
-                      children: [
-                        Chip(
-                          avatar: const Icon(Icons.flag_outlined, size: 18),
-                          label: Text('الأولوية: ${_priorityLabel(_task?['priority'])}'),
-                        ),
-                        Chip(
-                          avatar: const Icon(Icons.timelapse, size: 18),
-                          label: Text('الحالة: ${_taskStatusLabel(_task?['status'])}'),
-                        ),
-                      ],
-                    ),
-                    if (_task?['due_at'] != null)
-                      Text(
-                        'موعد الاستحقاق: ${_localDateTime(_task!['due_at'])}',
-                        textAlign: TextAlign.right,
-                      ),
-                  ],
-                ),
-              ),
+              _taskOverviewCard(),
               _unifiedTable('${_task?['description'] ?? ''}'),
               if ('${_task?['task_instructions'] ?? ''}'.trim().isNotEmpty)
                 SectionCard(
