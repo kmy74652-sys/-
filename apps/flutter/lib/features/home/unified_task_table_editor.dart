@@ -1130,7 +1130,6 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
     child: pw.Column(
       children: [
         pw.Row(
-          textDirection: pw.TextDirection.ltr,
           crossAxisAlignment: pw.CrossAxisAlignment.center,
           children: [
             pw.Expanded(
@@ -1171,7 +1170,6 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
         ),
         pw.SizedBox(height: 6),
         pw.Row(
-          textDirection: pw.TextDirection.rtl,
           children: [
             pw.Expanded(child: _pdfHeaderData('الموظف', _employee.text)),
             pw.Expanded(child: _pdfHeaderData('الفرع', _branch.text)),
