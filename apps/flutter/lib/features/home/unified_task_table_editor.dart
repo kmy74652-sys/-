@@ -740,13 +740,21 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
         onTap: () { widget.onChanged?.call(); _pickTime(controller); },
       );
 
-  Widget _timeRangeField(_UnifiedRow row) => Row(
-        textDirection: TextDirection.rtl,
-        children: [
-          Expanded(child: _timeField(row.endTime, 'إلى')),
-          const Padding(padding: EdgeInsets.symmetric(horizontal: 3), child: Text('–')),
-          Expanded(child: _timeField(row.time, 'من')),
-        ],
+  Widget _timeRangeField(_UnifiedRow row) => TextFormField(
+        initialValue: row.timeValue,
+        readOnly: true,
+        textAlign: TextAlign.center,
+        textDirection: TextDirection.ltr,
+        decoration: const InputDecoration(
+          labelText: 'الوقت من وإلى',
+          hintText: '8:00 ص - 9:00 ص',
+          isDense: true,
+          suffixIcon: Icon(Icons.schedule_outlined, size: 19),
+        ),
+        onTap: () {
+          widget.onChanged?.call();
+          _pickTimeRange(row);
+        },
       );
 
   Widget _periodField(
@@ -813,6 +821,31 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
       confirmText: 'اختيار',
     );
     if (value != null && mounted) setState(() => controller.text = _formatTime(value));
+  }
+
+  Future<void> _pickTimeRange(_UnifiedRow row) async {
+    final start = await showTimePicker(
+      context: context,
+      initialTime: _parseTime(row.time.text, TimeOfDay.now()),
+      helpText: 'اختر وقت البداية',
+      cancelText: 'إلغاء',
+      confirmText: 'التالي',
+    );
+    if (start == null || !mounted) return;
+    final defaultEnd = TimeOfDay(hour: (start.hour + 1) % 24, minute: start.minute);
+    final end = await showTimePicker(
+      context: context,
+      initialTime: _parseTime(row.endTime.text, defaultEnd),
+      helpText: 'اختر وقت النهاية',
+      cancelText: 'إلغاء',
+      confirmText: 'حفظ',
+    );
+    if (end != null && mounted) {
+      setState(() {
+        row.time.text = _formatTime(start);
+        row.endTime.text = _formatTime(end);
+      });
+    }
   }
 
   Future<void> _pickPeriod(
