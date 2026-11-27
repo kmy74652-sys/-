@@ -523,8 +523,8 @@ class _UnifiedTaskTableScreenState extends State<UnifiedTaskTableScreen> {
                   DataColumn(label: Text('الحالة')),
                   DataColumn(label: Text('الفرع')),
                   DataColumn(label: Text('الموظف')),
-                  DataColumn(label: Text('المهمة والمسؤولية')),
-                  DataColumn(label: Text('الوقت')),
+                  DataColumn(label: Text('المهمة')),
+                  DataColumn(label: Text('وقت التنفيذ')),
                 ],
                 rows: rows,
               ),
@@ -969,8 +969,8 @@ class _UnifiedTaskTableScreenState extends State<UnifiedTaskTableScreen> {
 
   @override
   Widget build(BuildContext context) => AppShell(
-        title: 'إنشاء مهام بالجدول الموحد',
-        subtitle: 'إنشاء المهام اليومية وإرسالها للموظفين',
+        title: 'إنشاء المهام بالجدول الموحد',
+        subtitle: 'إنشاء المهام وتوزيعها على الموظفين',
         onBeforeNavigate: _confirmDiscardChanges,
         child: WillPopScope(
           onWillPop: _confirmDiscardChanges,

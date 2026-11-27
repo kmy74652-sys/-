@@ -214,7 +214,7 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
           Row(textDirection: TextDirection.rtl, children: [
             const Icon(Icons.table_chart_outlined, color: AppColors.green), const SizedBox(width: 8),
             Expanded(child: Text(AppCustomizer.instance.unifiedLabel('screenTitle'), textAlign: TextAlign.right, style: TextStyle(fontSize: 16 * AppCustomizer.instance.unifiedFontScale, fontWeight: FontWeight.w900, color: AppColors.navy))),
-            IconButton(onPressed: () => setState(() => _expanded = !_expanded), icon: Icon(_expanded ? Icons.expand_less : Icons.expand_more), tooltip: _expanded ? 'طي التفاصيل' : 'إظهار التفاصيل'),
+            IconButton(onPressed: () => setState(() => _expanded = !_expanded), icon: Icon(_expanded ? Icons.expand_less : Icons.expand_more), tooltip: _expanded ? 'طي تفاصيل المهمة' : 'إظهار تفاصيل المهمة'),
           ]),
           if (_expanded) ...[
             const Divider(height: 16), _toolbar(),
@@ -246,7 +246,7 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
       'daily': _scheduleTable(store.unifiedLabel('daily'), _rows),
       'exception': _scheduleTable('${store.unifiedLabel('exception')} ($_exception)', _exceptionRows),
       'report': _reportSelector(),
-      'lists': Column(children: [_editableList('المسؤوليات الأساسية', _responsibilities), const SizedBox(height: 10), _editableList('الصلاحيات وحدود المسؤولية', _authorities), const SizedBox(height: 10), _editableList('التوصيات والتعليمات الإدارية', _instructions)]),
+      'lists': Column(children: [_editableList('المسؤوليات الأساسية', _responsibilities), const SizedBox(height: 10), _editableList('الصلاحيات وحدود المسؤولية', _authorities), const SizedBox(height: 10), _editableList('التعليمات الإدارية', _instructions)]),
       'kpi': _kpiTable(),
       'notes': _section(store.unifiedLabel('notes'), TextField(controller: _reportNotes, onChanged: (_) => widget.onChanged?.call(), textAlign: TextAlign.right, maxLines: 3, decoration: const InputDecoration(hintText: 'تعليمات إضافية اختيارية؛ نموذج التقرير يحدده القالب المعتمد'))),
       'approval': _approvalStatus(),
@@ -296,8 +296,8 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
     spacing: 7,
     runSpacing: 7,
     children: [
-      IconButton(onPressed: () { widget.onChanged?.call(); setState(() => _rows.add(_UnifiedRow('', '', ''))); }, icon: const Icon(Icons.add_box_outlined), tooltip: 'إضافة صف يومي'),
-      IconButton(onPressed: () { widget.onChanged?.call(); setState(() => _exceptionRows.add(_UnifiedRow('', '', ''))); }, icon: const Icon(Icons.event_available_outlined), tooltip: 'إضافة صف استثنائي'),
+      IconButton(onPressed: () { widget.onChanged?.call(); setState(() => _rows.add(_UnifiedRow('', '', ''))); }, icon: const Icon(Icons.add_box_outlined), tooltip: 'إضافة مهمة يومية'),
+      IconButton(onPressed: () { widget.onChanged?.call(); setState(() => _exceptionRows.add(_UnifiedRow('', '', ''))); }, icon: const Icon(Icons.event_available_outlined), tooltip: 'إضافة مهمة استثنائية'),
     ],
   );
 
@@ -434,7 +434,7 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
                 ? (selected == null ? 'auto' : 'ready:${selected.versionId}')
                 : _reportMode,
             isExpanded: true,
-            decoration: const InputDecoration(labelText: 'قالب التقرير اليومي', isDense: true),
+            decoration: const InputDecoration(labelText: 'تقرير المهمة', isDense: true),
             items: [
               const DropdownMenuItem(value: 'none', child: Text('بدون تقرير')),
               const DropdownMenuItem(value: 'auto', child: Text('التلقائي')),
@@ -665,11 +665,11 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
   }
 
   Widget _workHours() => _section(AppCustomizer.instance.unifiedLabel('hours'), Wrap(textDirection: TextDirection.rtl, spacing: 8, runSpacing: 8, children: [
-    _drop('نوع الدوام', _workType, ['دوام كامل', 'دوام جزئي', 'مناوبة'], (v) => setState(() => _workType = v)),
-    _drop('الأيام', _days, ['الأحد - الخميس', 'السبت - الخميس', 'حسب المناوبة'], (v) => setState(() => _days = v)),
-    _drop('الاستثناء الأسبوعي', _exception, ['الجمعة', 'الأحد', 'لا يوجد'], (v) => setState(() => _exception = v)),
+    _drop('نظام الدوام', _workType, ['دوام كامل', 'دوام جزئي', 'مناوبة'], (v) => setState(() => _workType = v)),
+    _drop('أيام العمل', _days, ['الأحد - الخميس', 'السبت - الخميس', 'حسب المناوبة'], (v) => setState(() => _days = v)),
+    _drop('يوم الاستثناء', _exception, ['الجمعة', 'الأحد', 'لا يوجد'], (v) => setState(() => _exception = v)),
     _periodField(_firstPeriod, 'الفترة الأولى', const TimeOfDay(hour: 8, minute: 0), const TimeOfDay(hour: 12, minute: 0)),
-    _periodField(_breakPeriod, 'الاستراحة', const TimeOfDay(hour: 12, minute: 0), const TimeOfDay(hour: 13, minute: 0)),
+    _periodField(_breakPeriod, 'فترة الراحة', const TimeOfDay(hour: 12, minute: 0), const TimeOfDay(hour: 13, minute: 0)),
     _periodField(_secondPeriod, 'الفترة الثانية', const TimeOfDay(hour: 13, minute: 0), const TimeOfDay(hour: 17, minute: 0)),
   ]));
 
@@ -683,7 +683,7 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
         scrollDirection: Axis.horizontal,
         child: DataTable(
           columnSpacing: 18,
-          columns: [...visible.map((key) => DataColumn(label: Text(AppCustomizer.instance.unifiedLabel(key)))), const DataColumn(label: Text('إجراء'))],
+          columns: [...visible.map((key) => DataColumn(label: Text(AppCustomizer.instance.unifiedLabel(key)))), const DataColumn(label: Text('إجراءات'))],
           rows: source.asMap().entries.map((entry) {
             final i = entry.key;
             final row = entry.value;
@@ -740,7 +740,7 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
         textDirection: TextDirection.ltr,
         style: const TextStyle(fontSize: 12),
         decoration: const InputDecoration(
-          labelText: 'الوقت من وإلى',
+          labelText: 'وقت التنفيذ',
           hintText: '8:00 ص - 9:00 ص',
           isDense: true,
           suffixIcon: Icon(Icons.schedule_outlined, size: 19),
@@ -914,7 +914,7 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
     ),
   );
 
-  Widget _approvalStatus() => _section('حالة الاعتماد', const Wrap(textDirection: TextDirection.rtl, spacing: 8, children: [Chip(avatar: Icon(Icons.hourglass_empty, size: 17), label: Text('إقرار الموظف: بانتظار الإقرار')), Chip(avatar: Icon(Icons.rate_review_outlined, size: 17), label: Text('مراجعة المسؤول: لم تبدأ')), Chip(avatar: Icon(Icons.verified_outlined, size: 17), label: Text('اعتماد المدير: مسودة'))]));
+  Widget _approvalStatus() => _section(AppCustomizer.instance.unifiedLabel('approval'), const Wrap(textDirection: TextDirection.rtl, spacing: 8, children: [Chip(avatar: Icon(Icons.hourglass_empty, size: 17), label: Text('إقرار الموظف: بانتظار الإقرار')), Chip(avatar: Icon(Icons.rate_review_outlined, size: 17), label: Text('مراجعة المسؤول: لم تبدأ')), Chip(avatar: Icon(Icons.verified_outlined, size: 17), label: Text('اعتماد المدير: مسودة'))]));
 
   Widget _section(String title, Widget child) => Container(padding: const EdgeInsets.all(10), decoration: BoxDecoration(color: const Color(0xFFF8FBFA), borderRadius: BorderRadius.circular(AppCustomizer.instance.unifiedRadius), border: Border.all(color: const Color(0xFFD8E4E0))), child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [Text(title, textAlign: TextAlign.right, style: TextStyle(fontWeight: FontWeight.w900, color: AppColors.navy, fontSize: 14 * AppCustomizer.instance.unifiedFontScale)), const SizedBox(height: 8), child]));
   Widget _input(TextEditingController controller, String label) => TextField(controller: controller, onChanged: (_) => widget.onChanged?.call(), textAlign: TextAlign.right, decoration: InputDecoration(labelText: label, isDense: true));

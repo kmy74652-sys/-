@@ -54,7 +54,7 @@ class AppCustomizer extends ChangeNotifier {
   int unifiedSchedulePreviewRows = 1;
 
   static const defaults = <String, String>{
-    'appName': 'NEXORA', 'organizationName': 'مؤسسة الشاعري للتجارة العامة', 'tagline': 'Smart Business Management', 'time': 'الوقت من وإلى',
+    'appName': 'NEXORA', 'organizationName': 'مؤسسة الشاعري للتجارة العامة', 'tagline': 'Smart Business Management', 'time': 'وقت التنفيذ',
     'home': 'الرئيسية', 'tasks': 'المهام الحالية', 'independentTasks': 'المهام المستقلة', 'employees': 'الموظفون', 'activity': 'سجل النشاط', 'report-designer': 'مصمم التقارير', 'hr': 'الموارد البشرية', 'workSection': 'العمل والمتابعة', 'unifiedTable': 'إنشاء المهام بالجدول الموحد', 'taskManagement': 'إدارة مهام الجدول الموحد', 'reports': 'مراجعة التقارير', 'performance': 'تحليلات أداء الموظفين والفروع', 'dailyReports': 'التقارير اليومية المصممة', 'employeeReports': 'تقاريري اليومية', 'adminSections': 'أقسام الإدارة', 'settings': 'إعدادات التطبيق والحساب', 'totalTasks': 'إجمالي المهام', 'inProgress': 'قيد التنفيذ', 'submitted': 'بانتظار المراجعة', 'lateTasks': 'مهام متأخرة',
   };
 
@@ -100,6 +100,29 @@ class AppCustomizer extends ChangeNotifier {
     };
     for (final entry in migrations.entries) {
       if (labels[entry.key] == entry.value) labels[entry.key] = defaults[entry.key]!;
+    }
+    const unifiedMigrations = <String, String>{
+      'screenTitle': 'الجدول الموحد لإنشاء المهام',
+      'screenSubtitle': 'إنشاء منظم وإرسال مباشر للموظف',
+      'employee': 'بيانات الموظف والاعتماد',
+      'purpose': 'الهدف من الوظيفة',
+      'purposeHint': 'اكتب الهدف العام من الوظيفة',
+      'hours': 'ساعات الدوام الرسمية',
+      'daily': 'الجدول الزمني اليومي',
+      'exception': 'العمل الاستثنائي',
+      'report': 'قالب التقرير اليومي',
+      'lists': 'البنود التنظيمية',
+      'notes': 'ملاحظات وتعليمات للإدارة أو الموظف',
+      'approval': 'حالة الاعتماد',
+      'time': 'الوقت من وإلى',
+      'task': 'المهمة المحددة والمسؤولية',
+      'employeeField': 'الموظف أو المجموعة',
+      'startDate': 'تاريخ بدء التطبيق',
+    };
+    for (final entry in unifiedMigrations.entries) {
+      if (unifiedLabels[entry.key] == entry.value) {
+        unifiedLabels[entry.key] = UnifiedTableCustomization.defaults[entry.key]!;
+      }
     }
   }
 
@@ -287,5 +310,5 @@ class AppCustomizer extends ChangeNotifier {
 
 class UnifiedTableCustomization {
   static const defaultSectionOrder = ['sent', 'employee', 'purpose', 'hours', 'daily', 'exception', 'report', 'lists', 'kpi', 'notes', 'approval'];
-  static const defaults = <String, String>{'screenTitle': 'الجدول الموحد لإنشاء المهام', 'screenSubtitle': 'إنشاء منظم وإرسال مباشر للموظف', 'sent': 'الجداول الموحدة المرسلة', 'back': 'العودة إلى الرئيسية', 'employee': 'بيانات الموظف والاعتماد', 'purpose': 'الهدف من الوظيفة', 'purposeHint': 'اكتب الهدف العام من الوظيفة', 'hours': 'ساعات الدوام الرسمية', 'daily': 'الجدول الزمني اليومي', 'exception': 'العمل الاستثنائي', 'report': 'قالب التقرير اليومي', 'lists': 'البنود التنظيمية', 'kpi': 'مؤشرات تقييم الأداء', 'notes': 'ملاحظات وتعليمات للإدارة أو الموظف', 'approval': 'حالة الاعتماد', 'time': 'الوقت من وإلى', 'task': 'المهمة المحددة والمسؤولية', 'output': 'المخرج المطلوب', 'employeeField': 'الموظف أو المجموعة', 'roleField': 'المسمى الوظيفي', 'branchField': 'الفرع', 'startDate': 'تاريخ بدء التطبيق'};
+  static const defaults = <String, String>{'screenTitle': 'إنشاء المهام بالجدول الموحد', 'screenSubtitle': 'إنشاء المهام وتوزيعها على الموظفين', 'sent': 'المهام المرسلة', 'back': 'العودة إلى الشاشة السابقة', 'employee': 'بيانات المهمة والموظف', 'purpose': 'هدف المهمة', 'purposeHint': 'اكتب الهدف المطلوب من تنفيذ المهمة', 'hours': 'مواعيد تنفيذ المهام', 'daily': 'المهام اليومية ومواعيد تنفيذها', 'exception': 'المهام الاستثنائية', 'report': 'تقرير المهمة', 'lists': 'المسؤوليات والتعليمات', 'kpi': 'مؤشرات تقييم الأداء', 'notes': 'ملاحظات وتعليمات المهمة', 'approval': 'مراحل اعتماد المهمة', 'time': 'وقت التنفيذ', 'task': 'المهمة', 'output': 'المخرج المطلوب', 'employeeField': 'الموظف أو المهام المشتركة', 'roleField': 'المسمى الوظيفي', 'branchField': 'الفرع', 'startDate': 'تاريخ بدء المهمة'};
 }
