@@ -831,11 +831,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
   }
 
   String _pdfSafeText(String value) {
-    final cleaned = value.replaceAllMapped(
-      RegExp(r'[^\x20-\x7E\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF\u200C\u200D\n\r\t]'),
-      (_) => ' ',
-    );
-    return cleaned.replaceAll(RegExp(r'[ \t]{2,}'), ' ').trim();
+    return reportPdfSafeText(value);
   }
 
   String _taskReportFieldLabel(Map<String, dynamic> row, Object? key) {

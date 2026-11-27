@@ -8,10 +8,14 @@ import 'package:pdf/widgets.dart' as pw;
 import 'app_customizer.dart';
 import 'organization_branding.dart';
 
+/// Removes characters that cannot be rendered safely in a PDF text stream
+/// without filtering valid Unicode punctuation. Arabic and general Unicode
+/// punctuation such as (، ؛ ؟ … — « ») must remain intact.
 String reportPdfSafeText(String value) => value
-    .replaceAll('·', ' - ')
     .replaceAll('\uFFFD', '')
-    .replaceAll(RegExp(r'[\u0000-\u0008\u000B\u000C\u000E-\u001F]'), ' ');
+    .replaceAll(RegExp(r'[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F]'), ' ')
+    .replaceAll(RegExp(r'[ \t]{2,}'), ' ')
+    .trim();
 
 class ReportPdfTheme {
   ReportPdfTheme(this.settings, {this.logo});

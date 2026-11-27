@@ -1048,7 +1048,7 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
           _pdfHeading(title),
           ...values.asMap().entries.map((entry) => pw.Padding(
             padding: const pw.EdgeInsets.only(bottom: 4),
-            child: pw.Text('${entry.key + 1}. ${entry.value.text.trim().isEmpty ? '—' : entry.value.text.trim()}', textDirection: pw.TextDirection.rtl),
+            child: pw.Text(_pdfSafeText('${entry.key + 1}. ${entry.value.text.trim().isEmpty ? '—' : entry.value.text.trim()}'), textDirection: pw.TextDirection.rtl),
           )),
           pw.SizedBox(height: 8),
         ],
@@ -1237,11 +1237,7 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
   );
 
   String _pdfSafeText(String value) {
-    final cleaned = value.replaceAllMapped(
-      RegExp(r'[^\x20-\x7E\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF\u200C\u200D\n\r\t]'),
-      (_) => ' ',
-    );
-    return cleaned.replaceAll(RegExp(r'[ \t]{2,}'), ' ').trim();
+    return reportPdfSafeText(value);
   }
 }
 
