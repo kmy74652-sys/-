@@ -675,21 +675,6 @@ class _AppCustomizerScreenState extends State<AppCustomizerScreen>
         child: TextField(controller: _reportController(key, value), textAlign: TextAlign.right, maxLines: maxLines, onChanged: onChanged, decoration: InputDecoration(labelText: label)),
       );
 
-  String _reportOrderLabel(String key) => const {
-        'company': 'اسم الشركة / المؤسسة',
-        'branchName': 'اسم الفرع الثابت',
-        'phone': 'الهاتف',
-        'email': 'البريد الإلكتروني',
-        'address': 'العنوان',
-        'headerText': 'نص الترويسة الإضافي',
-        'title': 'عنوان التقرير',
-        'employee': 'اسم الموظف',
-        'taskBranch': 'فرع المهمة',
-        'status': 'الحالة',
-        'number': 'رقم التقرير',
-        'exportDate': 'تاريخ التصدير',
-      }[key] ?? key;
-
   String _reportElementLabel(String key) {
     final custom = _store.reportCustomElements[key];
     if (custom != null) return '${custom['name'] ?? custom['text'] ?? 'عنصر مخصص'}';
