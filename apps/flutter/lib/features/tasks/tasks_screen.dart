@@ -38,7 +38,8 @@ class _TasksScreenState extends State<TasksScreen>
   bool _queueBusy = false;
   String _view = 'tasks';
   String _ledgerOrder = 'latest';
-  bool _officialHeaderCollapsed = false;
+  bool _officialHeaderCollapsed = true;
+  bool _officialTasksCollapsed = true;
   bool _administrativeDetailsCollapsed = true;
   String? _organizationId;
   bool _canEditOfficialTasks = false;
@@ -451,51 +452,77 @@ class _TasksScreenState extends State<TasksScreen>
                         ),
                       ),
                     Align(
-                      alignment: AlignmentDirectional.centerEnd,
-                      child: IconButton(
-                        tooltip: _search.isEmpty ? 'بحث' : 'مسح البحث',
-                        icon: Icon(_search.isEmpty ? Icons.search : Icons.search_off),
-                        onPressed: _search.isEmpty
-                            ? _openTaskSearch
-                            : () => setState(() {
-                                  _search = '';
-                                  _searchController.clear();
-                                }),
-                      ),
-                    ),
-                    if (_canFilterEmployees && _employees.isNotEmpty) ...[
-                      const SizedBox(height: 8),
-                      DropdownButtonFormField<String>(
-                        value: _employeeFilter,
-                        isExpanded: true,
-                        decoration: const InputDecoration(
-                          labelText: 'عرض الموظفين',
-                          prefixIcon: Icon(Icons.person_outline),
-                          border: OutlineInputBorder(),
-                          isDense: true,
-                        ),
-                        items: [
-                          const DropdownMenuItem(
-                            value: 'all',
-                            child: Text('كل الموظفين'),
-                          ),
-                          ..._employees.map(
-                            (employee) => DropdownMenuItem<String>(
-                              value: '${employee['user_id']}',
-                              child: Text(
-                                '${employee['display_name'] ?? 'موظف'}'
-                                '${employee['employee_no'] == null ? '' : ' · ${employee['employee_no']}' }',
-                                overflow: TextOverflow.ellipsis,
+                      alignment: AlignmentDirectional.centerStart,
+                      child: Row(
+                        textDirection: TextDirection.rtl,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (_canFilterEmployees && _employees.isNotEmpty)
+                            Expanded(
+                              flex: 3,
+                              child: DropdownButtonFormField<String>(
+                                value: _employeeFilter,
+                                isExpanded: true,
+                                decoration: const InputDecoration(
+                                  labelText: 'عرض الموظفين',
+                                  prefixIcon: Icon(Icons.person_outline),
+                                  border: OutlineInputBorder(),
+                                  isDense: true,
+                                ),
+                                items: [
+                                  const DropdownMenuItem(value: 'all', child: Text('كل الموظفين')),
+                                  ..._employees.map(
+                                    (employee) => DropdownMenuItem<String>(
+                                      value: '${employee['user_id']}',
+                                      child: Text(
+                                        '${employee['display_name'] ?? 'موظف'}'
+                                        '${employee['employee_no'] == null ? '' : ' · ${employee['employee_no']}' }',
+                                        overflow: TextOverflow.ellipsis,
+                                        textDirection: TextDirection.rtl,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                                onChanged: (value) => setState(() => _employeeFilter = value ?? 'all'),
+                              ),
+                            ),
+                          if (_canFilterEmployees && _employees.isNotEmpty) const SizedBox(width: 8),
+                          SizedBox(
+                            width: 220,
+                            child: Card(
+                              margin: EdgeInsets.zero,
+                              child: Row(
                                 textDirection: TextDirection.rtl,
+                                children: [
+                                  const Expanded(child: Text('الفلاتر', textAlign: TextAlign.right, style: TextStyle(fontWeight: FontWeight.w800))),
+                                  IconButton(
+                                    tooltip: 'إعادة تعيين الفلاتر',
+                                    onPressed: _resetFilters,
+                                    icon: const Icon(Icons.restart_alt),
+                                  ),
+                                  IconButton(
+                                    tooltip: _filtersExpanded ? 'إخفاء الفلاتر' : 'إظهار الفلاتر',
+                                    onPressed: () => setState(() => _filtersExpanded = !_filtersExpanded),
+                                    icon: Icon(_filtersExpanded ? Icons.expand_less : Icons.expand_more),
+                                  ),
+                                ],
                               ),
                             ),
                           ),
+                          const SizedBox(width: 8),
+                          IconButton(
+                            tooltip: _search.isEmpty ? 'بحث' : 'مسح البحث',
+                            icon: Icon(_search.isEmpty ? Icons.search : Icons.search_off, size: 30),
+                            onPressed: _search.isEmpty
+                                ? _openTaskSearch
+                                : () => setState(() {
+                                      _search = '';
+                                      _searchController.clear();
+                                    }),
+                          ),
                         ],
-                        onChanged: (value) => setState(
-                          () => _employeeFilter = value ?? 'all',
-                        ),
                       ),
-                    ],
+                    ),
                     const SizedBox(height: 8),
                     Row(
                       textDirection: TextDirection.rtl,
@@ -514,38 +541,11 @@ class _TasksScreenState extends State<TasksScreen>
                       ],
                     ),
                     const SizedBox(height: 8),
-                    Card(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          Row(
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  _statusFilter == 'all' && _priorityFilter == 'all'
-                                      ? 'الفلاتر'
-                                      : 'الفلاتر · نشط: ${(_statusFilter == 'all' ? 0 : 1) + (_priorityFilter == 'all' ? 0 : 1)}',
-                                  textAlign: TextAlign.right,
-                                  style: const TextStyle(fontWeight: FontWeight.w800),
-                                ),
-                              ),
-                              IconButton(
-                                tooltip: 'إعادة تعيين الفلاتر',
-                                onPressed: _resetFilters,
-                                icon: const Icon(Icons.restart_alt),
-                              ),
-                              IconButton(
-                                tooltip: _filtersExpanded ? 'إخفاء الفلاتر' : 'إظهار الفلاتر',
-                                onPressed: () => setState(() => _filtersExpanded = !_filtersExpanded),
-                                icon: Icon(_filtersExpanded ? Icons.expand_less : Icons.expand_more),
-                              ),
-                            ],
-                          ),
-                          AnimatedSize(
-                            duration: const Duration(milliseconds: 220),
-                            child: !_filtersExpanded
-                                ? const SizedBox.shrink()
-                                : Padding(
+                    AnimatedSize(
+                      duration: const Duration(milliseconds: 220),
+                      child: !_filtersExpanded
+                          ? const SizedBox.shrink()
+                          : Padding(
                                     padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
                                     child: Column(
                                       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -574,10 +574,7 @@ class _TasksScreenState extends State<TasksScreen>
                                         ),
                                       ],
                                     ),
-                                  ),
-                          ),
-                        ],
-                      ),
+                                ),
                     ),
                     Row(
                       children: [
@@ -1118,10 +1115,10 @@ class _TasksScreenState extends State<TasksScreen>
                     style: TextStyle(fontWeight: FontWeight.w900, color: AppColors.navy),
                   ),
                 ),
-                TextButton.icon(
+                IconButton(
+                  tooltip: _officialHeaderCollapsed ? 'إظهار بيانات الموظف وساعات الدوام' : 'إخفاء بيانات الموظف وساعات الدوام',
                   onPressed: () => setState(() => _officialHeaderCollapsed = !_officialHeaderCollapsed),
-                  icon: Icon(_officialHeaderCollapsed ? Icons.visibility_outlined : Icons.visibility_off_outlined, size: 17),
-                  label: Text(_officialHeaderCollapsed ? 'إظهار' : 'إخفاء'),
+                  icon: Icon(_officialHeaderCollapsed ? Icons.visibility_outlined : Icons.visibility_off_outlined, size: 20),
                 ),
               ],
             ),
@@ -1144,7 +1141,24 @@ class _TasksScreenState extends State<TasksScreen>
               compactGrid(workFields),
             ],
             const SizedBox(height: 8),
-            Table(
+            Row(
+              textDirection: Directionality.of(context),
+              children: [
+                const Expanded(
+                  child: Text(
+                    'المهام والبيانات',
+                    textAlign: TextAlign.right,
+                    style: TextStyle(fontWeight: FontWeight.w800, color: AppColors.navy),
+                  ),
+                ),
+                IconButton(
+                  tooltip: _officialTasksCollapsed ? 'إظهار المهام' : 'إخفاء المهام',
+                  onPressed: () => setState(() => _officialTasksCollapsed = !_officialTasksCollapsed),
+                  icon: Icon(_officialTasksCollapsed ? Icons.visibility_outlined : Icons.visibility_off_outlined, size: 20),
+                ),
+              ],
+            ),
+            if (!_officialTasksCollapsed) Table(
               textDirection: Directionality.of(context),
               defaultVerticalAlignment: TableCellVerticalAlignment.middle,
               columnWidths: const {

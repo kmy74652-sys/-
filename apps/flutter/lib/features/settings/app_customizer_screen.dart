@@ -740,6 +740,116 @@ class _AppCustomizerScreenState extends State<AppCustomizerScreen>
     ]));
   }
 
+  String _reportElementLabel(String key) {
+    final custom = _store.reportCustomElements[key];
+    if (custom != null) return '${custom['name'] ?? custom['text'] ?? 'عنصر مخصص'}';
+    const labels = {'logo': 'الشعار', 'company': 'اسم المؤسسة', 'branchName': 'الفرع', 'phone': 'الهاتف', 'email': 'البريد الإلكتروني', 'address': 'العنوان', 'headerText': 'النص المخصص', 'title': 'عنوان المستند', 'employee': 'الموظف', 'taskBranch': 'فرع المهمة', 'status': 'الحالة', 'number': 'رقم التقرير', 'exportDate': 'تاريخ التصدير', 'signature': 'التوقيع', 'footer': 'التذييل'};
+    return labels[key] ?? key;
+  }
+
+  String _reportElementText(String key) {
+    final custom = _store.reportCustomElements[key];
+    if (custom != null) return '${custom['text'] ?? ''}';
+    switch (key) {
+      case 'company': return _store.reportCompanyName;
+      case 'branchName': return _store.reportBranchName;
+      case 'phone': return _store.reportPhone;
+      case 'email': return _store.reportEmail;
+      case 'address': return _store.reportAddress;
+      case 'headerText': return _store.reportHeaderText;
+      case 'title': return 'تقرير المهمة';
+      case 'employee': return 'الموظف: أحمد محمد';
+      case 'taskBranch': return 'الفرع: الفرع الرئيسي';
+      case 'status': return 'الحالة: مكتملة';
+      case 'number': return 'رقم التقرير: 0001';
+      case 'exportDate': return 'تاريخ التصدير: 27/11/2026';
+      case 'signature': return _store.reportShowSignature ? 'التوقيع: __________________' : '';
+      case 'footer': return _store.reportShowFooter ? _store.reportFooterText : '';
+      default: return '';
+    }
+  }
+
+  List<String> get _reportCanvasElements => ['logo', ..._store.reportHeaderOrder, 'signature', 'footer', ..._store.reportCustomElements.keys];
+
+  Map<String, double> _defaultReportPosition(String key, int index) {
+    final custom = _store.reportCustomElements[key];
+    if (custom != null || _store.reportElementPositions.containsKey(key)) return _store.reportElementPosition(key);
+    if (key == 'logo') return {'left': .06, 'top': .04, 'width': .18, 'height': .11};
+    return {'left': .08, 'top': (.04 + ((index + 1) * .055)).clamp(.02, .72).toDouble(), 'width': .84, 'height': .045};
+  }
+
+  void _moveReportElement(String key, double left, double top, double width, double height) {
+    double snap(double value) => (value / .02).round() * .02;
+    _store.setReportElementPosition(key, left: snap(left).clamp(0.0, 1.0 - width).toDouble(), top: snap(top).clamp(0.0, 1.0 - height).toDouble(), width: width, height: height);
+  }
+
+  Widget _reportCanvasElement(String key, int index, double canvasWidth, double canvasHeight) {
+    final custom = _store.reportCustomElements[key];
+    if (custom != null && custom['visible'] == false) return const SizedBox.shrink();
+    final position = _defaultReportPosition(key, index);
+    final selected = _selectedHeaderElement == key;
+    final configuredSize = _store.reportHeaderLayouts[key]?['size'];
+    final size = custom != null ? ((custom['size'] as num?)?.toDouble() ?? 12) : (configuredSize is num ? configuredSize.toDouble() : (key == 'title' ? 19 : key == 'company' ? 15 : 10));
+    final color = custom != null ? Color((custom['color'] as num?)?.toInt() ?? _store.reportHeadingColor) : Color(key == 'title' ? _store.reportHeadingColor : _store.reportPrimaryColor);
+    final child = (key == 'logo' || custom?['type'] == 'logo') && _store.reportLogoUrl.isNotEmpty
+        ? Image.network(_store.reportLogoUrl, fit: BoxFit.contain, errorBuilder: (_, __, ___) => const Icon(Icons.image_not_supported_outlined))
+        : Text(_reportElementText(key), textAlign: TextAlign.right, softWrap: true, style: TextStyle(fontSize: size, fontWeight: key == 'company' || key == 'title' ? FontWeight.w800 : FontWeight.normal, color: color));
+    return Positioned(
+      left: position['left']! * canvasWidth,
+      top: position['top']! * canvasHeight,
+      width: position['width']! * canvasWidth,
+      height: position['height']! * canvasHeight,
+      child: GestureDetector(
+        onTap: () => setState(() => _selectedHeaderElement = key),
+        onPanUpdate: (details) {
+          final nextLeft = (position['left']! + details.delta.dx / canvasWidth).clamp(0.0, 1.0 - position['width']!).toDouble();
+          final nextTop = (position['top']! + details.delta.dy / canvasHeight).clamp(0.0, 1.0 - position['height']!).toDouble();
+          _moveReportElement(key, nextLeft, nextTop, position['width']!, position['height']!);
+        },
+        child: Container(
+          alignment: key == 'logo' ? Alignment.center : Alignment.centerRight,
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+          decoration: BoxDecoration(color: selected ? Color(_store.reportPrimaryColor).withOpacity(.10) : Colors.transparent, border: Border.all(color: selected ? Color(_store.reportPrimaryColor) : Colors.transparent, width: 1.2), borderRadius: BorderRadius.circular(4)),
+          child: child,
+        ),
+      ),
+    );
+  }
+
+  Widget _reportElementToolbar() {
+    final key = _selectedHeaderElement;
+    final custom = _store.reportCustomElements[key];
+    if (custom == null && !_reportCanvasElements.contains(key)) return const SizedBox.shrink();
+    final configuredSize = _store.reportHeaderLayouts[key]?['size'];
+    final size = custom != null ? ((custom['size'] as num?)?.toDouble() ?? 12) : (configuredSize is num ? configuredSize.toDouble() : (key == 'title' ? 19.0 : key == 'company' ? 15.0 : 10.0));
+    return SectionCard(title: 'تحرير العنصر المحدد: ${_reportElementLabel(key)}', child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      if (custom != null) TextFormField(initialValue: '${custom['text'] ?? ''}', textAlign: TextAlign.right, decoration: const InputDecoration(labelText: 'النص'), onChanged: (value) => _store.updateReportCustomElement(key, text: value, name: value)),
+      Row(children: [const Text('الحجم'), Expanded(child: Slider(value: size.clamp(7, 32).toDouble(), min: 7, max: 32, divisions: 25, onChanged: (value) => custom == null ? _store.setReportHeaderLayout(key, size: value) : _store.updateReportCustomElement(key, size: value)))]),
+      Wrap(spacing: 6, children: [for (final color in [_store.reportPrimaryColor, _store.reportHeadingColor, 0xFF146B50, 0xFF7A2430]) ActionChip(label: const Text(''), avatar: CircleAvatar(backgroundColor: Color(color)), onPressed: custom == null ? null : () => _store.updateReportCustomElement(key, color: color))]),
+      Row(children: [if (custom != null) IconButton(tooltip: 'إخفاء العنصر', icon: Icon(custom['visible'] == false ? Icons.visibility_outlined : Icons.visibility_off_outlined), onPressed: () => _store.updateReportCustomElement(key, visible: custom['visible'] == false)), if (custom != null) IconButton(tooltip: 'حذف العنصر', icon: const Icon(Icons.delete_outline, color: Colors.red), onPressed: () => setState(() { _store.removeReportCustomElement(key); _selectedHeaderElement = 'company'; }))]),
+    ]));
+  }
+
+  Widget _reportVisualEditor() => AnimatedBuilder(animation: _store, builder: (context, _) => LayoutBuilder(builder: (context, constraints) {
+    final width = (constraints.maxWidth - 24).clamp(280.0, 520.0).toDouble();
+    final height = width * 1.4142;
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      SectionCard(title: 'معاينة A4 مباشرة', child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        const Text('اضغط على أي عنصر ثم اسحبه داخل الورقة. ستظهر خطوط وحدود المحاذاة تلقائيًا ولن يخرج العنصر عن الهوامش.', textAlign: TextAlign.right),
+        const SizedBox(height: 8),
+        Center(child: Container(width: width, height: height, decoration: BoxDecoration(color: Colors.white, border: Border.all(color: const Color(0xFFD4DEDF)), boxShadow: const [BoxShadow(color: Color(0x22000000), blurRadius: 8)]), child: Stack(children: [
+          IgnorePointer(child: CustomPaint(size: Size(width, height), painter: _ReportAlignmentPainter())),
+          for (var i = 0; i < _reportCanvasElements.length; i++) _reportCanvasElement(_reportCanvasElements[i], i, width, height),
+          Positioned(left: width * .06, top: height * .48, width: width * .88, height: height * .30, child: _pdfPreviewTable(const [['الوقت', 'المهمة والبيان', 'المخرج المطلوب', 'الحالة'], ['08:00', 'مهمة حالية', 'لا يوجد', 'جديدة'], ['—', 'مهمة استثنائية', 'لا يوجد', 'جديدة']], Color(_store.reportPrimaryColor))),
+        ]))),
+        const SizedBox(height: 8),
+        Wrap(alignment: WrapAlignment.center, spacing: 8, children: [OutlinedButton.icon(onPressed: () => setState(() { _selectedHeaderElement = _store.addReportCustomElement(type: 'text', text: 'نص مخصص'); }), icon: const Icon(Icons.text_fields), label: const Text('إضافة نص')), OutlinedButton.icon(onPressed: () => setState(() { _selectedHeaderElement = _store.addReportCustomElement(type: 'logo', text: 'الشعار'); }), icon: const Icon(Icons.image_outlined), label: const Text('إضافة شعار'))]),
+      ])),
+      const SizedBox(height: 10),
+      _reportElementToolbar(),
+    ]);
+  }));
+
   Widget _reportThemeTab() => ListView(
         padding: const EdgeInsets.all(12),
         children: [
@@ -760,8 +870,7 @@ class _AppCustomizerScreenState extends State<AppCustomizerScreen>
             Row(children: [const Text('حجم الشعار'), Expanded(child: Slider(value: _store.reportLogoSize, min: 28, max: 110, divisions: 16, label: _store.reportLogoSize.round().toString(), onChanged: (v) => setState(() => _store.setReportTheme(logoSize: v))))]),
             _reportField('headerText', 'نص الترويسة الإضافي', _store.reportHeaderText, (v) => setState(() => _store.setReportTheme(headerText: v))),
           ])),
-          _reportHeaderOrderEditor(),
-          _reportHeaderLayoutEditor(),
+          _reportVisualEditor(),
           SectionCard(title: 'ألوان وشكل الجدول', child: Column(children: [
             DropdownButtonFormField<String>(value: _store.reportTableStyle, decoration: const InputDecoration(labelText: 'شكل الجداول'), items: const [DropdownMenuItem(value: 'simple', child: Text('بسيط')), DropdownMenuItem(value: 'full', child: Text('حدود كاملة')), DropdownMenuItem(value: 'colored', child: Text('تصميم ملون'))], onChanged: (v) => setState(() => _store.setReportTheme(tableStyle: v))),
             Wrap(spacing: 8, children: [_reportColor('كحلي', 0xFF0B3458), _reportColor('أخضر', 0xFF146B50), _reportColor('أزرق', 0xFF164C80), _reportColor('عنابي', 0xFF7A2430)]),
@@ -1406,6 +1515,22 @@ class _PreviewNavItem extends StatelessWidget {
           Text(label, style: TextStyle(color: selected ? const Color(0xFFDBA62A) : Colors.white70, fontSize: 10)),
         ],
       );
+}
+
+class _ReportAlignmentPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()..color = const Color(0x120B3458)..strokeWidth = .6;
+    for (final fraction in [.08, .5, .92]) {
+      final x = size.width * fraction;
+      final y = size.height * fraction;
+      canvas.drawLine(Offset(x, 0), Offset(x, size.height), paint);
+      if (fraction < .9) canvas.drawLine(Offset(0, y), Offset(size.width, y), paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
 class _ProfileLoader {

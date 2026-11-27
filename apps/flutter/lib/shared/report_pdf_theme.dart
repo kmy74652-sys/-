@@ -51,8 +51,9 @@ class ReportPdfTheme {
       final layout = settings.reportHeaderLayout(key);
       final align = layout['align'] == 'left' ? pw.TextAlign.left : layout['align'] == 'center' ? pw.TextAlign.center : pw.TextAlign.right;
       final configuredSize = settings.reportHeaderLayouts.containsKey(key) ? (layout['size'] as num).toDouble() : size;
-      final x = (layout['x'] as num).toDouble();
-      final y = (layout['y'] as num).toDouble();
+      final position = settings.reportElementPositions[key];
+      final x = position == null ? (layout['x'] as num).toDouble() : (position['left'] ?? 0) * 100;
+      final y = position == null ? (layout['y'] as num).toDouble() : (position['top'] ?? 0) * 100;
       return pw.Container(
         margin: pw.EdgeInsets.only(left: x > 0 ? x : 0, right: x < 0 ? -x : 0, top: y > 0 ? y : 0, bottom: y < 0 ? -y : 0),
         child: pw.Text(reportPdfSafeText(value), textDirection: pw.TextDirection.rtl, textAlign: align, style: pw.TextStyle(fontSize: configuredSize, fontWeight: bold ? pw.FontWeight.bold : pw.FontWeight.normal, color: color)),
@@ -74,6 +75,15 @@ class ReportPdfTheme {
         case 'exportDate': if (settings.reportShowExportDate) content.add(line(key, 'تاريخ التصدير: ${DateTime.now().toLocal().toString().split('.').first}', size: 8));
       }
     }
+    for (final entry in settings.reportCustomElements.entries) {
+      final custom = entry.value;
+      if (custom['visible'] == false || '${custom['type'] ?? 'text'}' == 'logo') continue;
+      final text = '${custom['text'] ?? ''}'.trim();
+      if (text.isEmpty) continue;
+      final size = (custom['size'] is num ? (custom['size'] as num).toDouble() : 12).clamp(7, 32).toDouble();
+      final color = PdfColor.fromInt(custom['color'] is num ? (custom['color'] as num).toInt() : settings.reportHeadingColor);
+      content.add(line(entry.key, text, size: size, color: color));
+    }
     final row = pw.Row(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
       if (settings.reportLogoPosition == 'right' && logo != null) pw.Container(width: settings.reportLogoSize, height: settings.reportLogoSize, child: pw.Image(logo!, fit: pw.BoxFit.contain)),
       pw.Expanded(child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.stretch, children: content)),
@@ -86,7 +96,10 @@ class ReportPdfTheme {
   pw.TableBorder get tableBorder => settings.reportTableStyle == 'simple' ? pw.TableBorder.symmetric(inside: pw.BorderSide(color: PdfColors.grey300, width: .5)) : pw.TableBorder.all(color: primary, width: .7);
   pw.BoxDecoration get tableHeaderDecoration => pw.BoxDecoration(color: settings.reportTableStyle == 'colored' ? PdfColor.fromHex('#DCEFE8') : PdfColor.fromHex('#EAF4F0'));
 
-  pw.Widget footer() => settings.reportShowFooter && settings.reportFooterText.trim().isNotEmpty ? pw.Padding(padding: const pw.EdgeInsets.only(top: 12), child: pw.Text(reportPdfSafeText(settings.reportFooterText), textAlign: pw.TextAlign.center, textDirection: pw.TextDirection.rtl, style: pw.TextStyle(fontSize: 8, color: heading))) : pw.SizedBox();
+  pw.Widget footer() => pw.Column(children: [
+        if (settings.reportShowSignature) pw.Padding(padding: const pw.EdgeInsets.only(top: 12), child: pw.Text('التوقيع: __________________', textAlign: pw.TextAlign.right, textDirection: pw.TextDirection.rtl, style: pw.TextStyle(fontSize: 9, color: heading))),
+        if (settings.reportShowFooter && settings.reportFooterText.trim().isNotEmpty) pw.Padding(padding: const pw.EdgeInsets.only(top: 12), child: pw.Text(reportPdfSafeText(settings.reportFooterText), textAlign: pw.TextAlign.center, textDirection: pw.TextDirection.rtl, style: pw.TextStyle(fontSize: 8, color: heading))),
+      ]);
 
   static Future<pw.Font> regularFont() async => pw.Font.ttf(await rootBundle.load('assets/fonts/NotoSansArabic-Regular.ttf'));
   static Future<pw.Font> boldFont() async => pw.Font.ttf(await rootBundle.load('assets/fonts/NotoSansArabic-Bold.ttf'));
