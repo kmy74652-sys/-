@@ -65,10 +65,6 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     }
   }
 
-  bool _can(String permission) => _permissions.contains(permission);
-
-  bool get _managesTasks => _can('tasks.manage');
-
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
