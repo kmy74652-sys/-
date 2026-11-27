@@ -467,7 +467,7 @@ class _TasksScreenState extends State<TasksScreen>
   @override
   Widget build(BuildContext context) => AppShell(
     title: 'المهام والمتابعة',
-    subtitle: 'قائمة المهام المصرّح بها لحسابك',
+    subtitle: null,
     child: RefreshIndicator(
       onRefresh: _load,
       child: _loading
@@ -495,7 +495,7 @@ class _TasksScreenState extends State<TasksScreen>
                   behavior: HitTestBehavior.opaque,
                   onHorizontalDragEnd: _swipeSections,
                   child: ListView(
-                  padding: const EdgeInsets.all(12),
+                  padding: const EdgeInsets.fromLTRB(12, 8, 12, 28),
                   children: [
                     if (_showingCachedTasks)
                       Card(
@@ -551,8 +551,13 @@ class _TasksScreenState extends State<TasksScreen>
                           ),
                         ),
                       ),
-                    Align(
-                      alignment: AlignmentDirectional.centerStart,
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF7FAFD),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: const Color(0xFFD7E1EC)),
+                      ),
                       child: Row(
                         textDirection: TextDirection.rtl,
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -564,7 +569,7 @@ class _TasksScreenState extends State<TasksScreen>
                                 value: _employeeFilter,
                                 isExpanded: true,
                                 decoration: const InputDecoration(
-                                  labelText: 'تصفية حسب الموظف',
+                                  labelText: 'الموظف',
                                   prefixIcon: Icon(Icons.person_outline),
                                   border: OutlineInputBorder(
                                     borderRadius: BorderRadius.all(Radius.circular(16)),
@@ -595,13 +600,18 @@ class _TasksScreenState extends State<TasksScreen>
                           if (_canFilterEmployees && _employees.isNotEmpty) const SizedBox(width: 8),
                           Expanded(
                             flex: 1,
-                            child: Card(
+                            child: Container(
                               margin: EdgeInsets.zero,
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                              padding: const EdgeInsets.symmetric(horizontal: 4),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(color: const Color(0xFFD8DEE8)),
+                              ),
                               child: Row(
                                 textDirection: TextDirection.rtl,
                                 children: [
-                                  const Expanded(child: Text('عوامل التصفية', textAlign: TextAlign.right, style: TextStyle(fontWeight: FontWeight.w800))),
+                                  const Expanded(child: Text('الفلاتر', textAlign: TextAlign.right, style: TextStyle(fontWeight: FontWeight.w800, color: AppColors.navy))),
                                   IconButton(
                                     tooltip: 'إعادة تعيين الفلاتر',
                                     onPressed: _resetFilters,
@@ -631,32 +641,46 @@ class _TasksScreenState extends State<TasksScreen>
                       ),
                     ),
                     const SizedBox(height: 8),
-                    SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      reverse: true,
-                      child: Row(
-                        textDirection: TextDirection.rtl,
-                        children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF7FAFD),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: const Color(0xFFD7E1EC)),
+                      ),
+                      child: SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        reverse: true,
+                        child: Row(
+                          textDirection: TextDirection.rtl,
+                          children: [
                           ChoiceChip(
-                            label: const Text('المهام الحالية'),
+                            label: const Text('الحالية'),
                             selected: _view == 'tasks',
                             onSelected: (_) => _selectSection('tasks', loadCycles: false),
+                            selectedColor: const Color(0xFFDCEAF8),
+                            labelStyle: TextStyle(color: _view == 'tasks' ? AppColors.navy : AppColors.muted, fontWeight: FontWeight.w700),
                           ),
                           const SizedBox(width: 8),
                           ChoiceChip(
-                            label: const Text('سجل المهام'),
+                            label: const Text('السجل'),
                             selected: _view == 'ledger',
                             onSelected: (_) => _selectSection('ledger', loadCycles: false),
+                            selectedColor: const Color(0xFFDCEAF8),
+                            labelStyle: TextStyle(color: _view == 'ledger' ? AppColors.navy : AppColors.muted, fontWeight: FontWeight.w700),
                           ),
                           if (_canFilterEmployees) ...[
                             const SizedBox(width: 8),
                             ChoiceChip(
-                              label: const Text('دورات المهام المعتمدة'),
+                              label: const Text('المعتمدة'),
                               selected: _view == 'approved_cycles',
                               onSelected: (_) => _selectSection('approved_cycles'),
+                              selectedColor: const Color(0xFFDCEAF8),
+                              labelStyle: TextStyle(color: _view == 'approved_cycles' ? AppColors.navy : AppColors.muted, fontWeight: FontWeight.w700),
                             ),
                           ],
-                        ],
+                          ],
+                        ),
                       ),
                     ),
                     const SizedBox(height: 8),
@@ -696,17 +720,19 @@ class _TasksScreenState extends State<TasksScreen>
                                 ),
                     ),
                     Row(
+                      textDirection: TextDirection.rtl,
                       children: [
+                        const Icon(Icons.view_list_outlined, size: 18, color: AppColors.navy),
+                        const SizedBox(width: 5),
                         Expanded(
                           child: Text(
                             'المعروض ${visibleTasks.length} من ${_tasks.length}',
                             textAlign: TextAlign.right,
-                            style: const TextStyle(
-                              color: AppColors.muted,
-                              fontSize: 12,
-                            ),
+                            style: const TextStyle(color: AppColors.muted, fontSize: 12, fontWeight: FontWeight.w700),
                           ),
                         ),
+                        if (_view == 'ledger')
+                          const Text('اضغط على السجل لعرض التفاصيل', style: TextStyle(color: AppColors.muted, fontSize: 11)),
                       ],
                     ),
                     if (_view == 'approved_cycles')
