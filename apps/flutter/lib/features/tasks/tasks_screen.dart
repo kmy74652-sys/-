@@ -49,6 +49,7 @@ class _TasksScreenState extends State<TasksScreen>
   List<Map<String, dynamic>> _employees = [];
   List<Map<String, dynamic>> _approvedCycles = [];
   bool _cyclesLoading = false;
+  static const _sectionViews = ['tasks', 'ledger', 'approved_cycles'];
 
   static const Map<String, String> _statusLabels = {
     'pending': 'جديدة',
@@ -262,6 +263,24 @@ class _TasksScreenState extends State<TasksScreen>
     }
   }
 
+  void _selectSection(String view, {bool loadCycles = true}) {
+    if (_view == view) return;
+    setState(() => _view = view);
+    if (loadCycles && view == 'approved_cycles') _loadApprovedCycles();
+  }
+
+  void _swipeSections(DragEndDetails details) {
+    final velocity = details.primaryVelocity ?? 0;
+    if (velocity.abs() < 250) return;
+    final current = _sectionViews.indexOf(_view);
+    if (current < 0) return;
+    // في RTL: السحب من اليمين إلى اليسار ينتقل للقسم التالي.
+    final direction = velocity < 0 ? 1 : -1;
+    final next = current + direction;
+    if (next < 0 || next >= _sectionViews.length) return;
+    _selectSection(_sectionViews[next]);
+  }
+
   Future<void> _toggleApprovedCycle(Map<String, dynamic> cycle) async {
     final id = '${cycle['id'] ?? ''}';
     if (id.isEmpty) return;
@@ -468,7 +487,10 @@ class _TasksScreenState extends State<TasksScreen>
           : Builder(
               builder: (context) {
                 final visibleTasks = _filteredTasks;
-                return ListView(
+                return GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onHorizontalDragEnd: _swipeSections,
+                  child: ListView(
                   padding: const EdgeInsets.all(12),
                   children: [
                     if (_showingCachedTasks)
@@ -611,23 +633,20 @@ class _TasksScreenState extends State<TasksScreen>
                         ChoiceChip(
                           label: const Text('المهام الحالية'),
                           selected: _view == 'tasks',
-                          onSelected: (_) => setState(() => _view = 'tasks'),
+                          onSelected: (_) => _selectSection('tasks', loadCycles: false),
                         ),
                         const SizedBox(width: 8),
                         ChoiceChip(
                           label: const Text('كشف المهام'),
                           selected: _view == 'ledger',
-                          onSelected: (_) => setState(() => _view = 'ledger'),
+                          onSelected: (_) => _selectSection('ledger', loadCycles: false),
                         ),
                         if (_canFilterEmployees) ...[
                           const SizedBox(width: 8),
                           ChoiceChip(
                             label: const Text('المهام والتقارير المعتمدة والمرحلة'),
                             selected: _view == 'approved_cycles',
-                            onSelected: (_) {
-                              setState(() => _view = 'approved_cycles');
-                              _loadApprovedCycles();
-                            },
+                            onSelected: (_) => _selectSection('approved_cycles'),
                           ),
                         ],
                       ],
@@ -716,6 +735,7 @@ class _TasksScreenState extends State<TasksScreen>
                         ),
                       )
                   ],
+                  ),
                 );
               },
             ),
