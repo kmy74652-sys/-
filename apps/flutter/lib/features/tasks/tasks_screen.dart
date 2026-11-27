@@ -277,6 +277,16 @@ class _TasksScreenState extends State<TasksScreen>
         status;
   }
 
+  String _taskTitle(Map<String, dynamic> task) {
+    final raw = '${task['title'] ?? 'مهمة'}'.trim();
+    final withoutPrefix = raw.replaceFirst(RegExp(r'^الجدول الموحد\s*-\s*'), '').trim();
+    final separator = RegExp(r'\s*[·•]\s*').firstMatch(withoutPrefix);
+    return (separator == null
+            ? withoutPrefix
+            : withoutPrefix.substring(separator.end))
+        .trim();
+  }
+
   bool _matchesStatus(Map<String, dynamic> task, DateTime now) {
     final status = _normalizedStatus(task);
     if (_statusFilter == 'all') return true;
@@ -1372,7 +1382,7 @@ class _TasksScreenState extends State<TasksScreen>
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Text('${task['title'] ?? 'مهمة'}', textAlign: TextAlign.right, style: const TextStyle(fontWeight: FontWeight.w800, color: AppColors.navy)),
+                  Text(_taskTitle(task), textAlign: TextAlign.right, style: const TextStyle(fontWeight: FontWeight.w800, color: AppColors.navy)),
                   const SizedBox(height: 3),
                   Text('التاريخ: $date', textAlign: TextAlign.right, style: const TextStyle(fontSize: 12, color: AppColors.muted)),
                   Text('المهمة: ${_statusLabels[status] ?? uiStatusLabel(status)} · التقرير: ${_reportStatusLabel(report?['status'])}', textAlign: TextAlign.right, style: const TextStyle(fontSize: 12)),

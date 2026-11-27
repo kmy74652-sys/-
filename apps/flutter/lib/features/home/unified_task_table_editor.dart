@@ -1038,105 +1038,102 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
     pw.Font boldFont,
     _UnifiedPdfTexts texts,
   ) async {
-      final document = pw.Document(theme: await ReportPdfTheme.pdfTheme(base: font, bold: boldFont));
-      final rows = [..._rows, ..._exceptionRows]
-          .map((row) => [_pdfSafeText(row.timeValue), _pdfSafeText(row.task.text), _pdfSafeText(row.output.text), 'جديدة'])
-          .toList();
-      final listSection = (String title, List<TextEditingController> values) => pw.Column(
-        crossAxisAlignment: pw.CrossAxisAlignment.stretch,
-        children: [
-          _pdfHeading(title),
-          ...values.asMap().entries.map((entry) => pw.Padding(
-            padding: const pw.EdgeInsets.only(bottom: 4),
-            child: pw.Text(_pdfSafeText('${entry.key + 1}. ${entry.value.text.trim().isEmpty ? '—' : entry.value.text.trim()}'), textDirection: pw.TextDirection.rtl),
-          )),
-          pw.SizedBox(height: 8),
-        ],
-      );
-      final store = AppCustomizer.instance;
-      final sections = <String, pw.Widget>{
-        'employee': _pdfInfoTable(),
-        'purpose': pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.stretch, children: [
-          _pdfHeading(store.unifiedLabel('purpose')),
-          pw.Text(_pdfSafeText(_purpose.text.trim().isEmpty ? 'لا يوجد' : _purpose.text), textDirection: pw.TextDirection.rtl),
-        ]),
-        'hours': pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.stretch, children: [
-          _pdfHeading(store.unifiedLabel('hours')),
-          pw.Text(_pdfSafeText('نوع الدوام: $_workType   -   الأيام: $_days   -   الفترة الأولى: ${_firstPeriod.text.trim().isEmpty ? 'لا يوجد' : _firstPeriod.text}   -   الاستراحة: ${_breakPeriod.text.trim().isEmpty ? 'لا يوجد' : _breakPeriod.text}   -   الفترة الثانية: ${_secondPeriod.text.trim().isEmpty ? 'لا يوجد' : _secondPeriod.text}   -   الاستثناء: $_exception'), textDirection: pw.TextDirection.rtl),
-        ]),
-        'daily': pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.stretch, children: [
-          _pdfHeading(store.unifiedLabel('daily')),
-          _pdfScheduleTable(rows),
-        ]),
-        'exception': pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.stretch, children: [
-          _pdfHeading(store.unifiedLabel('exception')),
-          _pdfScheduleTable([..._exceptionRows].map((row) => [_pdfSafeText(row.timeValue), _pdfSafeText(row.task.text), _pdfSafeText(row.output.text), 'جديدة']).toList()),
-        ]),
-        'lists': pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.stretch, children: [
-          listSection('المسؤوليات الأساسية', _responsibilities),
-          listSection('الصلاحيات وحدود المسؤولية', _authorities),
-          listSection('التوصيات والتعليمات الإدارية', _instructions),
-        ]),
-        'kpi': pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.stretch, children: [
-          _pdfHeading(store.unifiedLabel('kpi')),
-          _pdfKpiTable(),
-        ]),
-        'report': pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.stretch, children: [
-          _pdfHeading(store.unifiedLabel('report')),
-          pw.Text(_pdfSafeText(_selectedReport == null ? 'لا يوجد' : '${_selectedReport!.title} - الإصدار ${_selectedReport!.versionNumber} - ${_selectedReport!.fieldCount} حقول (${_selectedReport!.requiredFieldCount} إلزامية)'), textDirection: pw.TextDirection.rtl),
-        ]),
-        'notes': pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.stretch, children: [
-          _pdfHeading(store.unifiedLabel('notes')),
-          pw.Text(_pdfSafeText(_reportNotes.text.trim().isEmpty ? 'لا يوجد' : _reportNotes.text), textDirection: pw.TextDirection.rtl),
-        ]),
-        'approval': pw.Table(
-          border: reportTheme.tableBorder,
-          children: [pw.TableRow(children: [
-            _pdfCell('إقرار الموظف\nالاسم والتوقيع: يترك للتوقيع'),
-            _pdfCell('مراجعة المسؤول المباشر\nالاسم والتوقيع: يترك للتوقيع'),
-            _pdfCell('اعتماد المدير\nالاسم والتوقيع: يترك للتوقيع'),
-          ])],
-        ),
-      };
-      final orderedSections = store.unifiedSectionOrder
-          .where(store.isUnifiedVisible)
-          .where(sections.containsKey)
-          .map((key) => sections[key]!)
-          .toList();
-      document.addPage(
-        pw.MultiPage(
-          pageFormat: PdfPageFormat.a4,
-          margin: const pw.EdgeInsets.fromLTRB(28, 28, 28, 32),
-          build: (context) => [
-            _classicPdfHeader(reportTheme, texts),
-            pw.SizedBox(height: 12),
-            for (final section in orderedSections) ...[
-              section,
-              pw.SizedBox(height: 12),
-            ],
+    final document = pw.Document(theme: await ReportPdfTheme.pdfTheme(base: font, bold: boldFont));
+    final rows = [..._rows, ..._exceptionRows]
+        .map((row) => [_pdfSafeText(row.timeValue), _pdfSafeText(row.task.text), _pdfSafeText(row.output.text), 'جديدة'])
+        .toList();
+    final store = AppCustomizer.instance;
+
+    pw.Widget listContent(String title, List<TextEditingController> values) => pw.Column(
+          crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+          children: [
+            pw.Text(_pdfSafeText(title), textDirection: pw.TextDirection.rtl, textAlign: pw.TextAlign.right, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, color: ReportPdfTheme.officialNavy)),
+            pw.SizedBox(height: 4),
+            ...values.asMap().entries.map((entry) => pw.Padding(
+                  padding: const pw.EdgeInsets.only(bottom: 3),
+                  child: pw.Text(_pdfSafeText('${entry.key + 1}. ${entry.value.text.trim().isEmpty ? 'لا يوجد' : entry.value.text.trim()}'), textDirection: pw.TextDirection.rtl, textAlign: pw.TextAlign.right),
+                )),
           ],
-          footer: (context) => reportTheme.footer(context, texts.footer),
-        ),
-      );
-      return document.save();
+        );
+
+    final sections = <String, pw.Widget>{
+      'employee': _pdfInfoTable(),
+      'purpose': _pdfSection(store.unifiedLabel('purpose'), pw.Text(_pdfSafeText(_purpose.text.trim().isEmpty ? 'لا يوجد' : _purpose.text), textDirection: pw.TextDirection.rtl, textAlign: pw.TextAlign.right)),
+      'hours': _pdfSection('مواعيد المهام الرئيسية', pw.Text(_pdfSafeText('نوع الدوام: $_workType   -   الأيام: $_days   -   الفترة الأولى: ${_firstPeriod.text.trim().isEmpty ? 'لا يوجد' : _firstPeriod.text}   -   الاستراحة: ${_breakPeriod.text.trim().isEmpty ? 'لا يوجد' : _breakPeriod.text}   -   الفترة الثانية: ${_secondPeriod.text.trim().isEmpty ? 'لا يوجد' : _secondPeriod.text}   -   الاستثناء: $_exception'), textDirection: pw.TextDirection.rtl, textAlign: pw.TextAlign.right)),
+      'daily': _pdfSection('الجدول الزمني اليومي', _pdfScheduleTable(rows)),
+      'exception': _pdfSection('المهام الاستثنائية', _pdfScheduleTable(_exceptionRows.map((row) => [_pdfSafeText(row.timeValue), _pdfSafeText(row.task.text), _pdfSafeText(row.output.text), 'جديدة']).toList())),
+      'lists': _pdfSection('التعليمات والإرشادات', pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.stretch, children: [listContent('المسؤوليات الأساسية', _responsibilities), pw.SizedBox(height: 7), listContent('الصلاحيات وحدود المسؤولية', _authorities), pw.SizedBox(height: 7), listContent('التوصيات والتعليمات الإدارية', _instructions)])),
+      'kpi': _pdfSection('المهام حسب الأولوية ومؤشرات القياس', _pdfKpiTable()),
+      'report': _pdfSection(store.unifiedLabel('report'), pw.Text(_pdfSafeText(_selectedReport == null ? 'لا يوجد' : '${_selectedReport!.title} - الإصدار ${_selectedReport!.versionNumber} - ${_selectedReport!.fieldCount} حقول (${_selectedReport!.requiredFieldCount} إلزامية)'), textDirection: pw.TextDirection.rtl, textAlign: pw.TextAlign.right)),
+      'notes': _pdfSection('معلومات إضافية', pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.stretch, children: [
+        _pdfAdditionalTable(),
+        pw.SizedBox(height: 7),
+        pw.Text(_pdfSafeText(_reportNotes.text.trim().isEmpty ? 'لا يوجد' : _reportNotes.text), textDirection: pw.TextDirection.rtl, textAlign: pw.TextAlign.right),
+      ])),
+      'approval': _pdfApprovalCards(),
+    };
+    final orderedKeys = store.unifiedSectionOrder.where(store.isUnifiedVisible).where((key) => key != 'employee').where(sections.containsKey).toList();
+    final orderedSections = orderedKeys.map((key) => sections[key]!).toList();
+    document.addPage(
+      pw.MultiPage(
+        pageFormat: PdfPageFormat.a4,
+        margin: const pw.EdgeInsets.fromLTRB(28, 24, 28, 34),
+        build: (context) => [
+          _classicPdfHeader(reportTheme, texts),
+          pw.SizedBox(height: 9),
+          for (final section in orderedSections) ...[section, pw.SizedBox(height: 9)],
+        ],
+        footer: (context) => reportTheme.footer(context, texts.footer),
+      ),
+    );
+    return document.save();
   }
 
-  pw.Widget _classicPdfHeader(ReportPdfTheme theme, _UnifiedPdfTexts texts) => theme.officialHeader(
-    texts.title,
-    employee: _employee.text,
-    branch: _branch.text,
-    createdAt: _startDate.text,
-    arabicOrganization: texts.arabicOrganization,
-    englishOrganization: texts.englishOrganization,
-  );
+  pw.Widget _classicPdfHeader(ReportPdfTheme theme, _UnifiedPdfTexts texts) => pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+        children: [
+          pw.Container(
+            padding: const pw.EdgeInsets.fromLTRB(9, 8, 9, 7),
+            decoration: pw.BoxDecoration(color: PdfColors.white, border: pw.Border.all(color: ReportPdfTheme.officialBorder, width: .8), borderRadius: pw.BorderRadius.circular(9)),
+            child: pw.Column(children: [
+              pw.Container(height: 4, color: ReportPdfTheme.officialNavy),
+              pw.SizedBox(height: 3),
+              pw.Container(height: 1.5, color: ReportPdfTheme.officialGold),
+              pw.SizedBox(height: 8),
+              pw.Row(crossAxisAlignment: pw.CrossAxisAlignment.center, children: [
+                pw.Container(width: 62, height: 62, padding: const pw.EdgeInsets.all(4), decoration: pw.BoxDecoration(border: pw.Border.all(color: ReportPdfTheme.officialGold, width: 1.2), borderRadius: pw.BorderRadius.circular(31)), child: theme.logo == null ? pw.SizedBox() : pw.Image(theme.logo!, fit: pw.BoxFit.contain)),
+                pw.SizedBox(width: 9),
+                pw.Container(width: 1, height: 58, color: ReportPdfTheme.officialGold),
+                pw.SizedBox(width: 10),
+                pw.Expanded(child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.stretch, children: [
+                  pw.Text(_pdfSafeText(texts.arabicOrganization), textDirection: pw.TextDirection.rtl, textAlign: pw.TextAlign.right, style: pw.TextStyle(fontSize: 15, fontWeight: pw.FontWeight.bold, color: ReportPdfTheme.officialNavy)),
+                  pw.SizedBox(height: 3),
+                  pw.Row(children: [pw.Expanded(child: pw.Container(height: .8, color: ReportPdfTheme.officialGold)), pw.SizedBox(width: 5), pw.Container(width: 6, height: 6, color: ReportPdfTheme.officialGold), pw.SizedBox(width: 5), pw.Expanded(child: pw.Container(height: .8, color: ReportPdfTheme.officialGold))]),
+                  pw.SizedBox(height: 3),
+                  pw.Text(_pdfSafeText(theme.settings.reportHeaderText.trim().isEmpty ? 'معًا .. نحو أداء أفضل' : theme.settings.reportHeaderText), textDirection: pw.TextDirection.rtl, textAlign: pw.TextAlign.center, style: pw.TextStyle(fontSize: 8, color: ReportPdfTheme.officialNavy)),
+                ])),
+                pw.SizedBox(width: 10),
+                pw.SizedBox(width: 62, child: pw.Text(_pdfSafeText(texts.englishOrganization), textDirection: pw.TextDirection.ltr, textAlign: pw.TextAlign.left, style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold, color: ReportPdfTheme.officialNavy))),
+              ]),
+              pw.SizedBox(height: 8),
+              pw.Container(color: ReportPdfTheme.officialNavy, padding: const pw.EdgeInsets.symmetric(vertical: 7, horizontal: 8), child: pw.Text(_pdfSafeText(texts.title), textDirection: pw.TextDirection.rtl, textAlign: pw.TextAlign.center, style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold, color: PdfColors.white))),
+            ]),
+          ),
+          pw.SizedBox(height: 8),
+          _pdfInfoTable(),
+        ],
+      );
 
-  pw.Widget _pdfHeading(String title) => pw.Container(
-    width: double.infinity,
-    margin: const pw.EdgeInsets.only(bottom: 6),
-    padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-    color: PdfColor.fromHex('#004A87'),
-    child: pw.Text(_pdfSafeText(title), textDirection: pw.TextDirection.rtl, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, color: PdfColors.white)),
-  );
+  pw.Widget _pdfSection(String title, pw.Widget child) => pw.Container(
+        width: double.infinity,
+        padding: const pw.EdgeInsets.fromLTRB(7, 7, 7, 9),
+        decoration: pw.BoxDecoration(color: PdfColor.fromHex('#F3F7FC'), border: pw.Border.all(color: ReportPdfTheme.officialBorder, width: .8), borderRadius: pw.BorderRadius.circular(7)),
+        child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.stretch, children: [
+          pw.Container(color: ReportPdfTheme.officialNavy, padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 6), child: pw.Text(_pdfSafeText(title), textDirection: pw.TextDirection.rtl, textAlign: pw.TextAlign.right, style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold, color: PdfColors.white))),
+          pw.SizedBox(height: 7),
+          child,
+        ]),
+      );
 
   pw.Widget _pdfInfoTable() {
     final store = AppCustomizer.instance;
@@ -1156,84 +1153,106 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
     if (visible.isEmpty) return pw.SizedBox();
     final rows = <pw.TableRow>[];
     for (var index = 0; index < visible.length; index += 2) {
-      final right = _pdfCell(fields[visible[index]]!);
-      final left = index + 1 < visible.length ? _pdfCell(fields[visible[index + 1]]!) : _pdfCell('');
+      final right = _pdfInfoCell(fields[visible[index]]!);
+      final left = index + 1 < visible.length ? _pdfInfoCell(fields[visible[index + 1]]!) : _pdfInfoCell('');
       rows.add(pw.TableRow(children: [right, left]));
     }
-    return pw.Table(border: pw.TableBorder.all(color: PdfColor.fromHex('#6EA6D8')), children: rows);
+    return pw.Container(padding: const pw.EdgeInsets.all(7), decoration: pw.BoxDecoration(color: PdfColor.fromHex('#F3F7FC'), border: pw.Border.all(color: ReportPdfTheme.officialNavy, width: .8), borderRadius: pw.BorderRadius.circular(7)), child: pw.Table(border: pw.TableBorder.all(color: ReportPdfTheme.officialBorder, width: .6), children: rows));
+  }
+
+  pw.Widget _pdfInfoCell(String text) {
+    final parts = text.split('\n');
+    return pw.Padding(padding: const pw.EdgeInsets.all(5), child: pw.Row(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+      pw.Expanded(child: pw.Text(_pdfSafeText(parts.length > 1 ? parts.sublist(1).join(' ') : text), textDirection: pw.TextDirection.rtl, textAlign: pw.TextAlign.right, style: const pw.TextStyle(fontSize: 8))),
+      if (parts.first.trim().isNotEmpty) ...[pw.SizedBox(width: 5), pw.Container(padding: const pw.EdgeInsets.symmetric(horizontal: 5, vertical: 3), decoration: pw.BoxDecoration(color: ReportPdfTheme.officialNavy, borderRadius: pw.BorderRadius.circular(4)), child: pw.Text(_pdfSafeText(parts.first), textDirection: pw.TextDirection.rtl, style: const pw.TextStyle(fontSize: 7, color: PdfColors.white)))],
+    ]));
   }
 
   pw.Widget _pdfScheduleTable(List<List<String>> rows) {
-    final header = ['الحالة', 'المخرج المطلوب', 'المهمة والمسؤولية', 'الوقت'];
+    final header = ['الحالة', 'المخرج المطلوب', 'المهمة والبيان', 'الوقت'];
     final tableRows = <List<pw.Widget>>[
       header.map((value) => _pdfTableCell(value, bold: true)).toList(),
-      ...rows.map(
-        (row) => row.reversed.map((value) => _pdfTableCell(value)).toList(),
-      ),
+      ...rows.map((row) => row.reversed.map((value) => _pdfTableCell(value)).toList()),
     ];
     return pw.Table(
-      border: pw.TableBorder.all(color: PdfColor.fromHex('#6EA6D8')),
-      children: tableRows
-          .asMap()
-          .entries
-          .map(
-            (entry) => pw.TableRow(
-              decoration: entry.key == 0
-                  ? pw.BoxDecoration(color: PdfColor.fromHex('#E5F2FF'))
-                  : null,
-              children: entry.value,
-            ),
-          )
-          .toList(),
+      border: pw.TableBorder.all(color: ReportPdfTheme.officialBorder, width: .6),
+      children: tableRows.asMap().entries.map((entry) => pw.TableRow(decoration: entry.key == 0 ? pw.BoxDecoration(color: ReportPdfTheme.officialLightBlue) : null, children: entry.value)).toList(),
     );
   }
 
   pw.Widget _pdfKpiTable() {
     final rows = <List<pw.Widget>>[
-      [
-        _pdfTableCell('معيار الإنجاز / القياس', bold: true),
-        _pdfTableCell('المؤشر', bold: true),
-      ],
-      ..._kpis.map(
-        (row) => [
-          _pdfTableCell(row[1].text.trim().isEmpty ? '—' : row[1].text.trim()),
-          _pdfTableCell(row[0].text.trim().isEmpty ? '—' : row[0].text.trim()),
-        ],
-      ),
+      [_pdfTableCell('معيار الإنجاز / القياس', bold: true), _pdfTableCell('المؤشر', bold: true)],
+      ..._kpis.map((row) => [_pdfTableCell(row[1].text.trim().isEmpty ? '—' : row[1].text.trim()), _pdfTableCell(row[0].text.trim().isEmpty ? '—' : row[0].text.trim())]),
     ];
-    return pw.Table(
-      border: pw.TableBorder.all(color: PdfColor.fromHex('#6EA6D8')),
-      children: rows
-          .asMap()
-          .entries
-          .map(
-            (entry) => pw.TableRow(
-              decoration: entry.key == 0
-                  ? pw.BoxDecoration(color: PdfColor.fromHex('#E5F2FF'))
-                  : null,
-              children: entry.value,
-            ),
-          )
-          .toList(),
-    );
+    return pw.Table(border: pw.TableBorder.all(color: ReportPdfTheme.officialBorder, width: .6), children: rows.asMap().entries.map((entry) => pw.TableRow(decoration: entry.key == 0 ? pw.BoxDecoration(color: ReportPdfTheme.officialLightBlue) : null, children: entry.value)).toList());
   }
+
+  pw.Widget _pdfAdditionalTable() => pw.Table(
+        border: pw.TableBorder.all(color: ReportPdfTheme.officialBorder, width: .6),
+        children: [
+          pw.TableRow(decoration: pw.BoxDecoration(color: ReportPdfTheme.officialLightBlue), children: ['نوع المهمة', 'أولوية التنفيذ', 'ملاحظات'].map((value) => _pdfTableCell(value, bold: true)).toList()),
+          ...[..._rows, ..._exceptionRows].map((row) => pw.TableRow(children: [_pdfTableCell(row.task.text.trim().isEmpty ? 'لا يوجد' : row.task.text), _pdfTableCell('عادية'), _pdfTableCell(row.output.text.trim().isEmpty ? 'لا يوجد' : row.output.text)])),
+        ],
+      );
+
+  pw.Widget _pdfApprovalCards() => pw.Row(
+        children: ['اعتماد المدير', 'مراجعة المحاسب', 'إدارة الموظفين']
+            .map(
+              (title) => pw.Expanded(
+                child: pw.Container(
+                  margin: const pw.EdgeInsets.symmetric(horizontal: 3),
+                  decoration: pw.BoxDecoration(
+                    color: PdfColor.fromHex('#F3F7FC'),
+                    border: pw.Border.all(
+                      color: ReportPdfTheme.officialBorder,
+                      width: .8,
+                    ),
+                    borderRadius: pw.BorderRadius.circular(6),
+                  ),
+                  child: pw.Column(
+                    children: [
+                      pw.Container(
+                        width: double.infinity,
+                        color: ReportPdfTheme.officialNavy,
+                        padding: const pw.EdgeInsets.symmetric(
+                          vertical: 6,
+                          horizontal: 4,
+                        ),
+                        child: pw.Text(
+                          title,
+                          textDirection: pw.TextDirection.rtl,
+                          textAlign: pw.TextAlign.center,
+                          style: const pw.TextStyle(
+                            fontSize: 8,
+                            color: PdfColors.white,
+                          ),
+                        ),
+                      ),
+                      pw.SizedBox(height: 25),
+                      pw.Container(
+                        width: 72,
+                        height: .7,
+                        color: ReportPdfTheme.officialNavy,
+                      ),
+                      pw.SizedBox(height: 5),
+                      pw.Text(
+                        'الاسم والتوقيع',
+                        textDirection: pw.TextDirection.rtl,
+                        style: const pw.TextStyle(fontSize: 7),
+                      ),
+                      pw.SizedBox(height: 7),
+                    ],
+                  ),
+                ),
+              ),
+            )
+            .toList(),
+      );
 
   pw.Widget _pdfTableCell(String value, {bool bold = false}) => pw.Padding(
     padding: const pw.EdgeInsets.all(6),
-    child: pw.Text(
-      _pdfSafeText(value.trim().isEmpty ? 'لا يوجد' : value),
-      textDirection: pw.TextDirection.rtl,
-      textAlign: pw.TextAlign.right,
-      style: pw.TextStyle(
-        fontSize: 9,
-        fontWeight: bold ? pw.FontWeight.bold : pw.FontWeight.normal,
-      ),
-    ),
-  );
-
-  pw.Widget _pdfCell(String text) => pw.Padding(
-    padding: const pw.EdgeInsets.all(8),
-    child: pw.Text(_pdfSafeText(text), textDirection: pw.TextDirection.rtl, textAlign: pw.TextAlign.right),
+    child: pw.Text(_pdfSafeText(value.trim().isEmpty ? 'لا يوجد' : value), textDirection: pw.TextDirection.rtl, textAlign: pw.TextAlign.right, style: pw.TextStyle(fontSize: 8.5, fontWeight: bold ? pw.FontWeight.bold : pw.FontWeight.normal)),
   );
 
   String _pdfSafeText(String value) {

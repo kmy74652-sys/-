@@ -24,6 +24,16 @@ class AppNotification {
 
   bool get isUnread => readAt == null;
 
+  AppNotification copyWith({DateTime? readAt}) => AppNotification(
+        id: id,
+        taskId: taskId,
+        title: title,
+        body: body,
+        severity: severity,
+        readAt: readAt ?? this.readAt,
+        createdAt: createdAt,
+      );
+
   static AppNotification fromRow(Map<String, dynamic> row) => AppNotification(
         id: '${row['id'] ?? ''}',
         taskId: row['task_id']?.toString(),
@@ -114,6 +124,21 @@ class NotificationsRepository {
       'mark_notification_read',
       params: {'p_notification_id': notificationId},
     );
-    return result == true;
+    final marked = result == true;
+    final uid = Supabase.instance.client.auth.currentUser?.id;
+    if (uid != null && uid.isNotEmpty) {
+      final cached = await loadCached(uid);
+      if (cached != null) {
+        await _save(
+          uid,
+          cached
+              .map((item) => item.id == notificationId
+                  ? item.copyWith(readAt: DateTime.now().toUtc())
+                  : item)
+              .toList(),
+        );
+      }
+    }
+    return marked;
   }
 }

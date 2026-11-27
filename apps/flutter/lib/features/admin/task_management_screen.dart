@@ -82,8 +82,12 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
 
   String _taskTitle(Map<String, dynamic> task) {
     final raw = _s(task['title'], 'مهمة').trim();
-    final unified = RegExp(r'^الجدول الموحد\s*-\s*[^·]+·\s*(.+)$').firstMatch(raw);
-    return (unified?.group(1) ?? raw.replaceFirst(RegExp(r'^الجدول الموحد\s*-\s*'), '')).trim();
+    final withoutPrefix = raw.replaceFirst(RegExp(r'^الجدول الموحد\s*-\s*'), '').trim();
+    final separator = RegExp(r'\s*[·•]\s*').firstMatch(withoutPrefix);
+    return (separator == null
+            ? withoutPrefix
+            : withoutPrefix.substring(separator.end))
+        .trim();
   }
 
   String _priority(dynamic value) => const {

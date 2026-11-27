@@ -90,19 +90,13 @@ class ReportPdfTheme {
     pw.ImageProvider? logo;
     // الشعار اختياري صراحةً. لا نستخدم شعار المؤسسة المشترك كـ fallback؛
     // حتى يبقى حذف الشعار من إعدادات الهوية محترمًا في ملفات PDF الجديدة.
-    final url = settings.reportLogoUrl.trim();
+    final url = (organizationBranding.logoUrl ?? '').trim();
     if (url.isNotEmpty) {
       try {
         final response = await http.get(Uri.parse(url));
         if (response.statusCode == 200 && response.bodyBytes.isNotEmpty) {
           logo = pw.MemoryImage(response.bodyBytes);
         }
-      } catch (_) {}
-    }
-    if (logo == null) {
-      try {
-        final data = await rootBundle.load('assets/images/alshaeri-official-logo.png');
-        logo = pw.MemoryImage(data.buffer.asUint8List());
       } catch (_) {}
     }
     final latinRegular = await ReportPdfTheme.latinRegularFont();

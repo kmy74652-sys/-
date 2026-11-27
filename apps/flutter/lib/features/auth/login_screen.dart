@@ -252,18 +252,13 @@ class _LoginBrandLogo extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final fallback = Image.asset(
-      'assets/images/nexora-logo.png',
-      height: 110,
-      fit: BoxFit.contain,
-    );
     final url = branding.logoUrl;
-    if (url == null) return fallback;
+    if (url == null || url.trim().isEmpty) return const SizedBox(height: 110);
     return Image.network(
       url,
       height: 110,
       fit: BoxFit.contain,
-      errorBuilder: (_, __, ___) => fallback,
+      errorBuilder: (_, __, ___) => const SizedBox(height: 110),
     );
   }
 }

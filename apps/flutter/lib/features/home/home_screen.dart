@@ -34,13 +34,6 @@ class _HomeScreenState extends State<HomeScreen> {
       'العمل والمتابعة',
       [
         _Module(
-          'tasks',
-          'المهام والمتابعة',
-          'متابعة المهام والتقارير والمهام الحالية',
-          Icons.task_alt,
-          '/tasks',
-        ),
-        _Module(
           'reports',
           'تقارير الموظفين',
           'التقارير المرفوعة للمراجعة والاعتماد',

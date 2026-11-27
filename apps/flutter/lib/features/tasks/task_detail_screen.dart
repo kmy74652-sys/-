@@ -112,6 +112,24 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
     return formatArabicDateTime(parsed.toLocal());
   }
 
+  String _taskTitle() {
+    final raw = '${_task?['title'] ?? 'مهمة'}'.trim();
+    final withoutPrefix = raw.replaceFirst(RegExp(r'^الجدول الموحد\s*-\s*'), '').trim();
+    final separator = RegExp(r'\s*[·•]\s*').firstMatch(withoutPrefix);
+    return (separator == null
+            ? withoutPrefix
+            : withoutPrefix.substring(separator.end))
+        .trim();
+  }
+
+  void _goBackFromDetails() {
+    if (context.canPop()) {
+      context.pop();
+    } else {
+      context.go('/tasks');
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -1029,7 +1047,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
           orElse: () => <String, dynamic>{'title': 'نموذج تقرير'},
         );
         await _shareSnapshotPdf(
-          title: '${_task?['title'] ?? 'تقرير المهمة'}',
+          title: _taskTitle(),
           reportTitle: '${currentForm['title'] ?? 'نموذج تقرير'}',
           schema: schema,
           values: values,
@@ -1710,7 +1728,6 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
   @override
   Widget build(BuildContext context) => AppShell(
     title: 'تفاصيل المهمة',
-    subtitle: _task?['title']?.toString(),
     child: _busy
         ? const Center(child: CircularProgressIndicator())
         : _error != null
@@ -1730,7 +1747,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
             padding: const EdgeInsets.all(12),
             children: [
               SectionCard(
-                title: _task?['title']?.toString() ?? 'مهمة',
+                title: _taskTitle(),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
@@ -1899,7 +1916,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                                                   ),
                                               };
                                         _shareSnapshotPdf(
-                                          title: '${_task?['title'] ?? 'تقرير المهمة'}',
+                                          title: _taskTitle(),
                                           reportTitle: '${form['title'] ?? 'نموذج تقرير'}',
                                           schema: schema,
                                           values: values,
@@ -2038,7 +2055,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                       label: Text('مكتملة ومعتمدة'),
                     ),
                   OutlinedButton.icon(
-                    onPressed: () => context.pop(),
+                    onPressed: _goBackFromDetails,
                     icon: const Icon(Icons.arrow_back),
                     label: const Text('رجوع'),
                   ),

@@ -140,9 +140,20 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
         return '/';
     }
     if (path.startsWith('/tasks/')) {
-      return _managesTasks ? '/admin/tasks' : '/tasks';
+      return '/tasks';
     }
     return '/';
+  }
+
+  Future<void> _goBack(String path) async {
+    final allowed = await widget.onBeforeNavigate?.call() ?? true;
+    if (!allowed || !mounted) return;
+    if (path.startsWith('/tasks/') && context.canPop()) {
+      context.pop();
+      return;
+    }
+    final route = _backRoute(path);
+    if (route != null) context.go(route);
   }
 
 
@@ -299,10 +310,10 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
                                     maxLines: 3,
                                     overflow: TextOverflow.ellipsis,
                                   ),
-                            trailing: item.severity == null
+                            trailing: _notificationSeverityLabel(item.severity).isEmpty
                                 ? null
                                 : Text(
-                                    item.severity!,
+                                    _notificationSeverityLabel(item.severity),
                                     style: const TextStyle(
                                       fontSize: 11,
                                       color: AppColors.muted,
@@ -360,8 +371,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
         canPop: path == '/',
         onPopInvokedWithResult: (didPop, _) {
           if (didPop) return;
-          final route = _backRoute(path);
-          if (route != null) _navigate(route);
+          _goBack(path);
         },
         child: Directionality(
         textDirection: Directionality.of(context),
@@ -381,12 +391,12 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
                       onNotifications: () => _showNotifications(context),
                     ),
                   if (!widget.immersive)
-                    _PageTitleBar(
+                      _PageTitleBar(
                       title: widget.title,
                       showDateTime: path == '/',
                       onBack: _backRoute(path) == null
                           ? null
-                          : () => _navigate(_backRoute(path)!),
+                          : () => _goBack(path),
                     ),
                   Expanded(
                     child: Padding(
@@ -438,6 +448,21 @@ class _ShellTab {
   final String route;
   final String label;
   final IconData icon;
+}
+
+String _notificationSeverityLabel(String? value) {
+  switch (value?.trim().toLowerCase()) {
+    case 'info':
+      return 'معلومة';
+    case 'warning':
+      return 'تنبيه';
+    case 'success':
+      return 'نجاح';
+    case 'error':
+      return 'خطأ';
+    default:
+      return value?.trim() ?? '';
+  }
 }
 
 class _BrandHeader extends StatefulWidget {
@@ -528,9 +553,9 @@ class _BrandHeaderState extends State<_BrandHeader> {
               IconButton(
                 tooltip: 'التنبيهات',
                 onPressed: widget.onNotifications,
-                style: IconButton.styleFrom(fixedSize: Size.square(controlSize), backgroundColor: _navy, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+                style: IconButton.styleFrom(fixedSize: Size.square(controlSize), backgroundColor: Colors.transparent, foregroundColor: _navy, shadowColor: Colors.transparent, shape: const CircleBorder()),
                 icon: Stack(clipBehavior: Clip.none, children: [
-                  const Icon(Icons.notifications_none, size: 24),
+                  const Icon(Icons.notifications_none, size: 23),
                   if (widget.unreadCount > 0) Positioned(top: -8, left: -9, child: Container(
                     constraints: const BoxConstraints(minWidth: 17),
                     padding: const EdgeInsets.symmetric(horizontal: 4),
@@ -556,9 +581,8 @@ class _BrandLogo extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final fallback = Image.asset('assets/images/nexora-logo.png', width: width, height: height, fit: BoxFit.contain, semanticLabel: 'شعار NEXORA');
-    if (url == null) return fallback;
-    return Image.network(url!, width: width, height: height, fit: BoxFit.contain, semanticLabel: 'شعار المؤسسة', errorBuilder: (_, __, ___) => fallback);
+    if (url == null || url!.trim().isEmpty) return SizedBox(width: width, height: height);
+    return Image.network(url!, width: width, height: height, fit: BoxFit.contain, semanticLabel: 'شعار المؤسسة', errorBuilder: (_, __, ___) => SizedBox(width: width, height: height));
   }
 }
 
