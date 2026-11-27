@@ -160,8 +160,8 @@ class ReportPdfTheme {
       final position = positionFor(key, index);
       final layout = settings.reportHeaderLayout(key);
       final size = custom != null
-          ? (custom['size'] is num ? (custom['size'] as num).toDouble() : 12)
-          : (layout['size'] as num).toDouble();
+          ? (custom['size'] is num ? (custom['size'] as num).toDouble() : 12.0)
+          : (layout['size'] is num ? (layout['size'] as num).toDouble() : 12.0);
       final colorValue = custom?['color'] is num
           ? (custom!['color'] as num).toInt()
           : layout['color'] is num
