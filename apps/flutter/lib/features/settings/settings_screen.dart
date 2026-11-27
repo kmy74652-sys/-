@@ -727,22 +727,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       ),
                     ),
                   ),
-                if (_allowed && _owner)
-                  Card(
-                    child: ListTile(
-                      leading: const Icon(Icons.dashboard_customize_outlined),
-                      title: const Text(
-                        'مصمم الواجهات والتخصيص الشامل',
-                        textAlign: TextAlign.right,
-                      ),
-                      subtitle: const Text(
-                        'تعديل التسميات والترتيب والألوان والنسخ الاحتياطي',
-                        textAlign: TextAlign.right,
-                      ),
-                      trailing: const Icon(Icons.chevron_left),
-                      onTap: () => context.push('/admin/customizer'),
-                    ),
-                  ),
                 if (_allowed && (_branchManagementAllowed || _activityAllowed))
                   Card(
                     child: Column(

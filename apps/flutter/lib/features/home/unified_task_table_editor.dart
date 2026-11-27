@@ -261,7 +261,7 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 const Text(
-                  'تم إخفاء جميع أقسام الجدول الموحد من مصمم الواجهات. أظهر قسمًا واحدًا على الأقل للمتابعة.',
+                  'تم إخفاء جميع أقسام الجدول الموحد. أظهر قسمًا واحدًا على الأقل للمتابعة.',
                   textAlign: TextAlign.right,
                 ),
                 const SizedBox(height: 10),

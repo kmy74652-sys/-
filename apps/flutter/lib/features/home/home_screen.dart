@@ -61,7 +61,6 @@ class _HomeScreenState extends State<HomeScreen> {
     _Module('employees', 'الموظفون', 'ملفات الموظفين وبياناتهم الأساسية', Icons.people_outline, '/admin?section=employees'),
     _Module('activity', 'سجل النشاط', 'متابعة العمليات الإدارية الأخيرة', Icons.history, '/admin?section=activity'),
     _Module('report-designer', 'مصمم التقارير', 'إدارة قوالب التقارير وإصداراتها', Icons.dashboard_customize_outlined, '/admin/report-designer'),
-    _Module('customizer', 'تخصيص الواجهات', 'إعدادات العرض والتخصيص المؤسسي', Icons.palette_outlined, '/admin/customizer'),
     _Module('hr', 'الموارد البشرية', 'اتفاقيات الموظفين وبيانات الموارد البشرية', Icons.badge_outlined, '/hr'),
     _Module('settings', 'الإعدادات', 'إعدادات الحساب والتطبيق', Icons.settings_outlined, '/settings'),
   ];
@@ -127,8 +126,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 _permissions.contains('reports.read_all'));
       case 'activity':
         return _manageTasks && _permissions.contains('audit.read');
-      case 'customizer':
-        return _manageTasks && _permissions.contains('customizer.manage');
       case 'report-designer':
         return _manageTasks && _permissions.contains('report_forms.manage');
       case 'agreements':

@@ -18,7 +18,6 @@ import '../features/reports/reports_screen.dart';
 import '../features/reports/independent_reports_screen.dart';
 import '../features/hr/hr_screen.dart';
 import '../features/settings/settings_screen.dart';
-import '../features/settings/app_customizer_screen.dart';
 import '../features/agreements/agreements_screen.dart';
 
 class _AuthRefreshNotifier extends ChangeNotifier {
@@ -182,13 +181,6 @@ void initializeRouter() {
         builder: (context, state) => const _PermissionGate(
           permissions: {'tasks.review', 'reports.read_all'},
           child: PerformanceAnalyticsScreen(),
-        ),
-      ),
-      GoRoute(
-        path: '/admin/customizer',
-        builder: (context, state) => const _PermissionGate(
-          permissions: {'tasks.manage'},
-          child: AppCustomizerScreen(),
         ),
       ),
       GoRoute(

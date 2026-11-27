@@ -53,7 +53,7 @@ class AppCustomizer extends ChangeNotifier {
 
   static const defaults = <String, String>{
     'appName': 'NEXORA', 'organizationName': 'مؤسسة الشاعري للتجارة العامة', 'tagline': 'Smart Business Management', 'time': 'الوقت من وإلى',
-    'home': 'الرئيسية', 'tasks': 'المهام', 'independentTasks': 'المهام المستقلة', 'employees': 'الموظفون', 'activity': 'سجل النشاط', 'report-designer': 'مصمم التقارير', 'customizer': 'مصمم الواجهات والتحكم الشامل', 'hr': 'الموارد البشرية', 'workSection': 'العمل والمتابعة', 'unifiedTable': 'الجدول الموحد لإنشاء المهام', 'taskManagement': 'إدارة مهام الجداول الموحدة', 'reports': 'تقارير الموظفين', 'performance': 'إحصائيات ومقارنة الأداء', 'dailyReports': 'التقارير اليومية المصممة', 'employeeReports': 'تقارير الموظف', 'adminSections': 'أقسام الإدارة', 'settings': 'الإعدادات', 'totalTasks': 'إجمالي المهام', 'inProgress': 'قيد التنفيذ', 'submitted': 'بانتظار المراجعة', 'lateTasks': 'مهام متأخرة',
+    'home': 'الرئيسية', 'tasks': 'المهام', 'independentTasks': 'المهام المستقلة', 'employees': 'الموظفون', 'activity': 'سجل النشاط', 'report-designer': 'مصمم التقارير', 'hr': 'الموارد البشرية', 'workSection': 'العمل والمتابعة', 'unifiedTable': 'الجدول الموحد لإنشاء المهام', 'taskManagement': 'إدارة مهام الجداول الموحدة', 'reports': 'تقارير الموظفين', 'performance': 'إحصائيات ومقارنة الأداء', 'dailyReports': 'التقارير اليومية المصممة', 'employeeReports': 'تقارير الموظف', 'adminSections': 'أقسام الإدارة', 'settings': 'الإعدادات', 'totalTasks': 'إجمالي المهام', 'inProgress': 'قيد التنفيذ', 'submitted': 'بانتظار المراجعة', 'lateTasks': 'مهام متأخرة',
   };
 
   Future<void> load() => _loaded ? Future<void>.value() : (_loadFuture ??= _loadOnce());

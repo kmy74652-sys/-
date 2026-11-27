@@ -136,8 +136,6 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
       case '/admin/performance':
       case '/admin/report-designer':
         return '/';
-      case '/admin/customizer':
-        return '/settings';
       case '/admin':
         return '/';
     }
