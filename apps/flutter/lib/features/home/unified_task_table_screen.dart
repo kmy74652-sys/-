@@ -344,61 +344,6 @@ class _UnifiedTaskTableScreenState extends State<UnifiedTaskTableScreen> {
         if (draft.kpis.isNotEmpty) 'مؤشرات الأداء: ${draft.kpis.join('؛ ')}',
       ].join('\n');
 
-  Future<void> _chooseCreateOrEdit() async {
-    final choice = await showModalBottomSheet<String>(
-      context: context,
-      useSafeArea: true,
-      builder: (sheetContext) => ListView(
-        shrinkWrap: true,
-        padding: const EdgeInsets.all(16),
-        children: [
-          const Text('إنشاء أو تعديل المهام',
-              textAlign: TextAlign.right,
-              style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18)),
-          const SizedBox(height: 12),
-          FilledButton.icon(
-            onPressed: () => Navigator.of(sheetContext).pop('new'),
-            icon: const Icon(Icons.add_task),
-            label: const Text('إنشاء مهمة جديدة'),
-          ),
-          const SizedBox(height: 12),
-          if (_existingUnifiedTasks.isEmpty)
-            const Padding(
-              padding: EdgeInsets.all(12),
-              child: Text('لا توجد مهام سابقة في الجدول الموحد للتعديل.',
-                  textAlign: TextAlign.right),
-            )
-          else ...[
-            const Text(
-                'المهام السابقة — اختر مهمة لعرض كامل تفاصيلها وتعديلها:',
-                textAlign: TextAlign.right),
-            const SizedBox(height: 6),
-            ..._existingUnifiedTasks.map((task) => ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.edit_note_outlined),
-                  title: Text(_text(task['title'], 'مهمة'),
-                      textAlign: TextAlign.right),
-                  subtitle: Text(
-                      '${_employeeName(_text(task['assigned_to']))} · ${_text(task['status'], 'جديدة')}',
-                      textAlign: TextAlign.right),
-                  onTap: () =>
-                      Navigator.of(sheetContext).pop(_text(task['id'])),
-                )),
-          ],
-        ],
-      ),
-    );
-    if (!mounted || choice == null) return;
-    if (choice == 'new') {
-      setState(() => _editingTask = null);
-      return;
-    }
-    final selected = _existingUnifiedTasks
-        .where((task) => _text(task['id']) == choice)
-        .toList();
-    if (selected.isNotEmpty) setState(() => _editingTask = selected.first);
-  }
-
   Widget _previousUnifiedTasksTable() {
     if (_existingUnifiedTasks.isEmpty) return const SizedBox.shrink();
     final rows = <DataRow>[];
@@ -479,7 +424,6 @@ class _UnifiedTaskTableScreenState extends State<UnifiedTaskTableScreen> {
             SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               child: DataTable(
-                textDirection: TextDirection.rtl,
                 headingRowColor: WidgetStatePropertyAll(Color(0xFFEAF1EF)),
                 columns: const [
                   DataColumn(label: Text('الحالة')),
