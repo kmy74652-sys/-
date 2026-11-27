@@ -175,13 +175,15 @@ class ReportPdfTheme {
       final value = reportPdfSafeText(valueFor(key)).trim();
       if (value.isEmpty) return pw.SizedBox();
       return pw.Positioned(
-        left: position['left']! * pageWidth,
-        top: position['top']! * pageHeight,
-        width: position['width']! * pageWidth,
-        height: position['height']! * pageHeight,
-        child: pw.Container(
-          alignment: alignValue == 'left' ? pw.Alignment.centerLeft : alignValue == 'center' ? pw.Alignment.center : pw.Alignment.centerRight,
-          child: pw.Text(value, textDirection: pw.TextDirection.rtl, textAlign: textAlign, style: pw.TextStyle(font: isBold ? boldFontValue : regular, fontSize: size, color: PdfColor.fromInt(colorValue))),
+        left: (position['left']! * pageWidth).toDouble(),
+        top: (position['top']! * pageHeight).toDouble(),
+        child: pw.SizedBox(
+          width: (position['width']! * pageWidth).toDouble(),
+          height: (position['height']! * pageHeight).toDouble(),
+          child: pw.Container(
+            alignment: alignValue == 'left' ? pw.Alignment.centerLeft : alignValue == 'center' ? pw.Alignment.center : pw.Alignment.centerRight,
+            child: pw.Text(value, textDirection: pw.TextDirection.rtl, textAlign: textAlign, style: pw.TextStyle(font: isBold ? boldFontValue : regular, fontSize: size, color: PdfColor.fromInt(colorValue))),
+          ),
         ),
       );
     }
@@ -207,20 +209,23 @@ class ReportPdfTheme {
             for (var index = 0; index < keys.length; index++)
               if (keys[index] == 'logo' && logo != null)
                 pw.Positioned(
-                  left: positionFor(keys[index], index)['left']! * pageWidth,
-                  top: positionFor(keys[index], index)['top']! * pageHeight,
-                  width: positionFor(keys[index], index)['width']! * pageWidth,
-                  height: positionFor(keys[index], index)['height']! * pageHeight,
-                  child: pw.Image(logo!, fit: pw.BoxFit.contain),
+                  left: (positionFor(keys[index], index)['left']! * pageWidth).toDouble(),
+                  top: (positionFor(keys[index], index)['top']! * pageHeight).toDouble(),
+                  child: pw.SizedBox(
+                    width: (positionFor(keys[index], index)['width']! * pageWidth).toDouble(),
+                    height: (positionFor(keys[index], index)['height']! * pageHeight).toDouble(),
+                    child: pw.Image(logo!, fit: pw.BoxFit.contain),
+                  ),
                 )
               else if (keys[index] != 'logo')
                 textElement(keys[index], index),
             pw.Positioned(
-              left: .06 * pageWidth,
-              top: .48 * pageHeight,
-              width: .88 * pageWidth,
-              height: .30 * pageHeight,
-              child: pw.Table.fromTextArray(
+              left: (.06 * pageWidth).toDouble(),
+              top: (.48 * pageHeight).toDouble(),
+              child: pw.SizedBox(
+                width: (.88 * pageWidth).toDouble(),
+                height: (.30 * pageHeight).toDouble(),
+                child: pw.Table.fromTextArray(
                 headers: const ['الوقت', 'المهمة والبيان', 'المخرج المطلوب', 'الحالة'],
                 data: const [
                   ['08:00', 'مهمة حالية', 'لا يوجد', 'جديدة'],
@@ -232,6 +237,7 @@ class ReportPdfTheme {
                 border: tableBorder,
                 cellAlignment: pw.Alignment.centerRight,
                 cellPadding: const pw.EdgeInsets.all(5),
+                ),
               ),
             ),
           ],

@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:printing/printing.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../core/theme.dart';
 import '../../shared/app_customizer.dart';
 import '../../shared/app_shell.dart';
 import '../../shared/organization_branding.dart';
