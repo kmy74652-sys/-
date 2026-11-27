@@ -11,6 +11,7 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../core/theme.dart';
 import '../../core/offline_attachment_store.dart';
 import '../../core/offline_queue.dart';
 import '../../shared/app_shell.dart';
