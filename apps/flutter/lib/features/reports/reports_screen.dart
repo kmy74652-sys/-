@@ -484,13 +484,15 @@ class _ReportsScreenState extends State<ReportsScreen> {
                         if ((rows[index]['values'] ?? rows[index]['answers']) is Map)
                           for (final entry in ((rows[index]['values'] ?? rows[index]['answers']) as Map).entries)
                             reportPdfIsSignature(entry.value)
-                                ? pw.Row(
+                                ? pw.Directionality(
                                     textDirection: pw.TextDirection.rtl,
-                                    children: [
-                                      pw.Expanded(child: reportPdfSignatureWidget(entry.value)),
-                                      pw.SizedBox(width: 8),
-                                      pw.Text(_pdfSafeText('${entry.key}:'), textDirection: pw.TextDirection.rtl, textAlign: pw.TextAlign.right),
-                                    ],
+                                    child: pw.Row(
+                                      children: [
+                                        pw.Expanded(child: reportPdfSignatureWidget(entry.value)),
+                                        pw.SizedBox(width: 8),
+                                        pw.Text(_pdfSafeText('${entry.key}:'), textDirection: pw.TextDirection.rtl, textAlign: pw.TextAlign.right),
+                                      ],
+                                    ),
                                   )
                                 : pw.Text(
                                     _pdfSafeText('${entry.key}: ${_displayValue(entry.value)}'),

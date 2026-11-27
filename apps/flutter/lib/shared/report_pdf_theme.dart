@@ -379,9 +379,9 @@ class ReportPdfTheme {
 
   static Future<pw.ThemeData> pdfTheme({pw.Font? base, pw.Font? bold}) async {
     final regular = base ?? await regularFont();
-    final boldFont = bold ?? await boldFont();
+    final arabicBold = bold ?? await ReportPdfTheme.boldFont();
     final latin = await latinRegularFont();
     final latinBold = await latinBoldFont();
-    return pw.ThemeData.withFont(base: regular, bold: boldFont, fontFallback: [latin, latinBold]);
+    return pw.ThemeData.withFont(base: regular, bold: arabicBold, fontFallback: [latin, latinBold]);
   }
 }
