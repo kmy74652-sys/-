@@ -727,19 +727,6 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
         onTap: () { widget.onChanged?.call(); _pickStartDate(); },
       );
 
-  Widget _timeField(TextEditingController controller, String label) => TextField(
-        controller: controller,
-        readOnly: true,
-        textAlign: TextAlign.center,
-        textDirection: TextDirection.ltr,
-        decoration: InputDecoration(
-          labelText: label,
-          isDense: true,
-          suffixIcon: const Icon(Icons.schedule_outlined, size: 19),
-        ),
-        onTap: () { widget.onChanged?.call(); _pickTime(controller); },
-      );
-
   Widget _timeRangeField(_UnifiedRow row) => TextFormField(
         initialValue: row.timeValue,
         readOnly: true,
@@ -810,17 +797,6 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
       confirmText: 'اختيار',
     );
     if (value != null && mounted) setState(() => _startDate.text = _formatDate(value));
-  }
-
-  Future<void> _pickTime(TextEditingController controller) async {
-    final value = await showTimePicker(
-      context: context,
-      initialTime: _parseTime(controller.text, TimeOfDay.now()),
-      helpText: 'اختر الوقت',
-      cancelText: 'إلغاء',
-      confirmText: 'اختيار',
-    );
-    if (value != null && mounted) setState(() => controller.text = _formatTime(value));
   }
 
   Future<void> _pickTimeRange(_UnifiedRow row) async {
