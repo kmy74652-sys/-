@@ -429,9 +429,10 @@ class _UnifiedTaskTableScreenState extends State<UnifiedTaskTableScreen> {
       ].join('\n');
 
   Widget _previousUnifiedTasksTable() {
-    final previousTasks = widget.employeeUserId == null
-        ? _existingUnifiedTasks
-        : _selectedEmployeeTasks;
+    if (widget.employeeUserId == null || widget.employeeUserId!.trim().isEmpty) {
+      return const SizedBox.shrink();
+    }
+    final previousTasks = _selectedEmployeeTasks;
     if (previousTasks.isEmpty) return const SizedBox.shrink();
     final rows = <DataRow>[];
     for (final task in previousTasks) {
@@ -1030,7 +1031,7 @@ class _UnifiedTaskTableScreenState extends State<UnifiedTaskTableScreen> {
                               _editingTask?['id'] ?? 'new-unified-task'),
                           onSend: _send,
                           previousTasks: widget.employeeUserId == null
-                              ? _existingUnifiedTasks
+                              ? const []
                               : _selectedEmployeeTasks,
                           initialDraft: _selectedEmployeeTasks.isNotEmpty
                               ? _draftFromEmployeeTasks(_selectedEmployeeTasks)

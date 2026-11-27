@@ -47,6 +47,8 @@ class _TasksScreenState extends State<TasksScreen>
   bool _canFilterEmployees = false;
   String _employeeFilter = 'all';
   List<Map<String, dynamic>> _employees = [];
+  List<Map<String, dynamic>> _approvedCycles = [];
+  bool _cyclesLoading = false;
 
   static const Map<String, String> _statusLabels = {
     'pending': 'جديدة',
@@ -238,8 +240,64 @@ class _TasksScreenState extends State<TasksScreen>
         _canFilterEmployees = canFilter;
         _employees = employees;
       });
+      if (canFilter) await _loadApprovedCycles();
     } catch (_) {
       // Keep the edit affordance hidden; Supabase remains the final authority.
+    }
+  }
+
+  Future<void> _loadApprovedCycles() async {
+    if (!mounted) return;
+    setState(() => _cyclesLoading = true);
+    try {
+      final raw = await Supabase.instance.client.rpc('list_approved_task_cycles');
+      final rows = raw is List
+          ? raw.whereType<Map>().map((row) => Map<String, dynamic>.from(row)).toList()
+          : <Map<String, dynamic>>[];
+      if (mounted) setState(() => _approvedCycles = rows);
+    } catch (_) {
+      if (mounted) setState(() => _approvedCycles = []);
+    } finally {
+      if (mounted) setState(() => _cyclesLoading = false);
+    }
+  }
+
+  Future<void> _toggleApprovedCycle(Map<String, dynamic> cycle) async {
+    final id = '${cycle['id'] ?? ''}';
+    if (id.isEmpty) return;
+    try {
+      await Supabase.instance.client.rpc(
+        'set_approved_task_cycle_active',
+        params: {'p_cycle_id': id, 'p_active': cycle['active'] != true},
+      );
+      await _loadApprovedCycles();
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('تعذر تغيير حالة دورة المهمة: $error')),
+      );
+    }
+  }
+
+  Future<void> _issueApprovedCycleNow(Map<String, dynamic> cycle) async {
+    final id = '${cycle['id'] ?? ''}';
+    if (id.isEmpty || cycle['active'] != true) return;
+    try {
+      await Supabase.instance.client.rpc(
+        'issue_approved_task_cycle_now',
+        params: {'p_cycle_id': id},
+      );
+      await Future.wait([_load(), _loadApprovedCycles()]);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('تم إصدار مهمة اليوم من الدورة المعتمدة')),
+        );
+      }
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('تعذر إصدار المهمة الآن: $error')),
+      );
     }
   }
 
@@ -556,6 +614,17 @@ class _TasksScreenState extends State<TasksScreen>
                           selected: _view == 'ledger',
                           onSelected: (_) => setState(() => _view = 'ledger'),
                         ),
+                        if (_canFilterEmployees) ...[
+                          const SizedBox(width: 8),
+                          ChoiceChip(
+                            label: const Text('المهام والتقارير المعتمدة والمرحلة'),
+                            selected: _view == 'approved_cycles',
+                            onSelected: (_) {
+                              setState(() => _view = 'approved_cycles');
+                              _loadApprovedCycles();
+                            },
+                          ),
+                        ],
                       ],
                     ),
                     const SizedBox(height: 8),
@@ -608,16 +677,18 @@ class _TasksScreenState extends State<TasksScreen>
                         ),
                       ],
                     ),
-                    if (_view == 'ledger')
+                    if (_view == 'approved_cycles')
+                      _approvedCyclesCard()
+                    else if (_view == 'ledger')
                       _taskLedger(visibleTasks)
                     else if (visibleTasks.isNotEmpty)
                       _officialTableCard(visibleTasks),
-                    if (_tasks.isEmpty)
+                    if (_view != 'approved_cycles' && _tasks.isEmpty)
                       const Padding(
                         padding: EdgeInsets.only(top: 72),
                         child: Center(child: Text('لا توجد مهام متاحة حاليًا')),
                       )
-                    else if (visibleTasks.isEmpty)
+                    else if (_view != 'approved_cycles' && visibleTasks.isEmpty)
                       Padding(
                         padding: const EdgeInsets.only(top: 44),
                         child: Column(
@@ -645,6 +716,88 @@ class _TasksScreenState extends State<TasksScreen>
             ),
     ),
   );
+
+  Widget _approvedCyclesCard() {
+    if (_cyclesLoading) {
+      return const Padding(
+        padding: EdgeInsets.all(32),
+        child: Center(child: CircularProgressIndicator()),
+      );
+    }
+    if (_approvedCycles.isEmpty) {
+      return const Card(
+        child: Padding(
+          padding: EdgeInsets.all(22),
+          child: Text(
+            'لا توجد مهام وتقارير معتمدة قيد المرحلة حاليًا. عند اعتماد تقرير مهمة ستظهر دورته هنا تلقائيًا.',
+            textAlign: TextAlign.right,
+          ),
+        ),
+      );
+    }
+    return Column(
+      children: _approvedCycles.map((cycle) {
+        final active = cycle['active'] == true;
+        final title = '${cycle['title'] ?? 'مهمة'}'.trim();
+        final employee = '${cycle['employee_name'] ?? 'موظف'}'.trim();
+        final branch = '${cycle['branch_name'] ?? 'كل الفروع'}'.trim();
+        final next = '${cycle['next_issue_date'] ?? 'غير محدد'}';
+        final last = '${cycle['last_issued_date'] ?? 'لم يصدر بعد'}';
+        final count = '${cycle['issued_count'] ?? 0}';
+        return Card(
+          margin: const EdgeInsets.only(bottom: 10),
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  textDirection: TextDirection.rtl,
+                  children: [
+                    Icon(active ? Icons.autorenew : Icons.pause_circle_outline,
+                        color: active ? Colors.green : AppColors.muted),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(title,
+                          textAlign: TextAlign.right,
+                          style: const TextStyle(fontWeight: FontWeight.w800)),
+                    ),
+                    Text(active ? 'مرحلة فعالة' : 'متوقفة',
+                        style: TextStyle(
+                            color: active ? Colors.green : AppColors.muted,
+                            fontWeight: FontWeight.w700)),
+                  ],
+                ),
+                const Divider(height: 18),
+                Text('الموظف: $employee  ·  الفرع: $branch', textAlign: TextAlign.right),
+                const SizedBox(height: 4),
+                Text('آخر إصدار: $last  ·  الإصدار القادم: $next  ·  الإصدارات: $count',
+                    textAlign: TextAlign.right,
+                    style: const TextStyle(color: AppColors.muted, fontSize: 12)),
+                const SizedBox(height: 8),
+                Row(
+                  textDirection: TextDirection.rtl,
+                  children: [
+                    OutlinedButton.icon(
+                      onPressed: active ? () => _issueApprovedCycleNow(cycle) : null,
+                      icon: const Icon(Icons.add_task_outlined, size: 18),
+                      label: const Text('إصدار الآن'),
+                    ),
+                    const SizedBox(width: 8),
+                    TextButton.icon(
+                      onPressed: () => _toggleApprovedCycle(cycle),
+                      icon: Icon(active ? Icons.pause : Icons.play_arrow, size: 18),
+                      label: Text(active ? 'إيقاف المرحلة' : 'استئناف المرحلة'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      }).toList(),
+    );
+  }
 
   Widget _officialCell(
     String text, {

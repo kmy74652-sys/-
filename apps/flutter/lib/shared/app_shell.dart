@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/notifications_repository.dart';
@@ -75,6 +76,14 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
   void _openTaskFromNotification(String? taskId) {
     if (!mounted || taskId == null || taskId.isEmpty) return;
     context.go('/tasks/$taskId');
+  }
+
+  String _notificationTimestamp(DateTime? value) {
+    if (value == null) return 'وقت الإرسال غير متوفر';
+    final local = value.toLocal();
+    final period = local.hour < 12 ? 'ص' : 'م';
+    return '${DateFormat('dd/MM/yyyy').format(local)} · '
+        '${DateFormat('hh:mm').format(local)} $period';
   }
 
   @override
@@ -299,13 +308,26 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
                                     : FontWeight.w600,
                               ),
                             ),
-                            subtitle: item.body == null
-                                ? null
-                                : Text(
+                            subtitle: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                if (item.body != null && item.body!.trim().isNotEmpty)
+                                  Text(
                                     item.body!,
                                     maxLines: 3,
                                     overflow: TextOverflow.ellipsis,
                                   ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'أُرسل: ${_notificationTimestamp(item.createdAt)}',
+                                  textAlign: TextAlign.right,
+                                  style: const TextStyle(
+                                    fontSize: 11,
+                                    color: AppColors.muted,
+                                  ),
+                                ),
+                              ],
+                            ),
                             trailing: _notificationSeverityLabel(item.severity).isEmpty
                                 ? null
                                 : Text(
