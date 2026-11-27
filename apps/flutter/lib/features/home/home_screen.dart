@@ -347,7 +347,7 @@ class _HomeScreenState extends State<HomeScreen> {
     for (var offset = 0; ; offset += pageSize) {
       var query = client
           .from('tasks')
-          .select('id,status,due_at,completed_at,updated_at')
+          .select('id,status,due_at,updated_at')
           .eq('organization_id', organization);
       query = query.isFilter('deleted_at', null);
       if (!manages) query = query.eq('assigned_to', user.id);

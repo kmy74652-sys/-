@@ -127,7 +127,7 @@ class _PerformanceAnalyticsScreenState
         db
             .from('tasks')
             .select(
-              'id,title,description,assigned_to,position_code,branch_id,priority,status,due_at,completed_at,updated_at,assigned_at,received_at,opened_at,report_required',
+              'id,title,description,assigned_to,position_code,branch_id,priority,status,due_at,updated_at,assigned_at,received_at,opened_at,report_required',
             )
             .isFilter('deleted_at', null)
             .order('due_at')

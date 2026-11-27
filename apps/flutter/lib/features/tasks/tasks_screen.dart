@@ -142,7 +142,7 @@ class _TasksScreenState extends State<TasksScreen>
         final page = await client
             .from('tasks')
             .select(
-              'id,organization_id,title,description,due_at,completed_at,priority,status,report_required,report_form_snapshot_id,assigned_to,assigned_at,received_at,opened_at,created_at,updated_at',
+              'id,organization_id,title,description,due_at,priority,status,report_required,report_form_snapshot_id,assigned_to,assigned_at,received_at,opened_at,created_at,updated_at',
             )
             .isFilter('deleted_at', null)
             .order('due_at')
