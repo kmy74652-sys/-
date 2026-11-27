@@ -732,10 +732,13 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
       );
 
   Widget _timeRangeField(_UnifiedRow row) => TextFormField(
+        key: ValueKey('${identityHashCode(row)}:${row.timeValue}'),
         initialValue: row.timeValue,
         readOnly: true,
+        maxLines: 1,
         textAlign: TextAlign.center,
         textDirection: TextDirection.ltr,
+        style: const TextStyle(fontSize: 12),
         decoration: const InputDecoration(
           labelText: 'الوقت من وإلى',
           hintText: '8:00 ص - 9:00 ص',
@@ -1326,7 +1329,8 @@ class _UnifiedPdfPreviewDialog extends StatelessWidget {
 }
 
 String _displayUnifiedTime(String value) {
-  final match = RegExp(r'^(\d{1,2}):(\d{2})\s*([صم])?$').firstMatch(value.trim());
+  final normalized = _normalizeUnifiedTimeSeparators(value);
+  final match = RegExp(r'^(\d{1,2}):(\d{2})\s*([صم])?$').firstMatch(normalized);
   final hour = int.tryParse(match?.group(1) ?? '');
   final minute = int.tryParse(match?.group(2) ?? '');
   if (hour == null || minute == null || hour > 23 || minute > 59) return value;
@@ -1337,7 +1341,7 @@ String _displayUnifiedTime(String value) {
 }
 
 String _standardUnifiedTime(String value) {
-  final normalized = value.trim().replaceAll('صباحًا', 'ص').replaceAll('مساءً', 'م');
+  final normalized = _normalizeUnifiedTimeSeparators(value);
   final match = RegExp(r'^(\d{1,2}):(\d{2})\s*([صم])?$').firstMatch(normalized);
   final hour = int.tryParse(match?.group(1) ?? '');
   final minute = int.tryParse(match?.group(2) ?? '');
@@ -1345,6 +1349,32 @@ String _standardUnifiedTime(String value) {
   final marker = match?.group(3);
   final standardHour = marker == null ? hour : (hour % 12) + (marker == 'م' ? 12 : 0);
   return '${standardHour.toString().padLeft(2, '0')}:${minute.toString().padLeft(2, '0')}';
+}
+
+String _normalizeUnifiedTimeSeparators(String value) => value
+    .trim()
+    .replaceAll('صباحًا', 'ص')
+    .replaceAll('صباحا', 'ص')
+    .replaceAll('مساءً', 'م')
+    .replaceAll('مساءا', 'م')
+    .replaceAll('إلى', '-')
+    .replaceAll('الى', '-')
+    .replaceAll('–', '-')
+    .replaceAll('—', '-');
+
+List<String> _splitUnifiedTimeRange(String value) {
+  final normalized = _normalizeUnifiedTimeSeparators(value);
+  final parts = normalized
+      .split(RegExp(r'\s*-\s*|\r?\n+'))
+      .map((part) => part.trim())
+      .where((part) => part.isNotEmpty)
+      .toList();
+  if (parts.length >= 2) return [parts.first, parts.last];
+
+  // بعض السجلات القديمة كانت تحفظ وقت البداية والنهاية في سطر واحد بلا فاصل.
+  final times = RegExp(r'\d{1,2}:\d{2}\s*[صم]?').allMatches(normalized).map((match) => match.group(0)!.trim()).toList();
+  if (times.length >= 2) return [times.first, times.last];
+  return parts;
 }
 
 class _UnifiedRow {
@@ -1355,7 +1385,7 @@ class _UnifiedRow {
         output = TextEditingController(text: output),
         _extras = (extras ?? {}).map((key, value) => MapEntry(key, TextEditingController(text: value)));
   factory _UnifiedRow.fromTimeValue(String value, String task, String output, [Map<String, String>? extras]) {
-    final parts = value.split(RegExp(r'\s*[-–]\s*'));
+    final parts = _splitUnifiedTimeRange(value);
     return _UnifiedRow(parts.isEmpty ? '' : parts.first, task, output, extras, parts.length > 1 ? parts.last : '');
   }
   final TextEditingController time, endTime, task, output;
