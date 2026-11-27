@@ -123,7 +123,7 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget build(BuildContext context) => Directionality(
     textDirection: TextDirection.rtl,
     child: Scaffold(
-      backgroundColor: const Color(0xFFF5F7FD),
+      backgroundColor: const Color(0xFFF2F6FB),
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
@@ -132,50 +132,55 @@ class _LoginScreenState extends State<LoginScreen> {
               constraints: const BoxConstraints(maxWidth: 460),
               child: Card(
                 margin: EdgeInsets.zero,
-                elevation: 1,
+                elevation: 7,
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(24),
-                  side: const BorderSide(color: Color(0xFFDCE5EC)),
+                  borderRadius: BorderRadius.circular(28),
+                  side: const BorderSide(color: Color(0xFFD5E1EC)),
                 ),
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(24, 26, 24, 22),
+                  padding: const EdgeInsets.fromLTRB(24, 22, 24, 22),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     _LoginBrandLogo(branding: _branding),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 10),
                     const Text(
                       'بوابة العمل والتواصل الإداري',
-                      textAlign: TextAlign.right,
-                      style: TextStyle(color: AppColors.muted),
-                    ),
-                    const SizedBox(height: 6),
-                    const Text(
-                      'NEXORA',
-                      textAlign: TextAlign.right,
+                      textAlign: TextAlign.center,
                       style: TextStyle(
-                        fontSize: 28,
-                        fontWeight: FontWeight.w900,
-                        color: AppColors.navy,
+                        color: AppColors.muted,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
-                    const SizedBox(height: 2),
+                    const SizedBox(height: 4),
+                    const Text(
+                      'NEXORA',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 30,
+                        fontWeight: FontWeight.w900,
+                        color: AppColors.navy,
+                        letterSpacing: 1.2,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
                     const Text(
                       'Smart Business Management',
-                      textAlign: TextAlign.right,
+                      textAlign: TextAlign.center,
                       style: TextStyle(
                         color: Color(0xFFD9A441),
                         fontWeight: FontWeight.w700,
                         letterSpacing: .3,
                       ),
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 10),
                     const Text(
                       'سجّل دخولك للوصول إلى مهامك، تقاريرك، وتنبيهات العمل في مكان واحد.',
-                      textAlign: TextAlign.right,
-                      style: TextStyle(color: AppColors.muted, height: 1.6),
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: AppColors.muted, height: 1.5),
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 20),
                     if (_error != null)
                       Padding(
                         padding: const EdgeInsets.only(bottom: 12),
@@ -197,6 +202,11 @@ class _LoginScreenState extends State<LoginScreen> {
                         labelText: 'الرقم الوظيفي',
                         hintText: 'أدخل الرقم الوظيفي',
                         prefixIcon: Icon(Icons.badge_outlined),
+                        filled: true,
+                        fillColor: Color(0xFFF8FAFD),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.all(Radius.circular(16)),
+                        ),
                       ),
                     ),
                     const SizedBox(height: 12),
@@ -210,18 +220,26 @@ class _LoginScreenState extends State<LoginScreen> {
                       decoration: const InputDecoration(
                         labelText: 'رمز الدخول',
                         prefixIcon: Icon(Icons.lock_outline),
+                        filled: true,
+                        fillColor: Color(0xFFF8FAFD),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.all(Radius.circular(16)),
+                        ),
                       ),
                     ),
-                    const SizedBox(height: 14),
-                    FilledButton.icon(
-                      onPressed: _busy ? null : _login,
-                      icon: _busy
-                          ? const SizedBox.square(
-                              dimension: 18,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Icon(Icons.lock_open),
-                      label: Text(_busy ? 'جارٍ تسجيل الدخول…' : 'دخول آمن'),
+                    const SizedBox(height: 16),
+                    SizedBox(
+                      height: 54,
+                      child: FilledButton.icon(
+                        onPressed: _busy ? null : _login,
+                        icon: _busy
+                            ? const SizedBox.square(
+                                dimension: 18,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : const Icon(Icons.login_rounded),
+                        label: Text(_busy ? 'جارٍ تسجيل الدخول…' : 'دخول آمن'),
+                      ),
                     ),
                     const SizedBox(height: 12),
                     const Text(
@@ -253,12 +271,32 @@ class _LoginBrandLogo extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final url = branding.logoUrl;
-    if (url == null || url.trim().isEmpty) return const SizedBox(height: 110);
+    if (url == null || url.trim().isEmpty) {
+      return Container(
+        height: 78,
+        width: 78,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: const Color(0xFFEAF1F8),
+          border: Border.all(color: const Color(0xFFD9A441), width: 2),
+        ),
+        child: const Icon(
+          Icons.business_center_outlined,
+          size: 38,
+          color: AppColors.navy,
+        ),
+      );
+    }
     return Image.network(
       url,
-      height: 110,
+      height: 78,
       fit: BoxFit.contain,
-      errorBuilder: (_, __, ___) => const SizedBox(height: 110),
+      errorBuilder: (_, __, ___) => const Icon(
+        Icons.business_center_outlined,
+        size: 46,
+        color: AppColors.navy,
+      ),
     );
   }
 }
