@@ -880,6 +880,38 @@ class _ReportsScreenState extends State<ReportsScreen> {
             row['employee_name']?.toString() == selectedName);
   }
 
+  String _streamTitle() => switch (_stream) {
+        'submissions' => 'تقارير النماذج',
+        'role_reports' => 'تقارير الأدوار اليومية',
+        _ => 'تقارير المهام',
+      };
+
+  Widget _summaryMetric({
+    required String label,
+    required int value,
+    required IconData icon,
+    required Color color,
+  }) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+        decoration: BoxDecoration(
+          color: color.withAlpha(18),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: color.withAlpha(55)),
+        ),
+        child: Column(
+          children: [
+            Icon(icon, size: 19, color: color),
+            const SizedBox(height: 3),
+            Text('$value', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w900, color: color)),
+            Text(label, textAlign: TextAlign.center, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700)),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) => AppShell(
     title: 'مراجعة التقارير',
@@ -920,6 +952,13 @@ class _ReportsScreenState extends State<ReportsScreen> {
         : _stream == 'submissions'
         ? submissions
         : roleReports;
+    final allRows = _stream == 'tasks'
+        ? _rows
+        : _stream == 'submissions'
+        ? _submissionRows
+        : _roleReportRows;
+    final pendingCount = allRows.where((row) => row['status'] == 'submitted' || row['status'] == 'reviewed').length;
+    final approvedCount = allRows.where((row) => row['status'] == 'approved').length;
     final error = _stream == 'tasks'
         ? _error
         : _stream == 'submissions'
@@ -928,23 +967,32 @@ class _ReportsScreenState extends State<ReportsScreen> {
     return ListView(
       padding: const EdgeInsets.all(12),
       children: [
-        const Text(
-          'قائمة التقارير',
-          textAlign: TextAlign.right,
-          style: TextStyle(
-            color: AppColors.navy,
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-          ),
+        Row(
+          textDirection: TextDirection.rtl,
+          children: [
+            Expanded(
+              child: Text(
+                _streamTitle(),
+                textAlign: TextAlign.right,
+                style: const TextStyle(color: AppColors.navy, fontSize: 20, fontWeight: FontWeight.w900),
+              ),
+            ),
+            IconButton(
+              tooltip: 'تحديث التقارير',
+              onPressed: _busy ? null : _load,
+              icon: const Icon(Icons.refresh_outlined, color: AppColors.navy),
+            ),
+          ],
         ),
         Card(
+          margin: const EdgeInsets.only(top: 4, bottom: 10),
           child: Padding(
-            padding: const EdgeInsets.all(6),
-            child: Wrap(
-              alignment: WrapAlignment.end,
-              spacing: 6,
-              runSpacing: 6,
-              children: [
+            padding: const EdgeInsets.all(8),
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                textDirection: TextDirection.rtl,
+                children: [
                 ChoiceChip(
                   label: const Text('تقارير المهام'),
                   selected: _stream == 'tasks',
@@ -969,42 +1017,22 @@ class _ReportsScreenState extends State<ReportsScreen> {
                   labelPadding: const EdgeInsets.symmetric(horizontal: 4),
                   onSelected: (_) => setState(() => _stream = 'role_reports'),
                 ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
-        const SizedBox(height: 8),
-        if (_stream == 'tasks') ...[
-          const Text(
-            'مراجعة تقارير المهام',
-            textAlign: TextAlign.right,
-            style: TextStyle(
-              color: AppColors.navy,
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ] else if (_stream == 'submissions') ...[
-          const Text(
-            'تقارير النماذج',
-            textAlign: TextAlign.right,
-            style: TextStyle(
-              color: AppColors.navy,
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ] else ...[
-          const Text(
-            'تقارير الأدوار اليومية المستقلة',
-            textAlign: TextAlign.right,
-            style: TextStyle(
-              color: AppColors.navy,
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ],
+        Row(
+          textDirection: TextDirection.rtl,
+          children: [
+            _summaryMetric(label: 'المعروض', value: exportRows.length, icon: Icons.article_outlined, color: AppColors.navy),
+            const SizedBox(width: 8),
+            _summaryMetric(label: 'بانتظار المراجعة', value: pendingCount, icon: Icons.rate_review_outlined, color: Colors.indigo),
+            const SizedBox(width: 8),
+            _summaryMetric(label: 'معتمدة', value: approvedCount, icon: Icons.verified_outlined, color: Colors.green),
+          ],
+        ),
+        const SizedBox(height: 10),
         if (error != null) ...[
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 8),
@@ -1031,15 +1059,16 @@ class _ReportsScreenState extends State<ReportsScreen> {
                   Expanded(
                     child: Text(
                       (_filter == 'all' && _employeeFilter == 'all')
-                          ? 'الفلاتر'
-                          : 'الفلاتر · نشط: ${(_filter == 'all' ? 0 : 1) + (_employeeFilter == 'all' ? 0 : 1)}',
+                          ? 'تصفية التقارير'
+                          : 'تصفية التقارير · نشطة: ${(_filter == 'all' ? 0 : 1) + (_employeeFilter == 'all' ? 0 : 1)}',
                       textAlign: TextAlign.right,
                       style: const TextStyle(fontWeight: FontWeight.w800),
                     ),
                   ),
-                  TextButton(
+                  IconButton(
+                    tooltip: 'إعادة ضبط الفلاتر',
                     onPressed: _resetFilters,
-                    child: const Text('إعادة التعيين'),
+                    icon: const Icon(Icons.restart_alt, color: AppColors.navy),
                   ),
                   IconButton(
                     tooltip: _filtersExpanded ? 'إخفاء الفلاتر' : 'إظهار الفلاتر',
@@ -1131,8 +1160,8 @@ class _ReportsScreenState extends State<ReportsScreen> {
           textAlign: TextAlign.right,
           onChanged: (value) => setState(() => _search = value),
           decoration: InputDecoration(
-            labelText: 'بحث داخل التقارير الحالية',
-            hintText: 'اسم الموظف، الفرع، الدور، الرقم أو قيمة التقرير',
+            labelText: 'البحث في التقارير',
+            hintText: 'اسم الموظف أو المهمة أو قيمة التقرير',
             prefixIcon: _search.isEmpty
                 ? const Icon(Icons.search)
                 : IconButton(
@@ -1154,12 +1183,12 @@ class _ReportsScreenState extends State<ReportsScreen> {
               TextButton.icon(
                 onPressed: () => _savePdf(exportRows),
                 icon: const Icon(Icons.download_outlined),
-                label: const Text('حفظ PDF كملف'),
+                label: const Text('تصدير PDF'),
               ),
               TextButton.icon(
                 onPressed: () => _copyReports(exportRows),
                 icon: const Icon(Icons.content_copy_outlined),
-                label: const Text('نسخ التقارير'),
+                label: const Text('نسخ النتائج'),
               ),
             ],
           ),
@@ -1586,6 +1615,8 @@ class _ReportsScreenState extends State<ReportsScreen> {
         title: Text(
           _label(row),
           textAlign: TextAlign.right,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
           style: const TextStyle(
             fontWeight: FontWeight.bold,
             color: AppColors.navy,
@@ -1595,13 +1626,13 @@ class _ReportsScreenState extends State<ReportsScreen> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(
-              'الموظف: $employeeName · المهمة: ${_label(row)}',
+              'الموظف: $employeeName',
               textAlign: TextAlign.right,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
             Text(
-              'التاريخ: ${_formattedDate(row['submitted_at'])} · الاستحقاق: ${_formattedDate(task?['due_at'])}',
+              'الإرسال: ${_formattedDate(row['submitted_at'])} · الاستحقاق: ${_formattedDate(task?['due_at'])}',
               textAlign: TextAlign.right,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
