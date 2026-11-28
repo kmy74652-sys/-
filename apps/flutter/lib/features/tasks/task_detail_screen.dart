@@ -10,6 +10,7 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/theme.dart';
 import '../../core/offline_attachment_store.dart';
@@ -559,6 +560,129 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
       } catch (_) {}
     }
     return '$value';
+  }
+
+  Future<String?> _snapshotAttachmentUrl(Map<String, dynamic> item) async {
+    final direct = '${item['url'] ?? item['publicUrl'] ?? ''}'.trim();
+    if (direct.startsWith('http://') || direct.startsWith('https://')) {
+      return direct;
+    }
+    final path = '${item['storagePath'] ?? item['storage_path'] ?? item['path'] ?? ''}'.trim();
+    if (path.isEmpty) return null;
+    try {
+      return await Supabase.instance.client.storage
+          .from('task-attachments')
+          .createSignedUrl(path, 3600);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  bool _snapshotAttachmentIsImage(Map<String, dynamic> item) {
+    final mime = '${item['mimeType'] ?? item['mime_type'] ?? ''}'.toLowerCase();
+    if (mime.startsWith('image/')) return true;
+    final name = '${item['name'] ?? item['path'] ?? ''}'.toLowerCase();
+    return RegExp(r'\.(png|jpe?g|webp|gif|bmp)$').hasMatch(name);
+  }
+
+  Future<void> _openSnapshotAttachment(
+    Map<String, dynamic> item,
+    String url,
+  ) async {
+    if (_snapshotAttachmentIsImage(item)) {
+      if (!mounted) return;
+      await showDialog<void>(
+        context: context,
+        builder: (_) => Dialog(
+          child: InteractiveViewer(
+            minScale: 0.5,
+            maxScale: 4,
+            child: Image.network(
+              url,
+              fit: BoxFit.contain,
+              errorBuilder: (_, __, ___) => const Padding(
+                padding: EdgeInsets.all(24),
+                child: Text('تعذر عرض الصورة.'),
+              ),
+            ),
+          ),
+        ),
+      );
+      return;
+    }
+    final opened = await launchUrl(
+      Uri.parse(url),
+      mode: LaunchMode.externalApplication,
+    );
+    if (!opened && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('تعذر فتح المرفق على الجهاز.')),
+      );
+    }
+  }
+
+  Widget _snapshotAttachmentPreview(Object? raw) {
+    final items = reportPdfAttachmentItems(raw);
+    if (items.isEmpty) return const Text('لا يوجد', textAlign: TextAlign.right);
+    return Wrap(
+      alignment: WrapAlignment.end,
+      spacing: 8,
+      runSpacing: 8,
+      children: [
+        for (final item in items)
+          FutureBuilder<String?>(
+            future: _snapshotAttachmentUrl(item),
+            builder: (context, snapshot) {
+              final url = snapshot.data;
+              final name = '${item['name'] ?? ''}'.trim();
+              if (snapshot.connectionState != ConnectionState.done) {
+                return const SizedBox(
+                  width: 34,
+                  height: 34,
+                  child: Padding(
+                    padding: EdgeInsets.all(7),
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                );
+              }
+              if (url == null || url.isEmpty) {
+                return Chip(
+                  avatar: const Icon(Icons.attach_file, size: 18),
+                  label: Text(name.isEmpty ? 'مرفق' : name),
+                );
+              }
+              if (_snapshotAttachmentIsImage(item)) {
+                return InkWell(
+                  borderRadius: BorderRadius.circular(8),
+                  onTap: () => _openSnapshotAttachment(item, url),
+                  child: Tooltip(
+                    message: name.isEmpty ? 'عرض الصورة' : name,
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: Image.network(
+                        url,
+                        width: 76,
+                        height: 62,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => const SizedBox(
+                          width: 76,
+                          height: 62,
+                          child: Icon(Icons.broken_image_outlined),
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              }
+              return OutlinedButton.icon(
+                onPressed: () => _openSnapshotAttachment(item, url),
+                icon: const Icon(Icons.open_in_new, size: 18),
+                label: Text(name.isEmpty ? 'فتح المرفق' : name),
+              );
+            },
+          ),
+      ],
+    );
   }
 
   String _operationError(Object error, String fallback) {
@@ -2021,13 +2145,22 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                                         '${field['label'] ?? field['key']}',
                                         textAlign: TextAlign.right,
                                       ),
-                                      subtitle: Text(
-                                        _snapshotDisplayValue(
-                                          field,
-                                          savedValues[field['key']],
-                                        ),
-                                        textAlign: TextAlign.right,
-                                      ),
+                                      subtitle: [
+                                        'attachment',
+                                        'file',
+                                        'image',
+                                        'multi_image',
+                                      ].contains('${field['type'] ?? ''}')
+                                          ? _snapshotAttachmentPreview(
+                                              savedValues[field['key']],
+                                            )
+                                          : Text(
+                                              _snapshotDisplayValue(
+                                                field,
+                                                savedValues[field['key']],
+                                              ),
+                                              textAlign: TextAlign.right,
+                                            ),
                                     )
                                   : Padding(
                                       padding: const EdgeInsets.only(
