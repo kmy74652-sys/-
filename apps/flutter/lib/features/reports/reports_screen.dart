@@ -806,6 +806,9 @@ class _ReportsScreenState extends State<ReportsScreen> {
 
   String _displayValue(Object? value) {
     if (value == null) return '—';
+    if (reportPdfIsAttachment(value)) {
+      return reportPdfAttachmentText(value);
+    }
     if (value is String) {
       final raw = value.trim();
       final parsedDate = DateTime.tryParse(raw);

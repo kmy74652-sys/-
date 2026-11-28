@@ -18,6 +18,43 @@ String reportPdfSafeText(String value) => value
     .replaceAll(RegExp(r'[ \t]{2,}'), ' ')
     .trim();
 
+List<Map<String, dynamic>> reportPdfAttachmentItems(Object? raw) {
+  Object? value = raw;
+  if (value is String) {
+    try {
+      value = jsonDecode(value);
+    } catch (_) {
+      return const [];
+    }
+  }
+  if (value is Map) value = [value];
+  if (value is! List) return const [];
+  final items = <Map<String, dynamic>>[];
+  for (final item in value) {
+    if (item is! Map) continue;
+    final map = Map<String, dynamic>.from(item);
+    if (map['path'] != null || map['id'] != null || map['name'] != null) {
+      items.add(map);
+    }
+  }
+  return items;
+}
+
+bool reportPdfIsAttachment(Object? raw) =>
+    reportPdfAttachmentItems(raw).isNotEmpty;
+
+String reportPdfAttachmentText(Object? raw) {
+  final items = reportPdfAttachmentItems(raw);
+  if (items.isEmpty) return 'لا يوجد';
+  final names = <String>[];
+  for (var index = 0; index < items.length; index++) {
+    final item = items[index];
+    final name = '${item['name'] ?? ''}'.trim();
+    names.add(name.isEmpty ? 'مرفق ${index + 1}' : reportPdfSafeText(name));
+  }
+  return names.join('، ');
+}
+
 Map<String, dynamic> _reportPdfSignatureMap(Object? raw) {
   if (raw is Map) return Map<String, dynamic>.from(raw);
   if (raw is String) {

@@ -524,6 +524,9 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
     if (type == 'date' || type == 'datetime') {
       return _automaticDateLabel('$value', type);
     }
+    if (['attachment', 'file', 'image', 'multi_image'].contains(type)) {
+      return reportPdfAttachmentText(value);
+    }
     if (type == 'signature') {
       Map<String, dynamic> signature = {};
       if (value is Map) {
@@ -1095,6 +1098,9 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
 
   String _pdfValue(dynamic value) {
     if (value == null || '$value'.trim().isEmpty) return 'لا يوجد';
+    if (reportPdfIsAttachment(value)) {
+      return reportPdfAttachmentText(value);
+    }
     if (value is List) return value.map(_pdfValue).join('، ');
     if (value is Map) {
       return value.entries
