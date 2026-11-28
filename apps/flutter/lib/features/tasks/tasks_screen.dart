@@ -324,6 +324,159 @@ class _TasksScreenState extends State<TasksScreen>
     }
   }
 
+  Future<void> _editApprovedCycleNextIssue(Map<String, dynamic> cycle) async {
+    final id = '${cycle['id'] ?? ''}';
+    if (id.isEmpty || cycle['active'] != true || !_canEditOfficialTasks) return;
+    final titleController = TextEditingController(
+      text: '${cycle['next_issue_title'] ?? cycle['title'] ?? ''}',
+    );
+    final descriptionController = TextEditingController(
+      text: '${cycle['next_issue_description'] ?? cycle['description'] ?? ''}',
+    );
+    final expectedController = TextEditingController(
+      text: '${cycle['next_issue_expected_result'] ?? cycle['expected_result'] ?? ''}',
+    );
+    final instructionsController = TextEditingController(
+      text: '${cycle['next_issue_instructions'] ?? cycle['task_instructions'] ?? ''}',
+    );
+    var priority = '${cycle['next_issue_priority'] ?? cycle['priority'] ?? 'normal'}';
+    if (!_priorityLabels.containsKey(priority)) priority = 'normal';
+
+    final values = await showDialog<Map<String, String>>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('تخصيص الإصدار القادم', textAlign: TextAlign.right),
+          content: SingleChildScrollView(
+            child: Directionality(
+              textDirection: TextDirection.rtl,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text(
+                    'سيؤثر هذا التعديل على المهمة التي ستصدر لاحقًا فقط، ولن يغير التقرير السابق أو الاعتماد القديم.',
+                    textAlign: TextAlign.right,
+                    style: TextStyle(color: AppColors.muted, fontSize: 12),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: titleController,
+                    decoration: const InputDecoration(labelText: 'عنوان المهمة القادمة'),
+                    textInputAction: TextInputAction.next,
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: descriptionController,
+                    decoration: const InputDecoration(labelText: 'تفاصيل المهمة القادمة'),
+                    maxLines: 3,
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: expectedController,
+                    decoration: const InputDecoration(labelText: 'المخرج المطلوب'),
+                    maxLines: 2,
+                  ),
+                  const SizedBox(height: 10),
+                  DropdownButtonFormField<String>(
+                    value: priority,
+                    decoration: const InputDecoration(labelText: 'الأولوية القادمة'),
+                    items: _priorityLabels.entries
+                        .map((entry) => DropdownMenuItem<String>(
+                              value: entry.key,
+                              child: Text(entry.value),
+                            ))
+                        .toList(),
+                    onChanged: (value) {
+                      if (value != null) setDialogState(() => priority = value);
+                    },
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: instructionsController,
+                    decoration: const InputDecoration(labelText: 'التعليمات القادمة'),
+                    maxLines: 3,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('إلغاء'),
+            ),
+            FilledButton.icon(
+              onPressed: () {
+                if (titleController.text.trim().isEmpty) return;
+                Navigator.of(dialogContext).pop({
+                  'title': titleController.text.trim(),
+                  'description': descriptionController.text.trim(),
+                  'expected_result': expectedController.text.trim(),
+                  'priority': priority,
+                  'task_instructions': instructionsController.text.trim(),
+                });
+              },
+              icon: const Icon(Icons.save_outlined),
+              label: const Text('حفظ للإصدار القادم'),
+            ),
+          ],
+        ),
+      ),
+    );
+    titleController.dispose();
+    descriptionController.dispose();
+    expectedController.dispose();
+    instructionsController.dispose();
+    if (values == null || !mounted) return;
+
+    try {
+      await Supabase.instance.client.rpc(
+        'update_approved_task_cycle_next_issue',
+        params: {
+          'p_cycle_id': id,
+          'p_title': values['title'],
+          'p_description': values['description'],
+          'p_expected_result': values['expected_result'],
+          'p_priority': values['priority'],
+          'p_task_instructions': values['task_instructions'],
+        },
+      );
+      await _loadApprovedCycles();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('تم حفظ تخصيص الإصدار القادم')),
+        );
+      }
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('تعذر حفظ تخصيص الإصدار القادم: $error')),
+      );
+    }
+  }
+
+  Future<void> _clearApprovedCycleNextIssue(Map<String, dynamic> cycle) async {
+    final id = '${cycle['id'] ?? ''}';
+    if (id.isEmpty || !_canEditOfficialTasks) return;
+    try {
+      await Supabase.instance.client.rpc(
+        'clear_approved_task_cycle_next_issue',
+        params: {'p_cycle_id': id},
+      );
+      await _loadApprovedCycles();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('تمت إعادة بيانات الإصدار القادم إلى النسخة المعتمدة')),
+        );
+      }
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('تعذر إلغاء تخصيص الإصدار القادم: $error')),
+      );
+    }
+  }
+
   Future<void> _flushQueue() async {
     final client = Supabase.instance.client;
     if (client.auth.currentUser == null || _queueBusy) return;
@@ -856,6 +1009,8 @@ class _TasksScreenState extends State<TasksScreen>
       children: cycles.map((cycle) {
         final active = cycle['active'] == true;
         final title = '${cycle['title'] ?? 'مهمة'}'.trim();
+        final nextTitle = '${cycle['next_issue_title'] ?? title}'.trim();
+        final hasOverride = cycle['has_next_issue_override'] == true;
         final employee = '${cycle['employee_name'] ?? 'موظف'}'.trim();
         final branch = '${cycle['branch_name'] ?? 'كل الفروع'}'.trim();
         final next = '${cycle['next_issue_date'] ?? 'غير محدد'}';
@@ -887,20 +1042,49 @@ class _TasksScreenState extends State<TasksScreen>
                 ),
                 const Divider(height: 18),
                 Text('الموظف: $employee  ·  الفرع: $branch', textAlign: TextAlign.right),
+                if (hasOverride) ...[
+                  const SizedBox(height: 6),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: AppColors.navy.withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      'الإصدار القادم مخصص: $nextTitle',
+                      textAlign: TextAlign.right,
+                      style: const TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 4),
                 Text('آخر إصدار: $last  ·  الإصدار القادم: $next  ·  الإصدارات: $count',
                     textAlign: TextAlign.right,
                     style: const TextStyle(color: AppColors.muted, fontSize: 12)),
                 const SizedBox(height: 8),
-                Row(
+                Wrap(
+                  alignment: WrapAlignment.start,
                   textDirection: TextDirection.rtl,
+                  spacing: 8,
+                  runSpacing: 4,
                   children: [
                     OutlinedButton.icon(
                       onPressed: active ? () => _issueApprovedCycleNow(cycle) : null,
                       icon: const Icon(Icons.add_task_outlined, size: 18),
                       label: const Text('إصدار مهمة الآن'),
                     ),
-                    const SizedBox(width: 8),
+                    if (_canEditOfficialTasks)
+                      OutlinedButton.icon(
+                        onPressed: active ? () => _editApprovedCycleNextIssue(cycle) : null,
+                        icon: const Icon(Icons.edit_outlined, size: 18),
+                        label: const Text('تخصيص الإصدار القادم'),
+                      ),
+                    if (_canEditOfficialTasks && hasOverride)
+                      TextButton.icon(
+                        onPressed: () => _clearApprovedCycleNextIssue(cycle),
+                        icon: const Icon(Icons.restore_outlined, size: 18),
+                        label: const Text('إلغاء التخصيص'),
+                      ),
                     TextButton.icon(
                       onPressed: () => _toggleApprovedCycle(cycle),
                       icon: Icon(active ? Icons.pause : Icons.play_arrow, size: 18),
