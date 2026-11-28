@@ -6,6 +6,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:http/http.dart' as http;
+import 'package:image/image.dart' as img;
 import 'package:mime/mime.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
@@ -592,6 +593,17 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
     return name.endsWith('.pdf');
   }
 
+  Uint8List _normalizeSnapshotImage(Uint8List bytes) {
+    try {
+      final decoded = img.decodeImage(bytes);
+      if (decoded == null) return bytes;
+      final oriented = img.bakeOrientation(decoded);
+      return Uint8List.fromList(img.encodePng(oriented));
+    } catch (_) {
+      return bytes;
+    }
+  }
+
   Future<void> _openSnapshotAttachment(
     Map<String, dynamic> item,
     String url,
@@ -605,6 +617,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
       final bytes = response.bodyBytes;
       final name = '${item['name'] ?? 'المرفق'}'.trim();
       if (_snapshotAttachmentIsImage(item)) {
+        final displayBytes = _normalizeSnapshotImage(bytes);
         await showDialog<void>(
           context: context,
           builder: (_) => Dialog.fullscreen(
@@ -621,7 +634,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                   minScale: 0.5,
                   maxScale: 5,
                   child: Image.memory(
-                    bytes,
+                    displayBytes,
                     fit: BoxFit.contain,
                     errorBuilder: (_, __, ___) => const Text('تعذر عرض الصورة.'),
                   ),
