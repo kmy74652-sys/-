@@ -528,11 +528,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text('تم حذف حساب $name نهائيًا.')));
+    } on PostgrestException catch (error) {
+      final details = '${error.message} ${error.details ?? ''}';
+      final message = switch (details) {
+        String value when value.contains('management_role_required') =>
+          'لا تملك صلاحية حذف حسابات الموظفين.',
+        String value when value.contains('owner_account_protected') =>
+          'حساب صاحب المؤسسة محمي ولا يمكن حذفه.',
+        String value when value.contains('employee_not_found') =>
+          'الموظف غير موجود أو تم تعطيل حسابه مسبقًا.',
+        String value when value.contains('task_activity_log_append_only') =>
+          'تعذر حذف سجل نشاط المهام المرتبط بالموظف. طبّق تحديث قاعدة البيانات ثم أعد المحاولة.',
+        _ => 'تعذر حذف حساب الموظف: ${error.message}',
+      };
+      if (mounted) setState(() => _error = message);
     } catch (_) {
       if (mounted)
-        setState(
-          () => _error = 'تعذر حذف حساب الموظف. تحقق من الصلاحية والاتصال.',
-        );
+        setState(() => _error = 'تعذر حذف حساب الموظف. تحقق من الصلاحية والاتصال.');
     } finally {
       if (mounted) setState(() => _busyEmployeeId = null);
     }
