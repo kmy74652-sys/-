@@ -407,10 +407,14 @@ async function ownerOperation(body: Record<string, unknown>, request: Request, c
       return response({ error: 'database_update_required' }, 503);
     }
     const memberIds = (data ?? []).map((member) => member.id);
-    const [{ data: assignments, error: assignmentError }, { data: branches, error: branchError }] = await Promise.all([
+    const [assignmentsResult, branchesResult] = await Promise.all([
       clients.adminClient.from('role_assignments').select('membership_id,role_code,branch_id').eq('organization_id', owner.institutionId).in('membership_id', memberIds),
       clients.adminClient.from('branches').select('id,name,code,is_active').eq('organization_id', owner.institutionId).order('name'),
     ]);
+    const assignments = assignmentsResult?.data ?? [];
+    const assignmentError = assignmentsResult?.error;
+    const branches = branchesResult?.data ?? [];
+    const branchError = branchesResult?.error;
     if (assignmentError || branchError) return response({ error: 'employee_access_lookup_failed' }, 503);
     const branchById = new Map((branches ?? []).map((branch) => [branch.id, branch]));
     const assignmentByMember = new Map((assignments ?? []).map((assignment) => [assignment.membership_id, assignment]));

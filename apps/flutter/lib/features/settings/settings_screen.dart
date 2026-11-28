@@ -539,6 +539,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
           'الموظف غير موجود أو تم تعطيل حسابه مسبقًا.',
         String value when value.contains('task_activity_log_append_only') =>
           'تعذر حذف سجل نشاط المهام المرتبط بالموظف. طبّق تحديث قاعدة البيانات ثم أعد المحاولة.',
+        String value when value.contains('signed_report_immutable') =>
+          'تم تجهيز حذف التقارير الموقعة ضمن الحذف النهائي. حدّث التطبيق إلى آخر نسخة ثم أعد المحاولة.',
         _ => 'تعذر حذف حساب الموظف: ${error.message}',
       };
       if (mounted) setState(() => _error = message);
