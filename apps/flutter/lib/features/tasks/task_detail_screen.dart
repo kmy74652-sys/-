@@ -5,12 +5,12 @@ import 'dart:typed_data';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:http/http.dart' as http;
 import 'package:mime/mime.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/theme.dart';
 import '../../core/offline_attachment_store.dart';
@@ -585,38 +585,100 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
     return RegExp(r'\.(png|jpe?g|webp|gif|bmp)$').hasMatch(name);
   }
 
+  bool _snapshotAttachmentIsPdf(Map<String, dynamic> item) {
+    final mime = '${item['mimeType'] ?? item['mime_type'] ?? ''}'.toLowerCase();
+    if (mime == 'application/pdf') return true;
+    final name = '${item['name'] ?? item['path'] ?? ''}'.toLowerCase();
+    return name.endsWith('.pdf');
+  }
+
   Future<void> _openSnapshotAttachment(
     Map<String, dynamic> item,
     String url,
   ) async {
-    if (_snapshotAttachmentIsImage(item)) {
+    try {
+      final response = await http.get(Uri.parse(url));
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        throw Exception('attachment_download_failed');
+      }
       if (!mounted) return;
-      await showDialog<void>(
-        context: context,
-        builder: (_) => Dialog(
-          child: InteractiveViewer(
-            minScale: 0.5,
-            maxScale: 4,
-            child: Image.network(
-              url,
-              fit: BoxFit.contain,
-              errorBuilder: (_, __, ___) => const Padding(
-                padding: EdgeInsets.all(24),
-                child: Text('تعذر عرض الصورة.'),
+      final bytes = response.bodyBytes;
+      final name = '${item['name'] ?? 'المرفق'}'.trim();
+      if (_snapshotAttachmentIsImage(item)) {
+        await showDialog<void>(
+          context: context,
+          builder: (_) => Dialog.fullscreen(
+            child: Scaffold(
+              appBar: AppBar(
+                title: Text(name.isEmpty ? 'معاينة الصورة' : name),
+                leading: IconButton(
+                  onPressed: () => Navigator.pop(context),
+                  icon: const Icon(Icons.close),
+                ),
+              ),
+              body: Center(
+                child: InteractiveViewer(
+                  minScale: 0.5,
+                  maxScale: 5,
+                  child: Image.memory(
+                    bytes,
+                    fit: BoxFit.contain,
+                    errorBuilder: (_, __, ___) => const Text('تعذر عرض الصورة.'),
+                  ),
+                ),
               ),
             ),
           ),
+        );
+        return;
+      }
+      if (_snapshotAttachmentIsPdf(item)) {
+        await showDialog<void>(
+          context: context,
+          builder: (_) => Dialog.fullscreen(
+            child: Scaffold(
+              appBar: AppBar(
+                title: Text(name.isEmpty ? 'معاينة PDF' : name),
+                leading: IconButton(
+                  onPressed: () => Navigator.pop(context),
+                  icon: const Icon(Icons.close),
+                ),
+              ),
+              body: PdfPreview(
+                canChangeOrientation: false,
+                canChangePageFormat: false,
+                allowPrinting: true,
+                allowSharing: true,
+                pdfFileName: name.isEmpty ? 'attachment.pdf' : name,
+                build: (_) async => bytes,
+              ),
+            ),
+          ),
+        );
+        return;
+      }
+      await showDialog<void>(
+        context: context,
+        builder: (_) => AlertDialog(
+          title: const Text('معاينة المرفق'),
+          content: Text(
+            name.isEmpty
+                ? 'هذا النوع من الملفات لا يدعم المعاينة الداخلية حاليًا.'
+                : 'لا تتوفر معاينة داخلية لهذا النوع من الملفات:\n$name',
+            textAlign: TextAlign.right,
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('إغلاق'),
+            ),
+          ],
         ),
       );
-      return;
-    }
-    final opened = await launchUrl(
-      Uri.parse(url),
-      mode: LaunchMode.externalApplication,
-    );
-    if (!opened && mounted) {
+    } catch (_) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('تعذر فتح المرفق على الجهاز.')),
+        const SnackBar(content: Text('تعذر تحميل المرفق للمعاينة داخل التطبيق.')),
       );
     }
   }
