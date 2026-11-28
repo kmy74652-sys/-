@@ -134,10 +134,12 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
       case '/':
         return null;
       case '/tasks':
+      case '/admin/unified-tasks':
+      case '/settings':
+        return null;
       case '/reports':
       case '/reports/independent':
       case '/hr':
-      case '/settings':
         return '/';
       case '/admin/tasks':
       case '/admin/unified-task-management':
