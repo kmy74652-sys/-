@@ -19,7 +19,7 @@ typedef AutomaticReportSchemaBuilder = List<Map<String, dynamic>> Function(
 );
 
 class UnifiedTaskTableEditor extends StatefulWidget {
-  const UnifiedTaskTableEditor({super.key, required this.onSend, this.onSave, this.initialDraft, this.employees = const [], this.branches = const [], this.reports = const [], this.previousTasks = const [], this.onChanged, this.reportSchemaBuilder});
+  const UnifiedTaskTableEditor({super.key, required this.onSend, this.onSave, this.initialDraft, this.employees = const [], this.branches = const [], this.reports = const [], this.previousTasks = const [], this.onChanged, this.reportSchemaBuilder, this.approvedCycleCustomization = false});
   final Future<void> Function(UnifiedTaskTableDraft draft) onSend;
   final Future<void> Function(UnifiedTaskTableDraft draft)? onSave;
   final UnifiedTaskTableDraft? initialDraft;
@@ -29,6 +29,7 @@ class UnifiedTaskTableEditor extends StatefulWidget {
   final List<Map<String, dynamic>> previousTasks;
   final VoidCallback? onChanged;
   final AutomaticReportSchemaBuilder? reportSchemaBuilder;
+  final bool approvedCycleCustomization;
 
   @override
   State<UnifiedTaskTableEditor> createState() => _UnifiedTaskTableEditorState();
@@ -236,7 +237,7 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
               child: Padding(
                 padding: const EdgeInsets.only(bottom: 6),
                 child: Row(textDirection: TextDirection.rtl, children: [
-                  Expanded(child: FilledButton.icon(onPressed: _sending || (_sent && widget.onSave == null) ? null : _submit, icon: _sending ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)) : Icon(widget.onSave != null ? Icons.save_outlined : _sent ? Icons.check_circle_outline : Icons.send_outlined), label: Text(_sending ? 'جارٍ الحفظ...' : widget.onSave != null ? 'حفظ التعديلات' : _sent ? 'تم الإرسال' : 'حفظ الجدول وإرساله'))),
+                  Expanded(child: FilledButton.icon(onPressed: _sending || (_sent && widget.onSave == null) ? null : _submit, icon: _sending ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)) : Icon(widget.onSave != null ? Icons.save_outlined : _sent ? Icons.check_circle_outline : Icons.send_outlined), label: Text(_sending ? 'جارٍ الحفظ...' : widget.approvedCycleCustomization ? 'حفظ للإصدار التلقائي القادم' : widget.onSave != null ? 'حفظ التعديلات' : _sent ? 'تم الإرسال' : 'حفظ الجدول وإرساله'))),
                   const SizedBox(width: 8), Expanded(child: OutlinedButton.icon(onPressed: _exportPdf, icon: const Icon(Icons.picture_as_pdf_outlined), label: const Text('تصدير PDF'))),
                 ]),
               ),

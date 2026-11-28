@@ -1172,6 +1172,7 @@ class _UnifiedTaskTableScreenState extends State<UnifiedTaskTableScreen> {
                             if (!_hasUnsavedChanges && mounted)
                               setState(() => _hasUnsavedChanges = true);
                           },
+                          approvedCycleCustomization: _approvedCycle != null,
                           employees: _employees,
                           branches: _branches,
                           reports: _reports,
