@@ -81,7 +81,7 @@ class _UnifiedTaskTableScreenState extends State<UnifiedTaskTableScreen> {
       _db
             .from('tasks')
             .select(
-                'id,title,description,branch_id,assigned_to,due_at,status,report_required,updated_at,deleted_at,idempotency_key')
+                'id,title,description,branch_id,assigned_to,due_at,status,report_required,priority,updated_at,deleted_at,idempotency_key')
             .eq('organization_id', organization)
             .isFilter('deleted_at', null)
             .order('updated_at', ascending: false)
@@ -307,6 +307,8 @@ class _UnifiedTaskTableScreenState extends State<UnifiedTaskTableScreen> {
           ? rowMatch!.group(2)!.trim()
           : taskTitle,
       output: rowMatch?.group(3)?.trim() ?? '',
+      appointmentDate: _text(task['due_at']).split('T').first,
+      priority: _text(task['priority'], 'normal'),
     );
     final hours = _lineValue(description, 'ساعات الدوام');
     String hoursValue(String label) {
@@ -390,6 +392,7 @@ class _UnifiedTaskTableScreenState extends State<UnifiedTaskTableScreen> {
       reportTemplateId: first.reportTemplateId,
       reportVersionId: first.reportVersionId,
       reportRequired: first.reportRequired,
+      priority: first.priority,
     );
   }
 
@@ -399,6 +402,7 @@ class _UnifiedTaskTableScreenState extends State<UnifiedTaskTableScreen> {
       _text(cycle['description']),
     );
     final rawTitle = _text(cycle['next_issue_title'], _text(cycle['title']));
+    final cyclePriority = _text(cycle['next_issue_priority'], _text(cycle['priority'], 'normal'));
     final matches = RegExp(
       r'^صف الجدول:\s*(.*?)\s*\|\s*(.*?)\s*\|\s*(.*?)\s*$',
       multiLine: true,
@@ -411,6 +415,7 @@ class _UnifiedTaskTableScreenState extends State<UnifiedTaskTableScreen> {
                   .replaceFirst(RegExp(r'^الجدول الموحد\s*-\s*'), '')
                   .trim(),
               output: _text(cycle['next_issue_expected_result']),
+              priority: cyclePriority,
             ),
           ]
         : matches
@@ -418,11 +423,12 @@ class _UnifiedTaskTableScreenState extends State<UnifiedTaskTableScreen> {
                   time: match.group(1)?.trim() ?? '',
                   task: match.group(2)?.trim() ?? '',
                   output: match.group(3)?.trim() ?? '',
+                  priority: cyclePriority,
                 ))
             .where((row) => row.task.isNotEmpty)
             .toList();
     final safeRows = rows.isEmpty
-        ? [UnifiedTaskRowData(time: '', task: rawTitle, output: '')]
+        ? [UnifiedTaskRowData(time: '', task: rawTitle, output: '', priority: cyclePriority)]
         : rows;
     final snapshots = cycle['report_snapshots'] is List
         ? (cycle['report_snapshots'] as List).whereType<Map>().toList()
@@ -458,6 +464,7 @@ class _UnifiedTaskTableScreenState extends State<UnifiedTaskTableScreen> {
           if (schema.isNotEmpty) unifiedTaskReportKey(row): schema,
       },
       reportRequired: cycle['report_required'] != false,
+      priority: 'normal',
     );
   }
 
@@ -472,7 +479,7 @@ class _UnifiedTaskTableScreenState extends State<UnifiedTaskTableScreen> {
       'p_title': title,
       'p_description': _descriptionForRow(draft, row),
       'p_expected_result': row.output,
-      'p_priority': _text(cycle['next_issue_priority'], 'normal'),
+      'p_priority': row.priority,
       'p_task_instructions': draft.instructions.join('، '),
     });
     if (!mounted) return;
@@ -495,11 +502,15 @@ class _UnifiedTaskTableScreenState extends State<UnifiedTaskTableScreen> {
         'p_task_id': task['id'],
         'p_title': 'الجدول الموحد - ${draft.role} · ${row.task}',
         'p_description': _descriptionForRow(draft, row),
-        'p_due_at': _dueForRow(draft.startDate, row.time).toIso8601String(),
+        'p_due_at': _dueForRow(
+          row.appointmentDate.isEmpty ? draft.startDate : row.appointmentDate,
+          row.time,
+        ).toIso8601String(),
         'p_assigned_to':
             draft.employeeUserId.isEmpty ? null : draft.employeeUserId,
         'p_branch_id': draft.branchId,
         'p_role_code': _roleCode(draft.role),
+        'p_priority': row.priority,
       });
     }
     if (!mounted) return;
@@ -526,6 +537,8 @@ class _UnifiedTaskTableScreenState extends State<UnifiedTaskTableScreen> {
         if (row.extras.isNotEmpty)
           'الأعمدة الإضافية: ${row.extras.entries.map((entry) => '${entry.key}: ${entry.value.isEmpty ? '—' : entry.value}').join(' · ')}',
         'المسمى الوظيفي: ${draft.role}',
+        'موعد المهمة: ${row.appointmentDate.isEmpty ? draft.startDate : row.appointmentDate}',
+        'الأولوية: ${row.priority}',
         if (draft.branch.isNotEmpty) 'الفرع: ${draft.branch}',
         if (draft.startDate.isNotEmpty) 'تاريخ بدء التطبيق: ${draft.startDate}',
         'ساعات الدوام: ${draft.workType} · ${draft.workDays} · الفترة الأولى: ${draft.firstPeriod.isEmpty ? '—' : draft.firstPeriod} · الاستراحة: ${draft.breakPeriod.isEmpty ? '—' : draft.breakPeriod} · الفترة الثانية: ${draft.secondPeriod.isEmpty ? '—' : draft.secondPeriod} · الاستثناء الأسبوعي: ${draft.weeklyException}',
@@ -654,11 +667,15 @@ class _UnifiedTaskTableScreenState extends State<UnifiedTaskTableScreen> {
       'p_task_id': task['id'],
       'p_title': 'الجدول الموحد - ${draft.role} · ${row.task}',
       'p_description': _descriptionForRow(draft, row),
-      'p_due_at': _dueForRow(draft.startDate, row.time).toIso8601String(),
+      'p_due_at': _dueForRow(
+        row.appointmentDate.isEmpty ? draft.startDate : row.appointmentDate,
+        row.time,
+      ).toIso8601String(),
       'p_assigned_to':
           draft.employeeUserId.isEmpty ? null : draft.employeeUserId,
       'p_branch_id': draft.branchId,
       'p_role_code': _roleCode(draft.role),
+      'p_priority': row.priority,
     });
     if (!mounted) return;
     setState(() {
@@ -691,6 +708,8 @@ class _UnifiedTaskTableScreenState extends State<UnifiedTaskTableScreen> {
       roleCode,
       startDate,
       reportVersionId,
+      row.appointmentDate,
+      row.priority,
       _timeSlot(row.time),
     ].join('|');
     // Stable FNV-1a hash: no package or platform-specific hashCode is used.
@@ -716,17 +735,20 @@ class _UnifiedTaskTableScreenState extends State<UnifiedTaskTableScreen> {
   Future<bool> _dispatchTimeAlreadyExists({
     required String userId,
     required String? branchId,
+    required String appointmentDate,
     required String time,
   }) async {
     final slot = _timeSlot(time);
     if (!RegExp(r'^\d{1,2}:\d{2}$').hasMatch(slot)) return false;
-    final marker = 'صف الجدول: $slot';
+    final due = _dueForRow(appointmentDate, time);
+    final nextMinute = due.add(const Duration(minutes: 1));
     var query = _db
         .from('tasks')
         .select('id')
         .eq('organization_id', _organizationId!)
         .eq('assigned_to', userId)
-        .ilike('description', '%$marker%')
+        .gte('due_at', due.toIso8601String())
+        .lt('due_at', nextMinute.toIso8601String())
         .isFilter('deleted_at', null);
     query = branchId == null || branchId.isEmpty
         ? query.isFilter('branch_id', null)
@@ -971,7 +993,10 @@ class _UnifiedTaskTableScreenState extends State<UnifiedTaskTableScreen> {
       final userId = member['user_id']?.toString();
       if (userId == null || userId.isEmpty) continue;
       for (final row in draft.rows) {
-        final due = _dueForRow(draft.startDate, row.time);
+        final due = _dueForRow(
+          row.appointmentDate.isEmpty ? draft.startDate : row.appointmentDate,
+          row.time,
+        );
         final dispatchKey = _stableDispatchKey(
           organizationId: organizationId,
           userId: userId,
@@ -986,6 +1011,7 @@ class _UnifiedTaskTableScreenState extends State<UnifiedTaskTableScreen> {
             await _dispatchTimeAlreadyExists(
               userId: userId,
               branchId: branchId,
+              appointmentDate: row.appointmentDate.isEmpty ? draft.startDate : row.appointmentDate,
               time: row.time,
             )) {
           _successfulDispatches.add(dispatchKey);
@@ -998,6 +1024,8 @@ class _UnifiedTaskTableScreenState extends State<UnifiedTaskTableScreen> {
           if (row.extras.isNotEmpty)
             'الأعمدة الإضافية: ${row.extras.entries.map((entry) => '${entry.key}: ${entry.value.isEmpty ? '—' : entry.value}').join(' · ')}',
           'المسمى الوظيفي: ${draft.role}',
+      'موعد المهمة: ${row.appointmentDate.isEmpty ? draft.startDate : row.appointmentDate}',
+          'الأولوية: ${row.priority}',
           if (draft.branch.isNotEmpty) 'الفرع: ${draft.branch}',
           if (draft.startDate.isNotEmpty)
             'تاريخ بدء التطبيق: ${draft.startDate}',
@@ -1018,7 +1046,7 @@ class _UnifiedTaskTableScreenState extends State<UnifiedTaskTableScreen> {
           'p_title': 'الجدول الموحد - ${draft.role} · ${row.task}',
           'p_description': description,
           'p_due_at': due.toIso8601String(),
-          'p_priority': 'normal',
+          'p_priority': row.priority,
           'p_branch_id': branchId,
           'p_role_code': roleCode,
           'p_template_id': draft.reportTemplateId,

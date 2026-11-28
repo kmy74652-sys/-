@@ -115,7 +115,16 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
     for (final row in target) row.dispose();
     target
       ..clear()
-      ..addAll(source.isEmpty ? [_UnifiedRow('', '', '')] : source.map((row) => _UnifiedRow.fromTimeValue(row.time, row.task, row.output, row.extras)));
+      ..addAll(source.isEmpty
+          ? [_UnifiedRow('', '', '')]
+          : source.map((row) => _UnifiedRow.fromTimeValue(
+                row.time,
+                row.task,
+                row.output,
+                row.extras,
+                row.appointmentDate,
+                row.priority,
+              )));
   }
 
   void _replaceList(List<TextEditingController> target, List<String> source) {
@@ -400,6 +409,8 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
               task: row.task.text.trim(),
               output: row.output.text.trim(),
               extras: row.extras,
+              appointmentDate: row.appointmentDate.text.trim().isEmpty ? _startDate.text : row.appointmentDate.text.trim(),
+              priority: row.priority,
             ))
         .toList();
     rows.addAll(_exceptionRows
@@ -409,6 +420,8 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
               task: row.task.text.trim(),
               output: row.output.text.trim(),
               extras: row.extras,
+              appointmentDate: row.appointmentDate.text.trim().isEmpty ? _startDate.text : row.appointmentDate.text.trim(),
+              priority: row.priority,
             )));
     return rows;
   }
@@ -685,16 +698,19 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
   ]));
 
   Widget _scheduleTable(String title, List<_UnifiedRow> source) {
-    final visible = AppCustomizer.instance.unifiedScheduleColumns
+    final configured = AppCustomizer.instance.unifiedScheduleColumns
         .where((key) => !{'time', 'task', 'output'}.contains(key) || AppCustomizer.instance.isUnifiedFieldVisible(key))
         .toList();
+    final visible = <String>[...configured];
+    if (!visible.contains('appointment')) visible.insert(1, 'appointment');
+    if (!visible.contains('priority')) visible.insert(2, 'priority');
     return _section(
       title,
       SingleChildScrollView(
         scrollDirection: Axis.horizontal,
         child: DataTable(
           columnSpacing: 18,
-          columns: [...visible.map((key) => DataColumn(label: Text(AppCustomizer.instance.unifiedLabel(key)))), const DataColumn(label: Text('إجراءات'))],
+          columns: [...visible.map((key) => DataColumn(label: Text(_scheduleColumnLabel(key)))), const DataColumn(label: Text('إجراءات'))],
           rows: source.asMap().entries.map((entry) {
             final i = entry.key;
             final row = entry.value;
@@ -711,8 +727,16 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
     );
   }
 
+  String _scheduleColumnLabel(String key) => key == 'appointment'
+      ? 'الموعد'
+      : key == 'priority'
+          ? 'الأولوية'
+          : AppCustomizer.instance.unifiedLabel(key);
+
   Widget _scheduleField(String key, _UnifiedRow row) {
     if (key == 'time') return _timeRangeField(row);
+    if (key == 'appointment') return _rowDateField(row);
+    if (key == 'priority') return _rowPriorityField(row);
     return TextField(
       controller: key == 'task'
           ? row.task
@@ -724,6 +748,51 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
       decoration: const InputDecoration(isDense: true),
     );
   }
+
+  Widget _rowDateField(_UnifiedRow row) {
+    if (row.appointmentDate.text.trim().isEmpty) row.appointmentDate.text = _startDate.text;
+    return TextField(
+      controller: row.appointmentDate,
+      readOnly: true,
+      textAlign: TextAlign.center,
+      textDirection: TextDirection.ltr,
+      decoration: const InputDecoration(
+        isDense: true,
+        suffixIcon: Icon(Icons.calendar_today_outlined, size: 18),
+      ),
+      onTap: () async {
+        widget.onChanged?.call();
+        final initial = DateTime.tryParse(row.appointmentDate.text) ?? DateTime.now();
+        final value = await showDatePicker(
+          context: context,
+          initialDate: initial,
+          firstDate: DateTime(2020),
+          lastDate: DateTime(2100),
+          helpText: 'اختر موعد هذه المهمة',
+          cancelText: 'إلغاء',
+          confirmText: 'اختيار',
+        );
+        if (value != null && mounted) setState(() => row.appointmentDate.text = _formatDate(value));
+      },
+    );
+  }
+
+  Widget _rowPriorityField(_UnifiedRow row) => DropdownButtonFormField<String>(
+        value: const ['normal', 'important', 'urgent', 'critical'].contains(row.priority) ? row.priority : 'normal',
+        isExpanded: true,
+        decoration: const InputDecoration(isDense: true),
+        items: const [
+          DropdownMenuItem(value: 'normal', child: Text('عادية')),
+          DropdownMenuItem(value: 'important', child: Text('مهمة')),
+          DropdownMenuItem(value: 'urgent', child: Text('عاجلة')),
+          DropdownMenuItem(value: 'critical', child: Text('حرجة')),
+        ],
+        onChanged: (value) {
+          if (value == null) return;
+          widget.onChanged?.call();
+          setState(() => row.priority = value);
+        },
+      );
 
   Widget _dateField() => TextField(
         controller: _startDate,
@@ -944,6 +1013,8 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
               task: row.task.text.trim(),
               output: row.output.text.trim(),
               extras: row.extras,
+              appointmentDate: row.appointmentDate.text.trim().isEmpty ? _startDate.text : row.appointmentDate.text.trim(),
+              priority: row.priority,
             ))
         .toList();
     final exceptionTasks = _exceptionRows
@@ -953,6 +1024,8 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
               task: row.task.text.trim(),
               output: row.output.text.trim(),
               extras: row.extras,
+              appointmentDate: row.appointmentDate.text.trim().isEmpty ? _startDate.text : row.appointmentDate.text.trim(),
+              priority: row.priority,
             ))
         .toList();
     tasks.addAll(exceptionTasks);
@@ -1003,6 +1076,7 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
         reportTemplateId: _reportTemplateId,
         reportVersionId: _reportVersionId,
         reportRequired: _reportMode != 'none',
+        priority: 'normal',
         reportSchemasByTask: reportSchemasByTask,
       );
       if (widget.onSave != null) {
@@ -1290,6 +1364,7 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
   String _pdfSafeText(String value) {
     return reportPdfSafeText(value);
   }
+
 }
 
 class _UnifiedPdfTexts {
@@ -1389,17 +1464,19 @@ List<String> _splitUnifiedTimeRange(String value) {
 }
 
 class _UnifiedRow {
-  _UnifiedRow(String time, String task, String output, [Map<String, String>? extras, String endTime = ''])
+  _UnifiedRow(String time, String task, String output, [Map<String, String>? extras, String endTime = '', String appointmentDate = '', this.priority = 'normal'])
       : time = TextEditingController(text: _displayUnifiedTime(time)),
         endTime = TextEditingController(text: _displayUnifiedTime(endTime)),
+        appointmentDate = TextEditingController(text: appointmentDate),
         task = TextEditingController(text: task),
         output = TextEditingController(text: output),
         _extras = (extras ?? {}).map((key, value) => MapEntry(key, TextEditingController(text: value)));
-  factory _UnifiedRow.fromTimeValue(String value, String task, String output, [Map<String, String>? extras]) {
+  factory _UnifiedRow.fromTimeValue(String value, String task, String output, [Map<String, String>? extras, String appointmentDate = '', String priority = 'normal']) {
     final parts = _splitUnifiedTimeRange(value);
-    return _UnifiedRow(parts.isEmpty ? '' : parts.first, task, output, extras, parts.length > 1 ? parts.last : '');
+    return _UnifiedRow(parts.isEmpty ? '' : parts.first, task, output, extras, parts.length > 1 ? parts.last : '', appointmentDate, priority);
   }
-  final TextEditingController time, endTime, task, output;
+  final TextEditingController time, endTime, appointmentDate, task, output;
+  String priority;
   final Map<String, TextEditingController> _extras;
   String get timeValue {
     final start = _standardUnifiedTime(time.text);
@@ -1410,7 +1487,7 @@ class _UnifiedRow {
   }
   TextEditingController custom(String key) => _extras.putIfAbsent(key, () => TextEditingController());
   Map<String, String> get extras => _extras.map((key, value) => MapEntry(key, value.text));
-  void dispose() { time.dispose(); endTime.dispose(); task.dispose(); output.dispose(); for (final controller in _extras.values) controller.dispose(); }
+  void dispose() { time.dispose(); endTime.dispose(); appointmentDate.dispose(); task.dispose(); output.dispose(); for (final controller in _extras.values) controller.dispose(); }
 }
 
 class UnifiedTaskTableDraft {
@@ -1438,6 +1515,7 @@ class UnifiedTaskTableDraft {
     this.reportTemplateId,
     this.reportVersionId,
     this.reportRequired = true,
+    this.priority = 'normal',
   });
   final String employee, employeeUserId, role, branch, startDate, purpose, reportNotes;
   final String? branchId;
@@ -1447,11 +1525,12 @@ class UnifiedTaskTableDraft {
   final Map<String, List<Map<String, dynamic>>> reportSchemasByTask;
   final String? reportTemplateId, reportVersionId;
   final bool reportRequired;
+  final String priority;
 }
 
 class UnifiedTaskRowData {
-  const UnifiedTaskRowData({required this.time, required this.task, required this.output, this.extras = const {}});
-  final String time, task, output;
+  const UnifiedTaskRowData({required this.time, required this.task, required this.output, this.extras = const {}, this.appointmentDate = '', this.priority = 'normal'});
+  final String time, task, output, appointmentDate, priority;
   final Map<String, String> extras;
 }
 
