@@ -1073,18 +1073,6 @@ class _TasksScreenState extends State<TasksScreen>
                       icon: const Icon(Icons.add_task_outlined, size: 18),
                       label: const Text('إصدار مهمة الآن'),
                     ),
-                    if (_canEditOfficialTasks)
-                      OutlinedButton.icon(
-                        onPressed: active ? () => _editApprovedCycleNextIssue(cycle) : null,
-                        icon: const Icon(Icons.edit_outlined, size: 18),
-                        label: const Text('تخصيص الإصدار القادم'),
-                      ),
-                    if (_canEditOfficialTasks && hasOverride)
-                      TextButton.icon(
-                        onPressed: () => _clearApprovedCycleNextIssue(cycle),
-                        icon: const Icon(Icons.restore_outlined, size: 18),
-                        label: const Text('إلغاء التخصيص'),
-                      ),
                     TextButton.icon(
                       onPressed: () => _toggleApprovedCycle(cycle),
                       icon: Icon(active ? Icons.pause : Icons.play_arrow, size: 18),

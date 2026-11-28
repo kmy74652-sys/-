@@ -28,6 +28,7 @@ class _UnifiedTaskTableScreenState extends State<UnifiedTaskTableScreen> {
   List<UnifiedReportOption> _reports = const [];
   List<Map<String, dynamic>> _existingUnifiedTasks = const [];
   List<Map<String, dynamic>> _selectedEmployeeTasks = const [];
+  Map<String, dynamic>? _approvedCycle;
   Map<String, dynamic>? _editingTask;
   final Set<String> _successfulDispatches = <String>{};
   bool _hasUnsavedChanges = false;
@@ -174,6 +175,22 @@ class _UnifiedTaskTableScreenState extends State<UnifiedTaskTableScreen> {
           })
           .whereType<UnifiedReportOption>()
           .toList();
+      Map<String, dynamic>? approvedCycle;
+      if (widget.employeeUserId != null && widget.employeeUserId!.trim().isNotEmpty) {
+        try {
+          final cycles = await _db.rpc('list_approved_task_cycles');
+          for (final row in (cycles as List).whereType<Map>()) {
+            final cycle = Map<String, dynamic>.from(row);
+            if (cycle['active'] == true &&
+                _text(cycle['employee_user_id']) == widget.employeeUserId) {
+              approvedCycle = cycle;
+              break;
+            }
+          }
+        } catch (_) {
+          approvedCycle = null;
+        }
+      }
       if (!mounted) return;
       setState(() {
         _employees = [
@@ -203,6 +220,7 @@ class _UnifiedTaskTableScreenState extends State<UnifiedTaskTableScreen> {
         if (_selectedEmployeeTasks.isNotEmpty) {
           _editingTask = _selectedEmployeeTasks.first;
         }
+        _approvedCycle = approvedCycle;
         _reports = reports;
         _loading = false;
       });
@@ -372,6 +390,95 @@ class _UnifiedTaskTableScreenState extends State<UnifiedTaskTableScreen> {
       reportTemplateId: first.reportTemplateId,
       reportVersionId: first.reportVersionId,
       reportRequired: first.reportRequired,
+    );
+  }
+
+  UnifiedTaskTableDraft _draftFromApprovedCycle(Map<String, dynamic> cycle) {
+    final description = _text(
+      cycle['next_issue_description'],
+      _text(cycle['description']),
+    );
+    final rawTitle = _text(cycle['next_issue_title'], _text(cycle['title']));
+    final matches = RegExp(
+      r'^صف الجدول:\s*(.*?)\s*\|\s*(.*?)\s*\|\s*(.*?)\s*$',
+      multiLine: true,
+    ).allMatches(description);
+    final rows = matches.isEmpty
+        ? [
+            UnifiedTaskRowData(
+              time: _lineValue(description, 'الوقت المحدد'),
+              task: rawTitle
+                  .replaceFirst(RegExp(r'^الجدول الموحد\s*-\s*'), '')
+                  .trim(),
+              output: _text(cycle['next_issue_expected_result']),
+            ),
+          ]
+        : matches
+            .map((match) => UnifiedTaskRowData(
+                  time: match.group(1)?.trim() ?? '',
+                  task: match.group(2)?.trim() ?? '',
+                  output: match.group(3)?.trim() ?? '',
+                ))
+            .where((row) => row.task.isNotEmpty)
+            .toList();
+    final safeRows = rows.isEmpty
+        ? [UnifiedTaskRowData(time: '', task: rawTitle, output: '')]
+        : rows;
+    final snapshots = cycle['report_snapshots'] is List
+        ? (cycle['report_snapshots'] as List).whereType<Map>().toList()
+        : const <Map>[];
+    final schema = snapshots.isEmpty || snapshots.first['schema'] is! List
+        ? const <Map<String, dynamic>>[]
+        : (snapshots.first['schema'] as List)
+            .whereType<Map>()
+            .map((field) => Map<String, dynamic>.from(field))
+            .toList();
+    return UnifiedTaskTableDraft(
+      employee: _text(cycle['employee_name'], 'موظف'),
+      employeeUserId: _text(cycle['employee_user_id']),
+      role: _lineValue(description, 'المسمى الوظيفي'),
+      branch: _text(cycle['branch_name']),
+      branchId: _text(cycle['branch_id']).isEmpty ? null : _text(cycle['branch_id']),
+      startDate: _lineValue(description, 'تاريخ بدء التطبيق'),
+      purpose: _lineValue(description, 'الهدف من الوظيفة'),
+      reportNotes: _lineValue(description, 'ملاحظات وتعليمات إضافية'),
+      rows: safeRows,
+      responsibilities: _lineValue(description, 'المسؤوليات').split('،').map((v) => v.trim()).where((v) => v.isNotEmpty).toList(),
+      authorities: _lineValue(description, 'الصلاحيات').split('،').map((v) => v.trim()).where((v) => v.isNotEmpty).toList(),
+      instructions: _lineValue(description, 'التعليمات').split('،').map((v) => v.trim()).where((v) => v.isNotEmpty).toList(),
+      workType: _lineValue(description, 'ساعات الدوام'),
+      workDays: '',
+      weeklyException: _lineValue(description, 'الاستثناء الأسبوعي'),
+      firstPeriod: '',
+      breakPeriod: '',
+      secondPeriod: '',
+      kpis: _lineValue(description, 'مؤشرات الأداء').split('؛').map((v) => v.trim()).where((v) => v.isNotEmpty).toList(),
+      reportSchemasByTask: {
+        for (final row in safeRows)
+          if (schema.isNotEmpty) unifiedTaskReportKey(row): schema,
+      },
+      reportRequired: cycle['report_required'] != false,
+    );
+  }
+
+  Future<void> _updateApprovedCycle(UnifiedTaskTableDraft draft) async {
+    final cycle = _approvedCycle;
+    final organizationId = _organizationId;
+    if (cycle == null || organizationId == null || draft.rows.isEmpty) return;
+    final row = draft.rows.first;
+    final title = 'الجدول الموحد - ${draft.role} · ${row.task}';
+    await _db.rpc('update_approved_task_cycle_next_issue', params: {
+      'p_cycle_id': cycle['id'],
+      'p_title': title,
+      'p_description': _descriptionForRow(draft, row),
+      'p_expected_result': row.output,
+      'p_priority': _text(cycle['next_issue_priority'], 'normal'),
+      'p_task_instructions': draft.instructions.join('، '),
+    });
+    if (!mounted) return;
+    setState(() => _hasUnsavedChanges = false);
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('تم حفظ تخصيص المهمة والتقرير التلقائي للإصدار القادم.')),
     );
   }
 
@@ -1039,12 +1146,16 @@ class _UnifiedTaskTableScreenState extends State<UnifiedTaskTableScreen> {
                           previousTasks: widget.employeeUserId == null
                               ? const []
                               : _selectedEmployeeTasks,
-                          initialDraft: _selectedEmployeeTasks.isNotEmpty
+                          initialDraft: _approvedCycle != null
+                              ? _draftFromApprovedCycle(_approvedCycle!)
+                              : _selectedEmployeeTasks.isNotEmpty
                               ? _draftFromEmployeeTasks(_selectedEmployeeTasks)
                               : (_editingTask == null
                                   ? null
                                   : _draftFromExistingTask(_editingTask!)),
-                          onSave: _selectedEmployeeTasks.isNotEmpty
+                          onSave: _approvedCycle != null
+                              ? _updateApprovedCycle
+                              : _selectedEmployeeTasks.isNotEmpty
                               ? _updateSelectedEmployeeTasks
                               : (_editingTask == null
                                   ? null

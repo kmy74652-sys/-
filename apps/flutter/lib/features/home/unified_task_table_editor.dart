@@ -92,6 +92,16 @@ class _UnifiedTaskTableEditorState extends State<UnifiedTaskTableEditor> {
         : draft.reportVersionId != null
             ? 'ready'
             : 'auto';
+    _customReportSchemas
+      ..clear()
+      ..addAll(draft.reportSchemasByTask.map(
+        (key, schema) => MapEntry(
+          key,
+          schema
+              .map((field) => <String, dynamic>{...field})
+              .toList(),
+        ),
+      ));
     _replaceRows(_rows, draft.rows);
     _replaceRows(_exceptionRows, const []);
     _replaceList(_responsibilities, draft.responsibilities);
