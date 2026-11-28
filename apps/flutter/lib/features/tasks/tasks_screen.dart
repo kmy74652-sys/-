@@ -324,6 +324,15 @@ class _TasksScreenState extends State<TasksScreen>
     }
   }
 
+  Future<void> _openApprovedCycleEditor(Map<String, dynamic> cycle) async {
+    final employeeUserId = '${cycle['employee_user_id'] ?? ''}'.trim();
+    if (employeeUserId.isEmpty) return;
+    await context.push(
+      '/admin/unified-tasks?employee=${Uri.encodeComponent(employeeUserId)}',
+    );
+    if (mounted) await _loadApprovedCycles();
+  }
+
   Future<void> _editApprovedCycleNextIssue(Map<String, dynamic> cycle) async {
     final id = '${cycle['id'] ?? ''}';
     if (id.isEmpty || cycle['active'] != true || !_canEditOfficialTasks) return;
@@ -1072,6 +1081,11 @@ class _TasksScreenState extends State<TasksScreen>
                       onPressed: active ? () => _issueApprovedCycleNow(cycle) : null,
                       icon: const Icon(Icons.add_task_outlined, size: 18),
                       label: const Text('إصدار مهمة الآن'),
+                    ),
+                    OutlinedButton.icon(
+                      onPressed: active ? () => _openApprovedCycleEditor(cycle) : null,
+                      icon: const Icon(Icons.edit_note_outlined, size: 18),
+                      label: const Text('تخصيص الإصدار القادم'),
                     ),
                     TextButton.icon(
                       onPressed: () => _toggleApprovedCycle(cycle),
