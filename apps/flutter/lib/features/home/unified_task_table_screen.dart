@@ -618,7 +618,7 @@ class _UnifiedTaskTableScreenState extends State<UnifiedTaskTableScreen> {
         .from('tasks')
         .select('id')
         .eq('organization_id', _organizationId!)
-        .eq('assignee_employee_id', userId)
+        .eq('assigned_to', userId)
         .ilike('description', '%$marker%')
         .isFilter('deleted_at', null);
     query = branchId == null || branchId.isEmpty
