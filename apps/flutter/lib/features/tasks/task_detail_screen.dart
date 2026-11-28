@@ -598,9 +598,21 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
       final decoded = img.decodeImage(bytes);
       if (decoded == null) return bytes;
       final oriented = img.bakeOrientation(decoded);
-      return Uint8List.fromList(img.encodePng(oriented));
+      // صور هذا المسار تصل من المصدر معكوسة أفقيًا، لذلك نعكسها بعد
+      // تطبيق اتجاه EXIF حتى تظهر الكتابة العربية والواجهة بشكل صحيح.
+      return Uint8List.fromList(img.encodePng(img.flipHorizontal(oriented)));
     } catch (_) {
       return bytes;
+    }
+  }
+
+  Future<Uint8List?> _snapshotImageBytes(String url) async {
+    try {
+      final response = await http.get(Uri.parse(url));
+      if (response.statusCode < 200 || response.statusCode >= 300) return null;
+      return _normalizeSnapshotImage(response.bodyBytes);
+    } catch (_) {
+      return null;
     }
   }
 
@@ -732,19 +744,26 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                   onTap: () => _openSnapshotAttachment(item, url),
                   child: Tooltip(
                     message: name.isEmpty ? 'عرض الصورة' : name,
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
-                      child: Image.network(
-                        url,
-                        width: 76,
-                        height: 62,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => const SizedBox(
-                          width: 76,
-                          height: 62,
-                          child: Icon(Icons.broken_image_outlined),
-                        ),
-                      ),
+                    child: FutureBuilder<Uint8List?>(
+                      future: _snapshotImageBytes(url),
+                      builder: (context, imageSnapshot) {
+                        final imageBytes = imageSnapshot.data;
+                        return ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: imageBytes == null
+                              ? const SizedBox(
+                                  width: 76,
+                                  height: 62,
+                                  child: Icon(Icons.broken_image_outlined),
+                                )
+                              : Image.memory(
+                                  imageBytes,
+                                  width: 76,
+                                  height: 62,
+                                  fit: BoxFit.cover,
+                                ),
+                        );
+                      },
                     ),
                   ),
                 );
