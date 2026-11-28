@@ -809,6 +809,12 @@ class _BottomTab extends StatelessWidget {
   final bool selected;
   final VoidCallback onTap;
 
+  String get _displayLabel => switch (tab.label.trim()) {
+        'المهام الحالية' => 'المهام',
+        'إنشاء المهام' => 'إنشاء',
+        _ => tab.label,
+      };
+
   @override
   Widget build(BuildContext context) => Semantics(
     button: true,
@@ -827,14 +833,20 @@ class _BottomTab extends StatelessWidget {
               color: selected ? const Color(0xFFFFD36A) : Colors.white70,
             ),
             const SizedBox(height: 2),
-            Text(
-              tab.label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: selected ? const Color(0xFFFFD36A) : Colors.white70,
-                fontSize: 11,
-                fontWeight: selected ? FontWeight.w800 : FontWeight.w500,
+            SizedBox(
+              width: double.infinity,
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  _displayLabel,
+                  maxLines: 1,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: selected ? const Color(0xFFFFD36A) : Colors.white70,
+                    fontSize: 11,
+                    fontWeight: selected ? FontWeight.w800 : FontWeight.w500,
+                  ),
+                ),
               ),
             ),
           ],
